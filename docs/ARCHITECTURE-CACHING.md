@@ -211,7 +211,7 @@ Diagnostics endpoint returning per-tracker cache health:
 
 ## Verification
 
-1. **Rate limit**: After 10 minutes, verify `gh api /rate_limit` shows `graphql.remaining` near 5000
+1. **Rate limit**: After 10 minutes, verify `gh api graphql -f query='{rateLimit(dryRun:true){used remaining resetAt}}'` shows `remaining` near 5000 (PAN-4291: REST `/rate_limit`'s GraphQL bucket does not track this)
 2. **Cache persistence**: Start dashboard, see issues, stop, restart — issues appear instantly
 3. **Real-time push**: Open dashboard, create GitHub issue in another tab, see it appear within 30s
 4. **Backoff**: Artificially set rate limit remaining to 100, verify poll interval increases

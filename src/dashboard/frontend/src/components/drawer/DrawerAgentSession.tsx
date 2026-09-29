@@ -23,6 +23,8 @@ import { StartAgentCta } from '../issue-view/StartAgentCta';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { agentToConversation, isEndedAgent, sortIssueAgents, type SessionAgent } from '../../lib/agentConversation';
+import { useAgentSessionOutcome } from '../../lib/useSessionOutcome';
+import { SESSION_ENDED_FALLBACK } from '../../lib/sessionOutcome';
 import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -90,6 +92,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
     [agentId, orderedAgents],
   );
   const conversation = useMemo(() => (agent ? agentToConversation(agent) : null), [agent]);
+  const outcome = useAgentSessionOutcome(agent);
 
   // Tool-call visibility toggle for the embedded ConversationPanel. Keyed by
   // agent.id (== session name) so it matches SessionPanel's key for the same
@@ -110,7 +113,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
   const terminalDisabledReason = !agent
     ? 'No agent selected — start work to attach a terminal'
     : isEndedAgent(agent)
-      ? 'Session ended — no live terminal to attach'
+      ? `${(outcome ?? SESSION_ENDED_FALLBACK).label} — no live terminal to attach`
       : undefined;
   const viewToggle = onChangeView ? (
     <ViewToggle
@@ -240,8 +243,8 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
             hideComposer={hideComposer}
           />
         ) : isEndedAgent(agent) ? (
-          <div className="flex h-full items-center justify-center p-[18px] text-[13px] text-muted-foreground">
-            Session ended — no live terminal to attach.
+          <div className={`flex h-full items-center justify-center p-[18px] text-[13px] ${outcome?.tone === 'attention' ? 'text-destructive' : 'text-muted-foreground'}`}>
+            {(outcome ?? SESSION_ENDED_FALLBACK).label} — no live terminal to attach.
           </div>
         ) : (
           <XTerminal key={agent.id} sessionName={agent.id} />

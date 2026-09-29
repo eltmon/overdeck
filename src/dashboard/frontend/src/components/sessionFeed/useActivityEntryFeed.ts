@@ -64,20 +64,29 @@ export function createActivityEntryFeedSelector() {
       .filter((entry): entry is ActivitySessionFeedEntry => entry !== null)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-    // PAN-1556: collapse repeated review-kickoff entries per issue — keep only
-    // the most-recent "Review role spawned for <ISSUE>" so re-reviews of the
-    // same issue don't stack up and bury conversations. Verdicts/errors use
-    // different messages and are left untouched.
-    const seenReviewKickoff = new Set<string>();
-    lastResult = lastResult
-      .filter((entry) => {
-        if (entry.issueId && entry.headline.startsWith('Review role spawned')) {
-          if (seenReviewKickoff.has(entry.issueId)) return false;
-          seenReviewKickoff.add(entry.issueId);
-        }
-        return true;
-      })
-      .slice(0, MAX_ACTIVITY_ENTRY_FEED_ENTRIES);
+    // PAN-1556, widened by PAN-4301 FR-14: collapse every per-issue entry, not
+    // only review kickoffs. The list is newest-first, so the first entry per
+    // issue (case-insensitive) is the issue's current state and carries the
+    // headline; each older entry for that issue adds one to its stepCount.
+    // Entries without an issue pass through untouched.
+    const byIssue = new Map<string, ActivitySessionFeedEntry>();
+    const collapsed: ActivitySessionFeedEntry[] = [];
+    for (const entry of lastResult) {
+      if (!entry.issueId) {
+        collapsed.push(entry);
+        continue;
+      }
+      const key = entry.issueId.toLowerCase();
+      const head = byIssue.get(key);
+      if (head) {
+        head.stepCount = (head.stepCount ?? 1) + 1;
+        continue;
+      }
+      const first = { ...entry, stepCount: 1 };
+      byIssue.set(key, first);
+      collapsed.push(first);
+    }
+    lastResult = collapsed.slice(0, MAX_ACTIVITY_ENTRY_FEED_ENTRIES);
     return lastResult;
   };
 }

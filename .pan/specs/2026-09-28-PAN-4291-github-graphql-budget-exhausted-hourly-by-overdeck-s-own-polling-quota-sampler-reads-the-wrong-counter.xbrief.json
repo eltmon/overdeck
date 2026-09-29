@@ -1,0 +1,995 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T12:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4291: GitHub GraphQL budget exhausted hourly by Overdeck's own polling; quota sampler reads the wrong counter",
+    "updated": "2026-09-28T12:48:45.061Z"
+  },
+  "plan": {
+    "id": "pan-4291",
+    "title": "GitHub GraphQL budget exhausted hourly by Overdeck's own polling; quota sampler reads the wrong counter",
+    "status": "running",
+    "uid": "4483c336-ced3-4745-9907-d15cfcc17891",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-28T12:45:00Z",
+    "updated": "2026-09-28T12:48:45.061Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4291",
+        "label": "PAN-4291",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4302",
+        "label": "PAN-4302 (sibling: migrate remaining direct gh callers)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4291.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "github-quota",
+      "graphql",
+      "rate-limit",
+      "polling",
+      "close-out",
+      "pr-cache"
+    ],
+    "metadata": {
+      "postDeployCheck": "NFR-5 / issue AC 5 cannot run in CI. After pan reload, run `gh api graphql -f query='{rateLimit(dryRun:true){used remaining resetAt}}'` right after a window reset and again ~55 minutes later with the same resetAt; used must stay under 2,000. Fallback when over: raise PR_CACHE_IDLE_TTL_MS to 10 minutes and inspect `pan doctor github-quota` unattributed points.",
+      "canonicalFilename": "2026-09-28-PAN-4291-github-graphql-budget-exhausted-hourly-by-overdeck-s-own-polling-quota-sampler-reads-the-wrong-counter.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck's own dashboard and deacon spend nearly the whole 5,000-point hourly GraphQL budget of the operator's GitHub account, and the quota pill/banner under-report it. Verified causes: (1) the sampler reads REST /rate_limit resources.graphql, which reported used=45 while GraphQL rateLimit reported used=2424 at the same moment; (2) the deacon's 60 s closed-issue reaper asks `gh pr list --head <branch> --state merged` for every closed-but-unmerged branch on every tick through an unmetered exec; (3) the pr-cache lists 200 PRs (6 points on overdeck) per project every ~30 s, including 5 projects with no git remote (413 failed calls/hour) and skipped projects such as orca, while the ledger prices each call at 1; (4) pauses use a flat 10-minute window when the wrong sample shows budget left, overshooting the real reset by up to 7m45s.",
+      "Proposal": "Sample the user GraphQL bucket from GraphQL rateLimit(dryRun: true) (verified free) and keep REST /rate_limit only for the REST bucket; end primary pauses at the current window's resetAt and let every new sample reconcile an active pause; route close-out's merged-PR lookup through runGh with the tip SHA resolved first and a 1-hour negative cache keyed by (project, branch, tipSha); make the pr-cache skip no-remote and skipped projects, list 100 PRs instead of 200, and keep idle repos' listings for 5 minutes; price gh pr/issue list calls per 100-row page with GitHub's formula and record local failures at cost 0; show the GitHub-reported used/limit in the rate-limit banner; document GraphQL rateLimit as the source of truth. Full design, before/after snippets and decisions D1-D10 are in .pan/drafts/PAN-4291.md.",
+      "NonGoals": "- Migrating the ~19 other files that exec gh directly onto runGh (sibling issue PAN-4302).\n- Changing the App pool's sample source: getAppRateLimit() keeps REST /rate_limit for both app buckets.\n- Reducing the reaper's App-pool REST issue reads (isIssueClosed, ~945/hour); that is the separate REST budget.\n- Changing PR_CACHE_TTL_MS (30 s) for repos with open PRs, the PR-sync 60 s sweep interval, or the sampler's 5-minute interval.\n- Any GitHub call from the pause gate itself (no network probe on refusal).\n- Pill layout or styling changes.\n- Returning null (\"failed\") for policy-skipped projects; they read as an empty listing.",
+      "Verification": "Unit tests with fake timers cover the sampler source, pause end, pause reconciliation, close-out caching, pr-cache skipping/limit/idle TTL, per-page pricing and local-failure cost. The <2,000 points/hour budget is a post-deploy operator checkpoint (plan.metadata.postDeployCheck)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sampler keeps REST /rate_limit for the rest bucket and adds a GraphQL rateLimit(dryRun:true) query for the user graphql bucket, REST first.",
+        "rationale": "REST core is correct and free; only resources.graphql is wrong. Running REST first means a GraphQL failure never loses the REST sample."
+      },
+      {
+        "summary": "App pool sampling stays on REST /rate_limit.",
+        "rationale": "The pill and banner show the user pool only; the issue's AC 1 names the operator account's GraphQL counter."
+      },
+      {
+        "summary": "Pause end uses any sample whose resetAt is in the future, regardless of age, and each new sample reconciles an active primary pause (remaining > 0 removes it; remaining 0 moves it to resetAt). No network probe on refusal.",
+        "rationale": "A future resetAt identifies the current window. Whether a dry-run query is accepted while the bucket is exhausted is unverified, so the gate relies only on samples, which are free."
+      },
+      {
+        "summary": "close-out negative answers are cached per (projectPath, branch, tipSha) for CLOSE_OUT_NEGATIVE_TTL_MS = 1 hour, not forever.",
+        "rationale": "A PR merged after its issue closed keeps the same branch tip; a TTL-less cache would never reap it until the deacon restarts. 31 branches x 1 point per hour is negligible. The issue's AC 3 is met within the TTL."
+      },
+      {
+        "summary": "pr-cache uses a single `gh pr list --state all --limit 100` rather than an open+merged split listing.",
+        "rationale": "Halves overdeck's cost (6 -> 3) with no extra call; only overdeck has more than 100 PRs today and it has zero open PRs, so no open PR drops out now. Risk recorded as hazard H3."
+      },
+      {
+        "summary": "Policy-skipped projects (no git remote, or no resolvable tracker) read as an empty PR listing ([]).",
+        "rationale": "For a no-remote project [] is true; a skipped project has no tracker so no Overdeck issue depends on its listing. Returning null would feed PR sync's 3-strike failure backoff and log warnings."
+      },
+      {
+        "summary": "Idle repo = latest successful listing has zero OPEN rows; its listing is cached PR_CACHE_IDLE_TTL_MS = 5 minutes via a new optional ttlFor on createSettledTtlPromiseCache.",
+        "rationale": "The issue asks to lengthen refresh for repos with no active work; open PRs are the derivable signal of active work and need no new state."
+      },
+      {
+        "summary": "The ~19 remaining direct gh callers are split into sibling issue PAN-4302.",
+        "rationale": "Including them would exceed the 25-file plan ceiling; they are independently shippable."
+      },
+      {
+        "summary": "The banner (issue AC 1) adds 'GitHub reports <used> of <limit> points used this hour.' from the paused bucket's sample; the pill label (remaining/limit) is unchanged.",
+        "rationale": "The pill already reads the sample, so fixing the sampler fixes it; the banner previously showed only this machine's metered points."
+      },
+      {
+        "summary": "Issue AC 5 (<2,000 points/hour) is a post-deploy operator checkpoint, not a unit test.",
+        "rationale": "Real GitHub-reported usage depends on the live project set and agents; a unit-test proxy would not measure it."
+      }
+    ],
+    "items": [
+      {
+        "id": "sampler-graphql-source",
+        "title": "Sampler reads the user graphql bucket from GraphQL rateLimit(dryRun: true)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/sampler.ts",
+            "tests/unit/lib/github-quota/sampler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/sampler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sampler.test.ts passes including the new GraphQL-source and REST-survives cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add GRAPHQL_RATE_LIMIT_QUERY = 'query{rateLimit(dryRun:true){limit remaining resetAt}}'. Keep runGh(['api','rate_limit']) but write only the user-pool rest bucket from resources.core; the app pool still writes both buckets from REST. Then, in its own try/catch, runGh(['api','graphql','-f',`query=${GRAPHQL_RATE_LIMIT_QUERY}`], { caller: 'quota-sampler', timeout: 15_000, onSuccess: () => ({ cost: 0, estimated: false }) }) and append one kind:'sample' line for pool user, bucket graphql with remaining, limit and resetAt (already ISO). Skip the line when limit/remaining are not numbers. Update the module header to name GraphQL rateLimit as the graphql source. Tests: update the exec fixture to answer both arg lists; add the two cases named in the PRD."
+        },
+        "items": [
+          {
+            "id": "sampler-graphql-source.ac1",
+            "title": "Given REST /rate_limit reports graphql remaining 4956 and GraphQL rateLimit reports remaining 2576 with resetAt R, when sampleGitHubRateLimits runs, then the ledger holds a user/graphql sample with remaining 2576 and resetAt R",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-graphql-source.ac2",
+            "title": "Given the GraphQL rateLimit exec rejects, when sampleGitHubRateLimits runs, then it writes the user/rest sample from resources.core, writes no user/graphql sample, and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-graphql-source.ac3",
+            "title": "When the sampler's GraphQL rateLimit call succeeds, then it records a quota-sampler ledger call line with cost 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pause-until-window-reset",
+        "title": "Primary pauses end at the current window's resetAt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/pause-gate.ts",
+            "tests/unit/lib/github-quota/pause-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/pause-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pause-gate.test.ts passes with the updated current-window cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Replace the sample branch of primaryPauseUntil (pause-gate.ts ~lines 256-267, search 'const fresh = sample !== undefined'): if the latest (pool, bucket) sample has a resetAt that parses to a time later than nowMs, return sample.remaining === 0 ? resetMs : Math.min(nowMs + HIDDEN_PRIMARY_PAUSE_MS, resetMs); otherwise return nowMs + HIDDEN_PRIMARY_PAUSE_MS. Sample age no longer matters. Leave the refusal.resetAtSec header branch and its 60 s floor unchanged. Drop the SAMPLE_FRESH_MS import only if unused. Update the existing hidden-limit tests to the new expectations and add the three cases named in the PRD, all under fake timers."
+        },
+        "items": [
+          {
+            "id": "pause-until-window-reset.ac1",
+            "title": "Given a user/graphql sample with remaining 0 and resetAt 40 minutes ahead taken 15 minutes ago, when a primary refusal is recorded, then the pause until equals that resetAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-until-window-reset.ac2",
+            "title": "Given a sample with remaining 4900 and resetAt 10 seconds ahead, when a primary refusal is recorded, then the pause until equals that resetAt (no 60-second floor past it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-until-window-reset.ac3",
+            "title": "Given only a sample whose resetAt has passed, when a primary refusal is recorded, then the pause lasts 10 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pause-reconcile-on-sample",
+        "title": "Each new sample reconciles the active primary pause on its bucket",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/pause-gate.ts",
+            "src/lib/github-quota/sampler.ts",
+            "tests/unit/lib/github-quota/pause-gate.test.ts",
+            "tests/unit/lib/github-quota/sampler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/pause-gate.test.ts tests/unit/lib/github-quota/sampler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pause-gate.test.ts and sampler.test.ts pass including the reconcile cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add export async function reconcileGitHubPauseWithSample(sample: { pool: GitHubQuotaPool; bucket: GitHubQuotaBucket; remaining: number; resetAt?: string }, nowMs = Date.now()): Promise<void> to pause-gate.ts. Read pause.json; when the (pool, bucket) pause is active and kind === 'primary': remaining > 0 deletes it; remaining === 0 with a resetAt later than nowMs sets until to resetAt (keep since, caller, kind). Write via writePauseFile. Never touch secondary pauses or other keys. Never throw. In sampler.ts, call it after every successful user-pool sample line (rest and graphql). Tests: the three pause-gate cases and the sampler case named in the PRD."
+        },
+        "items": [
+          {
+            "id": "pause-reconcile-on-sample.ac1",
+            "title": "Given an active primary user/graphql pause, when reconcileGitHubPauseWithSample receives remaining 2576, then activeGitHubPause('user','graphql') returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reconcile-on-sample.ac2",
+            "title": "Given an active primary pause, when a sample with remaining 0 and a future resetAt R arrives, then the pause until equals R",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reconcile-on-sample.ac3",
+            "title": "Given an active secondary pause, when any sample arrives, then the pause record is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reconcile-on-sample.ac4",
+            "title": "Given an active primary user/graphql pause and a GraphQL rateLimit fixture with remaining 2576, when sampleGitHubRateLimits runs once, then no user/graphql pause is active afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gh-list-pricing",
+        "title": "runGh prices gh pr/issue list calls per 100-row page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pr-cache-limit-100",
+            "gh-local-failure-cost"
+          ],
+          "files_scope": [
+            "src/lib/github-quota/gh-cost.ts",
+            "src/lib/github-quota/run-gh.ts",
+            "tests/unit/lib/github-quota/gh-cost.test.ts",
+            "tests/unit/lib/github-quota/run-gh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/gh-cost.test.ts tests/unit/lib/github-quota/run-gh.test.ts",
+            "npm run typecheck",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "gh-cost.test.ts and run-gh.test.ts pass",
+            "typecheck completes without errors",
+            "effect-facades ratchet passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. New src/lib/github-quota/gh-cost.ts exporting priceGhListCall(args: readonly string[], stdout?: string): number | null. Returns null unless args[0] is 'pr' or 'issue' and args[1] is 'list'. limit = value after --limit/-L or --limit=N (default 30). fields = comma-split --json value. k = sum of weights: statusCheckRollup 2; reviewRequests, labels, assignees, comments, reviews, latestReviews, commits, files, projectCards, projectItems, closingIssuesReferences 1 each; other fields 0. Page sizes: min(100, remaining) until limit is covered; when stdout parses as a JSON array of length L keep only the first max(1, ceil(L/100)) pages. Page cost = Math.max(1, Math.round((1 + pageSize * k) / 100)); return the sum. In runGh's ok path use cost: priceGhListCall(args, result.stdout) ?? 1 (estimated stays true), applied before opts.onSuccess extras so an explicit onSuccess cost still wins; wrap pricing in try/catch falling back to 1. Verified on eltmon/overdeck with rateLimit(dryRun:true): first 100 -> 3, 50 -> 2, 30 -> 1."
+        },
+        "items": [
+          {
+            "id": "gh-list-pricing.ac1",
+            "title": "priceGhListCall returns 6 for the pr-cache args (--state all --limit 200 --json with reviewRequests and statusCheckRollup) with a 200-row stdout, and 3 with a 20-row stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-list-pricing.ac2",
+            "title": "priceGhListCall returns 3 for --limit 100, 2 for --limit 50, and 1 for --limit 30 with the same --json fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-list-pricing.ac3",
+            "title": "priceGhListCall returns 1 for the close-out lookup (pr list --head X --state merged --json headRefOid,mergeCommit --limit 1) and null for ['api','rate_limit'] and ['pr','view','1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-list-pricing.ac4",
+            "title": "Given a 200-row stdout for the pr-cache args, when runGh succeeds, then it writes one ok ledger line with cost 6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gh-local-failure-cost",
+        "title": "runGh records local gh failures at cost 0",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/run-gh.ts",
+            "tests/unit/lib/github-quota/run-gh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/run-gh.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "run-gh.test.ts passes including the local-failure case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In runGh's non-refusal catch branch (search \"queueLedgerEntry({ ...base, outcome: 'error' })\"), record cost: 0, estimated: false when stderr is not a string or matches neither /\\bHTTP \\d{3}\\b/ nor /GraphQL:/; keep cost 1, estimated true otherwise. The existing 'rethrows other failures unchanged' test additionally asserts cost 1 (its stderr has 'GraphQL:'). Add a test for stderr 'no git remotes found' and one for an ENOENT error with no stderr."
+        },
+        "items": [
+          {
+            "id": "gh-local-failure-cost.ac1",
+            "title": "Given gh fails with stderr 'no git remotes found', when runGh rethrows, then the ledger holds one error line with cost 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-local-failure-cost.ac2",
+            "title": "Given gh fails with an ENOENT error and no stderr, when runGh rethrows, then the ledger holds one error line with cost 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-local-failure-cost.ac3",
+            "title": "Given gh fails with stderr 'GraphQL: Could not resolve to an Issue', when runGh rethrows, then the ledger holds one error line with cost 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-negative-cache",
+        "title": "close-out merged-PR lookup: tip SHA first, metered through runGh, negative answers cached 1 hour",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/close-out.ts",
+            "tests/unit/lib/close-out-negative-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/close-out-negative-cache.test.ts src/lib/cloister/__tests__/reap-issue-residue.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "close-out-negative-cache.test.ts passes",
+            "reap-issue-residue.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/lib/close-out.ts add export const CLOSE_OUT_NEGATIVE_TTL_MS = 60 * 60_000, a module Map<string, number> keyed `${projectPath}\\0${branchName}\\0${tipSha}` -> answered-at ms, and export function resetCloseOutCacheForTests(). Rewrite isSquashMergedViaPr: (1) tipSha = git rev-parse tipRef (existing execAsync); failure -> false, no cache. (2) cached and Date.now() - answeredAt < TTL -> false with no GitHub call. (3) runGh(['pr','list','--head',branchName,'--state','merged','--json','headRefOid,mergeCommit','--limit','1'], { cwd: projectPath, timeout: 15_000 }) with NO explicit caller (the reaper's withGitHubCaller('close-out') context applies; pan close stays essential 'other'); any throw -> false, no cache. (4) no row or missing headRefOid/mergeCommit.oid -> cache, false. (5) merge-base --is-ancestor mergeCommit main fails -> false, no cache. (6) tipSha === headRefOid -> true; otherwise the artifact-only check, caching a false result. Update the doc comment. New test file mocks node:child_process exec (git) and execFile (gh) with promisify.custom like tests/unit/lib/overdeck/derived-issue-state-quota.test.ts, uses a temp OVERDECK_HOME and fake timers."
+        },
+        "items": [
+          {
+            "id": "close-out-negative-cache.ac1",
+            "title": "Given an unmerged local branch whose merged-PR lookup returns [], when isBranchMerged runs twice with the same tip SHA, then gh is exec'd once and both calls return status 'unmerged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-negative-cache.ac2",
+            "title": "Given a cached negative answer, when the branch tip SHA changes or CLOSE_OUT_NEGATIVE_TTL_MS elapses (fake timers), then the next isBranchMerged call execs gh again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-negative-cache.ac3",
+            "title": "Given the gh lookup rejects once and then returns [], when isBranchMerged runs twice, then gh is exec'd twice (a failure is never cached)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-negative-cache.ac4",
+            "title": "When isBranchMerged runs inside withGitHubCaller('close-out'), then the ledger holds one call line with caller 'close-out' and bucket 'graphql'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tracker-type-leaf",
+        "title": "Move tryResolveProjectTrackerType to a leaf module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/project-tracker-type.ts",
+            "src/lib/pipeline-membership-gather.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-membership-gather.test.ts passes unchanged",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ],
+          "acJustification": "A verbatim move with a re-export; two criteria cover importability and the unchanged tests."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create src/lib/project-tracker-type.ts containing tryResolveProjectTrackerType verbatim (from pipeline-membership-gather.ts ~lines 180-187), importing getIssuePrefix and type ProjectConfig from './projects.js' and type TrackerType from './tracker/interface.js'. In pipeline-membership-gather.ts delete the body, import it from './project-tracker-type.js', and re-export it (export { tryResolveProjectTrackerType }) so resolveProjectTrackerType and all importers keep working. No behavior change."
+        },
+        "items": [
+          {
+            "id": "tracker-type-leaf.ac1",
+            "title": "tryResolveProjectTrackerType imported from src/lib/project-tracker-type.ts returns the same tracker type as the import from src/lib/pipeline-membership-gather.ts, and project-tracker-type.ts contains no import of pipeline-membership-gather.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-type-leaf.ac2",
+            "title": "`npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts` exits 0 with that test file unmodified, and `npm run lint:circular` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-cache-skip",
+        "title": "pr-cache makes no gh call for no-remote or skipped projects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-cache-policy.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-quota.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "derived-issue-state-quota.test.ts passes including both skip cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New src/lib/overdeck/pr-cache-policy.ts exports async shouldListPullRequests(projectPath): findProjectByPath(projectPath) (from '../projects.js'); when found and tryResolveProjectTrackerType(project) === null (from '../project-tracker-type.js', NOT pipeline-membership-gather) return false. Then async execFile('git', ['remote'], { cwd: projectPath, timeout: 5_000 }); empty stdout or failure -> false; cache the remote answer per path for PR_CACHE_REMOTE_CHECK_TTL_MS = 10 * 60_000 with createSettledTtlPromiseCache. Otherwise true. In readRepoPullRequests, inside the cache loader before runGh: if (!await shouldListPullRequests(projectPath)) return []; with a one-line PAN-4291 comment. Update the test file's execFile stub to answer `git remote` with 'origin\\n' by default so existing cases still reach gh, then add the two skip cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "pr-cache-skip.ac1",
+            "title": "Given a project path where `git remote` prints nothing, when readRepoPullRequests runs, then it returns [], execs gh zero times, and writes no ledger line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-cache-skip.ac2",
+            "title": "Given a registered project with no tracker, rally_project, github_repo, issue_prefix or gitlab_repo, when readRepoPullRequests runs for its path, then it returns [] and execs gh zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-cache-skip.ac3",
+            "title": "Given a project with an origin remote, when readRepoPullRequests runs, then it execs gh pr list exactly once and records one pr-cache ledger line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-cache-limit-100",
+        "title": "pr-cache lists 100 PRs instead of 200",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/lib/flywheel/substrate-stats.ts",
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-quota.test.ts src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state-quota.test.ts passes including the limit/price case",
+            "pull-request-sync-service.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ],
+          "acJustification": "A one-argument change plus comment updates; two criteria cover the argument and the priced ledger line."
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In readRepoPullRequests change 'pr', 'list', '--state', 'all', '--limit', '200' to '--limit', '100'. Change the '200' wording in the header comments of src/lib/flywheel/substrate-stats.ts ('capped at 200 PRs') and src/dashboard/server/services/pull-request-sync-service.ts ('capped at 200', '200-row cap', 'beyond the 200-row listing') to 100. Add test 'lists 100 PRs and records the per-page price'."
+        },
+        "items": [
+          {
+            "id": "pr-cache-limit-100.ac1",
+            "title": "When readRepoPullRequests execs gh for a project with a remote, then the args contain '--limit', '100' and never '200'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-cache-limit-100.ac2",
+            "title": "Given gh returns 100 rows, when readRepoPullRequests completes, then its pr-cache ledger line records cost 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settled-cache-ttl-for",
+        "title": "createSettledTtlPromiseCache accepts an optional per-value TTL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/concurrency.ts",
+            "tests/unit/lib/concurrency.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/concurrency.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "concurrency.test.ts passes including the ttlFor case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Add an optional third parameter ttlFor?: (value: V) => number to createSettledTtlPromiseCache (src/lib/concurrency.ts ~line 51). Store the resolved value on the entry when it settles; a settled entry is fresh while now() - settledAt < (ttlFor ? ttlFor(value) : ttlMs). Rejected loads keep today's behavior (entry deleted). Existing two-argument callers are unchanged. Test with the injectable now()."
+        },
+        "items": [
+          {
+            "id": "settled-cache-ttl-for.ac1",
+            "title": "Given ttlFor returns 300000 for 'idle' and 30000 otherwise, when an 'idle' value settles, then a read at +60 s returns it without calling load and a read at +300 s calls load again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settled-cache-ttl-for.ac2",
+            "title": "Given the same ttlFor, when a 'busy' value settles, then a read at +30 s calls load again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settled-cache-ttl-for.ac3",
+            "title": "Given no ttlFor, when a value settles, then the cache returns it for exactly ttlMs and calls load again after ttlMs (existing two-argument behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-cache-idle-ttl",
+        "title": "Idle repos' PR listings are cached for 5 minutes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-cache-policy.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state-quota.test.ts passes including both TTL cases under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In pr-cache-policy.ts export PR_CACHE_IDLE_TTL_MS = 5 * 60_000 and prListingTtlMs(rows: readonly { state?: string }[] | null, activeTtlMs: number): number returning PR_CACHE_IDLE_TTL_MS when rows is a non-null array with no row whose state?.toUpperCase() === 'OPEN', else activeTtlMs. Construct cachedRepoPullRequests in derived-issue-state.ts (~line 308) as createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(PR_CACHE_TTL_MS, undefined, (rows) => prListingTtlMs(rows, PR_CACHE_TTL_MS)). Tests under vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "pr-cache-idle-ttl.ac1",
+            "title": "Given gh returns only MERGED rows, when readRepoPullRequests runs again at +60 s, then gh is not exec'd again, and at +5 minutes it is exec'd once more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-cache-idle-ttl.ac2",
+            "title": "Given gh returns one OPEN row, when readRepoPullRequests runs again at +31 s, then gh is exec'd a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-account-used",
+        "title": "Rate-limit banner states GitHub-reported used of limit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GitHubRateLimitBanner.tsx",
+            "src/dashboard/frontend/src/components/__tests__/GitHubRateLimitBanner.test.tsx",
+            "src/dashboard/frontend/src/components/GitHubQuotaPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/GitHubRateLimitBanner.test.tsx src/components/__tests__/GitHubQuotaPill.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "GitHubRateLimitBanner.test.tsx and GitHubQuotaPill.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. In gitHubRateLimitBannerText, for a primary pause, look up quota.samples.find(s => s.pool === pause.pool && s.bucket === pause.bucket). When found, insert `GitHub reports ${sample.limit - sample.remaining} of ${sample.limit} points used this hour.` directly after the 'calls paused until HH:MM' sentence in both the own-usage-low and top-caller variants (in the own-usage-low variant end the paused clause with a period before inserting). Secondary text unchanged. Update GitHubQuotaPill.tsx header comment: the budget is the latest GraphQL rateLimit sample, not /rate_limit. No layout or style change."
+        },
+        "items": [
+          {
+            "id": "banner-account-used.ac1",
+            "title": "Given a primary user/graphql pause and a user/graphql sample with remaining 35 and limit 5000, when gitHubRateLimitBannerText runs, then the text contains 'GitHub reports 4965 of 5000 points used this hour.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-account-used.ac2",
+            "title": "Given a primary pause and no sample for its pool and bucket, when gitHubRateLimitBannerText runs, then the text contains no 'GitHub reports' clause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-account-used.ac3",
+            "title": "Given a secondary pause, when gitHubRateLimitBannerText runs, then it returns the existing secondary text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-quota-source",
+        "title": "Document GraphQL rateLimit as the quota source of truth and the new polling rules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/ARCHITECTURE-CACHING.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'rateLimit(dryRun: true)' docs/PIPELINE-GATES.md",
+            "grep -n 'PAN-4302' docs/PIPELINE-GATES.md",
+            "! grep -n 'graphql.remaining' docs/ARCHITECTURE-CACHING.md",
+            "grep -n 'rateLimit' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "PIPELINE-GATES.md names rateLimit(dryRun: true)",
+            "PIPELINE-GATES.md names PAN-4302 for the unmigrated gh callers",
+            "ARCHITECTURE-CACHING.md no longer mentions graphql.remaining",
+            "architecture.md names the GraphQL rateLimit sampler"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. In docs/PIPELINE-GATES.md section 'GitHub quota policy (PAN-4264)': state that GraphQL rateLimit(dryRun: true) is the source of truth for the user-pool GraphQL budget and that REST /rate_limit resources.graphql does not match what /graphql charges (REST is used only for the core bucket and the App pool); replace the two 'Primary limit visible/hidden' bullets with the FR-2/FR-3 rules (current-window resetAt, 10-minute cap, sample reconciliation); add bullets under 'Wasted calls removed' for close-out's metered lookup with its 1-hour per-tip-SHA negative cache, pr-cache skipping no-remote and skipped projects, --limit 100, 5-minute idle refresh (PR_CACHE_IDLE_TTL_MS), per-page list pricing, and local failures at cost 0; change the '~35 unmigrated gh sites' sentence to name PAN-4302. In docs/ARCHITECTURE-CACHING.md (~line 214) replace the `gh api /rate_limit ... graphql.remaining` verification step with `gh api graphql -f query='{rateLimit(dryRun:true){used remaining resetAt}}'`. In .overdeck/context/codebase/architecture.md (~line 43) change 'the `/rate_limit` sampler' to 'the GraphQL `rateLimit` sampler (REST `/rate_limit` for the REST bucket)' and keep the `<!-- last-verified: -->` footer current."
+        },
+        "items": [
+          {
+            "id": "docs-quota-source.ac1",
+            "title": "docs/PIPELINE-GATES.md 'GitHub quota policy' contains 'rateLimit(dryRun: true)' as the source of the user GraphQL budget and states REST resources.graphql is not used for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-source.ac2",
+            "title": "docs/PIPELINE-GATES.md describes pauses ending at the current window's resetAt with sample reconciliation, and no longer contains the 'Primary limit hidden' bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-source.ac3",
+            "title": "docs/PIPELINE-GATES.md contains bullets for the close-out 1-hour negative cache, the pr-cache skip / --limit 100 / 5-minute idle refresh rules, per-page list pricing and cost-0 local failures, and contains 'PAN-4302'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-source.ac4",
+            "title": "docs/ARCHITECTURE-CACHING.md shows the `gh api graphql -f query='{rateLimit(dryRun:true){used remaining resetAt}}'` check and no longer mentions graphql.remaining from /rate_limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-source.ac5",
+            "title": ".overdeck/context/codebase/architecture.md contains 'rateLimit' in the github-quota entry and no longer describes the sampler as the `/rate_limit` sampler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sampler-graphql-source",
+        "to": "pause-reconcile-on-sample",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-until-window-reset",
+        "to": "pause-reconcile-on-sample",
+        "type": "blocks"
+      },
+      {
+        "from": "gh-list-pricing",
+        "to": "gh-local-failure-cost",
+        "type": "blocks"
+      },
+      {
+        "from": "gh-list-pricing",
+        "to": "pr-cache-limit-100",
+        "type": "blocks"
+      },
+      {
+        "from": "tracker-type-leaf",
+        "to": "pr-cache-skip",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-cache-skip",
+        "to": "pr-cache-limit-100",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-cache-limit-100",
+        "to": "pr-cache-idle-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "settled-cache-ttl-for",
+        "to": "pr-cache-idle-ttl",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-cache-skip",
+        "to": "pr-cache-idle-ttl",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import type { CanonicalState } from '../../core/state-mapping.js';
 import { Effect } from 'effect';
 import { listRunningAgents, type AgentState } from '../agents.js';
+import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import { getDashboardApiUrl } from '../config.js';
 import {
   getIssueWorkspacePath,
@@ -121,6 +122,11 @@ interface PostMergeRowDeps {
   /** The PR's own merge timestamp — the forge owns "merged", not a record. */
   readMergedAt: (issueId: string) => Awaitable<string | undefined>;
   listAgents: () => Awaitable<Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>>;
+  /**
+   * PAN-4324: the stored status is a spawn-time snapshot, so a claimed-live
+   * row is confirmed with the liveness oracle before it blocks the row.
+   */
+  isAlive: (agentId: string) => Promise<LivenessVerdict>;
 }
 
 const defaultPostMergeRowDeps: PostMergeRowDeps = {
@@ -129,6 +135,7 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   },
   readMergedAt: async issueId => (await defaultDeps.readPullRequest(issueId))?.mergedAt,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
+  isAlive: agentId => isAlive(agentId),
 };
 
 // The fourth check is the no-planning-on-main workflow's job; it was renamed from
@@ -560,17 +567,36 @@ export async function checkPostMergeRow(
     const canonicalState = await deps.readCanonicalState(ctx);
     const mergedAt = await deps.readMergedAt(ctx.issueId);
     const issueId = ctx.issueId.toUpperCase();
-    const runningAgents = (await deps.listAgents()).filter(agent =>
+    // PAN-4324: stored status is a spawn-time snapshot — nothing writes
+    // 'stopped' back when a work/planning agent exits on its own — so a
+    // claimed-live row is confirmed with the liveness oracle before it
+    // blocks the row.
+    const claimedLive = (await deps.listAgents()).filter(agent =>
       agent.issueId.toUpperCase() === issueId &&
       (agent.role === 'work' || agent.role === 'plan') &&
       (agent.status === 'starting' || agent.status === 'running'),
     );
+    const verdicts = await Promise.all(claimedLive.map(agent =>
+      deps.isAlive(agent.id).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' })),
+    ));
+    const runningAgents = claimedLive.filter((_, index) => verdicts[index]!.alive);
+    const indeterminateAgents = claimedLive.filter((_, index) =>
+      !verdicts[index]!.alive && !isConfirmedDead(verdicts[index]!));
+    const exitedAgents = claimedLive.filter((_, index) => isConfirmedDead(verdicts[index]!));
+    const blockingAgents = [...runningAgents, ...indeterminateAgents];
     const stateObserved = canonicalState
       ? `canonical state: ${canonicalState}`
       : `canonical state unavailable; PR mergedAt: ${mergedAt ?? 'not merged'}`;
-    const agentsObserved = runningAgents.length > 0
-      ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
-      : 'no running work/planning agents';
+    const blockingParts = [
+      runningAgents.length > 0 ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}` : '',
+      indeterminateAgents.length > 0 ? `liveness indeterminate: ${indeterminateAgents.map(agent => agent.id).join(', ')}` : '',
+    ].filter(Boolean);
+    const exitedNote = exitedAgents.length > 0
+      ? ` (stored running, not live: ${exitedAgents.map(agent => agent.id).join(', ')})`
+      : '';
+    const agentsObserved = blockingParts.length > 0
+      ? blockingParts.join('; ')
+      : `no running work/planning agents${exitedNote}`;
     // PAN-3188 (row 5): terminal canonical states settle this row. 'done'
     // proves the post-merge lifecycle already ran to close-out; 'canceled'
     // makes it moot. Requiring the transient verifying_on_main marker here
@@ -579,14 +605,14 @@ export async function checkPostMergeRow(
     if (canonicalState === 'done') {
       return result(
         'post-merge',
-        runningAgents.length === 0 ? 'pass' : 'miss',
+        blockingAgents.length === 0 ? 'pass' : 'miss',
         `terminal canonical state: done — the post-merge lifecycle already ran to close-out; ${agentsObserved}`,
       );
     }
     if (canonicalState === 'canceled') {
       return result(
         'post-merge',
-        runningAgents.length === 0 ? 'skip' : 'miss',
+        blockingAgents.length === 0 ? 'skip' : 'miss',
         `terminal canonical state: canceled — post-merge lifecycle not applicable; ${agentsObserved}`,
       );
     }
@@ -600,20 +626,20 @@ export async function checkPostMergeRow(
     if (!lifecycleObserved && merged?.containedStrikeHead) {
       return result(
         'post-merge',
-        runningAgents.length === 0 ? 'skip' : 'miss',
+        blockingAgents.length === 0 ? 'skip' : 'miss',
         `strike landing (strike/${ctx.issueId.toLowerCase()} contained in main) — the work-agent post-merge handoff is not the strike path's lifecycle; ${stateObserved}; ${agentsObserved}`,
       );
     }
     if (!lifecycleObserved && merged?.evidence === 'branch-containment') {
       return result(
         'post-merge',
-        runningAgents.length === 0 ? 'pass' : 'miss',
+        blockingAgents.length === 0 ? 'pass' : 'miss',
         `non-PR landing (branch-containment evidence) — post-merge lifecycle not applicable; ${agentsObserved}`,
       );
     }
     return result(
       'post-merge',
-      lifecycleObserved && runningAgents.length === 0 ? 'pass' : 'miss',
+      lifecycleObserved && blockingAgents.length === 0 ? 'pass' : 'miss',
       `${stateObserved}; ${agentsObserved}`,
     );
   } catch (error) {

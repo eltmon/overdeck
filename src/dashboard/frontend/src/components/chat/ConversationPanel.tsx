@@ -40,6 +40,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
+import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
@@ -191,6 +192,7 @@ export function ConversationPanel({
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
+  const httpFallbackDue = useMessagesHttpFallback(streamMessagesEnabled, receivedFirstPayload, conversation.name);
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);
@@ -227,12 +229,6 @@ export function ConversationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.deliveryMethod]);
 
-  useEffect(() => {
-    if (streamMessagesEnabled) {
-      void queryClient.cancelQueries({ queryKey: messagesQueryKey });
-    }
-  }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
-
   // The resume latch is spent once the poll confirms the resumed session came
   // alive. Clearing on endedAt instead would let a stale pre-resume row
   // (still carrying the previous death's endedAt) kill the bridge during the
@@ -253,26 +249,33 @@ export function ConversationPanel({
   }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
-  // Live transcripts are pushed through WS/RPC. HTTP supplies the initial
-  // snapshot/backfill and is the sole read path for stopped history.
+  // Live transcripts are pushed through WS/RPC. HTTP is a fallback for the
+  // initial snapshot (only after MESSAGES_HTTP_FALLBACK_MS without a stream
+  // payload) and is the sole read path for stopped history.
+  const messagesQueryFn = useCallback(async ({ signal }: { signal?: AbortSignal }) => {
+    const fetched = await fetchMessages(conversation.name, signal, agentId);
+    // If the WS subscription became active while this HTTP request was in
+    // flight, prefer the streamed cache ONLY when it is at least as complete
+    // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
+    // partial), this HTTP response is the authoritative full history — use it
+    // rather than returning empty/truncated state. (PAN-1642 regression: the
+    // old `cached ?? empty` rendered "How can I help you?" / only-last-parts
+    // whenever the snapshot lost the race, worsening under load.)
+    if (streamActiveRef.current) {
+      const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
+      if (cached && cached.messages.length >= fetched.messages.length) return cached;
+    }
+    return fetched;
+  }, [conversation.name, agentId, queryClient, messagesQueryKey]);
+  const refreshMessagesOverHttp = useCallback(() => {
+    // staleTime: 0 forces the refetch past the app's default 30s staleTime, since
+    // fetchQuery otherwise returns fresh cached data without calling queryFn.
+    void queryClient.fetchQuery({ queryKey: messagesQueryKey, queryFn: messagesQueryFn, staleTime: 0 }).catch(() => {});
+  }, [queryClient, messagesQueryKey, messagesQueryFn]);
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
-    queryFn: async ({ signal }) => {
-      const fetched = await fetchMessages(conversation.name, signal, agentId);
-      // If the WS subscription became active while this HTTP request was in
-      // flight, prefer the streamed cache ONLY when it is at least as complete
-      // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
-      // partial), this HTTP response is the authoritative full history — use it
-      // rather than returning empty/truncated state. (PAN-1642 regression: the
-      // old `cached ?? empty` rendered "How can I help you?" / only-last-parts
-      // whenever the snapshot lost the race, worsening under load.)
-      if (streamActiveRef.current) {
-        const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
-        if (cached && cached.messages.length >= fetched.messages.length) return cached;
-      }
-      return fetched;
-    },
-    enabled: true,
+    queryFn: messagesQueryFn,
+    enabled: !streamMessagesEnabled || Boolean(agentId) || httpFallbackDue,
     refetchInterval: streamMessagesEnabled || agentId ? false : (conversation.sessionAlive ? 2000 : false),
   });
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
@@ -332,7 +335,8 @@ export function ConversationPanel({
       return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
     },
     enabled: !isSyntheticConversation,
-    refetchInterval: 5000,
+    // Ended conversations cannot gain new edits, so stop polling once the session dies.
+    refetchInterval: conversation.sessionAlive ? 5000 : false,
   })
 
   const turnDiffSummaryByAssistantMessageId = useMemo(() => {
@@ -427,7 +431,7 @@ export function ConversationPanel({
     ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+      refreshMessagesOverHttp();
       // PAN-2975: the resume bar reports the actual outcome too. The latch is
       // only a bridge until the poll confirms the session — see the
       // resumedAwaitingConfirm clear effect below.
@@ -459,7 +463,7 @@ export function ConversationPanel({
       saveStoredModel(model);
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+      refreshMessagesOverHttp();
     },
     onError: (err: Error) => {
       toast.error(err.message, { duration: 6000 });
@@ -1070,6 +1074,7 @@ export function ConversationPanel({
               agentBusy={isWorking}
               streamMessagesEnabled={streamMessagesEnabled}
               receivedFirstPayload={receivedFirstPayload}
+              refreshMessagesOverHttp={refreshMessagesOverHttp}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
               onOpenTerminal={showTerminal ? () => handleViewMode('terminal') : undefined}
@@ -1210,6 +1215,8 @@ interface ConversationViewProps {
   streamMessagesEnabled?: boolean;
   /** True after the current conversation's WS subscription emits its first event. */
   receivedFirstPayload?: boolean;
+  /** Re-fetches messages over HTTP through the shared queryFn (PAN-4312). */
+  refreshMessagesOverHttp?: () => void;
   messagesData?: MessagesResponse;
   /** PAN-3113 — switch the panel to terminal mode (pane choice card). */
   onOpenTerminal?: () => void;
@@ -1222,7 +1229,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, refreshMessagesOverHttp, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
@@ -1237,9 +1244,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     const prev = prevForkStatusRef.current;
     prevForkStatusRef.current = conversation.forkStatus;
     if (prev && !conversation.forkStatus) {
-      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+      refreshMessagesOverHttp?.();
     }
-  }, [conversation.forkStatus, conversation.name, queryClient]);
+  }, [conversation.forkStatus, conversation.name, refreshMessagesOverHttp]);
 
   const data = messagesData;
   const isLoading = messagesLoading ?? false;

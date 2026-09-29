@@ -14,6 +14,7 @@ import { initEventStore, type StoredEvent } from '../event-store.js';
 import { emitActivityTts } from '../../../lib/activity-logger.js';
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { recordBackgroundAiCost } from '../../../lib/background-ai/cost.js';
+import { modelSupportsSamplingParams } from '../../../lib/model-capabilities.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ interface SummarizerState {
   lastFlush: number;
 }
 
-interface ActivityItem {
+export interface ActivityItem {
   source: string;
   level: string;
   message: string;
@@ -86,12 +87,8 @@ const state: SummarizerState = {
 
 // ─── API call ─────────────────────────────────────────────────────────────────
 
-async function callSummarizer(
-  model: string,
-  apiKey: string,
-  items: ActivityItem[]
-): Promise<SummarizerResult | null> {
-  const body = {
+export function buildSummarizerRequestBody(model: string, items: ActivityItem[]) {
+  return {
     model,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -100,9 +97,18 @@ async function callSummarizer(
         content: `Recent activity:\n${items.map(i => `- ${i.message}`).join('\n')}`,
       },
     ],
-    temperature: 0.4,
+    // Sampling-restricted models (Sonnet 5+, Opus 4.7+, Fable) 400 on temperature (PAN-4327).
+    ...(modelSupportsSamplingParams(model) ? { temperature: 0.4 } : {}),
     max_tokens: 80,
   };
+}
+
+async function callSummarizer(
+  model: string,
+  apiKey: string,
+  items: ActivityItem[]
+): Promise<SummarizerResult | null> {
+  const body = buildSummarizerRequestBody(model, items);
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {

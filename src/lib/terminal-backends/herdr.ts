@@ -47,6 +47,7 @@ import { controlTerminal, observeTerminal } from './herdr-stream.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
+import { steerHerdrPane } from './steer-keys.js';
 import {
   isUnsupported,
   TerminalBackendError,
@@ -173,7 +174,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
     case 'pane_created': {
       const pane = data.pane as HerdrPaneInfo | undefined;
       if (!pane) return [];
-      return [{ kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id }];
+      return [{ kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id, terminalId: pane.terminal_id, ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}) }];
     }
     case 'pane_exited':
       return [{ kind: 'pane-exited', paneId: String(data.pane_id ?? ''), code: null }];
@@ -185,7 +186,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
         events.push({ kind: 'agent-state', paneId: pane.pane_id, state: toAgentState(pane.agent_status) });
       }
       if (pane.tokens) {
-        events.push({ kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens> });
+        events.push({ kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens>, ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}) });
       }
       return events;
     }
@@ -802,6 +803,13 @@ export class HerdrBackend implements TerminalBackend {
       });
       if ('refused' in verdict) return { refused: true, reason: verdict.reason };
       if ('dropped' in verdict) return { dropped: true, reason: verdict.reason };
+
+      if (options.submit === 'steer') { // PAN-4292: agent.prompt ends with Enter, so a steer bypasses it
+        if (!info.agent?.pane_id) return unsupported('herdr steer needs a detected agent pane');
+        if (info.agent.agent_status === 'blocked') return { refused: true, reason: 'agent_blocked' };
+        await steerHerdrPane(this.api, info.agent.pane_id, text);
+        return { delivered: true, messageId: options.messageId };
+      }
 
       const wait = options.wait
         ? {

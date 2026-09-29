@@ -81,7 +81,8 @@ Overdeck is a multi-agent orchestration framework for AI coding assistants. This
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan skills` | List available skills | `pan skills` |
+| `pan skills` | List skills with their on/off state and its source | `pan skills --issue PAN-1` |
+| `pan skills set` | Turn a skill on, off, or back to inherit per level | `pan skills set grilling off --project overdeck` |
 | `pan sync` | Sync skills to AI tools (auto-runs on `pan up`) | `pan sync` |
 | `pan sync --dry-run` | Preview skill sync without applying | `pan sync --dry-run` |
 

@@ -872,6 +872,7 @@ async function generateTurnPrefixSummary(
 // — code-heavy content tokenizes denser than the 4-chars/token heuristic.
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
+  'claude-sonnet-5-5': 1_200_000,         // ~300k tokens content, 1M window
   'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
   'claude-fable-5': 1_200_000,            // ~300k tokens content, large window
@@ -882,7 +883,7 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
 };
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
 
-function getChunkBudgetChars(model: string | undefined): number {
+export function getChunkBudgetChars(model: string | undefined): number {
   if (!model) return DEFAULT_CHUNK_BUDGET_CHARS;
   return CHUNK_BUDGET_CHARS_BY_MODEL[model === 'claude-opus-5-5' ? 'claude-opus-5' : model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
 }

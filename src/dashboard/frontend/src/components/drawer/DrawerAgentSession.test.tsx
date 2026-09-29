@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Agent } from '../../types';
+import type { DerivedIssueState } from '@overdeck/contracts';
+import { useDashboardStore } from '../../lib/store';
 import { DrawerAgentSession, pickDefaultDrawerAgent, sortIssueAgents } from './DrawerAgentSession';
 
 vi.mock('@tanstack/react-query', () => ({
@@ -116,6 +118,10 @@ describe('sortIssueAgents', () => {
 });
 
 describe('DrawerAgentSession view selector', () => {
+  afterEach(() => {
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {}, agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
   it('renders the selector only when onChangeView is provided', () => {
     const liveAgent = agent({ id: 'agent-work', role: 'work' });
     const { rerender } = render(
@@ -142,7 +148,9 @@ describe('DrawerAgentSession view selector', () => {
     expect(screen.getByRole('tablist', { name: 'Agent session view' })).toBeInTheDocument();
   });
 
-  it('disables Terminal with the ended-session reason for a stopped agent', () => {
+  it('disables Terminal with the fallback reason for a stopped agent with no derived state', () => {
+    // No issueId on the fixture and nothing seeded in the store, so the
+    // outcome derivation has no facts to work with and falls back.
     const endedAgent = agent({ id: 'agent-work', role: 'work', status: 'stopped' });
     render(
       <DrawerAgentSession
@@ -160,6 +168,29 @@ describe('DrawerAgentSession view selector', () => {
     expect(terminal).toBeDisabled();
     expect(terminal).toHaveAttribute('title', 'Session ended — no live terminal to attach');
     expect(screen.getByRole('tab', { name: 'Conversation' })).toBeEnabled();
+  });
+
+  it('disables Terminal with the close-out reason for a stopped agent on a closed issue (PAN-4290)', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-4290': { issueId: 'PAN-4290', state: 'closed' } as DerivedIssueState,
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    const endedAgent = agent({ id: 'agent-work', role: 'work', status: 'stopped', issueId: 'PAN-4290' });
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        agents={[endedAgent]}
+        agentId={endedAgent.id}
+        onSelectAgent={vi.fn()}
+        onChangeView={vi.fn()}
+      />,
+    );
+
+    const terminal = screen.getByRole('tab', {
+      name: 'Terminal — Stopped by close-out — no live terminal to attach',
+    });
+    expect(terminal).toBeDisabled();
   });
 
   it('disables Terminal with the no-agent reason when no agent is selected', () => {

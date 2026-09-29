@@ -99,6 +99,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'anthropic', model: 'claude-opus-4-8', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.7 series
   { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
+  // Anthropic - Sonnet 5.5 (2026-09-28): same rates as Sonnet 5.
+  { provider: 'anthropic', model: 'claude-sonnet-5-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic retained Sonnet 5 launch pricing as standard; the planned September increase was cancelled.
   { provider: 'anthropic', model: 'claude-sonnet-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
@@ -189,7 +191,7 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
   let outputMultiplier = 1;
 
   // Long-context pricing for retired Sonnet 4 (>200K total input tokens).
-  // Sonnet 4.6 and Sonnet 5 include their full 1M context at standard pricing.
+  // Sonnet 4.6, Sonnet 5 and Sonnet 5.5 include their full 1M context at standard pricing.
   // Total input includes: inputTokens + cacheReadTokens + cacheWriteTokens
   const totalInputTokens = usage.inputTokens
     + (usage.cacheReadTokens || 0)

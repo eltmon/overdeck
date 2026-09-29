@@ -35,13 +35,17 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `getProviderForModel()`, per-provider `tierModels` (opus/sonnet/haiku slots).
 - `model-capabilities.ts` — `MODEL_CAPABILITIES` skill/cost matrix; `model-deprecations.ts`
   alias table; `model-capability-class.ts` (PAN-3842) frontier/workhorse/small classes.
+  New models land in `model-capability-additions.ts` (spread first into the matrix);
+  `model-capabilities.ts` is at its file-size cap. Adding a `ModelId` also needs rows in
+  `model-fallback.ts` `MODEL_PROVIDERS`, `providers.ts`, `cost.ts` and the dashboard pickers.
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
 - `github-quota/` (PAN-4264) — GitHub API quota metering: the per-hour ledger,
   `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
-  (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
-  and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
+  (`rest-meter.ts`), the cross-process pause gate, the GraphQL `rateLimit`
+  sampler (REST `/rate_limit` for the REST bucket) and the quota snapshot.
+  Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
 - `agents/permission-prompt.ts` + `overdeck/conversation-permission*.ts` (PAN-4278) —
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,
@@ -136,6 +140,10 @@ memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
 
+## Awareness rail (Command Deck right column)
+
+`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`; Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
+
 ## Flywheel (PAN-3964, derived view)
 
 The flywheel is the `/pan-flywheel` skill running in conversation `conv-flywheel`; it has
@@ -146,5 +154,7 @@ status on read for `pan flywheel status`, `GET /api/flywheel/status`
 injectable dep: the lib defaults serve the CLI; the route must inject the server's cached
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
+
+Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
 
 <!-- last-verified: 2026-09-28 -->

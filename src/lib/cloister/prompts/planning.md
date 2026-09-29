@@ -165,7 +165,7 @@ For every slot-eligible item, also declare:
 - `verify_commands: string[]` — commands a slot can run before merging, scoped as tightly as the item allows.
 - `expected_outputs: string[]` — observable evidence those commands must produce, such as a named test file passing or typecheck completing without errors.
 
-**The file-size ratchet is derived, not stored.** `scripts/lint-file-size.sh` compares each working-tree file against its line count on `origin/main` at lint time, so there is no baseline file to reconcile and items never add file-size metadata to `metadata.files_scope`. An item that grows a god file past its `origin/main` count must add an audited `scripts/file-size-allowlist.txt` row in the same commit using `<lines> <path> # <ISSUE-REF>`. Shrinking a god file requires no metadata change.
+**The file-size ratchet is derived, not stored.** `scripts/lint-file-size.sh` compares each working-tree file against its line count on `origin/main` at lint time, so there is no baseline file to reconcile and items never add file-size metadata to `metadata.files_scope`. An item must not grow a god file past its allowed count (its `origin/main` line count, or its `scripts/file-size-allowlist.txt` cap). When a change would push a file past it, plan an extraction item that moves code out so the file stays at or under the count. Never plan an allowlist raise: raising a ceiling is an operator decision, and the pre-push guard refuses it from agents. Shrinking a god file requires no metadata change.
 
 ### Difficulty Estimation
 

@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 778_
+_Last sequenced: 2026-09-28T17:03:58.994826Z · model: claude-opus-5-5 · open: 791_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,12 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4290 | M | medium | ok |  |  | In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended' |
 | 2 | PAN-4291 | L | high | ok |  |  | In-pipeline (live workspace): own polling drains GitHub GraphQL budget hourly, pausing calls; sampler reads wrong counter |
 | 3 | PAN-4292 | M | medium | ok |  |  | In-pipeline (live workspace): steer running Claude Code/Codex turns from composer (Ctrl+Enter) and pan tell --steer, not only Pi. |
+| 4 | PAN-4300 | S | high | ok |  |  | In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity |
+| 5 | PAN-4301 | L | medium | ok |  | PAN-4300 | In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed |
+| 6 | PAN-4310 | S | high | ok |  |  | In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix. |
+| 7 | PAN-4311 | L | high | ok |  |  | In-pipeline (live workspace): CPU weights/nice for agents, observe-only runaway detector, PSI-based CPU dispatch hold |
+| 8 | PAN-4312 | L | high | ok |  |  | In-pipeline (live workspace): conversation open stalls up to 17s behind polling ops on the read lane; duplicate transcript loads |
+| 9 | PAN-4320 | M | high | ok |  |  | In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -111,6 +117,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 142 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
 | 143 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 145 | PAN-4302 | M | high | ok |  | PAN-4291 | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
 | 147 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
@@ -258,13 +265,13 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 316 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
-| 316 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 316 | PAN-1166 | M | high | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 322 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
@@ -300,6 +307,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 356 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
 | 357 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
 | 358 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 359 | PAN-4306 | M | medium | ok |  | PAN-4300 | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
 | 362 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
@@ -314,6 +322,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 371 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
 | 372 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
 | 373 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 374 | PAN-4303 | S | medium | needs-refinement |  | PAN-4292 | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
 | 375 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
 | 376 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
 | 377 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
@@ -335,6 +344,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 396 | PAN-4305 | S | medium | ok |  |  | Composer marks mid-turn queued messages Not found (pasted_content wrap/merge mismatch); invites a duplicate Resend. |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -471,6 +481,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
 | 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
 | 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 541 | PAN-4307 | L | medium | ok |  | PAN-2609 | Session Vault dashboard consumer: auto-settle, read-only browse copies, Continue here, eviction review panel. Blocked by PAN-2609. |
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
 | 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
@@ -535,6 +546,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 606 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
 | 607 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
 | 608 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 609 | PAN-4308 | S | medium | ok |  | PAN-2609, PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
 | 610 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
 | 611 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
 | 612 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
@@ -585,7 +597,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4293 | L | low | ok |  |  | Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault |
-| 663 | PAN-4294 | L | low | needs-refinement |  | PAN-4293 | Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research |
+| 663 | PAN-4294 | L | low | ok |  | PAN-4293 | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
@@ -604,7 +616,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 682 | PAN-4297 | L | low | needs-refinement |  | PAN-2609, PAN-4293, PAN-4294 | Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); needs Phase A, account service, billing |
+| 682 | PAN-4297 | L | low | ok |  | PAN-2609, PAN-4293, PAN-4294 | Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); pricing decided; needs Phase A, account, billing |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
 | 684 | PAN-2356 | M | low | needs-refinement |  | PAN-4293, PAN-4297 | Overdeck Anywhere P3: relay service |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
@@ -798,6 +810,30 @@ New issue already in the pipeline with a live workspace, so it is pinned at the 
 ### PAN-4292 (rank 3)
 
 New issue already in the pipeline with a live workspace, so it is pinned in the in-pipeline tier at a free top slot rather than ranked against the queue; it extends the existing Pi-only steer delivery to Claude Code and Codex and carries an explicit implementation checkpoint on keystroke mechanics.
+
+### PAN-4300 (rank 4)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the free rank 4 slot rather than ranked against the backlog. It is a well-scoped event-emission bug in the stopped notifier with concrete ACs (one emission per real transition, fake-timer tests, docs), and it is the stated prerequisite for the PAN-4301 Awareness feed redesign, so importance is high and condition ok.
+
+### PAN-4301 (rank 5)
+
+New issue already in the pipeline with a live workspace and a committed PRD (.pan/drafts/pan-4301.md), so it is pinned at the free rank 5 slot. It is a derive-not-store frontend/read-model redesign built on existing lane and conversation facts; it depends on PAN-4300 removing the dead-agent event flood before telemetry moves into the Detailed stream.
+
+### PAN-4310 (rank 6)
+
+New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.
+
+### PAN-4311 (rank 7)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (7) rather than ranked against the backlog. It hardens the substrate against the 2026-09-28 load-79 incident: the governor CPU hold gates nothing today, no CPU weights exist, and runaway attribution never runs; the PRD names exact files, so condition is ok at high importance.
+
+### PAN-4312 (rank 8)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.
+
+### PAN-4320 (rank 9)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.
 
 ### PAN-4217 (rank 23)
 
@@ -1063,30 +1099,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 
 Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
-### PAN-2331 (rank 116)
-
-Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1094,10 +1106,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:43:01.812749Z",
+  "generatedAt": "2026-09-28T17:03:58.994826Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 778,
+  "openCount": 791,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -4277,7 +4289,7 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
     },
     {
       "issue": "PAN-2351",
-      "rank": 316,
+      "rank": 322,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -4286,7 +4298,7 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
         "PAN-1166"
       ],
       "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
-      "rationale": "Body updated since the last pass; it remains the security prerequisite that blocks every other Overdeck Anywhere phase, so the rank holds.",
+      "rationale": "Moved from 316 to the free rank 322 because in-pipeline PAN-1166 is pinned at 316 and PAN-2351 depends on it, so it must follow.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -4299,7 +4311,7 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order.",
-      "rationale": "Rank held at 317; the 2026-09-28 rebaseline answered the prior open question by making PAN-3762 the default architecture and listing the Session Vault, SSH-host, Fly and paid-tier tracks as children with an explicit build order, so contains edges and order edges were re-derived; it stays needs-refinement while the needs-rescope label remains, and the operator gate stays blocked.",
+      "rationale": "Rank held at 317; the 2026-09-28 edits swap the billing provider to Creem and record the decided pricing but add no children and change no order, so contains and order edges are unchanged; it stays needs-refinement while the needs-rescope label remains, and the operator gate stays blocked.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -8699,7 +8711,7 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "issue": "PAN-1166",
       "rank": 316,
       "size": "M",
-      "importance": "low",
+      "importance": "high",
       "score": 21,
       "condition": "ok",
       "dependsOn": [],
@@ -10680,12 +10692,12 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "size": "L",
       "importance": "low",
       "score": 22,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4293"
       ],
-      "why": "Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research",
-      "rationale": "Rank 682->663 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
+      "why": "Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service",
+      "rationale": "Rank held at 663; the body now records decided pricing, Creem as merchant of record and hosted compute billed separately, which closes every open decision, so the condition moves from needs-refinement to ok while the PAN-4293 dependency still holds its slot in step 6.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10738,14 +10750,14 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "size": "L",
       "importance": "low",
       "score": 23,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-2609",
         "PAN-4293",
         "PAN-4294"
       ],
-      "why": "Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); needs Phase A, account service, billing",
-      "rationale": "Rank 684->682 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
+      "why": "Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); pricing decided; needs Phase A, account, billing",
+      "rationale": "Rank held at 682; the pricing placeholder is replaced by the decided plan table and HB-1..HB-5 are concrete, so the condition moves from needs-refinement to ok, but it still waits on PAN-2609, PAN-4293 and PAN-4294 in step 6.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10764,6 +10776,175 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       ],
       "why": "Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt",
       "rationale": "New since the prior run: the last step of the Fly track with four unbuilt prerequisites and open isolation and credential questions, so it ranks below its dependencies.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4300",
+      "rank": 4,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 4 slot rather than ranked against the backlog. It is a well-scoped event-emission bug in the stopped notifier with concrete ACs (one emission per real transition, fake-timer tests, docs), and it is the stated prerequisite for the PAN-4301 Awareness feed redesign, so importance is high and condition ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4301",
+      "rank": 5,
+      "size": "L",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4300"
+      ],
+      "why": "In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed",
+      "rationale": "New issue already in the pipeline with a live workspace and a committed PRD (.pan/drafts/pan-4301.md), so it is pinned at the free rank 5 slot. It is a derive-not-store frontend/read-model redesign built on existing lane and conversation facts; it depends on PAN-4300 removing the dead-agent event flood before telemetry moves into the Detailed stream.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4302",
+      "rank": 145,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4291"
+      ],
+      "why": "~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291",
+      "rationale": "New follow-up split out of PAN-4291 (in pipeline at rank 2): it migrates the remaining direct gh callers to runGh so the quota ledger attributes spend and non-essential callers respect quota pauses. The file list and grep-based ACs are concrete, so condition is ok; it ranks just after PAN-2259 (GraphQL quota burn) because it completes the same quota-hardening line and needs PAN-4291 to land first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4303",
+      "rank": 374,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4292"
+      ],
+      "why": "Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind.",
+      "rationale": "New issue split from in-pipeline PAN-4292; it cannot start until PAN-4292 adds HarnessBehavior.steerKind, and its first step is an open verification question, so it sits in the free rank 374 slot among comparable medium conversation-delivery fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4305",
+      "rank": 396,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Composer marks mid-turn queued messages Not found (pasted_content wrap/merge mismatch); invites a duplicate Resend.",
+      "rationale": "New issue: false-negative landing check on queued prompts in transcript-landing.ts; clear AC and fixtures, ranked beside PAN-3121 (same double-send risk).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4306",
+      "rank": 359,
+      "size": "M",
+      "importance": "medium",
+      "score": 61,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4300"
+      ],
+      "why": "Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300",
+      "rationale": "New issue split out of in-pipeline PAN-4301 with verified emit sites and ACs; ranked in the medium band because it waits on PAN-4300 (in pipeline) and is feed hygiene, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4307",
+      "rank": 541,
+      "size": "L",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2609"
+      ],
+      "why": "Session Vault dashboard consumer: auto-settle, read-only browse copies, Continue here, eviction review panel. Blocked by PAN-2609.",
+      "rationale": "New node split from PAN-2609 during its 2026-09-28 planning; placed just after the vault engine it consumes, in a free slot so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4308",
+      "rank": 609,
+      "size": "S",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2609",
+        "PAN-4295"
+      ],
+      "why": "Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap).",
+      "rationale": "New node split from PAN-2609; placed after both blockers (PAN-2609 at 506, PAN-4295 at 566) in a free slot so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4310",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix.",
+      "rationale": "New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4311",
+      "rank": 7,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): CPU weights/nice for agents, observe-only runaway detector, PSI-based CPU dispatch hold",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (7) rather than ranked against the backlog. It hardens the substrate against the 2026-09-28 load-79 incident: the governor CPU hold gates nothing today, no CPU weights exist, and runaway attribution never runs; the PRD names exact files, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4312",
+      "rank": 8,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): conversation open stalls up to 17s behind polling ops on the read lane; duplicate transcript loads",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4320",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -11930,6 +12111,118 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4291",
+      "to": "PAN-4302",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4300",
+      "to": "PAN-4301",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2259",
+      "to": "PAN-4302",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4292",
+      "to": "PAN-4303",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2580",
+      "to": "PAN-4303",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4305",
+      "to": "PAN-3121",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4300",
+      "to": "PAN-4306",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4301",
+      "to": "PAN-4306",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4307",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4308",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2609",
+      "to": "PAN-4307",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2609",
+      "to": "PAN-4308",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4295",
+      "to": "PAN-4308",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4311",
+      "to": "PAN-4312",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-3762",
+      "to": "PAN-2609",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4320",
+      "to": "PAN-4300",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

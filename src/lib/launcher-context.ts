@@ -1,9 +1,14 @@
-/** Compose Claude's single append-file argument without changing native discovery. */
+/**
+ * Claude's launch context: the single append-file argument (without changing
+ * native discovery), and the skills it may see — the per-launch skill-override
+ * step and `--settings` suffix (PAN-3942).
+ */
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
 import { shellQuote } from './shell-quote.js';
-interface ContextConfig {
+import { claudeSkillOverrideLaunch, type SkillOverrideLaunchConfig } from './skill-overrides/launcher-lines.js';
+interface ContextConfig extends SkillOverrideLaunchConfig {
   harness?: string;
   baseCommand?: string;
   appendSystemPromptFile?: string;
@@ -11,6 +16,16 @@ interface ContextConfig {
 }
 
 export function prepareClaudeContext<T extends ContextConfig>(config: T): {
+  config: T;
+  lines: string[];
+  sources: string[];
+} {
+  const prepared = composeClaudeContext(config);
+  const skills = claudeSkillOverrideLaunch(prepared.config);
+  return { config: skills.config, lines: [...prepared.lines, ...skills.lines], sources: prepared.sources };
+}
+
+function composeClaudeContext<T extends ContextConfig>(config: T): {
   config: T;
   lines: string[];
   sources: string[];

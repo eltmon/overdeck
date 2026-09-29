@@ -33,6 +33,13 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, execFile: execFileStub };
 });
 
+// PAN-4291: this file exercises the stale-while-revalidate cache, not the
+// no-remote/no-tracker skip gate (covered in derived-issue-state-quota.test.ts).
+vi.mock('../../../../src/lib/overdeck/pr-cache-policy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/overdeck/pr-cache-policy.js')>();
+  return { ...actual, shouldListPullRequests: async () => true };
+});
+
 import {
   PR_CACHE_TTL_MS,
   PR_LISTING_MAX_STALE_MS,
@@ -43,8 +50,14 @@ import {
 const listing = (...branches: string[]) =>
   JSON.stringify(branches.map((headRefName, index) => ({ number: index + 1, state: 'OPEN', headRefName })));
 
-/** Answer the oldest pending `gh` spawn and let its promise chain settle. */
+/**
+ * Answer the oldest pending `gh` spawn and let its promise chain settle.
+ * PAN-4291: the skip-gate check adds a microtask hop before the spawn, so a
+ * call made right after triggering a read may need a tick to actually land
+ * in `gh.pending` first.
+ */
 async function answerGh(stdout: string): Promise<void> {
+  if (gh.pending.length === 0) await vi.advanceTimersByTimeAsync(0);
   const next = gh.pending.shift();
   if (!next) throw new Error('no gh spawn is pending');
   next.resolve(stdout);
@@ -52,6 +65,7 @@ async function answerGh(stdout: string): Promise<void> {
 }
 
 async function failGh(): Promise<void> {
+  if (gh.pending.length === 0) await vi.advanceTimersByTimeAsync(0);
   const next = gh.pending.shift();
   if (!next) throw new Error('no gh spawn is pending');
   next.reject(new Error('gh: HTTP 502'));
@@ -78,6 +92,8 @@ describe('listRepoPullRequestsStaleOk (PAN-3925)', () => {
 
   it('waits for the forge on the first read, then serves the cached listing inside the TTL', async () => {
     const first = listRepoPullRequestsStaleOk(repo);
+    // PAN-4291: the skip-gate check adds a microtask hop before the gh spawn.
+    await vi.advanceTimersByTimeAsync(0);
     expect(gh.calls).toBe(1);
     await answerGh(listing('feature/pan-1'));
     expect(branchesOf(await first)).toEqual(['feature/pan-1']);

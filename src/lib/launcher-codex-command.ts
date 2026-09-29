@@ -11,6 +11,7 @@ import { toCodexSandboxValue } from './runtimes/codex.js';
 import { shellQuoteModelId } from './model-validation.js';
 import { packageRoot } from './paths.js';
 import { shellQuote } from './shell-quote.js';
+import { codexSkillOverrideLines, type SkillOverrideLaunchConfig } from './skill-overrides/launcher-lines.js';
 
 /** LauncherConfig extends this so the generator file does not grow (PAN-3835). */
 export interface CodexNativeEndpointOption {
@@ -23,7 +24,7 @@ export interface CodexNativeEndpointOption {
 }
 
 /** The LauncherConfig subset the Codex command shapes read. */
-export interface CodexCommandConfig extends CodexNativeEndpointOption {
+export interface CodexCommandConfig extends CodexNativeEndpointOption, SkillOverrideLaunchConfig {
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
   codexEffort?: string;
   codexSandboxMode?: string;
@@ -33,7 +34,7 @@ export interface CodexCommandConfig extends CodexNativeEndpointOption {
   promptInline?: string;
   appendSystemPromptFile?: string;
   appendSystemPromptFiles?: string[];
-  overdeckEnv?: { agentId?: string };
+  overdeckEnv?: { agentId?: string; issueId?: string };
 }
 
 /** Wrap a command in the PTY supervisor (no-op when the launcher isn't using it). */
@@ -55,7 +56,8 @@ export function buildCodexCommand(
     `[codex-launcher] agent=${config.overdeckEnv?.agentId ?? '?'} mode=${config.codexMode ?? 'exec'} ` +
     `resumeSessionId=${config.resumeSessionId ?? '(none)'} resumeApplied=${applied} cmd=${flat.slice(0, 200)}`,
   );
-  return cmd;
+  // PAN-3942: write the skill-override block into $CODEX_HOME/config.toml before Codex reads it.
+  return [...codexSkillOverrideLines(config), ...cmd];
 }
 
 function computeCodexCommandTokens(

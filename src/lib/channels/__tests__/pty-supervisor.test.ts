@@ -622,3 +622,101 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     expect(retry.body).not.toContain('deduplicated');
   }, 30_000);
 });
+
+describe('steer submit (PAN-4292)', () => {
+  async function listen(agentId: string, fake: ReturnType<typeof createFakePty>) {
+    const token = await writePtyToken(agentId);
+    const server = createPtySupervisorServer(agentId, fake.child);
+    const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
+    mkdirSync(join(tmpHome, 'sockets'), { recursive: true, mode: 0o700 });
+    await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
+    return { token, server, socketPath };
+  }
+
+  it('writes the content then the send-now chord, never Enter', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-steer', { content: 'steer now', echo: false, submit: 'steer' });
+    fake.emit('steer now');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual(['steer now', '\x18\x13']);
+    expect(fake.writes).not.toContain('\r');
+  });
+
+  it('retries with the send-now chord when the steer stays in the composer', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const readPayloadPresence = vi.fn()
+      .mockResolvedValueOnce('present')
+      .mockResolvedValueOnce('absent');
+
+    const delivered = injectPtyMessage(
+      fake.child,
+      'agent-unit-steer-retry',
+      { content: 'steer retry', echo: false, submit: 'steer' },
+      { readPayloadPresence },
+    );
+    fake.emit('steer retry');
+    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(INPUT_SUBMIT_CONFIRM_INTERVAL_MS * 2);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual(['steer retry', '\x18\x13', '\x18\x13']);
+  });
+
+  it('keeps writing Enter when submit is absent', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-enter', { content: 'plain', echo: false });
+    fake.emit('plain');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual(['plain', '\r']);
+  });
+
+  it('answers a steer with {"ok":true,"submit":"steer"} and a plain delivery with bare ok', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const { token, server, socketPath } = await listen('agent-server-steer', fake);
+
+    try {
+      const steered = postToUnixSocket(socketPath, token, { content: 'steer body', echo: false, submit: 'steer' });
+      await vi.waitFor(() => expect(fake.writes).toEqual(['steer body']));
+      fake.emit('steer body');
+      await vi.advanceTimersByTimeAsync(400);
+      const steerResult = await steered;
+      expect(steerResult.status).toBe(200);
+      expect(JSON.parse(steerResult.body)).toEqual({ ok: true, submit: 'steer' });
+      expect(fake.writes).toEqual(['steer body', '\x18\x13']);
+
+      const plain = postToUnixSocket(socketPath, token, { content: 'plain body', echo: false });
+      await vi.waitFor(() => expect(fake.writes).toContain('plain body'));
+      fake.emit('plain body');
+      await vi.advanceTimersByTimeAsync(400);
+      const plainResult = await plain;
+      expect(plainResult.status).toBe(200);
+      expect(JSON.parse(plainResult.body)).toBe('ok');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('rejects an unknown submit mode with 400 and writes nothing', async () => {
+    const fake = createFakePty();
+    const { token, server, socketPath } = await listen('agent-server-bad-submit', fake);
+
+    try {
+      const result = await postToUnixSocket(socketPath, token, { content: 'bad', echo: false, submit: 'x' });
+      expect(result.status).toBe(400);
+      expect(result.body).toContain('submit must be');
+      expect(fake.writes).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -369,18 +369,42 @@ describe('conversation-embeddings-db', () => {
   });
 
   describe('getStats', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('returns chunk count, indexed file count, and latest indexed timestamp', () => {
       const dir = makeTmpDir();
       handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
       handle.upsertChunk(makeChunk({ sessionId: 'stats-a', byteOffset: 0, indexedAt: '2026-06-02T01:00:00.000Z' }));
       handle.upsertChunk(makeChunk({ sessionId: 'stats-b', byteOffset: 0, indexedAt: '2026-06-02T02:00:00.000Z' }));
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-02T03:00:00.000Z'));
       handle.setCursor('/tmp/session-a.jsonl', 100);
 
       expect(handle.getStats()).toEqual({
         chunkCount: 2,
         indexedFileCount: 1,
-        lastIndexedAt: '2026-06-02T02:00:00.000Z',
+        lastIndexedAt: '2026-06-02T03:00:00.000Z',
       });
+    });
+
+    it('does not count a cursor reset to 0 toward lastIndexedAt', () => {
+      const dir = makeTmpDir();
+      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-02T01:00:00.000Z'));
+      handle.setCursor('/tmp/session-a.jsonl', 100);
+
+      vi.setSystemTime(new Date('2026-06-02T02:00:00.000Z'));
+      handle.setCursor('/tmp/session-b.jsonl', 200);
+
+      vi.setSystemTime(new Date('2026-06-02T03:00:00.000Z'));
+      handle.setCursor('/tmp/session-b.jsonl', 0);
+
+      expect(handle.getStats().lastIndexedAt).toBe('2026-06-02T01:00:00.000Z');
     });
   });
 

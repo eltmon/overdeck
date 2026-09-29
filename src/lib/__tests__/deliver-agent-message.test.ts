@@ -1229,3 +1229,198 @@ describe('channel bridge delivery', () => {
     }
   });
 });
+
+describe('steer submit mode (PAN-4292)', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-deliver-steer-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('asks a steer-aware supervisor to steer and reports steered:true', async () => {
+    const agentId = 'agent-steer-supervisor';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: JSON.stringify({ ok: true, submit: 'steer' }),
+      capture,
+    });
+    try {
+      const result = await deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer' });
+      expect(result).toEqual({ ok: true, path: 'supervisor', steered: true });
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({ content: 'steer hi', submit: 'steer' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('reports steered:false with a reason when the supervisor predates steer', async () => {
+    const agentId = 'agent-steer-old-supervisor';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), { status: 200, body: '"ok"' });
+    try {
+      const result = await deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer' });
+      expect(result).toEqual({
+        ok: true,
+        path: 'supervisor',
+        steered: false,
+        failure: 'supervisor predates steer; delivered as a normal submit',
+      });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('sends no submit field to the supervisor for a default delivery', async () => {
+    const agentId = 'agent-steer-default-supervisor';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), { status: 200, body: '"ok"', capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'plain hi', 'caller-plain');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
+      expect(JSON.parse(capture.lastBody!)).not.toHaveProperty('submit');
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('passes the steer submit mode to the tmux tier', async () => {
+    const agentId = 'agent-steer-tmux';
+    writeAgentState(agentId, { channelsEnabled: false });
+
+    const result = await deliverAgentMessage(agentId, 'steer tmux', 'caller-steer', undefined, { submit: 'steer' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled', steered: true });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'steer tmux', undefined, { submit: 'steer' });
+  });
+
+  it('passes the steer submit mode to an explicit tmux delivery', async () => {
+    const agentId = 'agent-steer-tmux-explicit';
+    writeAgentState(agentId, { channelsEnabled: false });
+
+    const result = await deliverAgentMessage(agentId, 'steer tmux', 'caller-steer', 'tmux', { submit: 'steer' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', steered: true });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'steer tmux', undefined, { submit: 'steer' });
+  });
+
+  it('refuses a steer on the Channels tier instead of delivering a plain submit', async () => {
+    const agentId = 'agent-steer-channels';
+    writeAgentState(agentId, { channelsEnabled: true });
+    writeBridgeToken(agentId);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), { status: 200, body: 'ok', capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer' });
+      expect(result).toEqual({ ok: false, path: 'channels', failure: 'steer-unsupported: channels' });
+      expect(capture.lastBody).toBeUndefined();
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('refuses a steer on the Codex app-server tier', async () => {
+    const agentId = 'agent-steer-appserver';
+    writeAgentState(agentId, { channelsEnabled: false });
+    writeFileSync(join(socketDir, `appserver-${agentId}.sock`), '');
+
+    const result = await deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer' });
+
+    expect(result).toEqual({ ok: false, path: 'app-server', failure: 'steer-unsupported: app-server' });
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+  });
+
+  it('refuses a steer on an ACP host target', async () => {
+    const agentId = 'agent-steer-acp';
+    writeAgentState(agentId, { harness: 'acp' });
+
+    const result = await deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer' });
+
+    expect(result).toEqual({ ok: false, path: 'acp', failure: 'steer-unsupported: acp' });
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+  });
+
+  it('rejects a keyed steer', async () => {
+    const agentId = 'agent-steer-keyed';
+    writeAgentState(agentId, { channelsEnabled: false });
+
+    await expect(
+      deliverAgentMessage(agentId, 'steer hi', 'caller-steer', undefined, { submit: 'steer', dedupKey: 'k1' }),
+    ).rejects.toThrow(/keyed delivery cannot steer/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+  });
+
+  it('never redelivers a steer whose landing was not seen', async () => {
+    vi.useFakeTimers();
+    try {
+      const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0, fileSize: 100, readOffset: 100 }));
+      const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 0 }));
+      const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const, steered: true }));
+
+      const result = deliverResumeMessageWithTranscriptConfirmation({
+        agentId: 'agent-steer-once',
+        workspace: '/tmp/workspace',
+        sessionId: 'session-1',
+        message: 'steer now',
+        caller: 'test:steer',
+        submit: 'steer',
+        timeoutMs: 300,
+        intervalMs: 100,
+        deliver,
+        snapshot,
+        probe,
+        captureOffsets: vi.fn(async () => new Map<string, number>()),
+        probeSidechains: vi.fn(async () => null),
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(result).resolves.toMatchObject({ delivered: false, attempts: 1 });
+      expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('transcript confirmation passes submit to every delivery attempt, and omits it by default', async () => {
+    const snapshot = vi.fn(async () => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: 0,
+      fileSize: 100,
+      readOffset: 100,
+    }));
+    const probe = vi.fn(async () => ({ matchedUserRecord: true, compactBoundaryCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const, steered: true }));
+    const args = {
+      agentId: 'agent-steer-confirm',
+      workspace: '/tmp/workspace',
+      sessionId: 'session-1',
+      message: 'steer now',
+      caller: 'test:steer',
+      deliver,
+      snapshot,
+      probe,
+    };
+
+    await deliverResumeMessageWithTranscriptConfirmation({ ...args, submit: 'steer' });
+    expect(deliver).toHaveBeenLastCalledWith('agent-steer-confirm', 'steer now', 'test:steer', undefined, { submit: 'steer' });
+
+    await deliverResumeMessageWithTranscriptConfirmation(args);
+    expect(deliver).toHaveBeenLastCalledWith('agent-steer-confirm', 'steer now', 'test:steer', undefined);
+  });
+});

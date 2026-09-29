@@ -1,0 +1,211 @@
+{
+  "version": "1",
+  "issueId": "PAN-3942",
+  "created": "2026-09-28T17:21:05.119Z",
+  "updated": "2026-09-28T18:32:25.196Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:21:05.119Z",
+      "doneAt": "2026-09-28T17:23:57.140Z"
+    },
+    "store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:24:05.148Z",
+      "doneAt": "2026-09-28T17:29:44.307Z"
+    },
+    "launch-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:29:49.644Z",
+      "doneAt": "2026-09-28T17:31:27.055Z"
+    },
+    "cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:31:31.846Z",
+      "doneAt": "2026-09-28T17:34:47.839Z"
+    },
+    "launcher-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:34:52.760Z",
+      "doneAt": "2026-09-28T17:39:45.866Z"
+    },
+    "api": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:39:57.532Z",
+      "doneAt": "2026-09-28T17:43:56.998Z"
+    },
+    "ui-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:44:01.886Z",
+      "doneAt": "2026-09-28T18:05:07.539Z"
+    },
+    "ui-mounts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T18:05:08.867Z",
+      "doneAt": "2026-09-28T18:05:30.412Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T18:05:36.870Z",
+      "doneAt": "2026-09-28T18:07:39.689Z"
+    },
+    "resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:26:35.757Z"
+    },
+    "resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:26:46.482Z"
+    },
+    "resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:26:56.185Z"
+    },
+    "resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:06.028Z"
+    },
+    "store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:15.503Z"
+    },
+    "store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:26.007Z"
+    },
+    "store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:35.964Z"
+    },
+    "store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:45.522Z"
+    },
+    "store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:55.389Z"
+    },
+    "launch-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:04.962Z"
+    },
+    "launch-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:14.737Z"
+    },
+    "launch-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:24.337Z"
+    },
+    "launch-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:34.634Z"
+    },
+    "cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:43.927Z"
+    },
+    "cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:28:54.442Z"
+    },
+    "cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:04.557Z"
+    },
+    "cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:14.596Z"
+    },
+    "cli.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:24.350Z"
+    },
+    "launcher-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:34.365Z"
+    },
+    "launcher-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:44.026Z"
+    },
+    "launcher-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:54.359Z"
+    },
+    "launcher-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:04.670Z"
+    },
+    "api.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:15.851Z"
+    },
+    "api.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:26.845Z"
+    },
+    "api.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:36.592Z"
+    },
+    "api.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:45.803Z"
+    },
+    "ui-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:30:55.580Z"
+    },
+    "ui-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:05.324Z"
+    },
+    "ui-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:15.035Z"
+    },
+    "ui-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:24.741Z"
+    },
+    "ui-mounts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:34.336Z"
+    },
+    "ui-mounts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:45.028Z"
+    },
+    "ui-mounts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:54.846Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:32:05.225Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:32:15.325Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:32:25.196Z"
+    }
+  }
+}

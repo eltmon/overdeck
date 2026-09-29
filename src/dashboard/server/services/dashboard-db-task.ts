@@ -61,7 +61,7 @@ export type DashboardDbOperation =
   | 'costReconcileSweep';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
-export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
+export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse' | 'poll';
 
 type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'prime-agent' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
@@ -127,7 +127,7 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'parseTranscriptSnapshot',
 ]);
 
-const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null };
+const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null, poll: null };
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 let latestSemanticJobId: string | null = null;
@@ -200,7 +200,7 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 }
 
 export function workerLane(operation: DashboardDbOperation): WorkerLane {
-  if (isPollingSnapshot(operation)) return 'read';
+  if (isPollingSnapshot(operation)) return 'poll';
   if (operation === 'searchSessionsSemantic') return 'semantic';
   if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';

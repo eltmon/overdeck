@@ -31,6 +31,7 @@ HAS_TOOLING=0
 # per pushed branch ref against the tip being pushed (inside the loop below)
 # — a dirty working tree must not block pushing already-committed, legal
 # state, and an over-cap tip must not hide behind a clean working tree.
+# PAN-3308: agent pushes may not raise a file-size ceiling (guard-allowlist-raise.sh).
 
 read_version() {
   git show "$1:$2" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))"
@@ -65,6 +66,11 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi
         bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
+        if [ "$remote_sha" != "$zero" ]; then
+          bash scripts/guard-allowlist-raise.sh --range "$base..$local_sha" --prior "$remote_sha" </dev/null
+        else
+          bash scripts/guard-allowlist-raise.sh --range "$base..$local_sha" </dev/null
+        fi
         bash scripts/guard-hook-bundle-freshness.sh "$base..$local_sha" </dev/null
         bash scripts/lint-file-size.sh --at "$local_sha" </dev/null
       else

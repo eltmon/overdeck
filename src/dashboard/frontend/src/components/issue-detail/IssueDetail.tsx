@@ -42,6 +42,7 @@ import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueDetailShell } from './IssueDetailShell';
+import { IssueSkillsSection } from '../skills/SkillOverridesSections';
 import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 
 export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
@@ -372,6 +373,7 @@ export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTa
               <div data-section="DrawerWorkspaceSection"><WorkspaceSection issueId={issueId} /></div>
               <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
               <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>
+              <IssueSkillsSection issueId={issueId} />
               <div data-section="DrawerTasksList"><TasksPanel issueId={issueId} /></div>
             </div>
           ) : tab === 'tasks' ? (

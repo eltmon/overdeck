@@ -41,6 +41,7 @@ import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
+import { registerSkillsCommands } from './commands/skills.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -219,11 +220,7 @@ backup
   .option('--keep <count>', 'Number of backups to keep', '10')
   .action(lazyAction(() => import('./commands/backup.js'), 'backupCleanCommand'));
 
-program
-  .command('skills')
-  .description('List and manage skills')
-  .option('--json', 'Output as JSON')
-  .action(lazyAction(() => import('./commands/skills.js'), 'skillsCommand'));
+registerSkillsCommands(program);
 
 // pan issues — list and triage work
 program
@@ -343,6 +340,7 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
+  .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')
@@ -377,6 +375,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--allow-primary', 'Operator only: allow --cwd to be a project\'s primary checkout (refused for agent sessions)')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(lazyAction(() => import('./commands/fork.js'), 'forkCommand'));
@@ -387,6 +386,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--allow-primary', 'Operator only: allow --cwd to be a project\'s primary checkout (refused for agent sessions)')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--issue <id>', 'Issue ID to associate with the new conversation; without --cwd the new conversation starts in the issue workspace when it exists')
   .option('--role <role>', 'Pane role for the new conversation: conversation (default), work, review, test, plan. With --issue, review makes the handoff the issue\'s Review row')

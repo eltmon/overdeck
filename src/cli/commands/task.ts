@@ -18,13 +18,19 @@ import { computeWorkspaceRepoRoots, resolveProjectReposForIssue } from '../../li
 import { getDispatchableItems } from '../../lib/xbrief/dag.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import {
-  claimItem,
   ItemNotVerifiable,
   markItemDone,
   readContinueState,
   setItemStatus,
   type ContinueItemState,
 } from '../../lib/xbrief/continue-state.js';
+import {
+  claimItemChecked,
+  formatClaimRefusal,
+  resolveClaimantId,
+  type HolderLiveness,
+} from '../../lib/xbrief/claim-check.js';
+import { taskStateLockPath, withTaskStateLock } from '../../lib/xbrief/task-state-lock.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
 
 interface TaskOptions {
@@ -106,11 +112,43 @@ export async function runTaskRead(
   print(getDispatchableItems(doc, new Set()), options.json);
 }
 
-export async function runTaskClaim(issue: string, itemId: string, options: TaskOptions): Promise<void> {
-  const { issueId, planHome } = resolveTaskContext(issue);
-  const agentId = process.env.OVERDECK_AGENT_ID ?? `cli-${process.pid}`;
-  const state = claimItem(planHome, issueId, itemId, agentId);
-  await commitContinue(planHome, issueId);
+export interface TaskClaimOptions extends TaskOptions {
+  steal?: boolean;
+}
+
+export interface TaskClaimDeps {
+  /** Holder liveness probe. Injected by the test; defaults to {@link probeHolder}. */
+  readonly probe?: (holder: string) => Promise<HolderLiveness>;
+}
+
+/**
+ * Refuses the claim (FR-1..FR-5) unless the item's holder is dead or the
+ * claimant itself, or the target's `files_scope` overlaps an active claim
+ * held live/indeterminate. `--steal` overrides both refusal kinds (FR-9). The
+ * whole check-and-write runs under the task-state lock (FR-10) so a
+ * concurrent `pan task claim` can't race the read.
+ */
+export async function runTaskClaim(
+  issue: string,
+  itemId: string,
+  options: TaskClaimOptions,
+  deps: TaskClaimDeps = {},
+): Promise<void> {
+  const { issueId, planHome, doc } = resolveTaskContext(issue);
+  const claimant = resolveClaimantId();
+  const lockPath = await taskStateLockPath(planHome);
+  const { state, overridden } = await withTaskStateLock(lockPath, async () => {
+    const result = await claimItemChecked(planHome, issueId, itemId, claimant, {
+      items: doc.plan.items,
+      probe: deps.probe,
+      steal: options.steal,
+    });
+    await commitContinue(planHome, issueId);
+    return result;
+  });
+  for (const refusal of overridden) {
+    console.error(`--steal overrode: ${formatClaimRefusal(itemId, refusal)}`);
+  }
   print({ itemId, ...state }, options.json);
 }
 
@@ -127,12 +165,17 @@ export function issueRepoRoots(issueId: string, workspacePath: string, planHome:
 
 export async function runTaskDone(issue: string, itemId: string, options: TaskOptions): Promise<void> {
   const { issueId, planHome, workspacePath } = resolveTaskContext(issue);
+  const lockPath = await taskStateLockPath(planHome);
   let state: ContinueItemState;
   try {
-    state = await markItemDone(planHome, issueId, itemId, {
-      requireTrailer: `Item: ${itemId}`,
-      requirePushed: true,
-      repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
+    state = await withTaskStateLock(lockPath, async () => {
+      const result = await markItemDone(planHome, issueId, itemId, {
+        requireTrailer: `Item: ${itemId}`,
+        requirePushed: true,
+        repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
+      });
+      await commitContinue(planHome, issueId);
+      return result;
     });
   } catch (error) {
     if (error instanceof ItemNotVerifiable) {
@@ -143,7 +186,6 @@ export async function runTaskDone(issue: string, itemId: string, options: TaskOp
     }
     throw error;
   }
-  await commitContinue(planHome, issueId);
   print({ itemId, ...state }, options.json);
 }
 
@@ -154,8 +196,11 @@ export async function runTaskStatus(
   options: TaskOptions,
 ): Promise<void> {
   const { issueId, planHome } = resolveTaskContext(issue);
-  setItemStatus(planHome, issueId, itemId, status);
-  await commitContinue(planHome, issueId);
+  const lockPath = await taskStateLockPath(planHome);
+  await withTaskStateLock(lockPath, async () => {
+    setItemStatus(planHome, issueId, itemId, status);
+    await commitContinue(planHome, issueId);
+  });
   print({ itemId, status }, options.json);
 }
 
@@ -166,6 +211,7 @@ export function registerTaskCommands(program: Command): void {
   task.command('show <issue> <item>').option('--json', 'Print JSON')
     .action(async (issue, item, options) => taskAction(() => runTaskRead('show', issue, item, options)));
   task.command('claim <issue> <item>').option('--json', 'Print JSON')
+    .option('--steal', 'Claim even when a running agent holds this item or an overlapping one (foreman/operator override)')
     .action(async (issue, item, options) => taskAction(() => runTaskClaim(issue, item, options)));
   task.command('done <issue> <item>').option('--json', 'Print JSON')
     .description('Record an item as done. Requires a commit carrying "Item: <item>" on a pushed branch.')

@@ -1,0 +1,253 @@
+{
+  "version": "1",
+  "issueId": "PAN-4291",
+  "created": "2026-09-28T12:49:37.810Z",
+  "updated": "2026-09-28T14:25:32.143Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "sampler-graphql-source": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T12:49:37.809Z",
+      "doneAt": "2026-09-28T13:08:44.712Z"
+    },
+    "pause-until-window-reset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:09:16.353Z",
+      "doneAt": "2026-09-28T13:13:29.981Z"
+    },
+    "pause-reconcile-on-sample": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:13:47.160Z",
+      "doneAt": "2026-09-28T13:21:14.881Z"
+    },
+    "gh-list-pricing": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:27:46.821Z"
+    },
+    "gh-local-failure-cost": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:28:05.384Z",
+      "doneAt": "2026-09-28T13:30:51.841Z"
+    },
+    "close-out-negative-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:31:12.328Z",
+      "doneAt": "2026-09-28T13:36:54.308Z"
+    },
+    "tracker-type-leaf": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:37:18.100Z",
+      "doneAt": "2026-09-28T13:39:54.602Z"
+    },
+    "pr-cache-skip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:40:28.368Z",
+      "doneAt": "2026-09-28T13:45:06.714Z"
+    },
+    "pr-cache-limit-100": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:45:25.462Z",
+      "doneAt": "2026-09-28T13:48:45.410Z"
+    },
+    "settled-cache-ttl-for": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:49:24.080Z",
+      "doneAt": "2026-09-28T13:52:10.083Z"
+    },
+    "pr-cache-idle-ttl": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:52:28.208Z",
+      "doneAt": "2026-09-28T13:58:40.563Z"
+    },
+    "banner-account-used": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:58:58.301Z",
+      "doneAt": "2026-09-28T14:06:24.257Z"
+    },
+    "docs-quota-source": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T14:06:41.222Z",
+      "doneAt": "2026-09-28T14:09:41.066Z"
+    },
+    "sampler-graphql-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:17:24.718Z"
+    },
+    "sampler-graphql-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:12.528Z"
+    },
+    "sampler-graphql-source.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:23.503Z"
+    },
+    "pause-until-window-reset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:34.466Z"
+    },
+    "pause-until-window-reset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:45.047Z"
+    },
+    "pause-until-window-reset.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:55.606Z"
+    },
+    "pause-reconcile-on-sample.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:06.067Z"
+    },
+    "pause-reconcile-on-sample.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:17.230Z"
+    },
+    "pause-reconcile-on-sample.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:28.123Z"
+    },
+    "pause-reconcile-on-sample.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:38.722Z"
+    },
+    "gh-list-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:49.839Z"
+    },
+    "gh-list-pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:01.738Z"
+    },
+    "gh-list-pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:14.566Z"
+    },
+    "gh-list-pricing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:25.920Z"
+    },
+    "gh-local-failure-cost.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:37.316Z"
+    },
+    "gh-local-failure-cost.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:48.528Z"
+    },
+    "gh-local-failure-cost.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:20:59.764Z"
+    },
+    "close-out-negative-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:11.374Z"
+    },
+    "close-out-negative-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:23.413Z"
+    },
+    "close-out-negative-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:34.436Z"
+    },
+    "close-out-negative-cache.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:46.145Z"
+    },
+    "tracker-type-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:57.478Z"
+    },
+    "tracker-type-leaf.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:22:08.821Z"
+    },
+    "pr-cache-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:22:20.301Z"
+    },
+    "pr-cache-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:22:32.184Z"
+    },
+    "pr-cache-skip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:22:45.245Z"
+    },
+    "pr-cache-limit-100.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:22:56.810Z"
+    },
+    "pr-cache-limit-100.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:08.093Z"
+    },
+    "settled-cache-ttl-for.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:19.220Z"
+    },
+    "settled-cache-ttl-for.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:30.489Z"
+    },
+    "settled-cache-ttl-for.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:41.729Z"
+    },
+    "pr-cache-idle-ttl.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:52.644Z"
+    },
+    "pr-cache-idle-ttl.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:03.381Z"
+    },
+    "banner-account-used.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:14.804Z"
+    },
+    "banner-account-used.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:25.664Z"
+    },
+    "banner-account-used.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:36.315Z"
+    },
+    "docs-quota-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:47.449Z"
+    },
+    "docs-quota-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:57.866Z"
+    },
+    "docs-quota-source.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:25:09.734Z"
+    },
+    "docs-quota-source.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:25:20.974Z"
+    },
+    "docs-quota-source.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:25:32.142Z"
+    }
+  }
+}
