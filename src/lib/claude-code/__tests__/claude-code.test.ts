@@ -1,7 +1,15 @@
 import { mkdtemp, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { NormalizedConfig } from '../../config-yaml/schema.js';
+import {
+  assertClaudeCodeSupportsModel,
+  evaluateClaudeCodeRequirements,
+  formatClaudeCodeTooOldMessage,
+  listConfiguredModels,
+  minClaudeCodeVersionFor,
+} from '../requirements.js';
 import {
   claudeCodeUpgradePlan,
   detectClaudeInstall,
@@ -11,6 +19,8 @@ import {
   resetClaudeCodeVersionCacheForTests,
   type ClaudeInstall,
 } from '../version.js';
+
+type ConfigInput = Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel'>;
 
 describe('version', () => {
   afterEach(() => {
@@ -153,6 +163,132 @@ describe('version', () => {
       });
 
       expect(result).toEqual([{ path: '/a/claude', realPath: '/real/claude' }]);
+    });
+  });
+});
+
+describe('requirements', () => {
+  describe('minClaudeCodeVersionFor', () => {
+    it('returns the documented minimum for a model id', () => {
+      expect(minClaudeCodeVersionFor('claude-sonnet-5-5')).toBe('2.1.284');
+    });
+
+    it('strips a trailing context-window suffix before resolving', () => {
+      expect(minClaudeCodeVersionFor('claude-sonnet-5-5[1m]')).toBe('2.1.284');
+    });
+
+    it('returns undefined for an unknown model id', () => {
+      expect(minClaudeCodeVersionFor('not-a-real-model')).toBeUndefined();
+    });
+  });
+
+  describe('listConfiguredModels', () => {
+    it('walks weighted role models, sub-roles, workhorses, and enabled tiers, with sources', () => {
+      const config = {
+        workhorses: { mid: 'claude-sonnet-5-5' },
+        roles: {
+          work: {
+            model: [
+              { model: 'claude-sonnet-5-5', weight: 70 },
+              { model: 'workhorse:mid', weight: 30 },
+            ],
+            sub: {
+              parent: { model: 'parent' },
+              security: { model: 'claude-fable-5-1' },
+            },
+          },
+        },
+        tieredExecution: {
+          enabled: true,
+          tiers: { quick: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: [] } },
+          difficultyToTier: {},
+          byKind: {},
+        },
+        defaultConversationModel: 'claude-opus-4-7',
+      } as never as ConfigInput;
+
+      const models = listConfiguredModels(config);
+      const byModel = new Map(models.map((m) => [m.model, m.sources]));
+
+      expect(byModel.get('claude-sonnet-5-5')).toEqual(expect.arrayContaining(['roles.work.model', 'workhorses.mid']));
+      expect(byModel.get('claude-fable-5-1')).toEqual(['roles.work.sub.security.model']);
+      expect(byModel.get('claude-haiku-4-5')).toEqual(['tieredExecution.tiers.quick.model']);
+      expect(byModel.get('claude-opus-4-7')).toEqual(['models.default_conversation_model']);
+      expect(byModel.has('parent')).toBe(false);
+    });
+  });
+
+  describe('evaluateClaudeCodeRequirements', () => {
+    it('marks a too-old install unsatisfied and a met minimum satisfied', () => {
+      const models = [
+        { model: 'claude-sonnet-5-5', sources: ['roles.work.model'] },
+        { model: 'claude-fable-5-1', sources: ['roles.plan.model'] },
+      ];
+      const requirements = evaluateClaudeCodeRequirements('2.1.280', models);
+      const byModel = new Map(requirements.map((r) => [r.model, r.satisfied]));
+      expect(byModel.get('claude-sonnet-5-5')).toBe(false);
+      expect(byModel.get('claude-fable-5-1')).toBe(true);
+    });
+
+    it('is null (unknown) when the installed version could not be read', () => {
+      const requirements = evaluateClaudeCodeRequirements(null, [{ model: 'claude-sonnet-5-5', sources: [] }]);
+      expect(requirements[0]?.satisfied).toBeNull();
+    });
+  });
+
+  describe('formatClaudeCodeTooOldMessage', () => {
+    it('names both versions, the binary path, and the upgrade command', () => {
+      const message = formatClaudeCodeTooOldMessage({
+        model: 'claude-sonnet-5-5',
+        displayName: 'Claude Sonnet 5.5',
+        installed: '2.1.280',
+        required: '2.1.284',
+        binaryPath: '/usr/local/bin/claude',
+        upgradeCommand: 'npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest',
+      });
+      expect(message).toContain('2.1.284');
+      expect(message).toContain('2.1.280');
+      expect(message).toContain('/usr/local/bin/claude');
+      expect(message).toContain('npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest');
+      expect(message).toContain('No terminal session was created.');
+    });
+  });
+
+  describe('assertClaudeCodeSupportsModel', () => {
+    it('returns without throwing when the version cannot be read, and warns once', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(
+        assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+          readVersion: async () => null,
+        }),
+      ).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      warn.mockRestore();
+    });
+
+    it('returns without throwing when there is no model', async () => {
+      await expect(assertClaudeCodeSupportsModel('/usr/local/bin/claude', undefined)).resolves.toBeUndefined();
+    });
+
+    it('throws ClaudeCodeTooOldError when the installed version is older than the minimum', async () => {
+      await expect(
+        assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+          readVersion: async () => '2.1.280',
+          detectInstall: () => ({ method: 'npm', realPath: '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js', npmPrefix: '/usr/local' }),
+          upgradePlan: async () => ({
+            method: 'npm',
+            argv: ['npm', 'install', '-g', '--prefix', '/usr/local', '@anthropic-ai/claude-code@latest'],
+            display: 'npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest',
+            runnable: true,
+          }),
+          resolveRealPath: async (p) => p,
+        }),
+      ).rejects.toMatchObject({
+        name: 'ClaudeCodeTooOldError',
+        model: 'claude-sonnet-5-5',
+        installed: '2.1.280',
+        required: '2.1.284',
+      });
     });
   });
 });
