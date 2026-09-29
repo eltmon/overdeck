@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-2444",
+  "created": "2026-09-29T22:31:10.767Z",
+  "updated": "2026-09-29T22:31:10.768Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fork-base": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T22:31:10.767Z"
+    }
+  }
+}
