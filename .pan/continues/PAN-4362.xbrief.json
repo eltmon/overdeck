@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:17:42.390Z",
+  "updated": "2026-09-29T11:17:53.051Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -368,6 +368,10 @@
     "summary-fixtures.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T11:17:42.390Z"
+    },
+    "summary-faithfulness-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:53.050Z"
     }
   }
 }
