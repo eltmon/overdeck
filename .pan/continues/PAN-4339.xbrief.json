@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:11:49.693Z",
+  "updated": "2026-09-29T03:12:06.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "claim-check.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T03:11:49.693Z"
+    },
+    "task-state-lock.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:06.220Z"
     }
   }
 }
