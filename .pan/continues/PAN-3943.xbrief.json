@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T22:32:07.575Z",
+  "updated": "2026-09-29T22:37:21.806Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "deft-skill-map": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3943",
-      "claimedAt": "2026-09-29T22:32:07.575Z"
+      "claimedAt": "2026-09-29T22:32:07.575Z",
+      "doneAt": "2026-09-29T22:37:21.806Z"
     }
   }
 }
