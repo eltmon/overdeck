@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   commit: vi.fn(),
   repos: vi.fn(),
   repoRoots: vi.fn(),
+  withTaskStateLock: vi.fn((_lockPath: string, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -37,7 +38,7 @@ vi.mock('../../../lib/overdeck/plan-artifact-commit.js', () => ({
 }));
 vi.mock('../../../lib/xbrief/task-state-lock.js', () => ({
   taskStateLockPath: async () => '/tmp/test/lock',
-  withTaskStateLock: (_lockPath: string, fn: () => Promise<unknown>) => fn(),
+  withTaskStateLock: mocks.withTaskStateLock,
 }));
 
 import { registerTaskCommands, runTaskClaim, type TaskClaimDeps, type TaskClaimOptions } from '../task.js';
@@ -90,6 +91,7 @@ describe('pan task CLI', () => {
       },
     );
     expect(mocks.commit).toHaveBeenCalled();
+    expect(mocks.withTaskStateLock).toHaveBeenCalledTimes(1);
   });
 
   it('done searches every repository root of a polyrepo workspace', async () => {
@@ -141,6 +143,7 @@ describe('pan task CLI', () => {
     expect(errors.join('\n')).toContain('is not done yet');
     expect(errors.join('\n')).toContain('Item: PAN-1-a');
     expect(mocks.commit).not.toHaveBeenCalled();
+    expect(mocks.withTaskStateLock).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -148,17 +151,19 @@ describe('pan task CLI', () => {
     ['unblock', 'pending'],
     ['reopen', 'pending'],
     ['cancel', 'cancelled'],
-  ])('%s writes the item status into the continue file', async (verb, status) => {
+  ])('%s writes the item status into the continue file, under the task-state lock', async (verb, status) => {
     await program().parseAsync(['node', 'pan', 'task', verb, 'PAN-1', 'PAN-1-a']);
     expect(mocks.setItemStatus).toHaveBeenCalledWith(expect.any(String), 'PAN-1', 'PAN-1-a', status);
+    expect(mocks.withTaskStateLock).toHaveBeenCalledTimes(1);
   });
 
-  it('reads next and show without writing', async () => {
+  it('reads next and show without writing or taking the task-state lock', async () => {
     await program().parseAsync(['node', 'pan', 'task', 'next', 'PAN-1']);
     await program().parseAsync(['node', 'pan', 'task', 'show', 'PAN-1', 'PAN-1-a']);
     expect(mocks.claimItem).not.toHaveBeenCalled();
     expect(mocks.markItemDone).not.toHaveBeenCalled();
     expect(mocks.setItemStatus).not.toHaveBeenCalled();
+    expect(mocks.withTaskStateLock).not.toHaveBeenCalled();
   });
 });
 

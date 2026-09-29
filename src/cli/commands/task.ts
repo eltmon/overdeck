@@ -165,12 +165,17 @@ export function issueRepoRoots(issueId: string, workspacePath: string, planHome:
 
 export async function runTaskDone(issue: string, itemId: string, options: TaskOptions): Promise<void> {
   const { issueId, planHome, workspacePath } = resolveTaskContext(issue);
+  const lockPath = await taskStateLockPath(planHome);
   let state: ContinueItemState;
   try {
-    state = await markItemDone(planHome, issueId, itemId, {
-      requireTrailer: `Item: ${itemId}`,
-      requirePushed: true,
-      repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
+    state = await withTaskStateLock(lockPath, async () => {
+      const result = await markItemDone(planHome, issueId, itemId, {
+        requireTrailer: `Item: ${itemId}`,
+        requirePushed: true,
+        repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
+      });
+      await commitContinue(planHome, issueId);
+      return result;
     });
   } catch (error) {
     if (error instanceof ItemNotVerifiable) {
@@ -181,7 +186,6 @@ export async function runTaskDone(issue: string, itemId: string, options: TaskOp
     }
     throw error;
   }
-  await commitContinue(planHome, issueId);
   print({ itemId, ...state }, options.json);
 }
 
@@ -192,8 +196,11 @@ export async function runTaskStatus(
   options: TaskOptions,
 ): Promise<void> {
   const { issueId, planHome } = resolveTaskContext(issue);
-  setItemStatus(planHome, issueId, itemId, status);
-  await commitContinue(planHome, issueId);
+  const lockPath = await taskStateLockPath(planHome);
+  await withTaskStateLock(lockPath, async () => {
+    setItemStatus(planHome, issueId, itemId, status);
+    await commitContinue(planHome, issueId);
+  });
   print({ itemId, status }, options.json);
 }
 
