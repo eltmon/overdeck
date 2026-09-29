@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T05:29:53.434Z",
+  "updated": "2026-09-29T05:30:12.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "openai-responses-path.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T05:29:53.433Z"
+    },
+    "evals-readme-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:12.005Z"
     }
   }
 }
