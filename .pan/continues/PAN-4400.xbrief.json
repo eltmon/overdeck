@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:48:35.925Z",
+  "updated": "2026-09-29T15:48:53.061Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "preset-apply.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T15:48:35.925Z"
+    },
+    "preset-apply.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:53.061Z"
     }
   }
 }
