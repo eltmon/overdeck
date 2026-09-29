@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:08:20.549Z",
+  "updated": "2026-09-29T06:08:37.100Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,9 +118,10 @@
       "doneAt": "2026-09-29T06:08:20.549Z"
     },
     "vault-materialize": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2609",
-      "claimedAt": "2026-09-28T14:03:55.214Z"
+      "claimedAt": "2026-09-28T14:03:55.214Z",
+      "doneAt": "2026-09-29T06:08:37.100Z"
     },
     "vault-adopt": {
       "status": "in_progress",
