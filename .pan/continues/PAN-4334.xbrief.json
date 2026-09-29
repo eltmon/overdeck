@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T02:24:11.966Z",
+  "updated": "2026-09-29T02:24:23.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -286,6 +286,10 @@
     "launch-pack-apply.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T02:24:11.966Z"
+    },
+    "launch-pack-apply.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:23.608Z"
     }
   }
 }
