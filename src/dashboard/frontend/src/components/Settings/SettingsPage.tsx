@@ -10,6 +10,7 @@ import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
+import { ModelPresetsBar } from './ModelPresetsBar';
 import { RolesPanel } from './RolesPanel';
 import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
 import { ConversationSearchSection } from './sections/ConversationSearchSection';
@@ -298,6 +299,11 @@ export function SettingsPage() {
     flushAutosave,
   });
 
+  // A preset writes config.yaml outside the autosave pipeline (PAN-4400).
+  const handlePresetChanged = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['settings'] });
+  }, [queryClient]);
+
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
     // Two problems to handle: (1) on a fresh navigation the section may not be
@@ -487,6 +493,7 @@ export function SettingsPage() {
           Model Routing
         </h2>
 
+        <ModelPresetsBar onPresetChanged={handlePresetChanged} />
         <WorkhorsePanel />
         <RolesPanel />
       </section>
