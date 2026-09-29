@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-4340",
+  "created": "2026-09-29T04:09:59.174Z",
+  "updated": "2026-09-29T04:34:08.979Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "spawn-item-worktree-default": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4340",
+      "claimedAt": "2026-09-29T04:09:59.173Z",
+      "doneAt": "2026-09-29T04:25:57.709Z"
+    },
+    "spawn-item-worktree-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:06.385Z"
+    },
+    "spawn-item-worktree-default.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:19.719Z"
+    },
+    "spawn-item-worktree-default.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:37.571Z"
+    },
+    "spawn-item-worktree-default.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:59.516Z"
+    },
+    "foreman-skill-handback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4340",
+      "claimedAt": "2026-09-29T04:28:25.316Z",
+      "doneAt": "2026-09-29T04:29:43.539Z"
+    },
+    "foreman-skill-handback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:30:23.909Z"
+    },
+    "foreman-skill-handback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:00.258Z"
+    },
+    "foreman-skill-handback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:29.840Z"
+    },
+    "foreman-skill-handback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:44.757Z"
+    },
+    "foreman-doc-handback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4340",
+      "claimedAt": "2026-09-29T04:32:20.632Z",
+      "doneAt": "2026-09-29T04:32:53.306Z"
+    },
+    "foreman-doc-handback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:26.170Z"
+    },
+    "foreman-doc-handback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:40.350Z"
+    },
+    "foreman-doc-handback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:54.356Z"
+    },
+    "foreman-doc-handback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:08.979Z"
+    }
+  }
+}
