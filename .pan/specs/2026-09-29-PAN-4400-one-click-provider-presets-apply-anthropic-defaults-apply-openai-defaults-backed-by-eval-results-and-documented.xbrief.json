@@ -4,17 +4,17 @@
     "created": "2026-09-29T14:18:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4400: One-click provider presets: \"Apply Anthropic defaults\" / \"Apply OpenAI defaults\", backed by eval results and documented",
-    "updated": "2026-09-29T14:23:31.106Z"
+    "updated": "2026-09-29T14:24:53.956Z"
   },
   "plan": {
     "id": "pan-4400",
     "title": "One-click provider presets: \"Apply Anthropic defaults\" / \"Apply OpenAI defaults\", backed by eval results and documented",
-    "status": "proposed",
+    "status": "running",
     "uid": "eee65ca0-80bc-44ec-a8db-4eb501a1ba78",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T14:18:38Z",
-    "updated": "2026-09-29T14:23:31.106Z",
+    "updated": "2026-09-29T14:24:53.956Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4400",
@@ -834,5 +834,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

@@ -318,4 +318,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   an empty one drops force-added ignored files), async `execFile` only, and skip when the
   (base, tree) pair is unchanged.
 
+- **The whole-document settings save is lossy** — `saveSettingsApi` →
+  `writeYamlConfigPreservingComments` (`src/lib/settings-api.ts`) replaces
+  `workhorses`/`roles` wholesale, writes env-derived `api_keys` back in plaintext
+  (there is no server-side key masking), drops `tts.summarizer.batch_window_seconds`
+  and `memory.features.knowledge_index`, and copies project `.pan.yaml` values into the
+  global file. Writers that must touch only named keys use a path-scoped
+  `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
+
 <!-- last-verified: 2026-09-29 -->
