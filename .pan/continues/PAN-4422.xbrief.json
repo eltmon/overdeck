@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:57:52.481Z",
+  "updated": "2026-09-29T21:58:07.965Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "codex-floor.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T21:57:52.481Z"
+    },
+    "codex-context-pin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T21:58:07.964Z"
     }
   }
 }
