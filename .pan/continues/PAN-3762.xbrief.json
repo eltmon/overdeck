@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T14:34:33.597Z",
+  "updated": "2026-09-29T14:34:40.007Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3762",
       "claimedAt": "2026-09-29T14:16:42.973Z",
       "doneAt": "2026-09-29T14:34:33.596Z"
+    },
+    "access-token-registry": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:34:40.006Z"
     }
   }
 }
