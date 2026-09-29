@@ -1,0 +1,295 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T13:11:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4398: Work agents that finished normally show \"Ended unexpectedly\": no \"Handed to review\" outcome",
+    "updated": "2026-09-29T13:12:59.776Z"
+  },
+  "plan": {
+    "id": "pan-4398",
+    "title": "Work agents that finished normally show \"Ended unexpectedly\": no \"Handed to review\" outcome",
+    "status": "proposed",
+    "uid": "e0e7f0ad-19a3-4f05-8737-b7b9f4b796c8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T13:11:54Z",
+    "updated": "2026-09-29T13:12:59.776Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4398",
+        "label": "PAN-4398",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4398.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "session-outcome",
+      "false-alarm"
+    ],
+    "narratives": {
+      "Problem": "After PAN-4290, a work agent that ran `pan done` and whose PR is open (agent-pan-4358, PR #4375) renders \"Ended unexpectedly\" in attention color. deriveSessionOutcome in src/dashboard/frontend/src/lib/sessionOutcome.ts has no row for a handed-off work agent, so row 11 (primary role, known open unmerged issue) fires. The paused guard does not help because the ended agent is absent from the store (/api/agents), so paused reads undefined. Planning nodes whose planningComplete is not true reach the same row because outcomeFactsFromSessionNode copies node.planningComplete without consulting the derived state.",
+      "Proposal": "Add a quiet 'handed-to-review' outcome as a new row 11 (after rows 9/10, before the old row 11): role work/strike, not synthesized, issueState in {in-review, changes-requested, ready}. These states exist only when an open PR exists or a review/test pane is live, which is the in-browser evidence that `pan done` ran. No paused guard. Extract the drawer's post-planning state set into planFinalizedFromState() and use it in outcomeFactsFromSessionNode for planning nodes. Update docs/ISSUE-VIEW.md. Derive only; no server or contract change.",
+      "NonGoals": "- No server change: no new SessionNode field, no contract change in packages/contracts, no endpoint, store slice, or polling loop.\n- No exposure of the pipeline journal to the frontend and no PR head-SHA or timestamp comparison.\n- No fix for ended agents missing from /api/agents (store drop); it is recorded as a hazard only.\n- No change for parked issues: parked is not treated as evidence of a finalized plan.\n- No change to worker, reviewer, review, or test outcomes.\n- No change to useSessionOutcome.ts or to the surface components (AgentStepRow, SessionPanel, DrawerAgentSession).\n- Rows 9 and 10 (recorded error, or recorded running with the pane gone) must not be outranked by the new row."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The handoff signal is the derived issue state (in-review, changes-requested, ready), not the pipeline journal or a PR-head-vs-last-commit comparison.",
+        "rationale": "The journal is server-only, DerivedPrState carries no head SHA or timestamp, the batch door drops branch facts when a PR exists, and the issue says 'derive only; store nothing new'. deriveState returns those three states only for an open PR or a live review/test/uat pane, so they are the faithful in-browser proxy."
+      },
+      {
+        "summary": "The new row sits after rows 9/10 and before the old row 11.",
+        "rationale": "A work agent that crashed while reworking review feedback (recorded error, or record still running with the pane gone) must stay 'Ended unexpectedly' even with an open PR; only a clean end reaches the new row. The observed case (agent-pan-4358, recorded 'stopped') passes rows 9/10."
+      },
+      {
+        "summary": "The new row does not check paused.",
+        "rationale": "A pause recorded after pan done does not undo the handoff, and the agent record can be absent from the store, making paused unreliable. A paused work agent with an open PR therefore shows 'Handed to review' instead of the plain fallback."
+      },
+      {
+        "summary": "The planner fallback applies only to node.type 'planning'; legacy (synthesized) nodes keep node.planningComplete.",
+        "rationale": "Keeps the existing legacy-node test and PAN-4290 D5 semantics for synthesized rows; the 'planned' state means the canonical spec exists, which only pan plan finalize writes, so no git read for the 'chore(plan): complete planning' commit is needed."
+      },
+      {
+        "summary": "parked is excluded from the plan-finalized state set.",
+        "rationale": "parked outranks planned and occurs with or without a spec, so it is not evidence that planning finalized."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4398.md",
+      "canonicalFilename": "2026-09-29-PAN-4398-work-agents-that-finished-normally-show-ended-unexpectedly-no-handed-to-review-outcome.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "handed-to-review-row",
+        "title": "Add the 'Handed to review' outcome row to deriveSessionOutcome",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:11:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/sessionOutcome.ts",
+            "src/dashboard/frontend/src/lib/sessionOutcome.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/sessionOutcome.test.ts src/dashboard/frontend/src/lib/useSessionOutcome.test.ts src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "sessionOutcome.test.ts, useSessionOutcome.test.ts and AgentStepRow.test.tsx pass with zero failures",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/dashboard/frontend/src/lib/sessionOutcome.ts: (1) add `| 'handed-to-review'` to SessionOutcomeKind directly before `'ended-unexpectedly'`; (2) below `const PRIMARY_ROLES` add `const HANDED_OFF_STATES = new Set<IssueState>(['in-review', 'changes-requested', 'ready']);`; (3) insert a new row between the `// 10 — pane gone, no stop recorded` block and the `// 11 — primary agent ended cleanly` block: if role is 'work' or 'strike', !facts.synthesized, facts.issueState !== undefined and HANDED_OFF_STATES.has(facts.issueState), return { kind: 'handed-to-review', label: 'Handed to review', detail: 'The work agent handed off; its PR is open for review.', tone: 'quiet' }. Do NOT check paused. Comment it `// 11 — work/strike agent handed off ...` and renumber the following comments to `// 12 —` and `// 13 — fallback`. In sessionOutcome.test.ts add the tests named in PRD WI-1 (row 11 in-review work → Handed to review quiet; strike and changes-requested/ready loop; paused still hands off; recorded error/running on in-review → Ended unexpectedly attention; drawer adapter work stopped in-review → Handed to review; session node work stopped with no agent snapshot on in-review → Handed to review), add `facts({ role: 'work', issueState: 'in-review' })` to the 'no kind other than ended-unexpectedly ever returns tone attention' list, and rename existing 'row 11:'/'row 12:' test titles to 'row 12:'/'row 13:'. Do not touch useSessionOutcome.ts or any component."
+        },
+        "items": [
+          {
+            "id": "handed-to-review-row.ac1",
+            "title": "Given facts { role: 'work', recordedStatus: 'stopped', issueState: 'in-review' }, deriveSessionOutcome returns kind 'handed-to-review', label 'Handed to review', tone 'quiet', asserted by a new test in sessionOutcome.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handed-to-review-row.ac2",
+            "title": "Given recordedStatus 'error' or 'running' on an 'in-review' issue for role 'work', deriveSessionOutcome returns 'Ended unexpectedly' with tone 'attention' (rows 9/10 outrank the new row), asserted by a new test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handed-to-review-row.ac3",
+            "title": "Given a work agent that ended cleanly on a 'working' issue (no PR), deriveSessionOutcome still returns 'Ended unexpectedly' with tone 'attention', asserted by the renamed row-12 test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handed-to-review-row.ac4",
+            "title": "Given outcomeFactsFromSessionNode(node({ type: 'work', status: 'stopped' }), derived({ state: 'in-review' }), undefined), deriveSessionOutcome renders label 'Handed to review' (the agent-pan-4358 case with no store snapshot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handed-to-review-row.ac5",
+            "title": "npx vitest run on sessionOutcome.test.ts, useSessionOutcome.test.ts and AgentStepRow.test.tsx exits 0, and npm run typecheck and npm run lint exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planner-finalized-fallback",
+        "title": "Derive 'Plan finalized' for planning nodes from the derived issue state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T13:11:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/sessionOutcome.ts",
+            "src/dashboard/frontend/src/lib/sessionOutcome.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/sessionOutcome.test.ts src/dashboard/frontend/src/lib/useSessionOutcome.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "sessionOutcome.test.ts and useSessionOutcome.test.ts pass with zero failures",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In src/dashboard/frontend/src/lib/sessionOutcome.ts add `const PLAN_FINALIZED_STATES = new Set<IssueState>(['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged']);` and `export function planFinalizedFromState(state: IssueState | undefined): boolean { return state !== undefined && PLAN_FINALIZED_STATES.has(state); }`. In outcomeFactsFromAgent replace the D6 expression (anchor `const planningComplete = derived?.state !== undefined`) with `const planningComplete = planFinalizedFromState(derived?.state) ? true : undefined;` keeping the D6 comment. In outcomeFactsFromSessionNode replace `planningComplete: node.planningComplete,` with a local: for node.type === 'planning', `node.planningComplete === true || planFinalizedFromState(derived?.state) ? true : node.planningComplete`; for every other node type, `node.planningComplete` unchanged (legacy nodes must keep today's behavior). Add the tests named in PRD WI-2 to sessionOutcome.test.ts. The existing 'D6:' and 'legacy node maps to role plan but is synthesized' tests must pass unchanged."
+        },
+        "items": [
+          {
+            "id": "planner-finalized-fallback.ac1",
+            "title": "Given a planning SessionNode with planningComplete undefined and derived state 'planned', outcomeFactsFromSessionNode + deriveSessionOutcome returns label 'Plan finalized', asserted by a new test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planner-finalized-fallback.ac2",
+            "title": "Given a planning SessionNode with planningComplete false, status 'stopped' and derived state 'backlog', deriveSessionOutcome returns 'Ended unexpectedly' with tone 'attention', asserted by a new test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planner-finalized-fallback.ac3",
+            "title": "planFinalizedFromState returns true for planned, working, in-review, changes-requested, ready and merged, and returns false for backlog, parked, closed and undefined, asserted by a new test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planner-finalized-fallback.ac4",
+            "title": "A legacy SessionNode with derived state 'working' still returns SESSION_ENDED_FALLBACK, and the existing D6 drawer test preserves its results (true for six states, undefined for closed and backlog)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-view-docs",
+        "title": "Document the 'Handed to review' outcome and planner fallback in docs/ISSUE-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T13:11:54Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'handed-to-review' docs/ISSUE-VIEW.md",
+            "grep -n '13-row precedence table' docs/ISSUE-VIEW.md",
+            "grep -c '12-row precedence table' docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "grep finds the table row '| `handed-to-review` | Handed to review | quiet |'",
+            "grep finds the phrase '13-row precedence table'",
+            "grep -c prints 0 for '12-row precedence table'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly, editing only the '### Ended session outcomes (PAN-4290)' section of docs/ISSUE-VIEW.md: (1) add the table row '| `handed-to-review` | Handed to review | quiet |' directly above the ended-unexpectedly row; (2) change '12-row precedence table' to '13-row precedence table'; (3) add a paragraph (PAN-4398) saying a work or strike agent that ended cleanly while its issue derives as in-review, changes-requested or ready shows Handed to review, that those states mean an open PR or a live review/test pane, that the journal and PR head SHA are server-only and not consulted, that a recorded error or a record still running with the pane gone outranks it, and that the row does not check paused; (4) in the 'claimed only on positive evidence' paragraph, change 'neither closed nor merged' to 'neither closed, merged, nor (for work/strike) handed to review' and 'a paused agent' to 'a paused agent with no open PR'; (5) add one sentence that a planning node derives Plan finalized from planningComplete or, when that is not true, from a derived state of planned or later via planFinalizedFromState."
+        },
+        "items": [
+          {
+            "id": "issue-view-docs.ac1",
+            "title": "docs/ISSUE-VIEW.md renders a table row '| `handed-to-review` | Handed to review | quiet |' directly above the ended-unexpectedly row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-docs.ac2",
+            "title": "docs/ISSUE-VIEW.md contains '13-row precedence table' and grep -c '12-row precedence table' returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-docs.ac3",
+            "title": "The Ended session outcomes section states that a paused work agent with an open PR shows Handed to review, and that a recorded error outranks it and returns Ended unexpectedly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "handed-to-review-row",
+        "to": "planner-finalized-fallback",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
