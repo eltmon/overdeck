@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:06:54.280Z",
+  "updated": "2026-09-29T11:07:06.953Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "harness-messages.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T11:06:54.280Z"
+    },
+    "eval-results.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:06.953Z"
     }
   }
 }
