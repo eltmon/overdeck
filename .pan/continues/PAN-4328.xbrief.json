@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:00:07.754Z",
+  "updated": "2026-09-29T10:11:47.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4328",
       "claimedAt": "2026-09-29T09:59:21.880Z",
       "doneAt": "2026-09-29T10:00:07.754Z"
+    },
+    "store-slot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:11:47.105Z"
     }
   }
 }
