@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4398",
   "created": "2026-09-29T13:13:55.090Z",
-  "updated": "2026-09-29T13:26:48.587Z",
+  "updated": "2026-09-29T13:37:21.744Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-29T13:26:26.916Z"
     },
     "planner-finalized-fallback": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4398",
-      "claimedAt": "2026-09-29T13:26:48.587Z"
+      "claimedAt": "2026-09-29T13:26:48.587Z",
+      "doneAt": "2026-09-29T13:37:21.743Z"
     }
   }
 }
