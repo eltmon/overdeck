@@ -70,31 +70,30 @@ function Get-Tail([string]$Text) {
   return $Text
 }
 
-function Add-Step([string]$Id, [string]$Status, [string]$Command, $ExitCode, [string]$Evidence, [string]$Note = '') {
+function Add-Step([string]$Id, [string]$Status, [string]$Command, $ExitCode, [string]$Evidence, [string]$Note = '', $Seconds = $null) {
   $Steps[$Id] = [ordered]@{
     id = $Id; status = $Status; command = $Command; exitCode = $ExitCode
-    evidence = (Get-Tail $Evidence); note = $Note
+    evidence = (Get-Tail $Evidence); note = $Note; seconds = $Seconds
   }
 }
 
 # Run one catalogue step. The script block returns a hashtable with status and,
 # optionally, exitCode, evidence and note; a throw is recorded as fail.
 function Invoke-Step([string]$Id, [string]$Display, [scriptblock]$Command) {
+  $clock = [System.Diagnostics.Stopwatch]::StartNew()
   try {
     $r = & $Command
-    Add-Step $Id $r.status $Display $r.exitCode ([string]$r.evidence) ([string]$r.note)
+    Add-Step $Id $r.status $Display $r.exitCode ([string]$r.evidence) ([string]$r.note) ([Math]::Round($clock.Elapsed.TotalSeconds, 1))
   } catch {
-    Add-Step $Id 'fail' $Display $null ($_ | Out-String) 'the probe step threw'
+    Add-Step $Id 'fail' $Display $null ($_ | Out-String) 'the probe step threw' ([Math]::Round($clock.Elapsed.TotalSeconds, 1))
   }
 }
 
-# Run an executable with stdin closed and a timeout; kill its tree on timeout.
-# Output is stdout followed by stderr.
-function Invoke-Timed([string]$File, [string[]]$Arguments, [string]$Cwd = (Get-Location).Path, [int]$TimeoutSec = 300) {
+# Start an executable with stdin closed and stdout/stderr read in the
+# background. Returns Process = $null (and Error) when it cannot start.
+function Start-Timed([string]$File, [string[]]$Arguments, [string]$Cwd = (Get-Location).Path) {
   $app = Get-Command $File -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $app) {
-    return [pscustomobject]@{ ExitCode = $null; Output = "$File is not on PATH"; TimedOut = $false; Started = $false }
-  }
+  if (-not $app) { return [pscustomobject]@{ Process = $null; Error = "$File is not on PATH" } }
   $psi = [System.Diagnostics.ProcessStartInfo]::new($app.Source)
   foreach ($a in $Arguments) { $psi.ArgumentList.Add($a) }
   $psi.WorkingDirectory = $Cwd
@@ -105,24 +104,63 @@ function Invoke-Timed([string]$File, [string[]]$Arguments, [string]$Cwd = (Get-L
   try {
     $p = [System.Diagnostics.Process]::Start($psi)
   } catch {
-    return [pscustomobject]@{ ExitCode = $null; Output = ($_ | Out-String); TimedOut = $false; Started = $false }
+    return [pscustomobject]@{ Process = $null; Error = ($_ | Out-String) }
   }
   $p.StandardInput.Close()
-  $stdout = $p.StandardOutput.ReadToEndAsync()
-  $stderr = $p.StandardError.ReadToEndAsync()
-  $timedOut = -not $p.WaitForExit($TimeoutSec * 1000)
-  if ($timedOut) {
-    try { $p.Kill($true) } catch { }
-    $p.WaitForExit(10000) | Out-Null
-  }
-  [void]$stdout.Wait(10000)
-  [void]$stderr.Wait(10000)
+  [pscustomobject]@{ Process = $p; Stdout = $p.StandardOutput.ReadToEndAsync(); Stderr = $p.StandardError.ReadToEndAsync() }
+}
+
+# Kill a started process and its whole tree.
+function Stop-Tree($Started) {
+  $p = $Started.Process
+  if ($IsWindows) { & taskkill /T /F /PID $p.Id 2>&1 | Out-Null }
+  try { $p.Kill($true) } catch { }
+  $p.WaitForExit(10000) | Out-Null
+}
+
+# stdout followed by stderr of a started process that has exited or been killed.
+function Get-TimedOutput($Started) {
+  [void]$Started.Stdout.Wait(10000)
+  [void]$Started.Stderr.Wait(10000)
   $text = ''
-  if ($stdout.IsCompleted) { $text += $stdout.Result }
-  if ($stderr.IsCompleted) { $text += $stderr.Result }
+  if ($Started.Stdout.IsCompleted) { $text += $Started.Stdout.Result }
+  if ($Started.Stderr.IsCompleted) { $text += $Started.Stderr.Result }
+  $text
+}
+
+# Run an executable with stdin closed and a timeout; kill its tree on timeout.
+# Output is stdout followed by stderr.
+function Invoke-Timed([string]$File, [string[]]$Arguments, [string]$Cwd = (Get-Location).Path, [int]$TimeoutSec = 300) {
+  $s = Start-Timed $File $Arguments $Cwd
+  if (-not $s.Process) {
+    return [pscustomobject]@{ ExitCode = $null; Output = $s.Error; TimedOut = $false; Started = $false }
+  }
+  $timedOut = -not $s.Process.WaitForExit($TimeoutSec * 1000)
+  if ($timedOut) { Stop-Tree $s }
+  $text = Get-TimedOutput $s
   if ($timedOut) { $text += "`n[probe: killed after $TimeoutSec s]" }
-  $code = if ($timedOut) { $null } else { $p.ExitCode }
+  $code = if ($timedOut) { $null } else { $s.Process.ExitCode }
   return [pscustomobject]@{ ExitCode = $code; Output = $text; TimedOut = $timedOut; Started = $true }
+}
+
+# The process tree under $RootId (command lines) and what listens on $Port.
+function Get-ServeSnapshot([int]$RootId, [int]$Port) {
+  $all = foreach ($proc in Get-Process) {
+    $parent = $null
+    try { $parent = $proc.Parent.Id } catch { }
+    [pscustomobject]@{ Id = $proc.Id; Parent = $parent; Cmd = $proc.CommandLine }
+  }
+  $ids = [System.Collections.Generic.HashSet[int]]::new()
+  [void]$ids.Add($RootId)
+  do {
+    $grew = $false
+    foreach ($p in $all) { if ($null -ne $p.Parent -and $ids.Contains([int]$p.Parent) -and $ids.Add([int]$p.Id)) { $grew = $true } }
+  } while ($grew)
+  $tree = ($all | Where-Object { $ids.Contains([int]$_.Id) } | ForEach-Object { "$($_.Id) <- $($_.Parent): $($_.Cmd)" }) -join "`n"
+  $listen = if ($IsWindows) {
+    (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort) pid $($_.OwningProcess)" }) -join "`n"
+  } else { (& ss -ltnp "sport = :$Port" 2>&1 | Out-String).Trim() }
+  "--- process tree under $RootId ---`n$tree`n--- listening on $Port ---`n$(if ($listen) { $listen } else { '(nothing)' })"
 }
 
 function Invoke-Pan([string[]]$Arguments, [int]$TimeoutSec = 300, [string]$Cwd = (Get-Location).Path) {
@@ -166,8 +204,9 @@ $Result = [ordered]@{
 
 # Install the subject into the npx cache once, so 1c's 90 s budget measures the
 # server and not the download.
+$warmClock = [System.Diagnostics.Stopwatch]::StartNew()
 $warm = Invoke-Pan @('--version') 600
-$Result.subjectInstall = [ordered]@{ exitCode = $warm.ExitCode; evidence = (Get-Tail $warm.Output) }
+$Result.subjectInstall = [ordered]@{ exitCode = $warm.ExitCode; evidence = (Get-Tail $warm.Output); seconds = [Math]::Round($warmClock.Elapsed.TotalSeconds, 1) }
 
 # ---- 1a-1b: published latest ---------------------------------------------
 
@@ -186,39 +225,30 @@ Invoke-Step '1b' 'npx --yes @overdeck/core@latest vault list' {
 # ---- 1c-2b: dashboard ------------------------------------------------------
 
 $ServeUp = $false
-$ServeOut = Join-Path $ProbeTemp 'serve.stdout.txt'
-$ServeErr = Join-Path $ProbeTemp 'serve.stderr.txt'
 if ($SkipServe) {
   foreach ($id in '1c', '1d', '2a', '2b') { Add-Step $id 'not-run' '' $null '' 'skipped by -SkipServe' }
 } else {
-  $serveProc = $null
+  # serve runs through the same launcher as every other step. Its output is
+  # read once the tree is killed after 2b; 1c's evidence gets it then.
+  $serve = $null
+  $ServePoll = ''
   Invoke-Step '1c' "$(Format-Pan @('serve', '--port', "$Port")) (background); GET http://localhost:$Port/" {
-    $npx = (Get-Command npx -CommandType Application | Select-Object -First 1).Source
     $env:OVERDECK_INTERNAL_TOKEN = $Token
-    $script:serveProc = Start-Process -FilePath $npx -ArgumentList @('--yes', '-p', $Subject, 'pan', 'serve', '--port', "$Port") `
-      -RedirectStandardOutput $ServeOut -RedirectStandardError $ServeErr -PassThru
+    $script:serve = Start-Timed 'npx' @('--yes', '-p', $Subject, 'pan', 'serve', '--port', "$Port")
+    Remove-Item Env:OVERDECK_INTERNAL_TOKEN -ErrorAction SilentlyContinue
+    if (-not $script:serve.Process) { return @{ status = 'fail'; evidence = $script:serve.Error; note = 'serve did not start' } }
     $last = $null
     $deadline = (Get-Date).AddSeconds(90)
     while ((Get-Date) -lt $deadline) {
       $last = Get-HttpStatus 'GET' "http://localhost:$Port/" @{} $null
       if ($last.Status -eq 200) { break }
-      if ($script:serveProc.HasExited) { break }
+      if ($script:serve.Process.HasExited) { break }
       Start-Sleep -Seconds 3
     }
-    $log = "GET / -> $($last.Status)`n--- serve stdout ---`n$(Get-Content -Raw $ServeOut -ErrorAction SilentlyContinue)`n--- serve stderr ---`n$(Get-Content -Raw $ServeErr -ErrorAction SilentlyContinue)"
     $script:ServeUp = $last.Status -eq 200
-    $exit = if ($script:serveProc.HasExited) { $script:serveProc.ExitCode } else { $null }
-    @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $log }
-  }
-
-  Invoke-Step '1d' 'read serve stdout for "Open your browser to:"' {
-    $stdout = [string](Get-Content -Raw $ServeOut -ErrorAction SilentlyContinue)
-    if ($stdout -notmatch 'Starting server on port') {
-      return @{ status = 'not-run'; evidence = $stdout; note = '1c failed: serve never printed "Starting server on port"' }
-    }
-    $line = ($stdout -split "`r?`n") | Where-Object { $_ -match 'Open your browser to:' } | Select-Object -First 1
-    if ($line) { return @{ status = 'fail'; evidence = $stdout; note = $line } }
-    @{ status = 'partial'; evidence = $stdout; note = 'headless runner: openBrowser resolved, not observable' }
+    $script:ServePoll = "GET / -> $($last.Status)$(if ($last.Status -ne 200) { "`n$($last.Body)" })`n$(Get-ServeSnapshot $script:serve.Process.Id $Port)"
+    $exit = if ($script:serve.Process.HasExited) { $script:serve.Process.ExitCode } else { $null }
+    @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $script:ServePoll }
   }
 
   Invoke-Step '2a' "GET /api/{health,conversations,projects,settings,issues} with x-overdeck-internal-token" {
@@ -243,12 +273,21 @@ if ($SkipServe) {
     @{ status = $(if ($ok) { 'pass' } else { 'fail' }); evidence = "HTTP $($r.Status)`n$($r.Body)" }
   }
 
-  if ($serveProc) {
-    if ($IsWindows) { & taskkill /T /F /PID $serveProc.Id 2>&1 | Out-Null }
-    try { [System.Diagnostics.Process]::GetProcessById($serveProc.Id).Kill($true) } catch { }
-    Stop-Process -Id $serveProc.Id -Force -ErrorAction SilentlyContinue
+  $ServeOutput = ''
+  if ($serve -and $serve.Process) {
+    if (-not $serve.Process.HasExited) { Stop-Tree $serve }
+    $ServeOutput = Get-TimedOutput $serve
+    $Steps['1c'].evidence = Get-Tail "$ServePoll`n--- serve stdout+stderr ---`n$ServeOutput"
   }
-  Remove-Item Env:OVERDECK_INTERNAL_TOKEN -ErrorAction SilentlyContinue
+
+  Invoke-Step '1d' 'read serve output for "Open your browser to:"' {
+    if ($ServeOutput -notmatch 'Starting server on port') {
+      return @{ status = 'not-run'; evidence = $ServeOutput; note = '1c failed: serve never printed "Starting server on port"' }
+    }
+    $line = ($ServeOutput -split "`r?`n") | Where-Object { $_ -match 'Open your browser to:' } | Select-Object -First 1
+    if ($line) { return @{ status = 'fail'; evidence = $ServeOutput; note = $line } }
+    @{ status = 'partial'; evidence = $ServeOutput; note = 'headless runner: openBrowser resolved, not observable' }
+  }
 }
 
 # ---- 3a-3c: vault B-flow ---------------------------------------------------
@@ -450,11 +489,25 @@ Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 90 s, stdin closed
 
 Add-Step '5a' 'not-run' '' $null '' 'native env'
 
+# ---- cascade: steps whose subject never happened ---------------------------
+# Their evidence stays (the plain clone's bytes, the homes); the status says why.
+
+if (-not $MaterializedPath -and $Steps['3f'].status -ne 'not-run') {
+  $Steps['3f'].status = 'not-run'
+  $Steps['3f'].note = '3c failed: nothing was materialized'
+}
+if ($Steps['4a'].status -ne 'pass') {
+  foreach ($id in '4b', '4c', '4d', '4e', '4f') {
+    $Steps[$id].status = 'not-run'
+    $Steps[$id].note = '4a failed: the code snapshot was not applied'
+  }
+}
+
 # ---- write -----------------------------------------------------------------
 
 $ordered = foreach ($id in $Catalogue.Keys) {
   if ($Steps.Contains($id)) { $Steps[$id] } else {
-    [ordered]@{ id = $id; status = 'not-run'; command = ''; exitCode = $null; evidence = ''; note = 'the probe did not reach this step' }
+    [ordered]@{ id = $id; status = 'not-run'; command = ''; exitCode = $null; evidence = ''; note = 'the probe did not reach this step'; seconds = $null }
   }
 }
 $Result.steps = @($ordered)
