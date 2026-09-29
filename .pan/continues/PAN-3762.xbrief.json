@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T15:53:59.890Z",
+  "updated": "2026-09-29T15:59:09.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,10 @@
       "doneAt": "2026-09-29T15:53:53.548Z"
     },
     "e2e-pairing-journey": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3762",
-      "claimedAt": "2026-09-29T15:53:59.890Z"
+      "claimedAt": "2026-09-29T15:53:59.890Z",
+      "doneAt": "2026-09-29T15:59:09.789Z"
     }
   }
 }
