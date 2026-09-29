@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:13:24.381Z",
+  "updated": "2026-09-29T16:13:37.635Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "expansion-reasons.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:13:24.381Z"
+    },
+    "expansion-reasons.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:13:37.634Z"
     }
   }
 }
