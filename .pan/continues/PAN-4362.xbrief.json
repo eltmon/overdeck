@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T09:50:32.527Z",
+  "updated": "2026-09-29T09:51:58.161Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "harness-messages": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4362",
-      "claimedAt": "2026-09-29T09:50:32.527Z"
+      "claimedAt": "2026-09-29T09:50:32.527Z",
+      "doneAt": "2026-09-29T09:51:58.161Z"
     }
   }
 }
