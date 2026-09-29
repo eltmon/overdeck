@@ -32,7 +32,7 @@ import {
   resolveLaunchDisabledSkills,
   writeCodexSkillOverrides,
 } from '../launch.js';
-import { claudeSkillSettingsArg, launcherSkillOverrideLines } from '../launcher-lines.js';
+import { claudeSkillPluginDirArg, claudeSkillSettingsArg, launcherSkillOverrideLines } from '../launcher-lines.js';
 
 describe('claudeSkillSettingsJson', () => {
   it('maps every disabled skill to off', () => {
@@ -147,6 +147,26 @@ describe('launcherSkillOverrideLines', () => {
   it('keeps empty output and a JSON object', () => {
     expect(runStep('return 0;')).toBe('[]');
     expect(runStep(`echo '{"skillOverrides":{"grilling":"off"}}';`)).toBe('[{"skillOverrides":{"grilling":"off"}}]');
+  });
+
+  it('adds the plugin link step as the third line for Claude (PAN-4334)', () => {
+    const lines = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/w', pluginLink: '/h/launch/k/skill-packs' });
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain(`--cwd '/w' --plugin-link '/h/launch/k/skill-packs')"`);
+    expect(lines[1]).toMatch(/^case "\$PAN_SKILL_SETTINGS"/);
+    expect(lines[2]).toBe(
+      `if [ -d '/h/launch/k/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='/h/launch/k/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
+    );
+    const codex = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', pluginLink: '/h/x' });
+    expect(codex.join('\n')).not.toContain('--plugin-link');
+  });
+
+  it('expands to --plugin-dir only when the link is a directory', () => {
+    const arg = claudeSkillPluginDirArg(true);
+    const run = (value: string) => execFileSync('bash', ['-c', `PAN_SKILL_PLUGIN_DIR=${value}; set -- claude${arg}; printf '%s|' "$@"`], { encoding: 'utf8' });
+    expect(run(`''`)).toBe('claude|');
+    expect(run(`'/h/launch/k/skill-packs'`)).toBe('claude|--plugin-dir|/h/launch/k/skill-packs|');
+    expect(claudeSkillPluginDirArg(false)).toBe('');
   });
 
   it('expands to --settings only when settings were produced', () => {
