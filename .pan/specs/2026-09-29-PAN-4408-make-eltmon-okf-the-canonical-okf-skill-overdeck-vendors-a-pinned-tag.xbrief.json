@@ -1,0 +1,1166 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T14:40:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4408: Make eltmon/okf the canonical OKF skill; Overdeck vendors a pinned tag",
+    "updated": "2026-09-29T14:46:09.288Z"
+  },
+  "plan": {
+    "id": "pan-4408",
+    "title": "Make eltmon/okf the canonical OKF skill; Overdeck vendors a pinned tag",
+    "status": "proposed",
+    "uid": "a73a0989-faea-4123-a77d-e2e3ec228789",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T14:40:03Z",
+    "updated": "2026-09-29T14:46:09.288Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4408",
+        "label": "PAN-4408",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4408.md",
+        "label": "PRD draft (.pan/drafts/pan-4408.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/okf/blob/main/.pan/drafts/okf-v0.2-redesign.md",
+        "label": "OKF v0.2 redesign PRD (§4.7, §6 PAN-A)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/okf/issues/1",
+        "label": "OKF-1 (blocked by this issue)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "okf",
+      "skills",
+      "sync",
+      "vendoring",
+      "ci",
+      "doctor",
+      "cross-repo"
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-A is a pre-filed, operator-approved unit in the PAN-A → OKF-1 → … → PAN-B → PAN-C chain (eltmon/okf PRD §6), and OKF-1 is blocked on it. The file count includes four eltmon/okf files in a sibling repo and small single-purpose tests. The subsystem count is inflated because single-file paths (CLAUDE.md, .husky/pre-push, configuration/knowledge.mdx, scripts/vendor-okf-skill.sh) each count as their own subsystem. The okf release, the vendor script and the pin workflow are one chain (tag → vendor → pin), and the sync convergence and doctor warning only make sense once a pinned version file exists.",
+      "canonicalFilename": "2026-09-29-PAN-4408-make-eltmon-okf-the-canonical-okf-skill-overdeck-vendors-a-pinned-tag.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "sync-sources/skills/okf/ was canonical and subtree-mirrored to eltmon/okf, so the public repo could not take fixes, and it has no LICENSE. Since 2026-09-29 eltmon/okf carries the v0.2 PRD and has diverged; the mirror and its drift gate were retired in abaeeab9647. Installed skill copies in ~/.claude/skills/okf and ~/.agents/skills/okf still hold a 2026-09-01 variant because pan sync treats files whose hash differs from its manifest as user edits and skips them.",
+      "Proposal": "Make eltmon/okf canonical: add LICENSE, NOTICE and a selftest CI workflow there, rewrite its README install section, tag v0.1.0 on that release commit and merge it into okf main. In Overdeck, add scripts/vendor-okf-skill.sh (vendor and --check modes, one root-anchored exclude list, .okf-skill-version pin file), vendor v0.1.0, and add okf-vendor-pin.yml running the check. Make pan sync converge real-directory installed copies of vendored skills (okf) and report replaced files, add a pan doctor OKF Skill Version skew warning, and document where the skill lives.",
+      "NonGoals": "- Refreshing per-bundle .okf/scripts in knowledge repos (OKF-4 upgrade-bundle).\n- Rewriting existing per-agent CODEX_HOME/skills copies; they refresh from ~/.agents/skills at the next Codex spawn.\n- Changing okf skill content (SKILL.md, scripts, references) beyond README's install section and the new LICENSE, NOTICE and ci.yml.\n- Any OKF v0.2 work (OKF-1..OKF-9, PAN-B, PAN-C), including pytest in eltmon/okf.\n- Deleting __pycache__ from installed copies, or changing pan sync behavior for any non-vendored skill.\n- Writing into or re-pointing a symlinked skill root.\n- Creating a GitHub Release object for v0.1.0.\n- Re-creating okf-mirror-drift.yml or mirror-okf-skill.sh, or any workflow that compares against eltmon/okf main.\n- Hand-editing any file under sync-sources/skills/okf.\n- Raising any scripts/file-size-allowlist.txt cap.\n- Running a real pan sync from the workspace under a substituted HOME or OVERDECK_HOME."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Tag v0.1.0 on a release commit branched from fe73d46 that adds LICENSE, NOTICE, ci.yml and the README install rewrite, not on fe73d46 itself.",
+        "rationale": "The issue says tag at fe73d46 but its AC requires LICENSE and NOTICE in the v0.1.0 filtered tree, and fe73d46 has neither. A release commit off fe73d46 keeps every stated intent: no .pan/, skill content unchanged except README, LICENSE/NOTICE present. Merged into okf main with a merge commit so the tag stays reachable."
+      },
+      {
+        "summary": "Edit the README install section in eltmon/okf before tagging, not in sync-sources/skills/okf/README.md.",
+        "rationale": "sync-sources/skills/okf is vendored; any in-place edit fails the pin check. The README reaches Overdeck through the v0.1.0 vendor step."
+      },
+      {
+        "summary": "Corroborate cross-repo items with empty commits carrying the Item trailer on feature/pan-4408.",
+        "rationale": "pan task done only searches this repo for the Item trailer; commits in eltmon/okf never satisfy it."
+      },
+      {
+        "summary": "The pin workflow calls `scripts/vendor-okf-skill.sh --check` instead of re-implementing the filter.",
+        "rationale": "The issue requires the same exclude list in both places; one bash array in one script guarantees that."
+      },
+      {
+        "summary": "Root-anchored rsync excludes, --tarball/--dest flags for offline tests, pin file = tag plus newline.",
+        "rationale": "templates/repo/.github and templates/repo/.gitignore are skill content and must survive; tests must not hit the network; the simplest pin format serves both doctor and the check."
+      },
+      {
+        "summary": "pan sync force-converges only vendored skills (okf) whose installed root is a real directory; symlinked roots keep conflict behavior.",
+        "rationale": "The stale 2026-09-01 variant survived because modified files are skipped as user edits. The old README told users to symlink their okf checkout, and sync must never write replacements through into it."
+      },
+      {
+        "summary": "Convergence and diff checks ignore __pycache__.",
+        "rationale": "Python writes __pycache__ into installed script dirs at run time; it is not skill content."
+      },
+      {
+        "summary": "The CI deliberate-edit proof runs on this PR (red commit then revert), not via workflow_dispatch.",
+        "rationale": "workflow_dispatch only works for workflows already on the default branch; the Vitest --check case is the mechanical negative proof and the PR-run checkpoint has a recorded fallback."
+      },
+      {
+        "summary": "The doctor check lives in doctor-okf-skill.ts and is wired by editing the existing doctor.ts line 828 with a dynamic import.",
+        "rationale": "doctor.ts is at its 1042-line cap and agents may not raise caps; line 771 already uses the dynamic-import pattern."
+      },
+      {
+        "summary": "Live host convergence is verified after merge + pan reload + pan sync, not from the workspace.",
+        "rationale": "The deployed pan reads sync-sources from the primary checkout, and running pan sync under a substituted HOME/OVERDECK_HOME risks shared state (Herdr unit)."
+      },
+      {
+        "summary": "Keep this as one issue with a sizeJustification instead of splitting into siblings.",
+        "rationale": "PAN-A is a pre-filed unit in the operator-approved PAN-A → OKF-1 chain; OKF-1 is blocked on it."
+      }
+    ],
+    "items": [
+      {
+        "id": "okf-license-notice",
+        "title": "Add MIT LICENSE and Apache-2.0 NOTICE to eltmon/okf",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "/home/eltmon/Projects/okf-pan-4408/LICENSE*",
+            "/home/eltmon/Projects/okf-pan-4408/NOTICE*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "diff /home/eltmon/Projects/okf-pan-4408/LICENSE LICENSE",
+            "grep -c 'Apache License, Version 2.0' /home/eltmon/Projects/okf-pan-4408/NOTICE",
+            "bash /home/eltmon/Projects/okf-pan-4408/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "diff prints nothing and exits 0",
+            "grep prints 1",
+            "selftest prints ok - okf scaffold selftest complete"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ],
+          "readinessReason": "WI-1..WI-3 share one eltmon/okf worktree and the release/v0.1.0 branch, so they run one at a time in any order."
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create the throwaway okf worktree per PRD D13 (`git -C /home/eltmon/Projects/okf fetch origin && git -C /home/eltmon/Projects/okf worktree add -b release/v0.1.0 /home/eltmon/Projects/okf-pan-4408 fe73d46`) unless it already exists. Copy this repo's LICENSE byte-for-byte to the worktree root and create NOTICE with the exact text in PRD WI-1 (Apache-2.0 attribution for references/spec.md, upstream commit ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a). Commit `chore: add MIT LICENSE and Apache-2.0 NOTICE for the vendored spec`, run `bash scripts/selftest.sh`, push with `git push git@github.com:eltmon/okf.git release/v0.1.0`. Corroborate per PRD D3: after the eltmon/okf commit is pushed, make `git commit --allow-empty` on feature/pan-4408 whose body names the okf commit SHA and carries the `Item: okf-license-notice` trailer, push, then `pan task done`."
+        },
+        "items": [
+          {
+            "id": "okf-license-notice.ac1",
+            "title": "Given the release/v0.1.0 branch on eltmon/okf, when `git show origin/release/v0.1.0:LICENSE` runs, then it prints text byte-identical to this repo's LICENSE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-license-notice.ac2",
+            "title": "Given the release/v0.1.0 branch, `git show origin/release/v0.1.0:NOTICE` contains `Apache License, Version 2.0` and `references/spec.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-license-notice.ac3",
+            "title": "`bash scripts/selftest.sh` in the okf worktree exits 0 and prints `ok - okf scaffold selftest complete`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-ci-selftest",
+        "title": "Add eltmon/okf CI workflow running scripts/selftest.sh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "/home/eltmon/Projects/okf-pan-4408/.github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh run list -R eltmon/okf --workflow ci.yml --branch release/v0.1.0 --limit 1 --json conclusion"
+          ],
+          "expected_outputs": [
+            "JSON output shows conclusion success"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ],
+          "readinessReason": "WI-1..WI-3 share one eltmon/okf worktree and the release/v0.1.0 branch, so they run one at a time in any order."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In the okf worktree on release/v0.1.0 create .github/workflows/ci.yml with the exact YAML in PRD WI-2 (push + pull_request triggers, actions/checkout@v4, actions/setup-python@v5 python 3.12, `python -m pip install pyyaml`, `bash scripts/selftest.sh`). Commit `ci: run scripts/selftest.sh on push and pull_request` and push over SSH (`git push git@github.com:eltmon/okf.git release/v0.1.0`) because the gh OAuth token lacks the workflow scope. Wait for the run and confirm it is green. Corroborate per PRD D3: after the eltmon/okf commit is pushed, make `git commit --allow-empty` on feature/pan-4408 whose body names the okf commit SHA and carries the `Item: okf-ci-selftest` trailer, push, then `pan task done`. Put the green run URL in the empty commit body."
+        },
+        "items": [
+          {
+            "id": "okf-ci-selftest.ac1",
+            "title": "When the release/v0.1.0 branch is pushed, eltmon/okf runs the `ci` workflow and `gh run list -R eltmon/okf --workflow ci.yml --branch release/v0.1.0 --limit 1 --json conclusion` returns `success`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-ci-selftest.ac2",
+            "title": "The workflow file contains a step that runs `bash scripts/selftest.sh` after installing pyyaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-readme-install",
+        "title": "Rewrite the eltmon/okf README install section for the canonical repo",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "/home/eltmon/Projects/okf-pan-4408/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'canonical home' /home/eltmon/Projects/okf-pan-4408/README.md",
+            "grep -c 'mirror repo' /home/eltmon/Projects/okf-pan-4408/README.md || true",
+            "bash /home/eltmon/Projects/okf-pan-4408/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "first grep prints 1",
+            "second grep prints 0",
+            "selftest prints ok - okf scaffold selftest complete"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-12"
+          ],
+          "readinessReason": "WI-1..WI-3 share one eltmon/okf worktree and the release/v0.1.0 branch, so they run one at a time in any order."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In the okf worktree on release/v0.1.0 replace only the `## Install` section of README.md (up to, not including, `## 5-Minute Quickstart`) with the exact After text in PRD WI-3: eltmon/okf is canonical, Overdeck vendors a tag and `pan sync` installs it to ~/.claude/skills/okf and ~/.agents/skills/okf, standalone Claude Code and Codex/Pi symlink instructions, pinning with `git checkout vX.Y.Z`. Do not touch the command table; selftest.sh parses it. Run `bash scripts/selftest.sh`, commit `docs: canonical-repo install section for Claude Code, Codex and Pi`, push over SSH. Corroborate per PRD D3: after the eltmon/okf commit is pushed, make `git commit --allow-empty` on feature/pan-4408 whose body names the okf commit SHA and carries the `Item: okf-readme-install` trailer, push, then `pan task done`."
+        },
+        "items": [
+          {
+            "id": "okf-readme-install.ac1",
+            "title": "`git show origin/release/v0.1.0:README.md` contains `canonical home`, `~/.agents/skills/okf` and `pan sync`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-readme-install.ac2",
+            "title": "`git show origin/release/v0.1.0:README.md` no longer contains the phrase `mirror repo`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-readme-install.ac3",
+            "title": "`bash scripts/selftest.sh` in the okf worktree exits 0 after the README change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-tag-v010",
+        "title": "Tag eltmon/okf v0.1.0 and merge the release branch into okf main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "/home/eltmon/Projects/okf-pan-4408/README.md",
+            "/home/eltmon/Projects/okf-pan-4408/LICENSE*"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git -C /home/eltmon/Projects/okf fetch origin --tags",
+            "git -C /home/eltmon/Projects/okf merge-base --is-ancestor v0.1.0 origin/main",
+            "git -C /home/eltmon/Projects/okf ls-tree --name-only v0.1.0"
+          ],
+          "expected_outputs": [
+            "fetch succeeds",
+            "merge-base exits 0",
+            "ls-tree lists LICENSE and NOTICE and no .pan"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ],
+          "readinessReason": "Tagging and merging a shared release branch in another repo must not race any other okf-side push."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D1. Create annotated tag `v0.1.0` at the release/v0.1.0 tip (`git tag -a v0.1.0 -m \"OKF skill v0.1.0\"`) and push it over SSH. Open a PR in eltmon/okf from release/v0.1.0 to main and merge it with `gh pr merge --merge` (merge commit, never squash or rebase, so the tagged commit stays reachable). If GitHub refuses the API merge because of the workflow file, use the PRD WI-4 fallback: a detached second worktree at origin/main, `git merge --no-ff release/v0.1.0`, push HEAD:main over SSH. Verify with `git merge-base --is-ancestor v0.1.0 origin/main` and a 200 from the tag tarball URL. Remove the throwaway okf worktrees afterwards; never touch /home/eltmon/Projects/okf itself. Corroborate per PRD D3: after the eltmon/okf commit is pushed, make `git commit --allow-empty` on feature/pan-4408 whose body names the okf commit SHA and carries the `Item: okf-tag-v010` trailer, push, then `pan task done`. Name the tag SHA and PR URL in the body."
+        },
+        "items": [
+          {
+            "id": "okf-tag-v010.ac1",
+            "title": "`git -C /home/eltmon/Projects/okf cat-file -t v0.1.0` prints `tag` after `git fetch origin --tags`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-tag-v010.ac2",
+            "title": "`git -C /home/eltmon/Projects/okf merge-base --is-ancestor v0.1.0 origin/main` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-tag-v010.ac3",
+            "title": "`git -C /home/eltmon/Projects/okf ls-tree v0.1.0 .pan` prints nothing, and `git ls-tree v0.1.0 LICENSE NOTICE` lists both files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-tag-v010.ac4",
+            "title": "`curl -fsSLI https://github.com/eltmon/okf/archive/refs/tags/v0.1.0.tar.gz` returns HTTP 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vendor-script",
+        "title": "Add scripts/vendor-okf-skill.sh with vendor and --check modes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/vendor-okf-skill.sh",
+            "tests/unit/scripts/vendor-okf-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/vendor-okf-skill.test.ts",
+            "bash -n scripts/vendor-okf-skill.sh"
+          ],
+          "expected_outputs": [
+            "vendor-okf-skill.test.ts: 8 tests pass",
+            "bash -n exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "vendor-apply-v010",
+            "pin-workflow"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and decisions D4-D7. Create executable bash script scripts/vendor-okf-skill.sh: `<tag> [--tarball <file>] [--dest <dir>]` vendors, `--check [--tarball <file>] [--dest <dir>]` compares. Usage errors exit 2 with a `usage:` line. One EXCLUDES array (.github .pan .overdeck tests CHANGELOG.md .gitignore .gitattributes) turned into root-anchored rsync filters `--exclude=/<entry>`. Download from https://github.com/eltmon/okf/archive/refs/tags/<tag>.tar.gz unless --tarball; extract with --strip-components=1 into a mktemp dir cleaned by `trap 'rm -rf -- \"${tmp:?}\"' EXIT`. Vendor mode refuses a tarball without LICENSE or NOTICE, then `rsync -a --delete` into dest and writes `<tag>\\n` to .okf-skill-version. Check mode reads the tag from the pin file, builds the expected tree the same way, and `diff -r -x __pycache__` against dest, exiting 1 with a `::error::` message on difference. Write tests/unit/scripts/vendor-okf-skill.test.ts with the 8 fixture-tarball cases listed in PRD WI-5; never hit the network."
+        },
+        "items": [
+          {
+            "id": "vendor-script.ac1",
+            "title": "Given no arguments, a tag without the leading v, or an unknown flag, the script exits 2 and prints a `usage:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-script.ac2",
+            "title": "Given a fixture tarball, `v0.1.0 --tarball <f> --dest <d>` produces LICENSE, NOTICE, SKILL.md and templates/repo/.github/workflows/conformance.yml in <d>, deletes a pre-existing stale file, and creates no root .github, .pan, tests or CHANGELOG.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-script.ac3",
+            "title": "After vendoring, `<d>/.okf-skill-version` contains exactly `v0.1.0` and a newline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-script.ac4",
+            "title": "Given a tarball without NOTICE, vendor mode exits 1 and preserves the destination unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-script.ac5",
+            "title": "`--check` exits 0 on a freshly vendored tree and exits 1 naming SKILL.md after a line is appended to it, and exits 1 when the pin file is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vendor-apply-v010",
+        "title": "Vendor eltmon/okf v0.1.0 into sync-sources/skills/okf",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/okf/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/vendor-okf-skill.sh --check",
+            "cat sync-sources/skills/okf/.okf-skill-version",
+            "git show --stat HEAD -- sync-sources/skills/okf"
+          ],
+          "expected_outputs": [
+            "check prints okf skill matches eltmon/okf v0.1.0 and exits 0",
+            "prints v0.1.0",
+            "stat lists exactly 4 files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. From the workspace root run `bash scripts/vendor-okf-skill.sh v0.1.0` (network). `git status --short sync-sources/skills/okf` must show exactly LICENSE, NOTICE and .okf-skill-version added and README.md modified; any other change means the tag or exclude list is wrong, so stop and report via `pan tell`. Run `bash scripts/vendor-okf-skill.sh --check` (must exit 0) and commit `chore(okf): vendor eltmon/okf v0.1.0` with the Item trailer. Never hand-edit files under sync-sources/skills/okf."
+        },
+        "items": [
+          {
+            "id": "vendor-apply-v010.ac1",
+            "title": "When `bash scripts/vendor-okf-skill.sh --check` runs on the committed tree, it exits 0 and prints `okf skill matches eltmon/okf v0.1.0`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-apply-v010.ac2",
+            "title": "`cat sync-sources/skills/okf/.okf-skill-version` prints `v0.1.0`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-apply-v010.ac3",
+            "title": "sync-sources/skills/okf contains LICENSE, NOTICE and templates/repo/.github/workflows/conformance.yml and contains no root .github, .pan or tests directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-apply-v010.ac4",
+            "title": "`git show --stat HEAD -- sync-sources/skills/okf` on the vendor commit shows exactly LICENSE, NOTICE, .okf-skill-version and README.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pin-workflow",
+        "title": "Add okf-vendor-pin.yml CI workflow that runs the pin check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/okf-vendor-pin.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh pr checks --json name,state | grep okf-vendor-pin",
+            "git grep -n 'refs/heads/main' -- .github/workflows/okf-vendor-pin.yml || true"
+          ],
+          "expected_outputs": [
+            "okf-vendor-pin check shows SUCCESS on the PR head",
+            "git grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and decision D11. Create .github/workflows/okf-vendor-pin.yml with the exact YAML in PRD WI-7: pull_request and push-to-main triggers path-filtered to 'sync-sources/skills/okf/**' (double star, so nested templates/ edits trigger it), scripts/vendor-okf-skill.sh and the workflow itself, plus workflow_dispatch; permissions contents: read; one job running `bash scripts/vendor-okf-skill.sh --check`. Push over SSH (`git push git@github.com:eltmon/overdeck.git feature/pan-4408`). Implementation checkpoint: push a commit appending one line to sync-sources/skills/okf/SKILL.md, confirm the okf-vendor-pin check fails, revert it with a second commit, confirm it passes, and record both run URLs in the PR body. Fallback if the pipeline refuses the red push: skip it, note it in the PR body, and ask the operator to dispatch the workflow on an edited branch after merge."
+        },
+        "items": [
+          {
+            "id": "pin-workflow.ac1",
+            "title": "okf-vendor-pin.yml contains a step that runs `bash scripts/vendor-okf-skill.sh --check` and contains no reference to eltmon/okf main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-workflow.ac2",
+            "title": "When a pull request changes sync-sources/skills/okf, the okf-vendor-pin check runs on it and passes on the PR head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-workflow.ac3",
+            "title": "When a commit edits a vendored file without re-vendoring, the okf-vendor-pin check fails, and the PR body records that red run URL and the green run URL after the revert (or records the D11 fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vendored-skills-module",
+        "title": "Add src/lib/vendored-skills.ts vendored-skill helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vendored-skills.ts",
+            "src/lib/__tests__/vendored-skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/vendored-skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vendored-skills.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Create src/lib/vendored-skills.ts exporting VENDORED_SKILLS = ['okf'], OKF_SKILL_VERSION_FILE = '.okf-skill-version', convergesVendoredSkillFile(targetBase, manifestKey) and readSkillVersion(skillDir) with the signatures and doc comments in PRD WI-8. convergesVendoredSkillFile matches /^skills\\/([^/]+)\\//, requires the name in VENDORED_SKILLS, and requires lstat of <targetBase>/skills/<name> to be a real directory (not a symlink); any error returns false. readSkillVersion returns the trimmed first line or null for a missing or empty file. Write src/lib/__tests__/vendored-skills.test.ts with the cases in PRD WI-8."
+        },
+        "items": [
+          {
+            "id": "vendored-skills-module.ac1",
+            "title": "convergesVendoredSkillFile returns true for `skills/okf/SKILL.md` when <base>/skills/okf is a real directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendored-skills-module.ac2",
+            "title": "convergesVendoredSkillFile returns false for a symlinked skills/okf root, for `skills/pan-sync/SKILL.md`, for `agents/x.md` and for a missing root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendored-skills-module.ac3",
+            "title": "readSkillVersion returns `v0.1.0` for a file containing `v0.1.0\\n` and returns null for a missing or empty file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-converge-claude",
+        "title": "Converge vendored okf files in executeSync and planSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sync.ts",
+            "tests/unit/lib/sync-vendored-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-vendored-skill.test.ts tests/unit/lib/sync-adopt-legacy.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/sync.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "line count is 1009 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and decision D8. In src/lib/sync.ts import convergesVendoredSkillFile, append `replacedVendored: string[];` to the existing `conflicts: string[];` line of SyncResult, add `replacedVendored: [],` to the executeSync initializer's `conflicts: [],` line, change the 'modified' case to `if (options.force || convergesVendoredSkillFile(targetBase, file.relativePath))` pushing to `(options.force ? result.updated : result.replacedVendored)`, and in planSync map vendored 'modified' files to 'symlink' instead of 'conflict'. Net growth must keep `wc -l src/lib/sync.ts` at or below 1009 (cap); never edit scripts/file-size-allowlist.txt. Write tests/unit/lib/sync-vendored-skill.test.ts with mocked paths.js (sync-adopt-legacy.test.ts style) covering the four cases in PRD WI-9."
+        },
+        "items": [
+          {
+            "id": "sync-converge-claude.ac1",
+            "title": "Given a vendored okf file whose ~/.claude hash differs from its manifest hash, when executeSync runs without --force, then it overwrites the file with the cache copy, records the new hash in the manifest, and lists the path in replacedVendored rather than conflicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-claude.ac2",
+            "title": "Given a modified file in a non-vendored skill, executeSync still records it in conflicts and preserves the target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-claude.ac3",
+            "title": "Given ~/.claude/skills/okf as a symlink to another directory, executeSync records the modified file in conflicts and leaves the symlink target file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-claude.ac4",
+            "title": "planSync returns status 'symlink' for the vendored modified file and 'conflict' for the non-vendored one, and `wc -l < src/lib/sync.ts` prints at most 1009",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-converge-agent-skills",
+        "title": "Converge vendored okf files in executeAgentSkills and planAgentSkills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-skill-sync.ts",
+            "src/lib/__tests__/sync-agent-skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/sync-agent-skills.test.ts tests/unit/lib/sync-prune-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and decision D8. In src/lib/harness-skill-sync.ts add `replacedVendored: []` to the result, compute `convergesVendoredSkillFile(dirname(targetSkillsDir), manifestKey)` per file, overwrite 'modified' files when `options.force || converge` (pushing to replacedVendored when not forced), and in the 'user-owned' branch overwrite a vendored file whose hash differs from the source (manifest source 'overdeck', push to replacedVendored) instead of skipping it. planAgentSkills maps vendored 'modified' files to 'symlink'. Extend src/lib/__tests__/sync-agent-skills.test.ts with the five cases in PRD WI-10."
+        },
+        "items": [
+          {
+            "id": "sync-converge-agent-skills.ac1",
+            "title": "Given a modified okf file in ~/.agents/skills, executeAgentSkills overwrites it without --force and lists it in replacedVendored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-agent-skills.ac2",
+            "title": "Given an okf file with no manifest entry whose content differs from the source, executeAgentSkills overwrites it and records a manifest entry with source 'overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-agent-skills.ac3",
+            "title": "Given a modified non-vendored skill file or a symlinked okf root, executeAgentSkills records the file in conflicts and preserves the target content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-converge-agent-skills.ac4",
+            "title": "planAgentSkills returns 'symlink' for the vendored modified file and 'conflict' for the non-vendored one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-cli-report",
+        "title": "Print replaced vendored skill files in pan sync output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sync.ts",
+            "tests/cli/commands/sync-mirror.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/sync-mirror.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-mirror.test.ts passes including the new case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In src/cli/commands/sync.ts, after the conflict/success spinner block, when result.replacedVendored plus agentSkillsResult.replacedVendored is non-empty, print a blank line, a yellow header `Replaced locally edited file(s) in vendored skills (edit the OKF skill in eltmon/okf, not in place):`, then each path dimmed as `~/.claude/<path>` or `~/.agents/skills/<path>`. Add `replacedVendored: []` to emptySyncResult in tests/cli/commands/sync-mirror.test.ts and add one case where the mocked executeAgentSkills returns replacedVendored ['okf/SKILL.md'] and the console output contains `~/.agents/skills/okf/SKILL.md`."
+        },
+        "items": [
+          {
+            "id": "sync-cli-report.ac1",
+            "title": "When executeAgentSkills reports replacedVendored ['okf/SKILL.md'], `pan sync` prints the header and `~/.agents/skills/okf/SKILL.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-cli-report.ac2",
+            "title": "When both replacedVendored lists are empty, `pan sync` prints no vendored-replacement header, and the existing sync-mirror.test.ts cases still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-okf-convergence-test",
+        "title": "End-to-end test: pan sync converges the stale okf variant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/sync-okf-convergence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-okf-convergence.test.ts"
+          ],
+          "expected_outputs": [
+            "sync-okf-convergence.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 and decisions D9, D12. Write tests/unit/lib/sync-okf-convergence.test.ts with mocked paths.js (as in tests/unit/lib/sync-adopt-legacy.test.ts, plus AGENT_SKILLS_DIR). Seed a sync-source skills/okf tree including LICENSE, .okf-skill-version and templates/repo/.github/workflows/conformance.yml; seed ~/.claude/skills/okf and ~/.agents/skills/okf with an older variant of two files whose manifest hashes match neither content, plus scripts/__pycache__/x.pyc. Run refreshCache(), executeSync(), executeAgentSkills(), then assert with a recursive compare helper that skips __pycache__ that both installed dirs equal the source file-for-file and both conflicts lists are empty. Do not run a real `pan sync` under a substituted HOME."
+        },
+        "items": [
+          {
+            "id": "sync-okf-convergence-test.ac1",
+            "title": "Given the seeded stale variant, after refreshCache, executeSync and executeAgentSkills run, both installed okf dirs contain the same files with the same bytes as the source okf dir, ignoring __pycache__",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-okf-convergence-test.ac2",
+            "title": "After the run, both SyncResult conflicts lists are empty and each installed dir contains .okf-skill-version with the source version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-okf-skew",
+        "title": "Add the pan doctor OKF Skill Version check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-okf-skill.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-okf-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-okf-skill.test.ts src/cli/commands/__tests__/doctor-deployed-hooks-drift.test.ts",
+            "npm run typecheck",
+            "wc -l src/cli/commands/doctor.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "line count is 1042"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and decision D10. Create src/cli/commands/doctor-okf-skill.ts exporting checkOkfSkillVersion(opts) with a locally re-declared CheckResult (like doctor-hooks-drift.ts), defaults vendoredDir = join(SYNC_SOURCES.skills, 'okf') and installed = Claude Code ~/.claude/skills/okf and Agent Skills (Codex, Pi) ~/.agents/skills/okf, and the four ordered rules in PRD WI-13 using readSkillVersion. Wire it by replacing doctor.ts line 828 with the exact After line in PRD WI-13 (dynamic import appended to the existing checks.push, comment `// PAN-3327, PAN-3881, PAN-4408`) so doctor.ts stays at 1042 lines. Write src/cli/commands/__tests__/doctor-okf-skill.test.ts with the five temp-dir cases."
+        },
+        "items": [
+          {
+            "id": "doctor-okf-skew.ac1",
+            "title": "Given every existing installed copy carries the vendored version, checkOkfSkillVersion returns status ok with message `OKF skill <v> installed in <n> harness dir(s)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-okf-skew.ac2",
+            "title": "Given an installed copy at v0.0.9 or with no pin file, checkOkfSkillVersion returns warn naming the harness label and `v0.0.9` or `none`, with fix `Run: pan sync`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-okf-skew.ac3",
+            "title": "Given the vendored copy has no .okf-skill-version, checkOkfSkillVersion returns warn with a fix naming scripts/vendor-okf-skill.sh; a missing installed dir is skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-okf-skew.ac4",
+            "title": "`wc -l < src/cli/commands/doctor.ts` prints 1042 and doctor.ts calls checkOkfSkillVersion on the line that runs checkDeployedHooksDrift",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-knowledge-mdx",
+        "title": "Add the Where the skill lives section to configuration/knowledge.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/knowledge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## ' configuration/knowledge.mdx"
+          ],
+          "expected_outputs": [
+            "headings list shows Where the skill lives between Configure the bundle and Open the viewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Add a `## Where the skill lives` section to configuration/knowledge.mdx after `## Configure the bundle` and before `## Open the viewer`. State that eltmon/okf is canonical; Overdeck vendors one release tag into sync-sources/skills/okf with scripts/vendor-okf-skill.sh <tag>, recorded in .okf-skill-version; the okf-vendor-pin CI workflow fails when that tree differs from the tag; pan sync installs to ~/.claude/skills/okf and ~/.agents/skills/okf and replaces local edits in real (non-symlinked) copies; pan doctor's OKF Skill Version check warns on skew; changes go through a PR and tag in eltmon/okf, then a re-vendor PR here."
+        },
+        "items": [
+          {
+            "id": "docs-knowledge-mdx.ac1",
+            "title": "configuration/knowledge.mdx contains a `## Where the skill lives` heading placed between `## Configure the bundle` and `## Open the viewer`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-knowledge-mdx.ac2",
+            "title": "That section contains `eltmon/okf`, `.okf-skill-version`, `scripts/vendor-okf-skill.sh`, `okf-vendor-pin`, `pan sync` and `pan doctor`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-claude-md",
+        "title": "Add the vendored OKF skill one-liner to CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'vendor-okf-skill.sh' CLAUDE.md",
+            "git diff --numstat origin/main -- CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new bullet",
+            "numstat shows 1 added and 0 deleted"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Add the exact bullet from PRD WI-15 to the `## Small But Sharp` list in CLAUDE.md: sync-sources/skills/okf is a pinned copy of an eltmon/okf release tag (.okf-skill-version); edit the skill in eltmon/okf and re-vendor with scripts/vendor-okf-skill.sh <tag>; okf-vendor-pin.yml fails CI on in-place edits."
+        },
+        "items": [
+          {
+            "id": "docs-claude-md.ac1",
+            "title": "`grep -n 'vendor-okf-skill.sh' CLAUDE.md` prints one bullet under `## Small But Sharp` that contains `eltmon/okf` and `okf-vendor-pin.yml`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-md.ac2",
+            "title": "The CLAUDE.md change preserves every other line: `git diff --numstat origin/main -- CLAUDE.md` shows 1 added and 0 deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "husky-comment",
+        "title": "Correct the stale okf mirror comment in .husky/pre-push",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:40:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".husky/pre-push*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'mirror-okf' -- .husky || true",
+            "npx vitest run tests/unit/scripts/pre-push-hook.test.ts"
+          ],
+          "expected_outputs": [
+            "git grep prints nothing",
+            "pre-push-hook.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. In .husky/pre-push replace the comment text `e.g. scripts/mirror-okf-skill.sh pushing the subtree split to eltmon/okf — carry a tree` with `e.g. pushing a release branch or tag to eltmon/okf — carry a tree`, keep the (2026-08-06: …) history sentence, and change `# foreign repo (okf mirror, etc.)` to `# foreign repo (eltmon/okf, etc.)`. Comment-only; the case logic stays byte-identical."
+        },
+        "items": [
+          {
+            "id": "husky-comment.ac1",
+            "title": "`git grep -n 'mirror-okf' -- .husky` prints nothing and the pre-push comment names `eltmon/okf`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "husky-comment.ac2",
+            "title": "`npx vitest run tests/unit/scripts/pre-push-hook.test.ts` passes with the comment change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "okf-license-notice",
+        "to": "okf-tag-v010",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-ci-selftest",
+        "to": "okf-tag-v010",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-readme-install",
+        "to": "okf-tag-v010",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-tag-v010",
+        "to": "vendor-apply-v010",
+        "type": "blocks"
+      },
+      {
+        "from": "vendor-script",
+        "to": "vendor-apply-v010",
+        "type": "blocks"
+      },
+      {
+        "from": "vendor-apply-v010",
+        "to": "pin-workflow",
+        "type": "blocks"
+      },
+      {
+        "from": "vendored-skills-module",
+        "to": "sync-converge-claude",
+        "type": "blocks"
+      },
+      {
+        "from": "vendored-skills-module",
+        "to": "sync-converge-agent-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "vendored-skills-module",
+        "to": "doctor-okf-skew",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-converge-claude",
+        "to": "sync-converge-agent-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-converge-claude",
+        "to": "sync-cli-report",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-converge-agent-skills",
+        "to": "sync-cli-report",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-converge-claude",
+        "to": "sync-okf-convergence-test",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-converge-agent-skills",
+        "to": "sync-okf-convergence-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
