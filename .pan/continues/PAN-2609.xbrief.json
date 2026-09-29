@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:31:15.566Z",
+  "updated": "2026-09-29T06:31:27.877Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -486,6 +486,10 @@
     "vault-adopt.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T06:31:15.565Z"
+    },
+    "vault-adopt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:27.876Z"
     }
   }
 }
