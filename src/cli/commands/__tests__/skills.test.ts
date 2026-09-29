@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => {
     setSkillOverride: vi.fn(),
     resolveLaunchDisabledSkills: vi.fn(),
     writeCodexSkillOverrides: vi.fn(),
+    applyClaudePacks: vi.fn(),
+    applyCodexPacks: vi.fn(),
+    writeCodexPackBlock: vi.fn(),
   };
 });
 
@@ -30,7 +33,11 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../lib/skill-overrides/launch.js')>()),
   resolveLaunchDisabledSkills: mocks.resolveLaunchDisabledSkills,
   writeCodexSkillOverrides: mocks.writeCodexSkillOverrides,
+  applyClaudePacks: mocks.applyClaudePacks,
+  applyCodexPacks: mocks.applyCodexPacks,
 }));
+
+vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock }));
 
 import { registerSkillsCommands } from '../skills.js';
 
@@ -59,6 +66,8 @@ beforeEach(() => {
   vi.spyOn(process, 'exit').mockImplementation(((code?: number) => { throw new Error(`exit ${code}`); }) as never);
   mocks.listSkillStates.mockResolvedValue({ project: null, issue: null, skills: [grilling] });
   mocks.setSkillOverride.mockResolvedValue({});
+  mocks.applyClaudePacks.mockResolvedValue([]);
+  mocks.applyCodexPacks.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -148,5 +157,41 @@ describe('pan skills launch-settings', () => {
 
   it('exits 2 for an unsupported harness', async () => {
     await expect(run('launch-settings', '--harness', 'ohmypi', '--cwd', '/w')).rejects.toThrow('exit 2');
+  });
+
+  it('applies Claude packs to --plugin-link and keeps stdout to the settings JSON', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyClaudePacks.mockResolvedValue(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--issue', 'PAN-1', '--plugin-link', '/tmp/none/skill-packs');
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/tmp/none/skill-packs');
+    expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+    expect(errors).toEqual(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
+  });
+
+  it('skips packs without --plugin-link', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');
+    expect(mocks.applyClaudePacks).not.toHaveBeenCalled();
+  });
+
+  it('fails open when applying Claude packs throws', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyClaudePacks.mockRejectedValue(new Error('disk full'));
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
+    expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+    expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: disk full']);
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  it('applies Codex packs after the skill-override block and clears them on failure', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch');
+    expect(mocks.writeCodexSkillOverrides.mock.invocationCallOrder[0]).toBeLessThan(mocks.applyCodexPacks.mock.invocationCallOrder[0] ?? 0);
+
+    mocks.applyCodexPacks.mockRejectedValue(new Error('boom'));
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: boom']);
+    expect(mocks.writeCodexPackBlock).toHaveBeenCalledWith('/ch', null);
   });
 });

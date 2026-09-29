@@ -4,7 +4,7 @@
  *
  *   pan skills [list] [--project <key>] [--issue <id>] [--json]
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
- *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>]   (hidden; launchers)
+ *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
  * it imports only Commander types and chalk statically. The
@@ -15,7 +15,7 @@ import type { Command } from 'commander';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string }
-interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; codexHome?: string }
+interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; codexHome?: string; pluginLink?: string }
 
 const STATES = { on: true, off: false, inherit: null } as const;
 
@@ -103,13 +103,37 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     process.exit(1);
   }
   const launch = await import('../../lib/skill-overrides/launch.js');
-  const disabled = await launch.resolveLaunchDisabledSkills({ cwd: options.cwd, issueId: options.issue });
+  const ctx = { cwd: options.cwd, issueId: options.issue };
+  const disabled = await launch.resolveLaunchDisabledSkills(ctx);
   if (options.harness === 'claude-code') {
     const json = launch.claudeSkillSettingsJson(disabled);
+    const link = options.pluginLink;
+    if (link) {
+      // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
+      await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link), async () => {
+        const { rm } = await import('node:fs/promises');
+        await rm(link, { force: true });
+      });
+    }
+    // Stdout carries only the settings JSON; the launcher parses it.
     if (json) process.stdout.write(`${json}\n`);
     return;
   }
-  await launch.writeCodexSkillOverrides(options.codexHome as string, disabled);
+  const codexHome = options.codexHome as string;
+  await launch.writeCodexSkillOverrides(codexHome, disabled);
+  await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome), async () => {
+    const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
+    await writeCodexPackBlock(codexHome, null);
+  });
+}
+
+async function applyPacksFailOpen(apply: () => Promise<string[]>, clear: () => Promise<void>): Promise<void> {
+  try {
+    for (const warning of await apply()) console.error(warning);
+  } catch (error) {
+    console.error(`[launcher] WARNING: skill packs not applied: ${error instanceof Error ? error.message : String(error)}`);
+    await clear().catch(() => undefined);
+  }
 }
 
 /** Registers `pan skills` and its subcommands. */
@@ -124,5 +148,6 @@ export function registerSkillsCommands(program: Command): void {
   skills.command('launch-settings', { hidden: true }).description('Resolve skill overrides for a managed launch (used by launchers)')
     .requiredOption('--harness <harness>', 'claude-code or codex').requiredOption('--cwd <dir>', 'Launch working directory')
     .option('--issue <id>', 'Issue id').option('--codex-home <dir>', 'CODEX_HOME to write (codex)')
+    .option('--plugin-link <path>', 'Per-launch skill pack plugin link to point at the mount (claude-code)')
     .action(skillsLaunchSettingsCommand);
 }

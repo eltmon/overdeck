@@ -1,15 +1,31 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
+import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loadSkillOverrideLayers } = vi.hoisted(() => ({ loadSkillOverrideLayers: vi.fn() }));
+const { loadSkillOverrideLayers, listPackCatalog, overdeckHome } = await vi.hoisted(async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-launch-home-'));
+  process.env.OVERDECK_HOME = home;
+  return { loadSkillOverrideLayers: vi.fn(), listPackCatalog: vi.fn(), overdeckHome: home };
+});
 
 vi.mock('../store.js', () => ({ loadSkillOverrideLayers }));
+vi.mock('../catalog.js', () => ({ listPackCatalog }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execFile: vi.fn(actual.execFile), spawn: vi.fn(actual.spawn) };
+});
 
+import { packExtractDir } from '../../skill-packs/sources.js';
 import {
+  applyClaudePacks,
+  applyCodexPacks,
   CODEX_SKILL_BLOCK_BEGIN,
   CODEX_SKILL_BLOCK_END,
   claudeSkillSettingsJson,
@@ -139,5 +155,90 @@ describe('launcherSkillOverrideLines', () => {
     expect(run(`''`)).toBe('claude|');
     expect(run(`'{"a":1}'`)).toBe('claude|--settings|{"a":1}|');
     expect(claudeSkillSettingsArg(false)).toBe('');
+  });
+});
+
+describe('skill pack launch (PAN-4334)', () => {
+  const COMMIT = 'd'.repeat(40);
+  const link = join(overdeckHome, 'launch', 'agent-1', 'skill-packs');
+  const ctx = { cwd: '/repo/workspaces/feature-pan-1' };
+  const skill = (name: string, dir: string) => ({ name, dir, description: `${name}.`, optIn: false });
+  const catalogEntry = (cached: boolean) => ({
+    id: 'mattpocock',
+    url: 'https://github.com/mattpocock/skills',
+    ref: 'v1.2.3',
+    commit: COMMIT,
+    adapter: 'claude-plugin',
+    cached,
+    manifest: cached
+      ? {
+          skills: [skill('grilling', 'skills/productivity/grilling'), skill('tdd', 'skills/engineering/tdd')],
+          capabilities: {
+            hooks: false, mcpServers: false, commands: false, agents: false, contextInjection: false, gitHooks: false,
+            executables: [], projectMutatingSkills: [], requiresCli: [],
+          },
+          license: 'MIT',
+          pluginName: 'mattpocock-skills',
+        }
+      : null,
+  });
+
+  beforeEach(() => {
+    const root = packExtractDir('mattpocock', COMMIT);
+    for (const dir of ['skills/productivity/grilling', 'skills/engineering/tdd']) {
+      mkdirSync(join(root, dir), { recursive: true });
+      writeFileSync(join(root, dir, 'SKILL.md'), `---\nname: ${dir.split('/').pop()}\ndescription: x\n---\n`);
+    }
+    listPackCatalog.mockReset();
+    listPackCatalog.mockResolvedValue([catalogEntry(true)]);
+    loadSkillOverrideLayers.mockReset();
+    vi.mocked(execFile).mockClear();
+    vi.mocked(spawn).mockClear();
+  });
+
+  afterAll(() => {
+    rmSync(overdeckHome, { recursive: true, force: true });
+  });
+
+  it('links a mount holding the enabled pack skills', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: { 'mattpocock/tdd': false }, packs: { global: { mattpocock: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    expect(readlinkSync(link)).toMatch(/packs\/mounts\/[0-9a-f]{64}\/plugins$/);
+    expect(existsSync(join(link, 'mattpocock', 'skills', 'grilling', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(link, 'mattpocock', 'skills', 'tdd'))).toBe(false);
+  });
+
+  it('removes the link when the issue turns the pack off', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
+    await applyClaudePacks(ctx, link);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true }, issue: { mattpocock: false } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    expect(() => lstatSync(link)).toThrow();
+  });
+
+  it('skips an uncached pack with a warning and runs no git', async () => {
+    listPackCatalog.mockResolvedValue([catalogEntry(false)]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([
+      '[launcher] WARNING: skill pack mattpocock not cached; run pan skills pack sync mattpocock',
+    ]);
+    expect(() => lstatSync(link)).toThrow();
+    expect(execFile).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet about an uncached pack that nothing turns on', async () => {
+    listPackCatalog.mockResolvedValue([catalogEntry(false)]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {} });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+  });
+
+  it('writes the Codex pack block for the same selection', async () => {
+    const codexHome = join(overdeckHome, 'codex-agent');
+    loadSkillOverrideLayers.mockResolvedValue({ global: { 'mattpocock/grilling': true } });
+    await applyCodexPacks(ctx, codexHome);
+    const text = await readFile(join(codexHome, 'config.toml'), 'utf8');
+    expect(text).toContain('[plugins."mattpocock@overdeck-packs"]');
+    expect(execFile).not.toHaveBeenCalled();
   });
 });
