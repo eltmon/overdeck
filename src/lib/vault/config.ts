@@ -32,6 +32,8 @@ export interface VaultConfig {
   evict: boolean;
   liveQuietMinutes: number;
   maxChunkBytes: number;
+  /** Largest WIP code-snapshot bundle, in bytes, before capture records `skipped: 'too-large'` (PAN-4329). */
+  wipMaxBytes: number;
 }
 
 export const VAULT_CONFIG_DEFAULTS: Readonly<Omit<VaultConfig, 'backend'>> = {
@@ -41,6 +43,7 @@ export const VAULT_CONFIG_DEFAULTS: Readonly<Omit<VaultConfig, 'backend'>> = {
   evict: false,
   liveQuietMinutes: 30,
   maxChunkBytes: 64 * 1024 * 1024,
+  wipMaxBytes: 50 * 1024 * 1024,
 };
 
 /** `${OVERDECK_HOME}/vault`, resolved on every call so tests can swap OVERDECK_HOME. */
@@ -64,6 +67,7 @@ function defaultConfig(): VaultConfig {
     evict: VAULT_CONFIG_DEFAULTS.evict,
     liveQuietMinutes: VAULT_CONFIG_DEFAULTS.liveQuietMinutes,
     maxChunkBytes: VAULT_CONFIG_DEFAULTS.maxChunkBytes,
+    wipMaxBytes: VAULT_CONFIG_DEFAULTS.wipMaxBytes,
   };
 }
 
@@ -99,6 +103,7 @@ function withDefaults(raw: unknown): VaultConfig {
   config.evict = typeof record.evict === 'boolean' ? record.evict : config.evict;
   config.liveQuietMinutes = finiteNumber(record.liveQuietMinutes, config.liveQuietMinutes);
   config.maxChunkBytes = finiteNumber(record.maxChunkBytes, config.maxChunkBytes);
+  config.wipMaxBytes = finiteNumber(record.wipMaxBytes, config.wipMaxBytes);
   return config;
 }
 
