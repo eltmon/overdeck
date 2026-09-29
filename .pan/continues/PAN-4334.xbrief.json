@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T02:25:36.276Z",
+  "updated": "2026-09-29T02:25:48.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -314,6 +314,10 @@
     "launcher-plugin-dir.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T02:25:36.276Z"
+    },
+    "cli-pack-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:48.685Z"
     }
   }
 }
