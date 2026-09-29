@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4363",
   "created": "2026-09-29T04:31:37.212Z",
-  "updated": "2026-09-29T06:57:35.118Z",
+  "updated": "2026-09-29T06:57:49.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "start-explicit-floor.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T06:57:35.118Z"
+    },
+    "start-explicit-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:57:49.620Z"
     }
   }
 }
