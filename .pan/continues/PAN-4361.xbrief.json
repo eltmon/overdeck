@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T05:30:52.218Z",
+  "updated": "2026-09-29T05:31:09.979Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "evals-readme-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T05:30:52.217Z"
+    },
+    "live-eval-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:09.978Z"
     }
   }
 }
