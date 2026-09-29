@@ -1,0 +1,547 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T22:17:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4424: Matt Pocock skills as a fork-sourced pack (eltmon/skills): toggle at global/project/issue level",
+    "updated": "2026-09-29T22:22:59.878Z"
+  },
+  "plan": {
+    "id": "pan-4424",
+    "title": "Matt Pocock skills as a fork-sourced pack (eltmon/skills): toggle at global/project/issue level",
+    "status": "proposed",
+    "uid": "a6d41fe4-55fe-486f-9ccc-74391fc1890c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T22:17:20Z",
+    "updated": "2026-09-29T22:22:59.878Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4424",
+        "label": "PAN-4424",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4352",
+        "label": "PAN-4352 (managed Claude launch check, covered by verify-managed-claude)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skills",
+      "skill-packs",
+      "mattpocock",
+      "fork",
+      "live-verification"
+    ],
+    "narratives": {
+      "Problem": "PAN-4334 shipped external skill packs (pinned git sources mounted per launch, toggled at global/project/issue level), but Overdeck's mattpocock defaults (KNOWN_PACKS url, CLI empty-list hint, dashboard add command, docs) still point at upstream mattpocock/skills, no pack is registered on this host, and the managed-launch check (#4352) never ran. The operator wants the pack sourced from the fork eltmon/skills, pinned to an approved commit, and verified at all three levels on managed Claude Code and Codex launches so they can evaluate it.",
+      "Proposal": "Re-point the mattpocock defaults at https://github.com/eltmon/skills (KNOWN_PACKS url, CLI hint built from it, dashboard ADD_COMMAND literal, features/skills.mdx with a fork subsection and the real v1.2.3 preview). Register the pack on this host from the fork at tag v1.2.3 (commit 6acc160, the commit PAN-4334 audited). Verify global and project levels through the launch step (pan skills launch-settings) inside seconds-long windows, and run real managed Claude Code and Codex workers at issue level on PAN-4424. Record everything in .pan/drafts/PAN-4424-live-checkpoint.md and leave the pack registered but off at every level. The fork needs no changes: Overdeck already mounts only skill directories and marks setup-matt-pocock-skills opt-in by pack id.",
+      "NonGoals": "- No commits, branches, PRs, issues or comments on eltmon/skills or any mattpocock/* repo.\n- No change to the PAN-4334 pack mechanism (resolver, mount, launch step, stores, API route).\n- No retirement or replacement of the four vendored Matt Pocock skills (grilling, codebase-design, domain-modeling, improve-codebase-architecture).\n- No settings-based alternative to --plugin-dir; a consent dialog is reported via pan tell, not fixed in this issue.\n- No Deft (eltmon/directive) or SageOx (eltmon/ox) work.\n- No pack left enabled at any level after verification.\n- No remote (Fly) or non-Claude/Codex harness support.\n- No edits to docs/USAGE.md, reference/template-conversations.mdx or changelog.mdx."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pin the fork at tag v1.2.3 (commit 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e).",
+        "rationale": "Latest release tag, present on the fork, and the exact commit PAN-4334 audited (25 skills, 1 opt-in, 2 unapplied template scripts). Fork main is an untagged v1.3 merge; the operator can re-pin with pan skills pack update."
+      },
+      {
+        "summary": "Make no changes in the eltmon/skills fork.",
+        "rationale": "Overdeck already mounts only skill directories and already treats setup-matt-pocock-skills as opt-in by pack id (KNOWN_PACKS), so the fork stays identical to upstream with nothing to rebase or propose."
+      },
+      {
+        "summary": "Verify global and project levels through pan skills launch-settings, and run real managed launches only at issue level on PAN-4424.",
+        "rationale": "Global and project toggles apply to every launch on the host or project while on; the launch step is the literal command every managed launcher runs, so seconds-long windows prove the level logic without exposing other agents, while issue level confines the managed launches to this issue."
+      },
+      {
+        "summary": "End state: pack registered, off at every level, mounts garbage-collected.",
+        "rationale": "The issue says the operator tests the result; docs carry the enable commands."
+      },
+      {
+        "summary": "Keep the four vendored Matt Pocock skills; defer the replace-with-pack decision.",
+        "rationale": "The issue asks to decide it separately; vendored skills are default-on while the pack is default-off, so retiring them changes every user's defaults before the operator has evaluated the pack."
+      },
+      {
+        "summary": "Document in features/skills.mdx, not configuration/skills.mdx.",
+        "rationale": "configuration/skills.mdx does not exist; features/skills.mdx holds the Skill packs section the issue refers to as the packs page."
+      },
+      {
+        "summary": "Treat #4352 as covered by verify-managed-claude: reference it in the PR body and comment the checkpoint path on it, leave closing to the operator.",
+        "rationale": "Its five steps are exactly that item; commenting on an eltmon/overdeck issue is allowed."
+      }
+    ],
+    "items": [
+      {
+        "id": "fork-default-cli",
+        "title": "Point KNOWN_PACKS.mattpocock and the CLI empty-list hint at eltmon/skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts and skills.test.ts pass, including the new empty pack-list hint test",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/skill-packs/adapters.ts change KNOWN_PACKS.mattpocock.url from 'https://github.com/mattpocock/skills' to 'https://github.com/eltmon/skills' (adapter and optIn unchanged). In src/cli/commands/skills.ts line ~306 build the empty-list hint from KNOWN_PACKS['mattpocock']?.url: `No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3` (import KNOWN_PACKS from ../../lib/skill-packs/adapters.js matching the file's import style). Add url to the mattpocock toMatchObject in adapters.test.ts describe('KNOWN_PACKS'). Add one test in src/cli/commands/__tests__/skills.test.ts, reusing its existing pack-list harness with an empty registry, asserting the exact printed hint. Leave existing fixtures that pass the upstream url as an explicit add argument unchanged. No source-grep tests, no skipIf/.only."
+        },
+        "items": [
+          {
+            "id": "fork-default-cli.ac1",
+            "title": "Given adapters.ts, KNOWN_PACKS['mattpocock'] returns url 'https://github.com/eltmon/skills' with adapter 'claude-plugin' and optIn ['setup-matt-pocock-skills'], asserted in adapters.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-default-cli.ac2",
+            "title": "When pan skills pack list runs with no registered packs, it prints exactly 'No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3', asserted by a new test in skills.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-default-cli.ac3",
+            "title": "src/cli/commands/skills.ts no longer contains the literal string 'github.com/mattpocock/skills' (git grep returns no match in that file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-default-ui",
+        "title": "Point the dashboard Skill packs add command at eltmon/skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/SkillPacksSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SkillPacksSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In SkillPacksSection.tsx line 69 set ADD_COMMAND to 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3'. Update the 'renders the add command when there are no packs' expectation in SkillPacksSection.test.tsx (line ~144) to the new string. Leave the registered-pack fixture url (line ~33) unchanged; it is not the default. The frontend is a separate package and cannot import src/lib, so the literal stays."
+        },
+        "items": [
+          {
+            "id": "fork-default-ui.ac1",
+            "title": "Given an empty packs array, SkillPacksSection renders the text 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3', asserted in SkillPacksSection.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-default-ui.ac2",
+            "title": "SkillPacksSection.tsx no longer contains 'github.com/mattpocock/skills' (git grep returns no match in that file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fork-source",
+        "title": "Document the fork-sourced mattpocock pack in features/skills.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'github.com/eltmon/skills' features/skills.mdx",
+            "grep -c 'c55ee46' features/skills.mdx",
+            "grep -n \"### Matt Pocock's skills from a fork\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints 3 or more",
+            "second grep prints 0",
+            "third grep prints one line number"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In features/skills.mdx '## Skill packs': (1) intro links eltmon/skills as the example pack and says it is a fork of mattpocock/skills; (2) the add command uses https://github.com/eltmon/skills --ref v1.2.3; (3) replace the preview block with the real v1.2.3 output: Source line '@ v1.2.3 (6acc160)', 'Skills       25 (1 opt-in: setup-matt-pocock-skills)', the two executables, 'Not applied  executables (2), project-mutating skills (1)'; (4) add '### Matt Pocock's skills from a fork' after 'Pinning and updates': the fork is the operator-controlled default source pinned at v1.2.3; sync the fork on GitHub then run pan skills pack update mattpocock --ref <tag> to preview and re-pin; KNOWN_PACKS applies mattpocock defaults by pack id so any url works; setup-matt-pocock-skills is opt-in and only pan skills set mattpocock/setup-matt-pocock-skills on turns it on; a code block with enable/undo commands for global (on/off), project (on/inherit --project <key>) and issue (on/inherit --issue <id>). Follow the STE writing rule: short active sentences. Do not edit docs/USAGE.md, reference/template-conversations.mdx or changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-fork-source.ac1",
+            "title": "features/skills.mdx shows the add command 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3' and contains no 'c55ee46'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fork-source.ac2",
+            "title": "The preview block renders 'https://github.com/eltmon/skills @ v1.2.3 (6acc160)' and 'Not applied  executables (2), project-mutating skills (1)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fork-source.ac3",
+            "title": "features/skills.mdx contains a '### Matt Pocock's skills from a fork' subsection that shows syncing the fork plus pan skills pack update, shows that the pack switch never enables setup-matt-pocock-skills, and contains enable and undo commands for global, project and issue level",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-register-pack",
+        "title": "Register the mattpocock pack on this host from eltmon/skills at v1.2.3",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4424-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "pan skills pack list --offline --json",
+            "pan skills list | grep -A2 'Skill packs'"
+          ],
+          "expected_outputs": [
+            "JSON entry id mattpocock, url https://github.com/eltmon/skills, ref v1.2.3, commit 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e",
+            "mattpocock row shows off and default"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Live host mutation that enables nothing. First run pan skills pack list --offline; if a mattpocock pack is already registered with a different url, stop and report without removing it. Run pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3 --yes. Record the add output, pan skills pack list --offline --json and pan skills list | grep -A2 'Skill packs' verbatim in a new .pan/drafts/PAN-4424-live-checkpoint.md under '## Setup'. Commit the checkpoint doc with an Item: trailer."
+        },
+        "items": [
+          {
+            "id": "host-register-pack.ac1",
+            "title": "pan skills pack list --offline --json returns a mattpocock entry with url https://github.com/eltmon/skills, ref v1.2.3 and commit 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-register-pack.ac2",
+            "title": "After registration pan skills list shows the mattpocock pack off with source default (registration enables nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-register-pack.ac3",
+            "title": "The item creates and commits .pan/drafts/PAN-4424-live-checkpoint.md whose '## Setup' section contains the add preview (25 skills, 1 opt-in) and the pack list JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-levels",
+        "title": "Verify pack toggles at global, project and issue level through the launch step",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4424-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Levels (launch step)' .pan/drafts/PAN-4424-live-checkpoint.md",
+            "pan skills list | grep -A1 'Skill packs'",
+            "pan skills list --project panopticon-cli | grep -A1 'Skill packs'",
+            "pan skills list --issue PAN-4424 | grep -A1 'Skill packs'"
+          ],
+          "expected_outputs": [
+            "checkpoint doc has the Levels section",
+            "global: mattpocock off, source default",
+            "project panopticon-cli: mattpocock off, source default (inherit)",
+            "issue PAN-4424: mattpocock on, source issue"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. The launch step resolves the project from --cwd (resolveProjectKeyForCwdAsync in src/lib/skill-overrides/launch.ts), and this workspace lies under project panopticon-cli (path /home/eltmon/Projects/overdeck). Use scratch dirs outside the repo; WS = this workspace path. For each level (global: pan skills set --pack mattpocock on; project: ... on --project panopticon-cli; issue: ... on --issue PAN-4424): run pan skills launch-settings --harness claude-code --cwd \"$WS\" [--issue PAN-4424 for issue level] --plugin-link <scratch>/<level>-link, then find -L <link> -name SKILL.md | wc -l (expect 24) and find -L <link> -path '*setup-matt-pocock-skills*' (expect nothing); run pan skills launch-settings --harness codex --cwd \"$WS\" [--issue PAN-4424] --codex-home <scratch>/<level>-ch and grep -A1 'plugins.\"mattpocock@overdeck-packs\"' <ch>/config.toml (expect enabled = true). Revert global with 'off' and project with 'inherit --project panopticon-cli' immediately after their block; keep issue on. Narrowing check: global on + issue off, launch step with --issue PAN-4424 leaves the link absent; then global off and issue on again. Record every block verbatim under '## Levels (launch step)'. Checkpoint: if an issue-level set fails with a rebase/lock message, re-run with OVERDECK_PAN_GIT_OP=1; if it still fails, stop and report via pan tell flywheel-orchestrator."
+        },
+        "items": [
+          {
+            "id": "verify-levels.ac1",
+            "title": "For each of global, project panopticon-cli (the overdeck repo) and issue PAN-4424 turned on, the checkpoint doc shows the Claude plugin link mounting 24 SKILL.md files and no setup-matt-pocock-skills path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-levels.ac2",
+            "title": "For each level turned on, the checkpoint doc shows the Codex config.toml containing [plugins.\"mattpocock@overdeck-packs\"] with enabled = true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-levels.ac3",
+            "title": "With global on and issue PAN-4424 off, the launch step with --issue PAN-4424 leaves no plugin link ([ ! -e link ] exits 0), recorded in the checkpoint doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-levels.ac4",
+            "title": "When the item ends, pan skills list shows mattpocock off (default) globally and for --project panopticon-cli, and pan skills list --issue PAN-4424 shows it on with source issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-managed-claude",
+        "title": "Verify a managed Claude Code launch at issue level shows mattpocock skills with no consent dialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4424-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Managed Claude Code launch' .pan/drafts/PAN-4424-live-checkpoint.md",
+            "grep -c 'mattpocock:grilling' .pan/drafts/PAN-4424-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "checkpoint doc has the Managed Claude Code launch section",
+            "mattpocock:grilling appears in the recorded worker report"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (covers #4352). Precondition from verify-levels: issue pack on for PAN-4424, global off, project inherit. Run pan worker run --issue PAN-4424 --harness claude-code --model claude-haiku-4-5-20251001 --read-only --detach --name pack-probe-claude --prompt \"List every available skill whose name contains 'grilling' or 'setup-matt-pocock', exactly as named in your skill list, one per line. Do not invoke any skill. Then record that list as your worker report with pan worker report.\" It prints the worker id. Then pan worker wait <worker-id> --timeout 600 (expect exit 0) and record the report. While the worker is still alive, find its pane with herdr pane list and capture it with herdr pane read <pane-id>; record that output. Then stop the worker: pan kill <worker-id>; if that refuses a worker id or leaves the pane, herdr pane close <pane-id>. Record everything under '## Managed Claude Code launch'. Checkpoint: if pan worker wait exits 2 or 3 or the pane shows a plugin consent/trust dialog, record the pane text, run pan tell flywheel-orchestrator describing it (needs PAN-4334 PRD section 4.7 settings-based route), and do not implement that route here."
+        },
+        "items": [
+          {
+            "id": "verify-managed-claude.ac1",
+            "title": "The Claude Code worker for PAN-4424 exits 0 with a report listing mattpocock:grilling and the bundled grilling, recorded in the checkpoint doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-managed-claude.ac2",
+            "title": "Given the recorded Claude worker report, no line contains mattpocock:setup-matt-pocock-skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-managed-claude.ac3",
+            "title": "The recorded herdr pane read output for the Claude worker pane shows the Claude Code input prompt and contains no plugin consent or trust dialog text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-managed-codex",
+        "title": "Verify a managed Codex launch at issue level, then turn the pack off everywhere",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T22:17:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4424-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Managed Codex launch' .pan/drafts/PAN-4424-live-checkpoint.md",
+            "pan skills list --issue PAN-4424 | grep -A1 'Skill packs'",
+            "pan skills pack list --offline"
+          ],
+          "expected_outputs": [
+            "checkpoint doc has the Managed Codex launch and Cleanup sections",
+            "mattpocock pack off with source default for PAN-4424",
+            "mattpocock still registered: https://github.com/eltmon/skills @ v1.2.3 (6acc160)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Run pan worker run --issue PAN-4424 --harness codex --model gpt-5.6-luna --read-only --detach --name pack-probe-codex --prompt <same prompt as verify-managed-claude>, then pan worker wait <worker-id> --timeout 600 (expect exit 0), capture its pane with herdr pane read, and stop it the same way as verify-managed-claude. gpt-5.6-luna is the host's workhorses.cheap model (~/.overdeck/config.yaml). If it does not route to Codex here, use any OpenAI model the host config routes to Codex and record which. Record the report and grep -A1 'plugins.\"mattpocock@overdeck-packs\"' ~/.overdeck/agents/<worker-id>/codex-home-v2/config.toml under '## Managed Codex launch'. Same dialog checkpoint as verify-managed-claude. Cleanup under '## Cleanup': pan skills set --pack mattpocock inherit --issue PAN-4424 (retry with OVERDECK_PAN_GIT_OP=1 on a write-door git failure); pan skills set --pack mattpocock off; pan skills pack gc --max-age-days 0; pan skills list; pan skills pack list --offline. Then comment on eltmon/overdeck issue #4352 (gh issue comment 4352 --repo eltmon/overdeck) with the checkpoint doc path; never comment on any mattpocock/* repo."
+        },
+        "items": [
+          {
+            "id": "verify-managed-codex.ac1",
+            "title": "The Codex worker for PAN-4424 exits 0 with a report listing mattpocock:grilling and not mattpocock:setup-matt-pocock-skills, recorded in the checkpoint doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-managed-codex.ac2",
+            "title": "The recorded worker codex-home-v2/config.toml contains [plugins.\"mattpocock@overdeck-packs\"] with enabled = true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-managed-codex.ac3",
+            "title": "After cleanup, pan skills list shows the mattpocock pack off with source default and pan skills pack list --offline still shows https://github.com/eltmon/skills @ v1.2.3 (6acc160)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-managed-codex.ac4",
+            "title": "Issue #4352 on eltmon/overdeck receives a comment naming .pan/drafts/PAN-4424-live-checkpoint.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "host-register-pack",
+        "to": "verify-levels",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-levels",
+        "to": "verify-managed-claude",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-managed-claude",
+        "to": "verify-managed-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "host-register-pack",
+        "to": "docs-fork-source",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4424-matt-pocock-skills-as-a-fork-sourced-pack-eltmon-skills-toggle-at-global-project-issue-level.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
