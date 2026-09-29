@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-29T23:47:15.114Z",
+  "updated": "2026-09-29T23:53:26.099Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-09-29T23:46:44.546Z"
     },
     "fork-no-attribution": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2444",
-      "claimedAt": "2026-09-29T23:47:15.114Z"
+      "claimedAt": "2026-09-29T23:47:15.114Z",
+      "doneAt": "2026-09-29T23:53:26.098Z"
     }
   }
 }
