@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4369",
   "created": "2026-09-29T04:37:53.207Z",
-  "updated": "2026-09-29T05:18:46.805Z",
+  "updated": "2026-09-29T05:18:59.070Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "jev-smoke-eval.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T05:18:46.804Z"
+    },
+    "jev-smoke-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:18:59.070Z"
     }
   }
 }
