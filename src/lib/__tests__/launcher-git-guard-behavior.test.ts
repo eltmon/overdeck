@@ -345,9 +345,13 @@ describe('branch check (PAN-4337)', () => {
   let item: string;
   let nested: string;
   let wrapper: string;
+  let strikeWs: string;
+  let slotWs: string;
   let bcWorkspaceShim: string;
   let bcItemShim: string;
   let bcWrapperShim: string;
+  let bcStrikeShim: string;
+  let bcSlotShim: string;
 
   const env = {
     ...process.env,
@@ -397,6 +401,15 @@ describe('branch check (PAN-4337)', () => {
     wrapper = join(home, 'wrapper-ws', 'feature-pan-2');
     execFileSync('git', ['init', '--quiet', '-b', 'master', wrapper], { stdio: 'ignore' });
 
+    // pan strike (strike.ts:122): workspace basename ends in `-strike`, on `strike/<id>`.
+    strikeWs = join(primary, 'workspaces', 'feature-pan-9-strike');
+    realGit(['worktree', 'add', '--quiet', '-b', 'strike/pan-9', strikeWs, 'main'], primary);
+
+    // Blocked-slot replacement (swarm-blocked-slot.ts:112-115): the slot
+    // directory is reused on a fresh `feature/<id>-slot-<n>-attempt-<ts>` branch.
+    slotWs = join(primary, 'workspaces', 'feature-pan-8-slot-1');
+    realGit(['worktree', 'add', '--quiet', '-b', 'feature/pan-8-slot-1-attempt-20260929010203', slotWs, 'main'], primary);
+
     execFileSync('bash', ['-ec', buildGitGuardLines('bc-workspace', workspace).join('\n')], { cwd: home, stdio: 'ignore' });
     bcWorkspaceShim = join(home, 'agents', 'bc-workspace', 'git-guard', 'git');
 
@@ -405,6 +418,12 @@ describe('branch check (PAN-4337)', () => {
 
     execFileSync('bash', ['-ec', buildGitGuardLines('bc-wrapper', wrapper).join('\n')], { cwd: home, stdio: 'ignore' });
     bcWrapperShim = join(home, 'agents', 'bc-wrapper', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-strike', strikeWs).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcStrikeShim = join(home, 'agents', 'bc-strike', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-slot', slotWs).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcSlotShim = join(home, 'agents', 'bc-slot', 'git-guard', 'git');
   });
 
   it('exits 0 on commit on the expected branch', () => {
@@ -537,5 +556,35 @@ describe('branch check (PAN-4337)', () => {
 
   it('has no expectation for a git-init wrapper repo named feature-pan-2', () => {
     expect(run(bcWrapperShim, ['commit', '--allow-empty', '-m', 'x'], wrapper).status).toBe(0);
+  });
+
+  it('exits 0 on commit in a strike workspace on strike/<id>', () => {
+    expect(run(bcStrikeShim, ['commit', '--allow-empty', '-m', 'x'], strikeWs).status).toBe(0);
+  });
+
+  it('refuses commit in a strike workspace that has drifted to main', () => {
+    checkoutOther(strikeWs, 'main');
+    try {
+      const result = run(bcStrikeShim, ['commit', '--allow-empty', '-m', 'x'], strikeWs);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('strike/pan-9');
+    } finally {
+      checkoutOther(strikeWs, 'strike/pan-9');
+    }
+  });
+
+  it('exits 0 on commit in a blocked-slot replacement worktree on its -attempt- branch', () => {
+    expect(run(bcSlotShim, ['commit', '--allow-empty', '-m', 'x'], slotWs).status).toBe(0);
+  });
+
+  it('refuses commit in a slot workspace on an unrelated branch', () => {
+    checkoutOther(slotWs, 'main');
+    try {
+      const result = run(bcSlotShim, ['commit', '--allow-empty', '-m', 'x'], slotWs);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('feature/pan-8-slot-1');
+    } finally {
+      checkoutOther(slotWs, 'feature/pan-8-slot-1-attempt-20260929010203');
+    }
   });
 });

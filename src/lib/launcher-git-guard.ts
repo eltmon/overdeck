@@ -31,13 +31,15 @@
  *
  * Default mode also refuses `commit`, `push`, `merge` and `cherry-pick` in a
  * drifted worktree (PAN-4337): when the target's toplevel is a linked worktree
- * named `feature-<name>` it must be on `feature/<name>`, and
- * `<that>/.swarm/<item>` must be on `feature/<name>-<item>`. The expectation
- * is derived from git at call time, never stamped, so an in-harness subagent
- * committing in an item worktree is checked against that item's branch.
- * Detached HEAD is refused too. Like the rest of default mode this is
- * cheap-path prevention: `--git-dir`, `GIT_DIR` and `--work-tree` are not
- * followed.
+ * named `feature-<name>` it must be on `feature/<name>`; `feature-<name>-strike`
+ * must be on `strike/<name>`; `feature-<name>-slot-<n>` must be on
+ * `feature/<name>-slot-<n>` or that plus `-attempt-<digits>` (a blocked-slot
+ * retry); and `<that>/.swarm/<item>` must be on `<base>-<item>`. The
+ * expectation is derived from git at call time, never stamped, so an
+ * in-harness subagent committing in an item worktree is checked against that
+ * item's branch. Detached HEAD is refused too. Like the rest of default mode
+ * this is cheap-path prevention: `--git-dir`, `GIT_DIR` and `--work-tree` are
+ * not followed.
  */
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
@@ -201,16 +203,22 @@ function readOnlyShimLines(): string[] {
  * PAN-4337: refuse commit/push/merge/cherry-pick when the target worktree is
  * off its expected branch. The expectation is derived from the target's
  * toplevel at call time: a linked worktree named `feature-<name>` expects
- * `feature/<name>`; `<that>/.swarm/<item>` expects `feature/<name>-<item>`.
- * Anything else (primary checkouts, `git init` wrappers, other worktrees)
- * has no expectation and passes through. Plain POSIX sh; every `$` is a
- * runtime expansion, escaped by `branchCheckShimLines`.
+ * `feature/<name>`; `feature-<name>-strike` (`pan strike`, `strike.ts:122`)
+ * expects `strike/<name>` instead; `<that>/.swarm/<item>` expects
+ * `<base>-<item>`. A `feature-<name>-slot-<n>` workspace also accepts
+ * `feature/<name>-slot-<n>-attempt-<digits>` (`archiveBlockedSwarmSlot`,
+ * `swarm-blocked-slot.ts:112-115`, reuses the slot directory on a fresh
+ * branch after a blocked-slot retry). Anything else (primary checkouts,
+ * `git init` wrappers, other worktrees) has no expectation and passes
+ * through. Plain POSIX sh; every `$` is a runtime expansion, escaped by
+ * `branchCheckShimLines`.
  */
 const BRANCH_CHECK_SH = [
   'case "$_overdeck_git_command" in',
   '  commit|push|merge|cherry-pick)',
   '    _overdeck_top="$("$_OVERDECK_REAL_GIT" -C "$_overdeck_git_target" rev-parse --show-toplevel 2>/dev/null)"',
   '    _overdeck_expected=""',
+  '    _overdeck_expect_attempt=0',
   '    if [ -n "$_overdeck_top" ] && [ -f "$_overdeck_top/.git" ]; then',
   '      case "$_overdeck_top" in',
   '        */.swarm/*) _overdeck_ws="${_overdeck_top%/.swarm/*}"; _overdeck_item="${_overdeck_top##*/.swarm/}" ;;',
@@ -218,16 +226,38 @@ const BRANCH_CHECK_SH = [
   '      esac',
   '      _overdeck_ws_name="${_overdeck_ws##*/}"',
   '      case "$_overdeck_ws_name" in',
-  '        feature-?*) _overdeck_expected="feature/${_overdeck_ws_name#feature-}" ;;',
+  '        feature-*-strike)',
+  '          _overdeck_strike_id="${_overdeck_ws_name#feature-}"',
+  '          _overdeck_strike_id="${_overdeck_strike_id%-strike}"',
+  '          _overdeck_expected="strike/$_overdeck_strike_id"',
+  '          ;;',
+  '        feature-*-slot-[0-9]*)',
+  '          _overdeck_expected="feature/${_overdeck_ws_name#feature-}"',
+  '          _overdeck_expect_attempt=1',
+  '          ;;',
+  '        feature-?*)',
+  '          _overdeck_expected="feature/${_overdeck_ws_name#feature-}"',
+  '          ;;',
   '      esac',
   '      case "$_overdeck_item" in',
-  '        */*) _overdeck_expected="" ;;',
-  '        ?*) [ -z "$_overdeck_expected" ] || _overdeck_expected="$_overdeck_expected-$_overdeck_item" ;;',
+  '        */*) _overdeck_expected=""; _overdeck_expect_attempt=0 ;;',
+  '        ?*)',
+  '          [ -z "$_overdeck_expected" ] || _overdeck_expected="$_overdeck_expected-$_overdeck_item"',
+  '          _overdeck_expect_attempt=0',
+  '          ;;',
   '      esac',
   '    fi',
   '    if [ -n "$_overdeck_expected" ]; then',
   '      _overdeck_branch="$("$_OVERDECK_REAL_GIT" -C "$_overdeck_git_target" branch --show-current 2>/dev/null)"',
-  '      if [ "$_overdeck_branch" != "$_overdeck_expected" ]; then',
+  '      _overdeck_branch_ok=0',
+  '      if [ "$_overdeck_branch" = "$_overdeck_expected" ]; then',
+  '        _overdeck_branch_ok=1',
+  '      elif [ "$_overdeck_expect_attempt" = 1 ]; then',
+  '        case "$_overdeck_branch" in',
+  '          "$_overdeck_expected"-attempt-[0-9]*) _overdeck_branch_ok=1 ;;',
+  '        esac',
+  '      fi',
+  '      if [ "$_overdeck_branch_ok" != 1 ]; then',
   '        _overdeck_actual="branch $_overdeck_branch"',
   '        [ -n "$_overdeck_branch" ] || _overdeck_actual="a detached HEAD"',
   '        echo "Overdeck refused git $_overdeck_git_command: $_overdeck_top must be on branch $_overdeck_expected, but it is on $_overdeck_actual. Stop and report this via pan tell; do not commit or push from this worktree." >&2',
