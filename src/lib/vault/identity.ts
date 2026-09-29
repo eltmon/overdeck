@@ -30,6 +30,8 @@ export interface VaultSubkeys {
   K_id: Buffer;
   /** HMAC key for ref names. */
   K_ref: Buffer;
+  /** PAN-4333: sub-keys of retired keys, newest first; only chunk and WIP-part decoding reads them. */
+  previous?: VaultSubkeys[];
 }
 
 export function vaultKeyPath(): string {

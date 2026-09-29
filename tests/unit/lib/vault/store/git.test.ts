@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 // ac1: the git backend passes every contract case against a fresh bare remote.
-runVaultStoreContract(() => initGitVault(bareRepo(), join(tmp('pan-vault-clone-'), 'git')));
+runVaultStoreContract('git', () => initGitVault(bareRepo(), join(tmp('pan-vault-clone-'), 'git')));
 
 describe('GitVaultStore', () => {
   it('initGitVault on an empty remote pushes the marker as the first commit of main', async () => {
@@ -74,6 +74,45 @@ describe('GitVaultStore', () => {
     for (const store of [a, b]) {
       expect(git(store.cloneDir, 'rev-list', '--count', 'origin/main..HEAD').trim()).toBe('0');
     }
+  });
+
+  it('a batch of three valued ops adds exactly one commit to origin/main', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const names = ['r/' + 'a'.repeat(40), 'm/' + 'b'.repeat(40), 'h/header'];
+    expect(await store.casRef(names[0]!, null, Buffer.from('a1'))).toBe('ok');
+    expect(git(remote, 'log', '-1', '--format=%s', 'main').trim()).toBe('vault: settle');
+    const before = Number(git(remote, 'rev-list', '--count', 'main').trim());
+
+    expect(await store.casRefs([
+      { name: names[0]!, expectedVersion: blobSha(Buffer.from('a1')), value: Buffer.from('a2') },
+      { name: names[1]!, expectedVersion: null, value: Buffer.from('b1') },
+      { name: names[2]!, expectedVersion: null, value: Buffer.from('h1') },
+    ])).toBe('ok');
+
+    expect(Number(git(remote, 'rev-list', '--count', 'main').trim())).toBe(before + 1);
+    expect(git(store.cloneDir, 'rev-list', '--count', 'origin/main..HEAD').trim()).toBe('0');
+    expect(git(remote, 'log', '-1', '--format=%s', 'main').trim()).toBe('vault: batch');
+    expect(git(remote, 'show', '--name-only', '--format=', 'main').trim().split('\n').sort()).toEqual([
+      'refs/h/header',
+      `refs/m/${'b'.repeat(40)}`,
+      `refs/r/${'a'.repeat(40)}`,
+    ]);
+    expect(git(remote, 'cat-file', '-p', `main:refs/r/${'a'.repeat(40)}`)).toBe('a2');
+  });
+
+  it('a stale op in a git batch leaves origin/main and the clone untouched', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const name = 'r/' + 'a'.repeat(40);
+    await store.casRef(name, null, Buffer.from('a1'));
+    const head = git(remote, 'rev-parse', 'main').trim();
+    expect(await store.casRefs([
+      { name: 'm/' + 'b'.repeat(40), expectedVersion: null, value: Buffer.from('b1') },
+      { name, expectedVersion: 'stale', value: Buffer.from('a2') },
+    ])).toBe('conflict');
+    expect(git(remote, 'rev-parse', 'main').trim()).toBe(head);
+    expect(git(store.cloneDir, 'status', '--porcelain').trim()).toBe('');
   });
 
   it('objects put on one clone reach the other after a casRef and refresh', async () => {

@@ -1,13 +1,14 @@
 /**
  * pan vault status
  *
- * Backend, this machine's identity, owned record count, last sync and the
+ * Backend, the last key rotation, this machine's identity, owned record count, last sync and the
  * machine list, read from the local clone and index. With the vault off,
  * prints VAULT_OFF_MESSAGE and exits 0 (AC-1).
  */
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { readMachineRecord, type MachineRecord } from '../../../lib/vault/format.js';
 import { listOwned, readListCache } from '../../../lib/vault/local-index.js';
+import { readTolerant } from '../../../lib/vault/sync.js';
 import { defaultIo, openVault, type CliIo } from './shared.js';
 
 export interface StatusOptions {
@@ -24,13 +25,15 @@ export async function statusCommand(options: StatusOptions = {}, io: CliIo = def
   for (const { name } of await vault.store.listRefs('m/')) {
     const ref = await vault.store.readRef(name);
     if (!ref) continue;
-    const record = await readMachineRecord(name, ref.value, vault.keys);
-    if (record) machines.push(record);
+    // A ref under a retired or unknown key is skipped, not fatal (PAN-4333).
+    const read = await readTolerant(name, ref.value, vault.keys, readMachineRecord);
+    if (read !== 'retired' && read !== 'unreadable' && read.value) machines.push(read.value);
   }
   machines.sort((a, b) => a.label.localeCompare(b.label));
   const mine = machines.find((machine) => machine.environmentId === me.environmentId);
   const summary = {
     backend: vault.config.backend,
+    keyRotatedAt: vault.rotatedAt,
     machine: { label: me.label, environmentId: me.environmentId },
     ownedRecords: Object.keys(owned).length,
     listedRecords: cache.filter((row) => !row.tombstone).length,
@@ -43,6 +46,7 @@ export async function statusCommand(options: StatusOptions = {}, io: CliIo = def
     return;
   }
   io.out(`Backend:        ${summary.backend}`);
+  io.out(`Key rotated:    ${summary.keyRotatedAt ?? 'never'}`);
   io.out(`This machine:   ${summary.machine.label} (${summary.machine.environmentId})`);
   io.out(`Owned records:  ${summary.ownedRecords}`);
   io.out(`Listed records: ${summary.listedRecords}`);

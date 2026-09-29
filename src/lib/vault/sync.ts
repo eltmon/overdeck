@@ -8,6 +8,9 @@
  *   3. upsert this machine's `m/<hmac(environmentId)>` ref;
  *   4. read every `r/` ref, decrypt it, skip values whose type is not
  *      `session` (FR-9 reservation) and replace the machine-local list cache.
+ *      A ref the current key cannot open is skipped and counted (PAN-4333):
+ *      `retired` when a key of the ring opens it (the markers a rotation
+ *      leaves at old names), `unreadable` when no key does.
  *
  * `createSyncLoop` runs it on an interval; offline cycles retry with an
  * exponential backoff capped at the interval. Imports only Node built-ins and
@@ -17,6 +20,8 @@ import { stat } from 'node:fs/promises';
 import { ensureEnvironmentIdentity } from '../environment-identity.js';
 import { readVaultConfig, type VaultConfig } from './config.js';
 import {
+  VaultAuthenticationError,
+  decryptRef,
   encryptRef,
   isTombstone,
   readMachineRecord,
@@ -47,15 +52,45 @@ export interface SyncReport {
   /** Refs skipped because their decrypted type is not "session". */
   skipped: number;
   machines: MachineRecord[];
+  /** Refs the current key cannot open but a retired key of the ring can (rotation markers). */
+  retired: number;
+  /** Refs no key of this machine opens. */
+  unreadable: number;
   /** Transcripts whose settlement threw; one bad file never stops the cycle. */
   errors: Array<{ nativePath: string; message: string }>;
+}
+
+/**
+ * Read a ref value with the current key. A value it cannot open yields
+ * `'retired'` when a key of the ring opens it and `'unreadable'` otherwise.
+ */
+export async function readTolerant<T>(
+  name: string,
+  bytes: Uint8Array,
+  keys: VaultSubkeys,
+  read: (name: string, bytes: Uint8Array, keys: VaultSubkeys) => Promise<T>,
+): Promise<{ value: T } | 'retired' | 'unreadable'> {
+  try {
+    return { value: await read(name, bytes, keys) };
+  } catch (error) {
+    if (!(error instanceof VaultAuthenticationError)) throw error;
+  }
+  for (const previous of keys.previous ?? []) {
+    try {
+      await decryptRef(name, bytes, previous);
+      return 'retired';
+    } catch (error) {
+      if (!(error instanceof VaultAuthenticationError)) throw error;
+    }
+  }
+  return 'unreadable';
 }
 
 export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
   const { store, keys } = options;
   const now = options.now ?? (() => new Date());
   const config = options.config ?? (await readVaultConfig());
-  const report: SyncReport = { offline: false, settled: [], records: 0, skipped: 0, machines: [], errors: [] };
+  const report: SyncReport = { offline: false, settled: [], records: 0, skipped: 0, machines: [], retired: 0, unreadable: 0, errors: [] };
 
   try {
     await store.refresh();
@@ -102,7 +137,12 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
     for (const { name } of await store.listRefs('r/')) {
       const ref = await store.readRef(name);
       if (!ref) continue;
-      const value = await readSessionRecord(name, ref.value, keys);
+      const read = await readTolerant(name, ref.value, keys, readSessionRecord);
+      if (read === 'retired' || read === 'unreadable') {
+        report[read]++;
+        continue;
+      }
+      const { value } = read;
       if (value === null) {
         report.skipped++;
         continue;
@@ -128,8 +168,12 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
     for (const { name } of await store.listRefs('m/')) {
       const ref = await store.readRef(name);
       if (!ref) continue;
-      const record = await readMachineRecord(name, ref.value, keys);
-      if (record) report.machines.push(record);
+      const read = await readTolerant(name, ref.value, keys, readMachineRecord);
+      if (read === 'retired' || read === 'unreadable') {
+        report[read]++;
+        continue;
+      }
+      if (read.value) report.machines.push(read.value);
     }
   } catch (error) {
     if (error instanceof VaultOfflineError) return { ...report, offline: true };

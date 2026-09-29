@@ -31,7 +31,7 @@ export function registerVaultCommands(program: Command): void {
 
   const passphrase = vault
     .command('passphrase')
-    .description('Turn passphrase unlock for new machines on (set) or off (remove); the vault key never changes');
+    .description('Turn passphrase unlock for new machines on (set) or off (remove); the vault key stays the same');
   passphrase
     .command('set')
     .description('Wrap the vault key under a passphrase so a new machine can join without the recovery phrase')
@@ -42,6 +42,15 @@ export function registerVaultCommands(program: Command): void {
     .command('remove')
     .description('Delete the passphrase unlock object; joining then needs the recovery phrase')
     .action(lazyAction(() => import('./passphrase.js'), 'passphraseRemoveCommand'));
+
+  vault
+    .command('rotate-key')
+    .description('Replace the vault key after losing a device: re-encrypt refs under a new key, keep old chunks readable, print a new recovery phrase')
+    .option('--yes', 'Rotate without the confirmation prompt')
+    .option('--passphrase-file <path>', 'Re-wrap passphrase unlock under the new key with the passphrase in this file')
+    .option('--generate-passphrase', 'Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once')
+    .option('--no-passphrase', 'Turn passphrase unlock off')
+    .action(lazyAction(() => import('./rotate-key.js'), 'rotateKeyCommand'));
 
   vault
     .command('status')

@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 // ac1: the dir backend passes every contract case.
-runVaultStoreContract(() => DirVaultStore.open(freshRoot()));
+runVaultStoreContract('dir', () => DirVaultStore.open(freshRoot()));
 
 describe('DirVaultStore layout', () => {
   it('creates the P-3 marker and lays objects and refs out by prefix', async () => {
