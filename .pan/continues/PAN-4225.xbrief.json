@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4225",
   "created": "2026-09-29T02:27:12.817Z",
-  "updated": "2026-09-29T03:47:21.450Z",
+  "updated": "2026-09-29T03:47:25.958Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4225",
       "claimedAt": "2026-09-29T03:37:45.128Z",
       "doneAt": "2026-09-29T03:47:21.450Z"
+    },
+    "cancel-spec-workspace": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:47:25.958Z"
     }
   }
 }
