@@ -148,5 +148,7 @@
 1008 src/lib/terminal-backends/herdr.ts # PAN-4292
 1160 src/lib/agents/delivery.ts # PAN-4292
 1167 src/lib/tmux.ts # PAN-4292
+1422 src/lib/model-capabilities.ts # PAN-4327
+1148 src/lib/conversations/smart-compaction.ts # PAN-4327
 997 src/lib/overdeck/planning-promotion.ts # PAN-1728
 961 src/lib/cloister/verification-runner.ts # PAN-1728

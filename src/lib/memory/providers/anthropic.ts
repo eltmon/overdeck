@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { modelSupportsSamplingParams } from '../../model-capabilities.js';
 import {
   buildJsonExtractionPrompt,
   calculateExtractionCost,
@@ -28,7 +29,8 @@ export class AnthropicExtractionProvider implements ExtractionProvider {
       {
         model,
         max_tokens: options.maxTokens ?? 2048,
-        temperature: options.temperature ?? 0,
+        // Sampling-restricted models (Sonnet 5+, Opus 4.7+, Fable) 400 on temperature (PAN-4327).
+        ...(modelSupportsSamplingParams(model) ? { temperature: options.temperature ?? 0 } : {}),
         messages: [
           {
             role: 'user',

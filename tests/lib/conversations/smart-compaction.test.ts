@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as smartCompaction from '../../../src/lib/conversations/smart-compaction.js';
 
-const { generateSummaryFromPrompt, truncateHeadTail } = smartCompaction;
+const { generateSummaryFromPrompt, truncateHeadTail, getChunkBudgetChars } = smartCompaction;
 
 const OVERFLOW_ERROR = new Error(
   'Summary generation failed: {"result":"Prompt is too long","terminal_reason":"blocking_limit"}',
@@ -84,5 +84,16 @@ describe('generateSummaryFromPrompt', () => {
       generateSummaryFromPrompt('small transcript', undefined, undefined, false),
     ).rejects.toThrow('ENOENT');
     expect(runModelSummarySpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getChunkBudgetChars (PAN-4327)', () => {
+  it('gives Sonnet 5.5 the same 1M-window budget as Sonnet 5', () => {
+    expect(getChunkBudgetChars('claude-sonnet-5-5')).toBe(1_200_000);
+    expect(getChunkBudgetChars('claude-sonnet-5')).toBe(1_200_000);
+  });
+
+  it('falls back to the default budget for an unmodeled or missing model', () => {
+    expect(getChunkBudgetChars(undefined)).toBe(300_000);
   });
 });
