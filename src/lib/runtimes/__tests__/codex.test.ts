@@ -126,6 +126,7 @@ describe('initCodexHome', () => {
   it.each([
     ['gpt-6-astra', undefined, 272000, 'high'],
     ['gpt-6-sol', undefined, 272000, 'high'],
+    ['gpt-6.1-sol', undefined, 272000, 'high'],
     ['gpt-6-luna', 'low', 272000, 'low'],
     ['gpt-5.6-sol', 'low', 272000, 'low'],
     ['gpt-5.6-terra[372k]', 'high', 372000, 'high'],
