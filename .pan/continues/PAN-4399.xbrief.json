@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T14:39:33.172Z",
+  "updated": "2026-09-29T14:39:39.661Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4399",
       "claimedAt": "2026-09-29T14:37:14.496Z",
       "doneAt": "2026-09-29T14:39:33.172Z"
+    },
+    "contract-work-start": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4399",
+      "claimedAt": "2026-09-29T14:39:39.661Z"
     }
   }
 }
