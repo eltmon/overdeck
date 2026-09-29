@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4398",
   "created": "2026-09-29T13:13:55.090Z",
-  "updated": "2026-09-29T13:38:01.047Z",
+  "updated": "2026-09-29T13:42:31.144Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-4398",
       "claimedAt": "2026-09-29T13:37:29.239Z",
       "doneAt": "2026-09-29T13:38:01.047Z"
+    },
+    "handed-to-review-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:42:31.144Z"
     }
   }
 }
