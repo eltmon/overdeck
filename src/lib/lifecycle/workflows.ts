@@ -571,29 +571,9 @@ export function cancelIssueWorkflow(
 
 async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
-  try {
-    const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-    const result = await transitionXBriefOnMain(
-      ctx.projectPath,
-      ctx.issueId,
-      'completed',
-      'completed',
-      `scope: complete ${ctx.issueId.toUpperCase()} xBRIEF`,
-    );
-    const details = [
-      result.moved ? 'Updated xBRIEF lifecycle to completed' : 'xBRIEF lifecycle already completed',
-      result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
-    ];
-    if (result.committed) details.push('Committed xBRIEF completion on main');
-    return stepOk(step, details);
-  } catch (err) {
-    const cause = (err as { cause?: unknown }).cause ?? err;
-    const message = cause instanceof Error ? cause.message : String(cause);
-    if (message.includes('No xBRIEF found')) {
-      return stepSkipped(step, [`No xBRIEF found for ${ctx.issueId}`]);
-    }
-    return stepFailed(step, `xBRIEF completion failed: ${message}`);
-  }
+  return stepSkipped(step, [
+    `Spec status for ${ctx.issueId} is derived from the merged PR; close-out does not write it`,
+  ]);
 }
 
 /**

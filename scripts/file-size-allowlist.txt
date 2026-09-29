@@ -148,6 +148,7 @@
 1221 src/dashboard/server/ws-rpc.ts # PAN-1166
 1064 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-1166
 1075 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-1166
+1042 src/cli/commands/doctor.ts # PAN-4359
 1008 src/lib/terminal-backends/herdr.ts # PAN-4292
 1160 src/lib/agents/delivery.ts # PAN-4292
 1167 src/lib/tmux.ts # PAN-4292

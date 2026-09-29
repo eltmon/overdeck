@@ -1,0 +1,512 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:22:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4363: GPT-6 Sol and Luna fail with 400 on ChatGPT login below Codex 0.155, and Overdeck's version floor is 0.153.4",
+    "updated": "2026-09-29T04:30:27.671Z"
+  },
+  "plan": {
+    "id": "pan-4363",
+    "title": "GPT-6 Sol and Luna fail with 400 on ChatGPT login below Codex 0.155, and Overdeck's version floor is 0.153.4",
+    "status": "running",
+    "uid": "84da3a1a-834c-44e3-befa-547d3c004deb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T04:22:49Z",
+    "updated": "2026-09-29T04:30:27.671Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4363",
+        "label": "PAN-4363",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codex",
+      "harness-policy",
+      "gpt-6",
+      "doctor",
+      "model-routing"
+    ],
+    "narratives": {
+      "Problem": "OpenAI's backend rejects gpt-6-sol and gpt-6-luna with HTTP 400 for ChatGPT-sign-in Codex clients below 0.155.x (0.156.1 is the first catalog-bearing release). Overdeck's only Codex gates are 0.144.0 (app-server) and 0.153.4 (native attach), so a host on 0.153.4-0.156.0 passes every Overdeck check, launches a Sol or Luna agent, and the agent dies on its first turn. pan doctor reports that Codex CLI as OK.",
+      "Proposal": "Add a per-model Codex client-version floor table (gpt-6-sol and gpt-6-luna -> 0.156.1) beside MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION, plus an async never-throwing, never-caching version reader and a resolveCodexPolicyContext helper. canUseHarness gains an optional sync fourth argument { codexCliVersion } and refuses the codex harness under subscription auth when the installed version is below the model's floor, naming the model, installed version, required version and the upgrade command `npm install -g @openai/codex`. resolveHarness (the async chokepoint every spawn path passes before writing agent state) and pan start's explicit --harness path read the version and pass it. pan doctor gains a Codex model floor row per floored model (WARN below floor). CLIProxy 7.3.16 was verified during planning to serve both models, so it only gets a comment and a docs line. Full detail: .pan/drafts/PAN-4363.md.",
+      "NonGoals": "- Changing pan install to install or upgrade the Codex CLI\n- A client-version floor for the ohmypi openai-codex route, the ACP route, or remote (Fly) agents\n- Changing providers.ts openai tierModels or model-capability-class.ts (that is PAN-4364)\n- Fixing the reference install's CLIProxy oauth-model-alias config that hides the upstream gpt-6-sol id\n- Bumping the CLIProxy pin (CLIPROXY_RELEASE_VERSION stays v7.3.16)\n- Setting clientVersion in the app-server initialize request (the backend ignores it)\n- Gating model pickers, tier validation, or the settings harness-policy endpoint on the installed Codex version\n- Substituting another model or harness when the floor is not met\n- Caching the Codex version across launches\n- Refactoring doctor.ts checkCodex/readCodexVersion or other existing canUseHarness callers"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The refusal and doctor fix name `npm install -g @openai/codex`, not `pan install`.",
+        "rationale": "pan install never installs or upgrades the Codex CLI: the only Codex install instruction is the copyable hint in src/lib/system-prerequisites.ts:183-192, whose header says Overdeck never runs system package installs itself. Naming pan install would send operators to a command that does not fix the 400. The string becomes one exported constant CODEX_CLI_INSTALL_COMMAND that the prerequisites entry also uses."
+      },
+      {
+        "summary": "The floor applies only when authMode === 'subscription'.",
+        "rationale": "The 400 is specific to ChatGPT-account clients; API-key users have no floor and must not be refused. getProviderAuthMode returns 'subscription' for a ChatGPT sign-in and never undefined for OpenAI."
+      },
+      {
+        "summary": "An unreadable Codex version fails open at the policy and shows a WARN in doctor.",
+        "rationale": "Failing closed on a flaky --version probe would block every GPT-6 launch; the app-server's own assertSupportedVersion still fails loudly on an unparseable version."
+      },
+      {
+        "summary": "The version is read fresh on every launch (no cache).",
+        "rationale": "The dashboard is long-lived; an operator who upgrades Codex must not stay refused until a restart, and codex --version is cheap."
+      },
+      {
+        "summary": "pan doctor emits WARN (not FAIL) rows, one per floored model, and no rows when Codex is absent.",
+        "rationale": "Overdeck has no 'enabled model' setting, Sol and Luna are documented opt-in, and doctor exits 1 on any error row; the launch-time refusal is the hard stop. checkCodex already warns when Codex is missing."
+      },
+      {
+        "summary": "canUseHarness stays sync and pure; host facts arrive through an optional fourth argument.",
+        "rationale": "canUseHarness is called synchronously by pickers, tier validation and the settings route. Only launch paths (resolveHarness, pan start's explicit flag) read the version, and every launch reaches resolveHarness before any agent state write (spawn.ts:680 before :715)."
+      },
+      {
+        "summary": "CLIProxy needs no pin change; record the verified version in a comment and the docs.",
+        "rationale": "On 2026-09-29 CLIProxy 7.3.16 returned 'ok' for gpt-6-luna directly and for gpt-6-sol through its claude-opus-5 alias under ChatGPT sign-in. The 'unknown provider for model gpt-6-sol' result for the bare id comes from the operator's oauth-model-alias config hiding upstream ids, not a version gate."
+      },
+      {
+        "summary": "Gate on the Codex binary version, not Overdeck's clientInfo version.",
+        "rationale": "A planning probe ran codex app-server 0.158.0 with clientInfo overdeck/0.0.0 (what Overdeck sends) and completed a gpt-6-luna turn, so the backend reads the binary's version."
+      }
+    ],
+    "items": [
+      {
+        "id": "floor-table-reader",
+        "title": "Add the Codex per-model floor table, install-command constant, version reader, and policy-context helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4363",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "policy-codex-floor",
+            "resolver-policy-context",
+            "start-explicit-floor",
+            "doctor-codex-model-floors"
+          ],
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/policy-context.ts",
+            "src/lib/system-prerequisites.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "src/lib/codex/__tests__/policy-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts src/lib/codex/__tests__/policy-context.test.ts src/lib/__tests__/system-prerequisites.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "app-server-manager.test.ts, policy-context.test.ts and system-prerequisites.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. In src/lib/codex/app-server-manager.ts, under MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION, export CODEX_MODEL_MINIMUM_VERSIONS = { 'gpt-6-sol': '0.156.1', 'gpt-6-luna': '0.156.1' }, CODEX_CLI_INSTALL_COMMAND = 'npm install -g @openai/codex', codexModelMinimumVersion(model) using Object.hasOwn, parseCodexCliVersion(raw) (extracted from assertSupportedVersion without changing its behavior), and async readCodexCliVersion(binary = 'codex') that uses the existing promisified execFile with VERSION_TIMEOUT_MS, returns undefined on any failure, and never caches. Create src/lib/codex/policy-context.ts exporting interface HarnessPolicyContext { codexCliVersion?: string }, interface CodexPolicyContextDeps, and resolveCodexPolicyContext(harness, model, authMode, deps) that returns {} with no I/O unless harness === 'codex' && authMode === 'subscription' && codexModelMinimumVersion(model) is defined; otherwise it resolves the binary with resolveHarnessBinary('codex', configuredHarnessBinaryPath('codex') ? { executablePath } : undefined) and returns { codexCliVersion } or {} when the binary or version is unreadable. In src/lib/system-prerequisites.ts make the codex entry's install.linux/mac/win use CODEX_CLI_INSTALL_COMMAND (text unchanged). Add the tests listed in PRD WI-1; inject deps, never exec a real binary in tests."
+        },
+        "items": [
+          {
+            "id": "floor-table-reader.ac1",
+            "title": "codexModelMinimumVersion returns '0.156.1' for gpt-6-sol and gpt-6-luna, and returns undefined for gpt-6-astra and for 'toString'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-table-reader.ac2",
+            "title": "Given injected deps, resolveCodexPolicyContext('codex','gpt-6-luna','subscription') returns { codexCliVersion: '0.153.4' } when readVersion yields 0.153.4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-table-reader.ac3",
+            "title": "resolveCodexPolicyContext returns {} without calling readVersion for gpt-6-astra, for api-key auth, and for the claude-code harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-table-reader.ac4",
+            "title": "resolveCodexPolicyContext returns {} when resolveBinary yields null or readVersion yields undefined, and parseCodexCliVersion('codex-cli 0.158.0') returns '0.158.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-codex-floor",
+        "title": "Refuse below-floor GPT-6 models for the codex harness in canUseHarness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-policy.test.ts passes, including the new PAN-4363 describe block and the unchanged 'allows codex + %s on every authMode' test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. Add an optional fourth parameter context?: HarnessPolicyContext to canUseHarness (type-only import from ./codex/policy-context.js; value imports CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions from ./codex/app-server-manager.js). Replace the codex branch's `return ALLOWED` with `return codexModelFloorDecision(model, authMode, context)`, a new private function that returns ALLOWED unless authMode === 'subscription', context.codexCliVersion is set, the model has a floor, and compareVersions(installed, floor) < 0; then it returns allowed:false with the reason text given in the PRD (names model, floor, installed version, and the backticked CODEX_CLI_INSTALL_COMMAND). Forward context in the legacy 'pi' recursion. Add rule 5 to the module header comment. canUseHarness must stay synchronous with no I/O. Add the tests listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "policy-codex-floor.ac1",
+            "title": "canUseHarness('codex','gpt-6-luna','subscription',{codexCliVersion:'0.153.4'}) returns allowed:false with a reason that contains '0.156.1', '0.153.4' and 'npm install -g @openai/codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-codex-floor.ac2",
+            "title": "canUseHarness returns { allowed: true } for gpt-6-sol and gpt-6-luna when codexCliVersion is '0.158.0' or '0.156.1', and refuses gpt-6-sol at '0.156.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-codex-floor.ac3",
+            "title": "canUseHarness returns { allowed: true } at 0.153.4 for api-key auth, for gpt-6-astra, and when no context is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-policy-context",
+        "title": "Pass the codex policy context from resolveHarness to canUseHarness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-resolve.ts",
+            "src/lib/__tests__/harness-resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-resolve.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-resolve.test.ts passes with the new policy-context cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. In src/lib/harness-resolve.ts replace `const decision = canUseHarness(winner, input.model, authMode);` with `const policyContext = await resolveCodexPolicyContext(winner, input.model, authMode);` followed by `const decision = canUseHarness(winner, input.model, authMode, policyContext);`, importing resolveCodexPolicyContext from ./codex/policy-context.js. Change nothing else: the existing denial branches already throw HarnessResolutionError for explicit picks and for non-claude-code built-in defaults such as codex, so no fallback to claude-code occurs. In harness-resolve.test.ts add a hoisted vi.mock of ../codex/policy-context.js (same pattern as policyMocks) and the three cases listed in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "resolver-policy-context.ac1",
+            "title": "Given the policy-context mock resolves { codexCliVersion: '0.153.4' }, resolveHarness({ explicit: 'codex', model: 'gpt-6-luna' }) calls canUseHarness with that object as its fourth argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-policy-context.ac2",
+            "title": "When canUseHarness denies with reason 'needs Codex CLI 0.156.1', resolveHarness rejects with a HarnessResolutionError whose message contains that reason, for both an explicit codex pick and a provider-default codex pick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-policy-context.ac3",
+            "title": "When canUseHarness allows, resolveHarness resolves 'codex' and never falls back to claude-code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-explicit-floor",
+        "title": "Make pan start --harness codex refuse below-floor GPT-6 models before workspace or spawn work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/__tests__/start-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/start-harness.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "start-harness.test.ts passes with the new 0.153.4 and 0.158.0 cases",
+            "lint-file-size.sh reports no violation for src/cli/commands/start.ts (at most 1283 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. In resolveExplicitHarnessFlag in src/cli/commands/start.ts, lazily import resolveCodexPolicyContext from ../../lib/codex/policy-context.js, compute authMode once with getProviderAuthMode(model), and call canUseHarness(harness, model, authMode, await resolveCodexPolicyContext(harness, model, authMode)). Keep the existing stderr write and exitCli(1) on denial. Keep start.ts at or below 1283 lines (current 1276; the newest allowlist row is 1283 for PAN-4211) so no allowlist change is needed. In start-harness.test.ts mock ../../../lib/codex/policy-context.js with a controllable version and add the two cases from PRD WI-4 through __testInternals.resolveExplicitHarnessFlag."
+        },
+        "items": [
+          {
+            "id": "start-explicit-floor.ac1",
+            "title": "Given Codex 0.153.4 under subscription auth, resolveExplicitHarnessFlag('codex','gpt-6-luna') exits with code 1 and writes stderr containing '0.156.1' and 'npm install -g @openai/codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-explicit-floor.ac2",
+            "title": "When the refusal fires, spawnAgent is not called, so no agent row is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-explicit-floor.ac3",
+            "title": "Given Codex 0.158.0, resolveExplicitHarnessFlag('codex','gpt-6-luna') returns 'codex' and the launch proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-codex-model-floors",
+        "title": "Add Codex model floor rows to pan doctor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-codex-models.ts",
+            "src/cli/commands/doctor.ts",
+            "scripts/file-size-allowlist.txt",
+            "tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/doctor-codex-models.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-codex-models.test.ts passes",
+            "lint-file-size.sh reports no violation for src/cli/commands/doctor.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Create src/cli/commands/doctor-codex-models.ts modeled on doctor-prime-agent.ts (re-declare the local CheckResult interface to avoid the doctor.ts import cycle) exporting CodexModelsDoctorDeps and async checkCodexModelFloors(deps) that emits one 'Codex model floor' row per key of CODEX_MODEL_MINIMUM_VERSIONS with the exact severities and messages in PRD WI-5: [] when the codex binary is absent; warn 'version unknown'; ok for non-subscription auth; warn below floor with fix 'Upgrade: ' + CODEX_CLI_INSTALL_COMMAND; ok otherwise. Default deps: the WI-1 binary resolver, readCodexCliVersion, and a lazy import of getProviderAuthMode from ../../lib/agents.js. In doctor.ts add the import and change `for (const c of checkCodex()) checks.push(c);` to `for (const c of [...checkCodex(), ...await checkCodexModelFloors()]) checks.push(c);`. Leave doctor.ts's execSync readCodexVersion alone. Append `<post-change wc -l> src/cli/commands/doctor.ts # PAN-4363` to scripts/file-size-allowlist.txt in the same commit. Add the tests listed in PRD WI-5 with injected deps."
+        },
+        "items": [
+          {
+            "id": "doctor-codex-model-floors.ac1",
+            "title": "Given Codex 0.153.4 under subscription auth, checkCodexModelFloors returns two warn rows whose messages contain gpt-6-sol / gpt-6-luna and '0.156.1', with a fix containing 'npm install -g @openai/codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-codex-model-floors.ac2",
+            "title": "checkCodexModelFloors returns two ok rows at 0.158.0 under subscription auth and two ok rows at 0.153.4 under api-key auth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-codex-model-floors.ac3",
+            "title": "checkCodexModelFloors returns [] when the codex binary is absent and two warn rows containing 'version unknown' when the version is unreadable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-codex-model-floors.ac4",
+            "title": "pan doctor prints the Codex model floor rows directly after the Codex CLI row, and lint-file-size.sh passes with the new PAN-4363 allowlist row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-codex-model-floor",
+        "title": "Document the Codex GPT-6 floor and the verified CLIProxy version",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:22:49Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "src/lib/cliproxy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '0.156.1' configuration/harnesses.mdx",
+            "grep -n 'npm install -g @openai/codex' configuration/harnesses.mdx",
+            "grep -n 'PAN-4363' src/lib/cliproxy.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "harnesses.mdx Codex section contains the 0.156.1 floor and the upgrade command",
+            "cliproxy.ts contains the PAN-4363 verification comment above CLIPROXY_RELEASE_VERSION",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. In configuration/harnesses.mdx, section '### OpenAI Codex CLI (alternative)', replace the sentences starting 'The Codex CLI lists them in its model catalog from `0.156.1`; older CLIs forward the id...' through the openai/codex#47784 link with text stating: under ChatGPT sign-in gpt-6-sol and gpt-6-luna need Codex CLI 0.156.1 or newer and OpenAI answers HTTP 400 below it (keep the #47784 link); gpt-6-astra and API-key auth have no floor; Overdeck refuses such a launch before it starts on every spawn path, names the required version, and never substitutes another model; upgrade with `npm install -g @openai/codex` because pan install does not manage the Codex CLI; pan doctor shows a Codex model floor row per model; CLIProxy 7.3.16 (the version pan install pins) was verified on 2026-09-29 to serve both models under ChatGPT sign-in on the claude-code harness. In src/lib/cliproxy.ts add the one-line comment from PRD WI-6 above `const CLIPROXY_RELEASE_VERSION = 'v7.3.16';` with no code change."
+        },
+        "items": [
+          {
+            "id": "docs-codex-model-floor.ac1",
+            "title": "The harnesses.mdx Codex section states that gpt-6-sol and gpt-6-luna require Codex CLI 0.156.1 or newer under ChatGPT sign-in and that Overdeck refuses the launch below it without substituting a model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-codex-model-floor.ac2",
+            "title": "The harnesses.mdx Codex section contains the upgrade command `npm install -g @openai/codex`, the Codex model floor doctor row, and the CLIProxy 7.3.16 verification date 2026-09-29",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-codex-model-floor.ac3",
+            "title": "src/lib/cliproxy.ts contains a PAN-4363 comment above CLIPROXY_RELEASE_VERSION and the pinned value remains 'v7.3.16'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "floor-table-reader",
+        "to": "policy-codex-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-table-reader",
+        "to": "resolver-policy-context",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-codex-floor",
+        "to": "resolver-policy-context",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-table-reader",
+        "to": "start-explicit-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-codex-floor",
+        "to": "start-explicit-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-table-reader",
+        "to": "doctor-codex-model-floors",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4363-gpt-6-sol-and-luna-fail-with-400-on-chatgpt-login-below-codex-0-155-and-overdeck-s-version-floor-is-0-153-4.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

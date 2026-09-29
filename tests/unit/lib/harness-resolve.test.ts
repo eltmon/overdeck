@@ -111,7 +111,7 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
-    expect(mocks.canUseHarness).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarness).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription', {});
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
@@ -127,7 +127,7 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
 
-    expect(mocks.canUseHarness).toHaveBeenNthCalledWith(1, 'ohmypi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarness).toHaveBeenNthCalledWith(1, 'ohmypi', 'claude-sonnet-4-6', 'subscription', {});
     expect(mocks.canUseHarness).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
     expect(warnSpy).toHaveBeenCalledWith('harness ohmypi denied for anthropic: pi denied — falling back to native claude-code');
   });

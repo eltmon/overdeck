@@ -2,8 +2,8 @@
  * pan scope — xBRIEF lifecycle manual overrides
  *
  * Commands to inspect and move scope xBRIEFs between lifecycle directories.
- * All transitions use `transitionXBriefOnMain` so they inherit idempotency,
- * branch-awareness, and background-push behavior.
+ * All transitions use `transitionIssueXBrief`, which writes files only and
+ * never commits — the caller is responsible for committing the result.
  */
 
 import { exitCli } from '../exit.js';
@@ -14,7 +14,8 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   findXBriefByIssueSync,
-  transitionXBriefOnMain,
+  resolveIssueWorkspacePlanHome,
+  transitionIssueXBrief,
   type XBriefTransitionResult,
 } from '../../lib/xbrief/lifecycle-io.js';
 import { findPlanSync, readPlanSync } from '../../lib/xbrief/io.js';
@@ -23,6 +24,8 @@ import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { readContinueState } from '../../lib/xbrief/continue-state.js';
 import { listXBriefs, readXBriefDocument } from '../../lib/xbrief/xbrief-index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam, listProjectsSync } from '../../lib/projects.js';
+import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
+import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 
 function getProjectPath(issueId: string): string {
@@ -38,6 +41,51 @@ function getProjectPath(issueId: string): string {
   throw new Error(`Could not resolve project path for ${issueId}. Add the project to projects.yaml or pass --project.`);
 }
 
+export interface ScopeTransitionTarget {
+  /** Where the transition writes: the issue's base workspace, or the primary checkout. */
+  planHome: string;
+  /** True when `planHome` is the primary checkout — the base workspace is gone. */
+  onMain: boolean;
+}
+
+/** The base workspace's plan home when it exists, else the primary checkout (PAN-4225). */
+export function resolveScopeTarget(projectPath: string, issueId: string): ScopeTransitionTarget {
+  const workspaceHome = resolveIssueWorkspacePlanHome(projectPath, issueId);
+  if (workspaceHome) return { planHome: workspaceHome, onMain: false };
+  return { planHome: resolvePlanHome(projectPath), onMain: true };
+}
+
+/**
+ * Commit and push the spec change when the transition landed on the primary
+ * checkout (the base workspace is gone) — the agent that would otherwise
+ * commit it no longer exists. Returns a one-line warning to print, or null
+ * when nothing needed committing (pattern: src/cli/commands/orders.ts).
+ *
+ * Stages only `specPath` (the transitioned issue's own spec file), not the
+ * whole `.pan/specs/` tree — a primary checkout can carry other issues'
+ * stray modified specs (PAN-4224), and this verb must not sweep those into
+ * its commit.
+ */
+export async function finishScopeTransition(
+  target: ScopeTransitionTarget,
+  specPath: string,
+  message: string,
+): Promise<string | null> {
+  if (!target.onMain) return null;
+
+  const commit = await commitPlanArtifacts({
+    cwd: target.planHome,
+    paths: [specPath],
+    message,
+  });
+  if (!commit.committed && commit.reason !== 'nothing to commit') {
+    return `Could not commit xBRIEF spec: ${commit.reason}`;
+  }
+  const push = await pushPlanArtifacts(target.planHome);
+  const description = await surfacePlanArtifactPush(push, { planHome: target.planHome, command: 'pan scope' });
+  return description ? description.message : null;
+}
+
 function formatTransition(result: XBriefTransitionResult, _issueId: string): string {
   const lines: string[] = [];
   if (result.moved) {
@@ -47,11 +95,6 @@ function formatTransition(result: XBriefTransitionResult, _issueId: string): str
   }
   if (result.statusUpdated) {
     lines.push(`${chalk.green('✓')} Updated plan.status → ${result.toDir}`);
-  }
-  if (result.committed) {
-    lines.push(`${chalk.green('✓')} Committed on main`);
-  } else if (result.moved || result.statusUpdated) {
-    lines.push(`${chalk.yellow('⚠')} On-disk state updated but not committed (not on main)`);
   }
   return lines.join('\n');
 }
@@ -387,57 +430,47 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   }
 }
 
+async function printScopeWarning(target: ScopeTransitionTarget, specPath: string, message: string): Promise<void> {
+  const warning = await finishScopeTransition(target, specPath, message);
+  if (warning) console.log(chalk.yellow(`⚠ ${warning}`));
+}
+
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
-    issueId,
-    'proposed',
-    'proposed',
-    `scope: propose ${issueId.toUpperCase()} xBRIEF`,
-  );
+  const target = resolveScopeTarget(projectPath, issueId);
+  const result = await transitionIssueXBrief(target.planHome, issueId, 'proposed', 'proposed');
   console.log(formatTransition(result, issueId));
+  await printScopeWarning(target, result.toPath, `scope: propose ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
-    issueId,
-    'active',
-    'approved',
-    `scope: approve ${issueId.toUpperCase()} xBRIEF`,
-  );
+  const target = resolveScopeTarget(projectPath, issueId);
+  const result = await transitionIssueXBrief(target.planHome, issueId, 'active', 'approved');
   console.log(formatTransition(result, issueId));
+  await printScopeWarning(target, result.toPath, `scope: approve ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
-    issueId,
-    'completed',
-    'completed',
-    `scope: complete ${issueId.toUpperCase()} xBRIEF`,
-  );
+  const target = resolveScopeTarget(projectPath, issueId);
+  const result = await transitionIssueXBrief(target.planHome, issueId, 'completed', 'completed');
   console.log(formatTransition(result, issueId));
+  await printScopeWarning(target, result.toPath, `scope: complete ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
-    issueId,
-    'cancelled',
-    'cancelled',
-    `scope: cancel ${issueId.toUpperCase()} xBRIEF`,
-  );
+  const target = resolveScopeTarget(projectPath, issueId);
+  const result = await transitionIssueXBrief(target.planHome, issueId, 'cancelled', 'cancelled');
   console.log(formatTransition(result, issueId));
+  await printScopeWarning(target, result.toPath, `scope: cancel ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function restoreCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const found = findXBriefByIssueSync(projectPath, issueId);
+  const target = resolveScopeTarget(projectPath, issueId);
+  const found = findXBriefByIssueSync(target.planHome, issueId);
   if (!found) {
     console.log(chalk.red(`No xBRIEF found for ${issueId}`));
     return exitCli(1);
@@ -446,14 +479,9 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`xBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     return exitCli(1);
   }
-  const result = await transitionXBriefOnMain(
-    projectPath,
-    issueId,
-    'active',
-    'approved',
-    `scope: restore ${issueId.toUpperCase()} xBRIEF`,
-  );
+  const result = await transitionIssueXBrief(target.planHome, issueId, 'active', 'approved');
   console.log(formatTransition(result, issueId));
+  await printScopeWarning(target, result.toPath, `scope: restore ${issueId.toUpperCase()} xBRIEF`);
 }
 
 export function registerScopeCommands(program: Command): void {

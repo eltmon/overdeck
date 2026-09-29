@@ -124,6 +124,25 @@ The public changelog is [`changelog.mdx`](../changelog.mdx) at the repo root, se
 3. Keep the `RELEASE STEP` comment above the newest block. Add the next `Unreleased` block only once it has entries; an empty one renders on the public page.
 4. Commit (`docs(infra): changelog for vX.Y.Z`), then run `pan release stable --version X.Y.Z` and push `main` and the tag. Mintlify redeploys from `main`.
 
+## Adding a model that needs a newer Claude Code
+
+New Claude models sometimes require a newer Claude Code CLI than operators
+already have installed. When adding one:
+
+1. Set `minClaudeCodeVersion` on the model's capability row in
+   [`src/lib/model-capability-additions.ts`](../src/lib/model-capability-additions.ts)
+   — the oldest Claude Code CLI (`X.Y.Z`) that recognizes the model. Leave it
+   unset for a model with no documented requirement.
+2. Add the model and its minimum to the table in
+   [`configuration/harnesses.mdx`](../configuration/harnesses.mdx) under
+   "Claude Code version requirements".
+3. State the requirement in the model's changelog entry so operators upgrading
+   Overdeck see it before the model fails to launch.
+
+The launch gate (`prepareHarnessLaunch`, PAN-4359) reads `minClaudeCodeVersion`
+directly — no other wiring is needed for the refusal or the dashboard banner
+to pick up a new minimum.
+
 ## Verify a clean install
 
 After npm lists the new version, run the advertised launch command with an empty cache and an empty global prefix. A global `@overdeck/core` on the release machine otherwise satisfies `npx` and hides a broken package:

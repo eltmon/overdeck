@@ -9,6 +9,7 @@ import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
+import { normalizeJevConfig } from './jev.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -165,6 +166,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.terminal,
     },
     ollama: { ...DEFAULT_CONFIG.ollama },
+    jev: { ...DEFAULT_CONFIG.jev },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -466,6 +468,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // highest-precedence layer lands last. Unlike terminal.backend, a bad value throws:
     // a non-localhost base_url would ship every local-agent prompt off the machine.
     result.ollama = normalizeOllamaConfig(config.ollama, result.ollama);
+    // Optional Jev judgment client (PAN-4369): folds like ollama, throws on bad values.
+    result.jev = normalizeJevConfig(config.jev, result.jev);
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
@@ -613,6 +617,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (config.api_keys.voyage) {
         result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+      }
+      // TypeSafe is not a model provider, so no enabledProviders entry (PAN-4369).
+      if (config.api_keys.typesafe) {
+        result.apiKeys.typesafe = resolveEnvVar(config.api_keys.typesafe);
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);

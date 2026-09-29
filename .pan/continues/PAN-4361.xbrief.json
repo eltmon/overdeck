@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "issueId": "PAN-4361",
+  "created": "2026-09-29T04:30:21.943Z",
+  "updated": "2026-09-29T05:31:41.406Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "eval-model-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T04:30:21.937Z",
+      "doneAt": "2026-09-29T04:38:35.522Z"
+    },
+    "eval-usage-cost": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T04:38:59.868Z",
+      "doneAt": "2026-09-29T04:43:58.089Z"
+    },
+    "anthropic-path-and-run-info": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T04:44:11.748Z",
+      "doneAt": "2026-09-29T04:57:33.624Z"
+    },
+    "openai-responses-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T04:57:42.969Z",
+      "doneAt": "2026-09-29T05:10:15.931Z"
+    },
+    "evals-readme-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T05:10:27.226Z",
+      "doneAt": "2026-09-29T05:11:56.259Z"
+    },
+    "live-eval-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T05:12:05.849Z",
+      "doneAt": "2026-09-29T05:18:14.512Z"
+    },
+    "eval-model-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:15.502Z"
+    },
+    "eval-model-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:28.623Z"
+    },
+    "eval-model-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:41.120Z"
+    },
+    "eval-model-config.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:52.837Z"
+    },
+    "eval-model-config.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:04.442Z"
+    },
+    "eval-usage-cost.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:20.742Z"
+    },
+    "eval-usage-cost.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:32.408Z"
+    },
+    "eval-usage-cost.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:44.247Z"
+    },
+    "anthropic-path-and-run-info.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:02.188Z"
+    },
+    "anthropic-path-and-run-info.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:19.176Z"
+    },
+    "anthropic-path-and-run-info.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:31.417Z"
+    },
+    "anthropic-path-and-run-info.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:44.128Z"
+    },
+    "anthropic-path-and-run-info.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:57.372Z"
+    },
+    "openai-responses-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:15.571Z"
+    },
+    "openai-responses-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:28.333Z"
+    },
+    "openai-responses-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:40.721Z"
+    },
+    "openai-responses-path.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:53.433Z"
+    },
+    "evals-readme-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:12.005Z"
+    },
+    "evals-readme-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:26.669Z"
+    },
+    "evals-readme-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:39.679Z"
+    },
+    "evals-readme-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:52.217Z"
+    },
+    "live-eval-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:09.978Z"
+    },
+    "live-eval-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:26.472Z"
+    },
+    "live-eval-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:41.406Z"
+    }
+  }
+}

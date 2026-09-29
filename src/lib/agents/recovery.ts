@@ -276,7 +276,7 @@ export async function restartAgent(
     role: agentState.role,
     model: effectiveModel,
   });
-  const harnessLaunch = await prepareRestartHarness(effectiveHarness);
+  const harnessLaunch = await prepareRestartHarness(effectiveHarness, { model: effectiveModel });
 
   if (graceful && await restartSessionExists(normalizedId)) {
     const warningPendingDecision = await checkPendingDecision();
@@ -582,7 +582,7 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const harnessLaunch = await prepareHarnessLaunch(recoveryHarness);
+  const harnessLaunch = await prepareHarnessLaunch(recoveryHarness, { model: state.model });
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
   saveAgentStateSync(state);
 

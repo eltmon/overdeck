@@ -1,0 +1,811 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T09:40:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4329: Session Vault: carry uncommitted work with a conversation (encrypted WIP snapshots)",
+    "updated": "2026-09-29T09:48:21.574Z"
+  },
+  "plan": {
+    "id": "pan-4329",
+    "title": "Session Vault: carry uncommitted work with a conversation (encrypted WIP snapshots)",
+    "status": "running",
+    "uid": "00647642-c3ba-413f-a143-73a0565a9256",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T09:40:12Z",
+    "updated": "2026-09-29T09:48:21.574Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4329",
+        "label": "PAN-4329",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4329.md",
+        "label": "PRD draft (.pan/drafts/pan-4329.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/anywhere-accounts.md",
+        "label": "anywhere-accounts design §6.7",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "git",
+      "encryption",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Resuming a Session Vault conversation on another machine moves the transcript but not the uncommitted code; with the origin machine off, those edits cannot be fetched later and the drift prompt can only warn.",
+      "Proposal": "On the owner machine, build a WIP commit from a temporary index seeded with a copy of the user index, bundle it with every unpushed commit (--not --remotes), secret-scan every carried commit, cap the size, and store it as zstd+AES-GCM parts through VaultStore referenced from the settlement `wip` field (auto mode throttled to 5 minutes, force mode on the Stop hook and pan vault save, last 5 kept). On resume, require a clean checkout (or a fresh --worktree), fetch origin, unbundle into refs/overdeck/wip/<vaultId>, check out branch at base without moving any branch backward, apply the base..wip diff unstaged, delete the temp ref, then adopt and launch. --no-code skips it. Full design and decisions D-1..D-17 in .pan/drafts/pan-4329.md.",
+      "NonGoals": "- Preserving staged-vs-unstaged state; everything is applied unstaged in v1\n- Carrying submodule working trees, LFS objects or clean/smudge-filtered content beyond their git-clean form; autocrlf normalization\n- Pushing WIP refs or snapshots to the project origin or any git host\n- Garbage-collecting unreferenced snapshot objects in the vault backend\n- Dashboard shutdown trigger, managed session-end trigger and dashboard \"Continue here\" apply (PAN-4307 calls the lib API)\n- Adding a Claude Code SessionEnd hook\n- Native Windows verification\n- A vault format version bump\n- Any use of execSync, git stash, or writes to the user index/worktree during capture"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Capture modes: auto (5-minute throttle, then (base,tree) compare) for auto-settle and pan vault sync; force (always compare, retry secret/error skips) for the Stop hook, pan vault save, session end and shutdown.",
+        "rationale": "The issue says \"at most every 5 minutes\" for settlement-triggered capture and \"always\" for explicit triggers; comparing the (base,tree) pair avoids duplicate snapshots, and retrying secret/error skips lets allow-secret take effect."
+      },
+      {
+        "summary": "On a noop settlement in force mode the latest settlement wip is replaced in place; no settlement is appended.",
+        "rationale": "Appending a settlement without new lines would create phantom versions for pan vault show and versionAtLineCount."
+      },
+      {
+        "summary": "The secret scan covers every commit the bundle carries (git log -p <wip> --not --remotes), not only git diff HEAD <wip>.",
+        "rationale": "Unpushed local commits travel in the bundle too; scanning only HEAD..wip would upload their secrets unchecked."
+      },
+      {
+        "summary": "Code allow flow extends `pan vault allow-secret` with --file <path> storing line hashes under the same vaultId key.",
+        "rationale": "The issue asks for the same allow flow as FR-13; transcript line numbers cannot address code, so file + content hash is the smallest extension."
+      },
+      {
+        "summary": "Bundle parts are 8 MiB, with a domain-separated HMAC id; the 50 MB cap is measured on the bundle file.",
+        "rationale": "The git backend writes each object as a file and pushes it, so parts stay far below the 50 MB GitHub warning; the pack inside the bundle is already compressed."
+      },
+      {
+        "summary": "Standalone dirty target: TTY prompt for a sibling worktree, non-TTY exits 1 naming --worktree; Overdeck-mode workspace creation belongs to PAN-4307.",
+        "rationale": "The standalone CLI must not import Overdeck workspace code (import-graph test), and a non-interactive run must never write."
+      },
+      {
+        "summary": "Apply never moves a branch backward: detach at base when the local branch diverged or is checked out in another worktree.",
+        "rationale": "The AC requires HEAD equal to A HEAD; detaching satisfies it without discarding local commits."
+      },
+      {
+        "summary": "No SessionEnd hook; the per-turn Stop hook is the standalone session-end trigger, and dashboard shutdown/session end are PAN-4307 call sites.",
+        "rationale": "Stop fires after the final turn; the dashboard does not settle yet, so its triggers belong with PAN-4307."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature (capture on machine A, apply on machine B) whose headline AC is a two-machine round trip; 24 files. The subsystem count exceeds 6 only because the two-segment rule counts each single doc file (docs/SESSION-VAULT.md, configuration/session-vault.mdx, sync-sources/skills) and the generated manifest (packages/contracts) as separate subsystems. Splitting capture from apply would ship a sibling that stores snapshots nothing can read.",
+      "canonicalFilename": "2026-09-29-PAN-4329-session-vault-carry-uncommitted-work-with-a-conversation-encrypted-wip-snapshots.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "wip-format",
+        "title": "Add encrypted WIP part encoding, skip fields and wipMaxBytes config",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wip-capture",
+            "wip-apply",
+            "settle-wip"
+          ],
+          "files_scope": [
+            "src/lib/vault/format.ts",
+            "src/lib/vault/config.ts",
+            "tests/unit/lib/vault/wip-format.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/wip-format.test.ts tests/unit/lib/vault/format.test.ts tests/unit/lib/vault/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-4329.md WI-1. In src/lib/vault/format.ts add WIP_PART_BYTES (8 MiB), wipPartIdFor (HMAC over \"overdeck-wip-part-v1\\0\"+bytes, domain-separated from chunk ids), encodeWipParts (split, zstd, AES-256-GCM with aad=id) and decodeWipParts (decrypt, decompress, id-check, concatenate; any failure throws VaultAuthenticationError). Extend the skipped variant of WipSnapshotRef with optional base and tree and update the reserved-field comments. In src/lib/vault/config.ts add wipMaxBytes (default 52428800) to VaultConfig, defaults and withDefaults."
+        },
+        "items": [
+          {
+            "id": "wip-format.ac1",
+            "title": "Given a 20 MiB random buffer, when encodeWipParts then decodeWipParts run, then 3 parts are produced and the decoded bytes equal the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-format.ac2",
+            "title": "Given identical bytes, wipPartIdFor returns a different id than chunkIdFor, so a part id never collides with a transcript chunk id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-format.ac3",
+            "title": "Given one flipped byte in a stored part or two parts swapped in order, decodeWipParts rejects with VaultAuthenticationError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-format.ac4",
+            "title": "Given no vault config file, readVaultConfig() returns wipMaxBytes equal to 52428800",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wip-scan",
+        "title": "Add scanWipPatch secret scan for code patches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/secrets.ts",
+            "tests/unit/lib/vault/wip-scan.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/wip-scan.test.ts tests/unit/lib/vault/secrets.test.ts"
+          ],
+          "expected_outputs": [
+            "wip-scan.test.ts passes"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add WipSecretHit {file, pattern, hash} and scanWipPatch(vaultId, patch) to src/lib/vault/secrets.ts: track the file from \"+++ b/<path>\" headers (fall back to \"--- a/<path>\" when +++ is /dev/null), scan only lines starting with \"+\" and not \"+++\" with findSecretMatches, hash = lineHash(line.slice(1)), skip hashes in allowedSecretHashes(vaultId), one hit per (file, line, pattern), never include the matched text."
+        },
+        "items": [
+          {
+            "id": "wip-scan.ac1",
+            "title": "Given a patch that adds a ghp_ token in src/a.ts, scanWipPatch returns one hit with file \"src/a.ts\" and pattern \"token\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-scan.ac2",
+            "title": "Given the same token only on a removed (-) or context line, scanWipPatch returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-scan.ac3",
+            "title": "Given allowSecret(vaultId, hit.hash) was stored, a rescan returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-scan.ac4",
+            "title": "JSON.stringify of the scan result never contains the token text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wip-capture",
+        "title": "Create wip-capture.ts: temp-index WIP commit, bundle, secret scan, size cap, encrypted upload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "settle-wip",
+            "allow-secret-code",
+            "wip-apply"
+          ],
+          "files_scope": [
+            "src/lib/vault/wip-capture.ts",
+            "tests/unit/lib/vault/wip-capture.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/wip-capture.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "wip-capture.test.ts and import-graph.test.ts pass",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and decisions D-1, D-9, D-10. New module src/lib/vault/wip-capture.ts exporting WipMode, WIP_MIN_INTERVAL_SEC=300, WIP_KEEP=5, WipCaptureResult, runWipGit (promisified execFile with GIT_OPTIONAL_LOCKS=0, GIT_TERMINAL_PROMPT=0 and fixed Overdeck Session Vault author/committer env), latestWipEntry, pruneWipEntries, buildWipCommit (temp index seeded from a COPY of `git rev-parse --git-path index`, add -A, write-tree, commit-tree -p HEAD; null for non-repo or unborn HEAD), wipPatch (git log -p --no-color <wip> --not --remotes) and captureWip (throttle on wip.at before git; unchanged by (base,tree) pair per D-1; skipped clean when tree equals HEAD tree and nothing is unpushed; no-git returned but never persisted; update-ref refs/overdeck/wip/<vaultId>-<pid>; bundle create <tmpfile> <ref> --not --remotes; update-ref -d in finally; size cap; scanWipPatch; encodeWipParts + putObjects). Never execSync, never git stash, no shell pipes; temp files under mkdtemp removed in finally. Imports only node built-ins, sibling vault modules and ../secret-redaction.js."
+        },
+        "items": [
+          {
+            "id": "wip-capture.ac1",
+            "title": "Given a fixture repo with an unpushed commit, staged, unstaged, untracked, deleted, binary and force-added ignored files, captureWip returns captured with base equal to HEAD and at least one object written to the dir store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-capture.ac2",
+            "title": "captureWip preserves the sha256 of the user index file, `git stash list` (empty), `git status --porcelain=v1 --untracked-files=all` and `git for-each-ref refs/overdeck/` (empty) exactly as they were before capture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-capture.ac3",
+            "title": "Given a ghp_ token in an untracked file, captureWip returns skipped \"secret\" with hits naming that file and pattern, and no file is added under the store objects directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-capture.ac4",
+            "title": "Given maxBytes 10, captureWip returns skipped \"too-large\" with bytes > 10 and writes no object; a clean pushed checkout returns skipped \"clean\"; a non-repo cwd returns status \"no-git\" with no wip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-capture.ac5",
+            "title": "given a captured snapshot, a byte scan of every backend file returns no match for \"# v2 git bundle\", \"refs/overdeck/wip/\", the WIP commit sha, or a random marker string written into the untracked file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settle-wip",
+        "title": "Attach WIP capture to settle() with auto/force/off modes, noop amend and retention",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/settle.ts",
+            "tests/unit/lib/vault/settle-wip.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/settle-wip.test.ts tests/unit/lib/vault/settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settle-wip.test.ts and existing settle tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decisions D-1, D-2, D-3, D-8. SettleOptions gains wip?: WipMode (default auto); SettleResult noop/append gain wip?: WipCaptureResult. Append path: before casRef call captureWip for the target record (owned record or the P-6 fork) with previous=latestWipEntry(record.settlements), maxBytes=config.wipMaxBytes; set settlement.wip for captured/skipped; prune to 5 captured entries on capture. Noop path: only in force mode and when this machine owns the record, capture and replace the LAST settlement wip in place, prune, casRef with the read version; a conflict returns plain noop. Tests inject now; no real timers."
+        },
+        "items": [
+          {
+            "id": "settle-wip.ac1",
+            "title": "given a first settle in a dirty repo, settle returns result.wip.status \"captured\" and persists the captured wip on the last settlement; a non-git cwd produces a settlement with no wip field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-wip.ac2",
+            "title": "given a second settle 60 s later in default auto mode, settle returns result.wip.status \"throttled\" and the new settlement has no wip field; with wip \"force\" it returns \"captured\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-wip.ac3",
+            "title": "given a noop settle with wip \"force\" after an edit, settle preserves the settlement count and updates the last settlement wip.tree and wip.at in place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-wip.ac4",
+            "title": "given 7 forced captures with distinct edits, the stored record contains exactly 5 settlements with a captured wip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-wip.ac5",
+            "title": "given a record now owned by another environment, settle stores the wip on the P-6 fork record and preserves the original record ref bytes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "save-wip-output",
+        "title": "pan vault save captures in force mode and prints the code snapshot outcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/save.ts",
+            "tests/unit/cli/vault/save-wip.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/save-wip.test.ts tests/unit/cli/vault/save-sync.test.ts"
+          ],
+          "expected_outputs": [
+            "save-wip.test.ts and save-sync.test.ts pass"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. saveHook and saveCommand pass wip: \"force\" to settle. describeVerdict appends the WIP outcome (saved size, unchanged, blocked file (pattern) with the `pan vault allow-secret <id8> --file <file>` hint, too-large with cap, failed reason; nothing for no-git). saveCommand exits 1 on a secret or error skip; hook mode stays silent and exits 0."
+        },
+        "items": [
+          {
+            "id": "save-wip-output.ac1",
+            "title": "Given a secret in the working tree, `pan vault save <path>` output names the file and pattern \"token\", does not contain the token value, suggests allow-secret --file, and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-wip-output.ac2",
+            "title": "Given the same secret in hook mode, nothing is written to stdout or stderr and the command returns normally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-wip-output.ac3",
+            "title": "Given a clean change, `pan vault save` prints \"code snapshot saved\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "allow-secret-code",
+        "title": "Add `pan vault allow-secret <id> --file <path>` for blocked code lines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/allow-secret.ts",
+            "src/cli/commands/vault/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/vault/allow-secret-code.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/allow-secret-code.test.ts",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "allow-secret-code.test.ts passes",
+            "slash-command manifest lint passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-5. Register `allow-secret <id-or-path> [line]` with `--file <path>`; exactly one of line or --file is required. For --file: resolve the owned vaultId, loadRecord, buildWipCommit(record.cwd), scanWipPatch over wipPatch, allowSecret(vaultId, hash) for each hit in that file, cleanup, print the count and the retry hint; zero hits exits 1. Regenerate packages/contracts/src/composer-commands.generated.ts (npm run build, then node scripts/generate-slash-commands.mjs) and commit it in this item."
+        },
+        "items": [
+          {
+            "id": "allow-secret-code.ac1",
+            "title": "Given a blocked code snapshot, `allow-secret <id> --file <path>` followed by `pan vault save` produces a captured snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "allow-secret-code.ac2",
+            "title": "Given neither a line number nor --file, the command exits 1 with \"Give a line number or --file <path>.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "allow-secret-code.ac3",
+            "title": "Given a file with no blocked lines, the command exits 1 with \"No blocked lines in <file>.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "allow-secret-code.ac4",
+            "title": "bash scripts/lint-slash-commands.sh exits 0 with the regenerated manifest containing the --file option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wip-apply",
+        "title": "Create wip-apply.ts: verify, unbundle, checkout base, apply unstaged, worktree variant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/wip-apply.ts",
+            "tests/unit/lib/vault/wip-apply.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/wip-apply.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "wip-apply.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and decisions D-12, D-13, D-14. New module src/lib/vault/wip-apply.ts exporting findLatestWip, WipApplyResult, applyWipSnapshot and applyWipSnapshotInWorktree. Dirty check first (readCwdState) and return {status:\"dirty\"} before any other git call. Then fetch parts, decodeWipParts, write the bundle to a temp file, fetch origin (non-fatal) BEFORE bundle verify (verify needs the prerequisite commits), bundle verify, bundle list-heads (exactly one), fetch <head>:refs/overdeck/wip/<vaultId>, check tree and parent against the record, checkout per D-12 (never move a branch backward), git diff --binary base..ref to a temp patch, git apply, delete the temp ref and temp dir in finally. Worktree variant fetches in the repo, `git worktree add --detach <dir> <base>`, applies there."
+        },
+        "items": [
+          {
+            "id": "wip-apply.ac1",
+            "title": "given a snapshot captured in clone A, applyWipSnapshot in a fresh clean clone B produces byte- and mode-identical tracked and untracked files (ignored files absent), B HEAD equal to A HEAD, nothing staged, and an empty refs/overdeck/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-apply.ac2",
+            "title": "Given a dirty clone B, applyWipSnapshot returns \"dirty\" and B status --porcelain and index hash are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-apply.ac3",
+            "title": "given a local branch that diverged from base, applyWipSnapshot returns applied with a note, HEAD detached at base, and preserves the branch tip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-apply.ac4",
+            "title": "Given a tampered part, applyWipSnapshot returns \"failed\" and B is unchanged; given a clone B made before A last push, apply still succeeds because origin is fetched before bundle verify",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wip-apply.ac5",
+            "title": "Given a dirty repo, applyWipSnapshotInWorktree produces the identical tree in the new directory and leaves the dirty repo status and index hash unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-wip",
+        "title": "pan vault resume applies the latest code snapshot with --no-code and --worktree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/resume.ts",
+            "src/cli/commands/vault/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/vault/resume-wip.test.ts",
+            "tests/unit/cli/vault/resume.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/resume-wip.test.ts tests/unit/cli/vault/resume.test.ts",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resume-wip.test.ts and resume.test.ts pass",
+            "slash-command manifest lint passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and decisions D-11, D-14, D-15, D-16. Add --no-code and --worktree <dir> to resume. After resolveTargetCwd: latest captured wip (unless --no-code) is applied before adoption; dirty target prompts on a TTY for a sibling worktree `<cwd>-vault-<id8>`, non-TTY exits 1 naming --worktree; applied snapshot skips the FR-12 drift prompt; skipped entry prints \"No code snapshot: skipped (...)\" and runs FR-12; failed exits 1 with nothing adopted; adopt conflict after apply prints the D-15 message and exits 1. Regenerate the slash-command manifest and commit it in this item. Update the existing tests/unit/cli/vault/resume.test.ts drift tests (ac2, ac3 and any other test expecting the FR-12 prompt) to pass code: false, because their no-remote fixture repo now always carries a snapshot."
+        },
+        "items": [
+          {
+            "id": "resume-wip.ac1",
+            "title": "Given machine A with an unpushed commit and uncommitted edits including an untracked file settled to the vault, when machine B runs `pan vault resume <id>` in a clean clone, then B tracked and untracked files match A byte for byte (ignored excluded) and B HEAD equals A HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-wip.ac2",
+            "title": "Given a dirty target checkout without a TTY, resume exits 1, stderr names --worktree, the checkout status and index hash are unchanged, and the record owner is still A",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-wip.ac3",
+            "title": "given a dirty target and --worktree <dir>, resume applies the snapshot in <dir> and spawns the harness with cwd <dir>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-wip.ac4",
+            "title": "given --no-code in a clean clone, resume preserves every working-tree file and falls back to the FR-12 drift handling; the existing resume.test.ts drift tests pass with code: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-wip.ac5",
+            "title": "Given a latest entry skipped \"too-large\", stdout contains \"No code snapshot: skipped (too-large\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document \"Carrying your code\" in SESSION-VAULT.md, session-vault.mdx and the pan-vault skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:40:12Z",
+        "metadata": {
+          "issueLabel": "pan-4329",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "src/lib/vault/cwd-state.ts"
+          ],
+          "verify_commands": [
+            "grep -n \"Carrying your code\" docs/SESSION-VAULT.md",
+            "grep -n -- \"--no-code\" configuration/session-vault.mdx sync-sources/skills/pan-vault/SKILL.md",
+            "grep -n \"wipMaxBytes\" docs/SESSION-VAULT.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add \"### Carrying your code\" to docs/SESSION-VAULT.md (captured vs excluded content, triggers and 5-minute throttle, 50 MB wipMaxBytes cap and skipped too-large, secret block and allow-secret --file, end-to-end encrypted and never pushed to the git host, last 5 kept, apply steps with clean checkout, --worktree, unstaged, --no-code); replace the Settlement glossary sentence saying Phase A never writes wip; add wipMaxBytes to Configuration and wip-capture.ts / wip-apply.ts to the Module map. Add a \"Your uncommitted code comes along\" subsection to configuration/session-vault.mdx. Add --no-code, --worktree and allow-secret --file to sync-sources/skills/pan-vault/SKILL.md."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/SESSION-VAULT.md contains a \"Carrying your code\" section stating that snapshots are never pushed to your git host and naming the 50 MB wipMaxBytes cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/SESSION-VAULT.md no longer contains the sentence \"Phase A never writes it\" in the Settlement glossary row and lists wip-capture.ts and wip-apply.ts in the Module map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/session-vault.mdx and sync-sources/skills/pan-vault/SKILL.md each contains the --no-code and --worktree resume flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "src/lib/vault/cwd-state.ts header contains a pointer to wip-capture.ts and no longer contains \"no paths, diffs or file contents ever enter the vault\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wip-format",
+        "to": "wip-capture",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-format",
+        "to": "wip-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-scan",
+        "to": "wip-capture",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-capture",
+        "to": "settle-wip",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-capture",
+        "to": "allow-secret-code",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-capture",
+        "to": "wip-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "settle-wip",
+        "to": "save-wip-output",
+        "type": "blocks"
+      },
+      {
+        "from": "save-wip-output",
+        "to": "allow-secret-code",
+        "type": "blocks"
+      },
+      {
+        "from": "settle-wip",
+        "to": "resume-wip",
+        "type": "blocks"
+      },
+      {
+        "from": "wip-apply",
+        "to": "resume-wip",
+        "type": "blocks"
+      },
+      {
+        "from": "allow-secret-code",
+        "to": "resume-wip",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

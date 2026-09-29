@@ -26,6 +26,12 @@
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
+- **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI.
+  Live-model evals call `runPromptScenario` in `evals/lib/prompt-harness.ts` and
+  need `OVERDECK_EVAL_MODEL` (no fallback); `typecheck:evals` covers `evals/**`.
+  Unit tests for eval helpers live in `tests/unit/evals/`. The model-placement
+  suites append per-case records to gitignored `evals/results/`, and
+  `npx tsx evals/report.ts` prints the cross-run placement table.
 - **Lint:** `npm run lint` is ESLint plus ~20 chained shell guards in `scripts/`
   (skill/CLI drift, state doors, prompt trailers, file size, circular deps,
   ratchet audit, …). `npm run typecheck` chains root + hooks + evals + the two
@@ -41,8 +47,12 @@
   and muse, with persistent transports.
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
   xBRIEF v0.8 specs and task state live under `.pan/` in the project repo and are exposed through `pan task`.
+- **Optional judgment model:** TypeSafe Jev via `@typesafe-ai/sdk`, wrapped by
+  `src/lib/jev/` (`assess()` never throws; gated per background-AI toggle, off
+  by default; model only from `jev.model`). Questions and thresholds live in
+  `src/lib/jev/questions.ts`. See `configuration/jev.mdx`.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-09-28 -->
+<!-- last-verified: 2026-09-29 -->

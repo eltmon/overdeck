@@ -15,6 +15,7 @@ import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
 import { GitHubRateLimitBanner } from '../components/GitHubRateLimitBanner';
 import { GitHubQuotaPill } from '../components/GitHubQuotaPill';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
+import { ClaudeCodeUpgradeBanner } from '../components/ClaudeCodeUpgradeBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
@@ -90,6 +91,9 @@ export function AppChrome({
             claude) is missing from the server's PATH (PAN-774). Hidden on the
             Home tab, which shows the "Get set up" card instead (PAN-4282). */}
         <SetupChecklistBanner activeTab={activeTab} />
+
+        {/* Claude Code launch binary is older than a configured model's minimum (PAN-4359) */}
+        <ClaudeCodeUpgradeBanner />
 
         {/* Package/context inputs changed since the last pan sync. */}
         <SyncRequiredBanner />

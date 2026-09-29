@@ -18,6 +18,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { GitError, MergeConflictError } from '../errors.js';
+import { commitPendingIssueArtifacts } from '../overdeck/plan-artifact-commit.js';
 
 const execAsync = promisify(exec);
 
@@ -201,6 +202,16 @@ async function rebaseFeatureBranchBody(
         unlinkSync(lockFile);
         console.log(`${logPrefix} Removed stale git index.lock`);
       } catch { /* non-fatal */ }
+    }
+
+    // Pre-flight: a server writer (feedback, session history, a spec
+    // transition) may have dirtied .pan/continues or .pan/specs in this
+    // workspace without committing it (PAN-4225) — `git rebase` below
+    // refuses in place with any tracked file dirty, so commit it first.
+    try {
+      await commitPendingIssueArtifacts(workspacePath, issueId);
+    } catch (err: any) {
+      console.warn(`${logPrefix} Could not commit pending plan artifacts (non-fatal): ${err?.message ?? err}`);
     }
 
     // Step 1: Fetch latest base branch

@@ -35,6 +35,13 @@ vi.mock('../../agents/liveness.js', () => ({
   isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
+// PAN-4371 — pre-existing fixtures with no `turnEndFor` injected must never
+// reach the real Jev gate (host config, tmux, filesystem); force it closed so
+// `defaultTurnEndFor` short-circuits regardless of the host's own jev config.
+vi.mock('../../jev/turn-end-store.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../jev/turn-end-store.js')>();
+  return { ...actual, isTurnEndAssessmentEnabled: () => false };
+});
 
 import {
   classifyParked,
@@ -292,5 +299,43 @@ describe('resolveParkedPopulation', () => {
     await resolveParkedPopulation({ now: NOW, isClosed });
 
     expect(isClosed).not.toHaveBeenCalled();
+  });
+
+  it('with an injected turnEndFor, calls it only for the idle-past-threshold agent', async () => {
+    const idle = { ...baseAgent({ id: 'agent-pan-507', issueId: 'PAN-507' }), tmuxActive: true };
+    const warm = {
+      ...baseAgent({ id: 'agent-pan-508', issueId: 'PAN-508', lastActivity: new Date(NOW - 60_000).toISOString() }),
+      tmuxActive: true,
+    };
+    gather.agents = [idle, warm];
+    gather.liveAgents = [idle, warm];
+    const turnEndFor = vi.fn(async () => undefined);
+
+    await resolveParkedPopulation({ now: NOW, isClosed: async () => false, turnEndFor });
+
+    expect(turnEndFor).toHaveBeenCalledTimes(1);
+    expect(turnEndFor).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-pan-507' }));
+  });
+});
+
+describe('classifyParked — turn-end reading on idle-running rows (PAN-4371)', () => {
+  const view = { kind: 'reports_blocked', confidence: 0.84, needsAnswer: false, model: 'm' };
+
+  it('appends the turn-end summary to parkReason and adds details.turnEnd when a view is present', () => {
+    const rows = classifyParked(signals({
+      liveAgents: liveIdle(),
+      turnEndByAgentId: new Map([['agent-pan-1', view]]),
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].parkReason).toContain('last message reads as: blocked (0.84)');
+    expect(rows[0].details?.turnEnd).toEqual({ kind: 'reports_blocked', confidence: 0.84, model: 'm', summary: 'last message reads as: blocked (0.84)' });
+  });
+
+  it('without a turnEndByAgentId map, the row is exactly as before this item', () => {
+    const withMap = classifyParked(signals({ liveAgents: liveIdle(), turnEndByAgentId: new Map() }));
+    const withoutMap = classifyParked(signals({ liveAgents: liveIdle() }));
+    expect(withoutMap).toEqual(withMap);
+    expect(withoutMap[0].parkReason).not.toContain('last message reads as');
+    expect(withoutMap[0].details?.turnEnd).toBeUndefined();
   });
 });

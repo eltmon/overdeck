@@ -266,10 +266,10 @@ export function serializeXBriefDocument<T extends XBriefEnvelopeInput>(doc: T): 
   return JSON.stringify({ xBRIEFInfo: xBRIEFInfo ?? vBRIEFInfo, ...rest }, null, 2);
 }
 
-export function readPlanSync(planPath: string): XBriefDocument {
-  const raw = readFileSync(planPath, 'utf-8');
+/** Parses raw xBRIEF JSON text; `source` names it in errors (a path, or e.g. 'model output'). */
+export function parseXBriefDocument(raw: string, source: string): XBriefDocument {
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-    throw new XBriefMergeConflictError(planPath);
+    throw new XBriefMergeConflictError(source);
   }
   const parsed = normalizeXBriefEnvelope(JSON.parse(raw));
 
@@ -280,10 +280,14 @@ export function readPlanSync(planPath: string): XBriefDocument {
 
   // Non-spec format — reject with helpful error
   throw new Error(
-    `Invalid xBRIEF format in ${planPath}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+    `Invalid xBRIEF format in ${source}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
     `xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or legacy "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
     `See docs/XBRIEF.md for the correct format.`
   );
+}
+
+export function readPlanSync(planPath: string): XBriefDocument {
+  return parseXBriefDocument(readFileSync(planPath, 'utf-8'), planPath);
 }
 
 

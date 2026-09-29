@@ -1,0 +1,10 @@
+{
+  "id": "pan-3705",
+  "issueId": "PAN-3705",
+  "issueState": "CLOSED",
+  "title": "Ctrl-K search: add Conversations to the type list",
+  "url": "https://github.com/eltmon/overdeck/issues/3705",
+  "body": "## Problem\n\nThe Ctrl-K type list includes Actions, Workspaces, and Issues, but Conversations are missing even though conversation results are searchable. Operators cannot explicitly narrow the palette to conversations.\n\n## Requested behavior\n\nAdd Conversations as a first-class entry in the Ctrl-K type list, following the same interaction and visual conventions as Actions, Workspaces, and Issues.\n\n## Acceptance criteria\n\n- The Ctrl-K type list includes Conversations alongside Actions, Workspaces, and Issues.\n- Selecting Conversations limits results to conversation entries.\n- The Conversations entry supports the same keyboard navigation, selection, active-state, and clear/reset behavior as existing types.\n- Empty, loading, and error states are correct when the Conversations type is selected.\n- Tests cover selecting Conversations, filtering results, clearing the type, and keyboard navigation.\n- Conversation ordering composes correctly with #3703 and the toggle requested in #3704.\n",
+  "prdPath": ".pan/drafts/pan-3705.md",
+  "referenceSpecPath": ".pan/specs/2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json"
+}

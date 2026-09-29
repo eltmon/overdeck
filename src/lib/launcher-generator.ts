@@ -8,7 +8,7 @@ import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
 import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
-import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
+import { buildConversationGhShimLines, buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
@@ -202,6 +202,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
    * context receipt identity across resume.
    */
   managedStateKey?: string;
+  ghShim?: { id: string; denyGrantLabels: boolean }; // PAN-4343: conversation gh shim (spawnMode 'conversation' only)
   unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
@@ -378,9 +379,8 @@ export function generateLauncherScript(config: LauncherConfig): string {
     }
   }
 
-  if (config.overdeckEnv?.agentId && config.spawnMode !== 'conversation') {
-    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
-  }
+  if (config.spawnMode === 'conversation') lines.push(...(config.ghShim ? buildConversationGhShimLines(config.ghShim.id, config.ghShim.denyGrantLabels) : []));
+  else if (config.overdeckEnv?.agentId) lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
 
   // Extra env exports
   if (config.extraEnvExports) {

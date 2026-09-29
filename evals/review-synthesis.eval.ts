@@ -1,5 +1,5 @@
 import { createScorer, evalite } from 'evalite';
-import { loadPromptFile, runPromptScenario } from './lib/prompt-harness.js';
+import { loadPromptFile, runPromptScenario, type PromptScenarioRun } from './lib/prompt-harness.js';
 
 const reviewRole = loadPromptFile('roles/review.md');
 
@@ -79,11 +79,11 @@ const cases: SynthesisCase[] = [
   },
 ];
 
-evalite<SynthesisCase, { report: string }, SynthesisCase>('review synthesis canonical blocker format', {
+evalite<SynthesisCase, { report: string; run: PromptScenarioRun }, SynthesisCase>('review synthesis canonical blocker format', {
   data: cases.map((c) => ({ input: c, expected: c })),
   task: async (input) => {
-    const report = await runPromptScenario({ system: reviewRole, user: input.userPrompt });
-    return { report };
+    const { text: report, run } = await runPromptScenario({ system: reviewRole, user: input.userPrompt });
+    return { report, run };
   },
   scorers: [
     createScorer({

@@ -11,6 +11,14 @@ import {
   NATIVE_SOCKET_PATH_MAX_BYTES,
   type AppServerTransport,
 } from './app-server-transport.js';
+import { compareVersions } from './model-floors.js';
+
+// Re-exported so existing callers of these pure pieces need no import
+// change; the definitions live in the `ws`-free leaf module model-floors.ts
+// (PAN-4363) so the startup config chain (harness-policy.ts,
+// system-prerequisites.ts) can depend on them without pulling in `ws`
+// through this module's app-server-transport.js import.
+export { CODEX_CLI_INSTALL_COMMAND, CODEX_MODEL_MINIMUM_VERSIONS, codexModelMinimumVersion, compareVersions } from './model-floors.js';
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = '0.144.0';
@@ -20,6 +28,7 @@ const MINIMUM_CODEX_VERSION = '0.144.0';
  * the ordinary stdio transport; only attachment is unavailable.
  */
 export const MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION = '0.153.4';
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
 const VERSION_TIMEOUT_MS = 4_000;
 
@@ -456,7 +465,7 @@ export class CodexAppServerManager extends EventEmitter {
       cwd: this.options.cwd,
       timeout: VERSION_TIMEOUT_MS,
     }).then(result => result.stdout));
-    const installed = raw.match(/\d+\.\d+\.\d+/)?.[0];
+    const installed = parseCodexCliVersion(raw);
     if (!installed) throw new Error(`Could not parse Codex CLI version from: ${raw.trim()}`);
     if (compareVersions(installed, MINIMUM_CODEX_VERSION) < 0) {
       throw new Error(`Codex CLI ${installed} is unsupported; upgrade to ${MINIMUM_CODEX_VERSION} or newer.`);
@@ -638,13 +647,18 @@ export function messageThreadId(message: AppServerMessage): string | undefined {
   return typeof thread.id === 'string' ? thread.id : undefined;
 }
 
-export function compareVersions(left: string, right: string): number {
-  const a = left.split('.').map(Number);
-  const b = right.split('.').map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return (a[index] ?? 0) - (b[index] ?? 0);
+export function parseCodexCliVersion(raw: string): string | undefined {
+  return raw.match(/\d+\.\d+\.\d+/)?.[0];
+}
+
+/** Installed Codex CLI version, or undefined when it cannot be run or parsed. Never throws, never caches. */
+export async function readCodexCliVersion(binary = 'codex'): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync(binary, ['--version'], { timeout: VERSION_TIMEOUT_MS });
+    return parseCodexCliVersion(stdout);
+  } catch {
+    return undefined;
   }
-  return 0;
 }
 
 function stripAnsi(value: string): string {

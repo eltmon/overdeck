@@ -25,6 +25,14 @@ verdict, every time it's asked.
 > when it is the only one: that batch is the UAT stack the operator tests on.
 > An `auto-merge` label releases the feature in a held project.
 
+**Grant labels are operator-only.** `released`, `auto-merge` and `hold-for-uat`
+carry operator decisions. The agent `gh` shim refuses to add or remove them
+(`gh issue|pr edit|create` label flags and `gh api` writes on
+`issues/<n>/labels`) for every agent pane and the Flywheel conversation
+(PAN-4343); operator conversations and the dashboard pass. It is a PATH shim,
+so an absolute `/usr/bin/gh`, or a GraphQL mutation by label node ID,
+bypasses it.
+
 ## Flow
 
 1. **Work agent calls `pan done`** on a clean tree. The work-agent role

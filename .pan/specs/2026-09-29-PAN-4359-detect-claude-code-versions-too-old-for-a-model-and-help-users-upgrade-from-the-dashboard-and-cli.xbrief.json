@@ -1,0 +1,873 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T03:42:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4359: Detect Claude Code versions too old for a model, and help users upgrade from the dashboard and CLI",
+    "updated": "2026-09-29T03:47:52.356Z"
+  },
+  "plan": {
+    "id": "pan-4359",
+    "title": "Detect Claude Code versions too old for a model, and help users upgrade from the dashboard and CLI",
+    "status": "running",
+    "uid": "a9d49aa2-03c2-49ad-b914-d15cacbb1176",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T03:42:40Z",
+    "updated": "2026-09-29T03:47:52.356Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4359",
+        "label": "PAN-4359",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4360",
+        "label": "PAN-4360 (sibling: pan claude upgrade)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "claude-code",
+      "harness",
+      "model-capabilities",
+      "dashboard",
+      "doctor"
+    ],
+    "narratives": {
+      "Problem": "New models can require a newer Claude Code than the operator has (Sonnet 5.5 needs 2.1.284, Fable 5.1 needs 2.1.255). Overdeck has no Claude Code version check, so launches fail with no reason and no help. Stale shadow claude binaries on PATH add confusion.",
+      "Proposal": "Add minClaudeCodeVersion to model capability rows; a src/lib/claude-code/ module reads the launch binary's version (async, cached by realpath+mtime), derives its install method and upgrade plan, lists shadow binaries and evaluates configured models; prepareHarnessLaunch refuses claude-code launches whose model needs a newer Claude Code with a message carrying the upgrade command; GET/POST /api/claude-code routes feed a dashboard banner whose Upgrade button runs the upgrade in a terminal session (only for user-writable installs) and clears after a re-check; pan doctor reports version, install method, per-model minimums and shadows; docs cover the requirement table, upgrade paths and the release rule. See PRD .pan/drafts/pan-4359.md.",
+      "NonGoals": "- pan claude upgrade and the upgrade offer in pan install / pan sync (moved to PAN-4360)\n- Upgrading or deleting shadow claude binaries (doctor only reports them)\n- Running sudo or upgrading a root-owned install from Overdeck\n- Running the upgrade on Windows hosts (copyable command only)\n- A pan doctor --fix flag\n- Gating launches that carry no model\n- Restarting running agents or conversations after an upgrade\n- Upgrading Claude Code without an operator click\n- Maximum-version checks or pinning a Claude Code version\n- Falling back to another model or harness when Claude Code is too old\n- Executing any client-supplied command text from the upgrade route"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split pan claude upgrade and the pan install / pan sync upgrade offer into sibling issue PAN-4360",
+        "rationale": "No PAN-4359 acceptance criterion names them; the issue offers pan doctor --fix as an alternative; keeping every AC-bound surface (launch refusal, banner, Upgrade button, doctor, docs) here while splitting the only AC-free scope keeps the plan reviewable."
+      },
+      {
+        "summary": "Gate every launch inside prepareHarnessLaunch via a new model option",
+        "rationale": "It is the single function all nine Claude-Code-capable launch paths call, it already resolves the absolute binary and already refuses launches with 'No terminal session was created.'"
+      },
+      {
+        "summary": "An unreadable Claude Code version allows the launch with one warning; pan doctor reports it as warn",
+        "rationale": "Blocking on an unexpected --version banner would brick every launch; the refusal is reserved for a known-too-old version."
+      },
+      {
+        "summary": "Overdeck runs the upgrade only for user-writable installs (native, user-owned npm prefix, Homebrew); root-owned npm prefixes, unknown installs and Windows get a copyable command",
+        "rationale": "Keeps the spirit of SetupChecklistBanner's 'never run installs needing sudo' rule while delivering the requested one-click upgrade for the common cases."
+      },
+      {
+        "summary": "npm upgrades pass --prefix <detected prefix>",
+        "rationale": "The dashboard server's npm may belong to a different Node version than the launch binary; targeting the detected prefix upgrades the binary Overdeck actually launches."
+      },
+      {
+        "summary": "The banner counts every configured model with a minimum, regardless of harness routing",
+        "rationale": "Simple and derived; a rare false banner for an Anthropic model routed to another harness costs less than a failed launch."
+      },
+      {
+        "summary": "The upgrade runs in a terminal session opened with popoutTerminal (Codex re-auth pattern) rather than a new streaming protocol",
+        "rationale": "That is the existing way the dashboard streams a server-side command's output; no new transport is needed."
+      },
+      {
+        "summary": "minClaudeCodeVersion is set only for Claude Fable 5.1 (2.1.255) and Claude Sonnet 5.5 (2.1.284)",
+        "rationale": "Those are the only models whose requirement is documented in the codebase (model notes, docs/MODEL-CONTEXT-AUDIT.md)."
+      },
+      {
+        "summary": "The upgrade-time warning (issue design point 4) is the dashboard banner on first load; pan up prints no extra line",
+        "rationale": "The banner queries /api/claude-code/status on the first dashboard load after pan up, before any agent launches; pan doctor covers terminal-only users; PAN-4360 adds the pan install / pan sync offer."
+      },
+      {
+        "summary": "POST /api/claude-code/upgrade returns 400 when Claude Code already satisfies every configured model and its version is known",
+        "rationale": "Prevents accidental or scripted reinstalls; a null version stays upgradable so an unreadable install can be fixed."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The six PAN-4359 acceptance criteria are satisfiable only by the launch gate, the dashboard banner with its Upgrade button, and pan doctor together, so they ship as one issue; the only AC-free scope (pan claude upgrade, install/sync offer) is already split to PAN-4360. Of the ~29 files, 7 are one-line model pass-throughs at existing launch sites, 5 are tests (the three claude-code modules share one test file), 3 are docs, and 2 are one-line registrations (server.ts, AppChrome.tsx).",
+      "canonicalFilename": "2026-09-29-PAN-4359-detect-claude-code-versions-too-old-for-a-model-and-help-users-upgrade-from-the-dashboard-and-cli.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "capability-field",
+        "title": "Add minClaudeCodeVersion to the model capability row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capability-types.ts",
+            "src/lib/model-capability-additions.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/model-capability-types.ts add the optional `minClaudeCodeVersion?: string` field (with the doc comment from the PRD) after `supportsSamplingParams?: boolean;`. In src/lib/model-capability-additions.ts set `minClaudeCodeVersion: '2.1.255'` on 'claude-fable-5-1' and `minClaudeCodeVersion: '2.1.284'` on 'claude-sonnet-5-5'. Do not touch src/lib/model-capabilities.ts (at its file-size cap)."
+        },
+        "items": [
+          {
+            "id": "capability-field.ac1",
+            "title": "Given the capability matrix, when MODEL_CAPABILITIES['claude-sonnet-5-5'].minClaudeCodeVersion is read, then it returns '2.1.284'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-field.ac2",
+            "title": "Given the capability matrix, when MODEL_CAPABILITIES['claude-fable-5-1'].minClaudeCodeVersion is read, then it returns '2.1.255', and models without a documented requirement leave the field undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-code-version",
+        "title": "Create src/lib/claude-code/version.ts: version read, install method, upgrade plan, PATH binaries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-code/version.ts",
+            "src/lib/claude-code/__tests__/claude-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/claude-code/__tests__/claude-code.test.ts",
+            "npm run typecheck",
+            "git grep -nE \"execSync|spawnSync\" -- src/lib/claude-code"
+          ],
+          "expected_outputs": [
+            "src/lib/claude-code/__tests__/claude-code.test.ts passes",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "claude-code-requirements",
+            "claude-code-status",
+            "doctor-claude-code",
+            "claude-code-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (decisions D3, D5, D6, D7, D10, D12). New module exporting parseClaudeCodeVersion, readClaudeCodeVersion (async promisified execFile with 10s timeout, cache keyed `${realpath}:${mtimeMs}`, 60s TTL, {refresh:true} bypass, errors resolve null, resetClaudeCodeVersionCacheForTests), detectClaudeInstall (pure; rules in PRD order: native ~/.local/share/claude/ or ~/.claude/local/, homebrew /Caskroom/claude-code/, npm ^(prefix)/lib/node_modules/@anthropic-ai/claude-code/, else unknown), claudeCodeUpgradePlan (native -> [binary,'update']; npm -> [<prefix>/bin/npm or npm,'install','-g','--prefix',prefix,'@anthropic-ai/claude-code@latest'] runnable only when <prefix>/lib/node_modules is writable else display `sudo npm install -g --prefix <prefix> @anthropic-ai/claude-code@latest`; homebrew per D10 checkpoint; unknown -> display `claude update` not runnable; win32 -> not runnable), and listClaudeBinariesOnPath (PATH order, X_OK, dedupe by realpath). Reuse extractSemver/compareSemver from src/lib/herdr-setup/binary.ts. All process/fs deps injectable. IMPLEMENTATION CHECKPOINT (D10): confirm the Homebrew cask name from https://code.claude.com/docs/en/setup (or `brew info --cask claude-code`); fallback = homebrew plan not runnable with display `brew upgrade claude-code`. Tests go in src/lib/claude-code/__tests__/claude-code.test.ts under describe('version'); cache TTL tests use vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "claude-code-version.ac1",
+            "title": "Given the output '2.1.284 (Claude Code)', when parseClaudeCodeVersion runs, then it returns '2.1.284', and for output with no X.Y.Z it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-version.ac2",
+            "title": "Given the real path /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js, when detectClaudeInstall runs, then it returns method 'npm' with npmPrefix '/usr/local'; ~/.local/share/claude/versions/2.1.284 returns 'native'; /opt/homebrew/Caskroom/claude-code/2.1.284/claude returns 'homebrew'; /usr/bin/claude returns 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-version.ac3",
+            "title": "Given an npm install whose lib/node_modules is not writable, when claudeCodeUpgradePlan runs, then it returns runnable false, reason 'not-writable' and a display starting 'sudo npm install -g --prefix'; given a writable prefix it returns argv containing '--prefix' and '@anthropic-ai/claude-code@latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-version.ac4",
+            "title": "Given two readClaudeCodeVersion calls on the same binary within 60 s, when both resolve, then the injected exec runs once; a {refresh:true} call or a changed mtime runs it again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-version.ac5",
+            "title": "Given a PATH with two directories holding different claude binaries, when listClaudeBinariesOnPath runs, then it returns both in PATH order with their real paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-code-requirements",
+        "title": "Create src/lib/claude-code/requirements.ts: model minimums, configured models, refusal error",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-code/requirements.ts",
+            "src/lib/claude-code/__tests__/claude-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/claude-code/__tests__/claude-code.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/claude-code/__tests__/claude-code.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (D1, D3, D8). Export minClaudeCodeVersionFor (resolveModelId first), listConfiguredModels(config) (roles incl. weighted refs, defaults, sub-roles except 'parent', workhorses, enabled tieredExecution tiers, defaultConversationModel; derefWorkhorse; skip entries whose deref throws; merge duplicates with concatenated sources), evaluateClaudeCodeRequirements(installed, models) (only models with a minimum; satisfied null when installed is null), ClaudeCodeTooOldError (fields model, installed, required, binaryPath, upgradeCommand), formatClaudeCodeTooOldMessage (exact shape in the PRD, ending 'No terminal session was created.'), and assertClaudeCodeSupportsModel(binaryPath, model, deps) (no model or no minimum -> return; version null -> one console.warn per binary and return; older -> throw with the upgrade plan's display). Import compareSemver from ../herdr-setup/binary.js. Tests under describe('requirements') in the shared test file. minClaudeCodeVersionFor must strip a trailing `[...]` context suffix (e.g. 'claude-sonnet-5-5[1m]') before resolveModelId; neither resolveModelId nor apiLaunchModelId strips it today."
+        },
+        "items": [
+          {
+            "id": "claude-code-requirements.ac1",
+            "title": "Given model 'claude-sonnet-5-5' or 'claude-sonnet-5-5[1m]', when minClaudeCodeVersionFor runs, then it returns '2.1.284', and an unknown model id returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-requirements.ac2",
+            "title": "Given a config with a weighted roles.work.model, a sub-role model, workhorses and an enabled tier, when listConfiguredModels runs, then it returns each model once with every config source that references it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-requirements.ac3",
+            "title": "Given installed '2.1.280' and a Sonnet 5.5 launch, when assertClaudeCodeSupportsModel runs, then it rejects with ClaudeCodeTooOldError whose message contains '2.1.284', '2.1.280', the binary path, the upgrade command and 'No terminal session was created.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-requirements.ac4",
+            "title": "Given a version read that returns null, when assertClaudeCodeSupportsModel runs, then it resolves without throwing and emits exactly one console.warn naming the binary path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-gate",
+        "title": "Gate claude-code launches in prepareHarnessLaunch on the model's minimum",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-binary.ts",
+            "src/lib/__tests__/harness-binary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/harness-binary.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "harness-binary.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (D2). In src/lib/harness-binary.ts add `export interface HarnessLaunchOptions extends ExecutableResolutionOptions { model?: string }` and change prepareHarnessLaunch to strip `model`, resolve the binary as before, and for harness 'claude-code' call assertClaudeCodeSupportsModel(binaryPath, model) via `await import('./claude-code/requirements.js')` (keeps model-capabilities out of harness-binary's static import graph; a static import is acceptable only if npm run lint:circular passes). Add tests to src/lib/__tests__/harness-binary.test.ts with vi.mock('../claude-code/requirements.js')."
+        },
+        "items": [
+          {
+            "id": "launch-gate.ac1",
+            "title": "Given harness 'claude-code' and model 'claude-sonnet-5-5', when prepareHarnessLaunch runs, then it calls assertClaudeCodeSupportsModel with the resolved binary path and 'claude-sonnet-5-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-gate.ac2",
+            "title": "Given assertClaudeCodeSupportsModel rejects, when prepareHarnessLaunch runs, then it rejects with the same error and returns no pathExport",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-gate.ac3",
+            "title": "Given harness 'codex', when prepareHarnessLaunch runs with a model, then assertClaudeCodeSupportsModel is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-sites-agents",
+        "title": "Pass the model to prepareHarnessLaunch at agent spawn, resume, recovery and messaging sites",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/resume.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/messaging.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n \"prepareHarnessLaunch(\\|prepareRestartHarness(\" -- src/lib/agents",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "every listed call site shows a { model: ... } second argument",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5a. Change each call to prepareHarnessLaunch(x, { model: <var> }): src/lib/agents/spawn.ts:201 and :686 (selectedModel), src/lib/agents/resume.ts:351 (model), src/lib/agents/recovery.ts:279 (prepareRestartHarness(effectiveHarness, { model: effectiveModel })) and :585 ({ model: state.model }), src/lib/agents/messaging.ts:484 ({ model: resumeModel }). Add no new catch blocks. Adjust existing tests that assert prepareHarnessLaunch was called with one argument only if they fail. Keep each edit on the existing single line so lint:file-size (which compares against origin/main) sees no growth in these large files."
+        },
+        "items": [
+          {
+            "id": "launch-sites-agents.ac1",
+            "title": "Given the agent launch files, when `git grep -n \"prepareHarnessLaunch(\\|prepareRestartHarness(\" -- src/lib/agents` runs, then every call in spawn.ts, resume.ts, recovery.ts and messaging.ts supplies a { model } option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-sites-agents.ac2",
+            "title": "Given the edited agent launch files, when npm run typecheck runs, then it exits 0 with every { model } argument accepted by the HarnessLaunchOptions type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-sites-conversations",
+        "title": "Pass the model to prepareHarnessLaunch at conversation and planning launch sites",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/dashboard/server/routes/misc/planning.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n \"prepareHarnessLaunch(\" -- src/lib/overdeck/conversation-runtime.ts src/lib/planning src/dashboard/server/routes/misc/planning.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "every listed call shows a model option",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5b. src/lib/overdeck/conversation-runtime.ts:558 -> prepareHarnessLaunch(harness, { model }); src/lib/planning/spawn-planning-session.ts:522 -> { model: planningModel }; src/dashboard/server/routes/misc/planning.ts:320 -> prepareHarnessLaunch('claude-code', { model: msgPlanningModel }). A conversation created with no model passes undefined (D4: no gate). Keep each edit on the existing single line so lint:file-size (which compares against origin/main) sees no growth in these large files."
+        },
+        "items": [
+          {
+            "id": "launch-sites-conversations.ac1",
+            "title": "Given the conversation and planning launch files, when the grep in verify_commands runs, then each prepareHarnessLaunch call supplies a { model } option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-sites-conversations.ac2",
+            "title": "Given the edited conversation and planning files, when npm run typecheck runs, then it exits 0, and conversation-runtime.ts passes the conversation's model (undefined when none was requested) so a model-less conversation skips the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-code-status",
+        "title": "Create src/lib/claude-code/status.ts: getClaudeCodeStatus aggregator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-code/status.ts",
+            "src/lib/claude-code/__tests__/claude-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/claude-code/__tests__/claude-code.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/claude-code/__tests__/claude-code.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Export the ClaudeCodeStatus interface and getClaudeCodeStatus(opts, deps) combining resolveHarnessBinary('claude-code'), readClaudeCodeVersion, detectClaudeInstall + claudeCodeUpgradePlan, listConfiguredModels(loadConfigSync().config) + evaluateClaudeCodeRequirements, and shadows = listClaudeBinariesOnPath() minus the launch binary's real path, each with its version. outdated = any requirement.satisfied === false. All deps injectable. Tests under describe('status') in the shared test file."
+        },
+        "items": [
+          {
+            "id": "claude-code-status.ac1",
+            "title": "Given no resolvable claude binary, when getClaudeCodeStatus runs, then it returns found false and outdated false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-status.ac2",
+            "title": "Given version 2.1.280 and a config whose workhorses.mid is claude-sonnet-5-5, when getClaudeCodeStatus runs, then it returns outdated true with a Sonnet 5.5 requirement listing 'workhorses.mid' and the npm upgrade plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-status.ac3",
+            "title": "Given a second claude binary on PATH, when getClaudeCodeStatus runs, then shadows contains that path with its own version and excludes the launch binary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-code-routes",
+        "title": "Add GET /api/claude-code/status and POST /api/claude-code/upgrade",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/claude-code.ts",
+            "src/dashboard/server/routes/__tests__/claude-code.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/claude-code.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (D5, D9, NFR-3). New src/dashboard/server/routes/claude-code.ts exporting claudeCodeRouteLayer, registered in src/dashboard/server/server.ts beside codexAuthRouteLayer. GET returns getClaudeCodeStatus({refresh: query refresh=1}). POST: reject invalid origin like routes/codex-auth.ts; refresh status; not found or not runnable -> 400 {error, command: upgrade.display}; status.outdated === false && status.version !== null -> 400 {error:'Claude Code already satisfies every configured model', command}; sessionExists('claude-code-upgrade') -> 409 {sessionName, alreadyRunning: true}; else createSession('claude-code-upgrade', homedir(), command, { env: { PATH } }) from src/lib/tmux.js and return {sessionName, command}. Build the command only from upgrade.argv (shell-quoted) plus the fixed tail from the PRD (re-read version, 'running sessions keep their current one', wait for Enter). Ignore the request body. Add the two no-loss-matrix rows from the PRD to tests/unit/lib/overdeck/no-loss-matrix.ts. Test: src/dashboard/server/routes/__tests__/claude-code.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-code-routes.ac1",
+            "title": "Given a runnable npm plan, when POST /api/claude-code/upgrade is called, then it returns 200 with sessionName 'claude-code-upgrade' and createSession receives a command containing '@anthropic-ai/claude-code@latest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-routes.ac2",
+            "title": "Given a not-runnable plan, or a status with outdated false and a known version, when POST /api/claude-code/upgrade is called, then it returns 400 with the copyable command and creates no session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-routes.ac3",
+            "title": "Given a live claude-code-upgrade session, when POST /api/claude-code/upgrade is called, then it returns 409 with alreadyRunning true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-routes.ac4",
+            "title": "Given a request body {\"command\":\"rm -rf /\"}, when POST /api/claude-code/upgrade is called, then the command passed to createSession contains no text from the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-routes.ac5",
+            "title": "Given the no-loss matrix, when no-loss-matrix.test.ts runs, then both new surfaces are accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "upgrade-banner",
+        "title": "Add the Claude Code upgrade banner to the dashboard system notices row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ClaudeCodeUpgradeBanner.tsx",
+            "src/dashboard/frontend/src/components/ClaudeCodeUpgradeBanner.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/ClaudeCodeUpgradeBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ClaudeCodeUpgradeBanner.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (D8, D9). New src/dashboard/frontend/src/components/ClaudeCodeUpgradeBanner.tsx with a local ClaudeCodeStatus interface, exported pure helper claudeCodeBannerMessage(status), react-query on /api/claude-code/status (staleTime 5 min; refetch every 5 s with ?refresh=1 while an upgrade is in progress, stopping after 10 min or when outdated is false). Runnable plan -> 'Upgrade Claude Code' button: POST /api/claude-code/upgrade, on 200/409 popoutTerminal(sessionName, 'Upgrade Claude Code'). Not runnable -> CopyableCommand (exported from SetupChecklistBanner.tsx) with upgrade.display plus a Re-check button. Always show 'Running agents and conversations keep their current Claude Code; new launches use the upgraded one.' Mount it in src/dashboard/frontend/src/App/AppChrome.tsx after <SetupChecklistBanner />. Style with the warning tokens used by SetupChecklistBanner (load /pan-style-guide). Poll tests use vi.useFakeTimers. Browser UAT uses an isolated Playwright instance. UAT must intercept POST /api/claude-code/upgrade with page.route; reaching the real route would run npm install -g against the operator's Claude Code."
+        },
+        "items": [
+          {
+            "id": "upgrade-banner.ac1",
+            "title": "Given a status with outdated false, when claudeCodeBannerMessage runs, then it returns null and the banner renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upgrade-banner.ac2",
+            "title": "Given a status with Claude Code 2.1.280 and an unmet Sonnet 5.5 requirement, when the banner renders, then it shows 'Claude Code 2.1.280 is older than Claude Sonnet 5.5 needs (2.1.284).' and an 'Upgrade Claude Code' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upgrade-banner.ac3",
+            "title": "Given a not-runnable plan, when the banner renders, then it shows the copyable 'sudo npm install -g --prefix' command and no Upgrade button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upgrade-banner.ac4",
+            "title": "Given the Upgrade button is clicked, when the POST returns sessionName, then popoutTerminal is called with 'claude-code-upgrade' and a later status with outdated false unmounts the banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "upgrade-banner.ac5",
+            "title": "Given the running dashboard in an isolated Playwright browser with GET /api/claude-code/status stubbed outdated and POST /api/claude-code/upgrade intercepted by page.route (never the real route), when the page loads and Upgrade is clicked, then the banner is visible before any launch, the pop-out for 'claude-code-upgrade' is requested, and an outdated:false status clears the banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-claude-code",
+        "title": "Report Claude Code version, install method, model minimums and shadow binaries in pan doctor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-claude-code.ts",
+            "src/cli/commands/__tests__/doctor-claude-code.test.ts",
+            "src/cli/commands/doctor.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-claude-code.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "doctor-claude-code.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. New src/cli/commands/doctor-claude-code.ts: checkClaudeCode(deps) built on getClaudeCodeStatus (injectable) with a re-declared CheckResult. Rows: 'Claude Code' (ok with version, install method and path; error when not found; warn when version unreadable); one 'Claude Code for <displayName>' row per requirement (ok 'needs X; have Y (sources)' or error with fix = upgrade.display); one 'Claude Code shadow' warn per shadow naming both paths and versions with fix 'Remove or upgrade the other binary so your shell and Overdeck run the same Claude Code.'. Wire it in src/cli/commands/doctor.ts right after the checkPrimeAgent line and add a `<final line count> src/cli/commands/doctor.ts # PAN-4359` row to scripts/file-size-allowlist.txt. Test: src/cli/commands/__tests__/doctor-claude-code.test.ts."
+        },
+        "items": [
+          {
+            "id": "doctor-claude-code.ac1",
+            "title": "Given a current install, when checkClaudeCode runs, then it returns an ok 'Claude Code' row naming the version, install method and binary path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-claude-code.ac2",
+            "title": "Given Claude Code 2.1.280 with Sonnet 5.5 configured, when checkClaudeCode runs, then it returns an error row 'Claude Code for Claude Sonnet 5.5' whose fix is the upgrade command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-claude-code.ac3",
+            "title": "Given a shadow /usr/local/bin/claude at 2.0.19, when checkClaudeCode runs, then it returns a warn 'Claude Code shadow' row naming both binary paths and both versions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-claude-code.ac4",
+            "title": "Given an unreadable version, when checkClaudeCode runs, then the 'Claude Code' row has status warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-claude-code-versions",
+        "title": "Document Claude Code version requirements, the upgrade paths and the release rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/RELEASING.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Claude Code version requirements\" configuration/harnesses.mdx",
+            "grep -n \"minClaudeCodeVersion\" docs/RELEASING.md changelog.mdx"
+          ],
+          "expected_outputs": [
+            "the heading is found",
+            "both files contain minClaudeCodeVersion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. configuration/harnesses.mdx: add '#### Claude Code version requirements' under '### Claude Code (default)' with the model/minimum table (Claude Fable 5.1 -> 2.1.255, Claude Sonnet 5.5 -> 2.1.284), the refused-launch message, the dashboard banner and Upgrade button (command per install method; copyable command for root-owned npm prefixes, unknown installs and Windows; running sessions keep the old binary), and the pan doctor rows including shadow binaries; add a Troubleshooting entry '### \"needs Claude Code X or newer\"' linking to it. docs/RELEASING.md: add '## Adding a model that needs a newer Claude Code' (set minClaudeCodeVersion in src/lib/model-capability-additions.ts, add the harnesses.mdx table row, state the requirement in the changelog entry). changelog.mdx: extend the RELEASE STEP comment with 'If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set.'"
+        },
+        "items": [
+          {
+            "id": "docs-claude-code-versions.ac1",
+            "title": "Given configuration/harnesses.mdx, when a reader opens 'Claude Code version requirements', then it lists Claude Sonnet 5.5 -> 2.1.284 and Claude Fable 5.1 -> 2.1.255 and names the command each install method runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-code-versions.ac2",
+            "title": "Given docs/RELEASING.md, when a release manager adds a model, then the 'Adding a model that needs a newer Claude Code' section tells them to set minClaudeCodeVersion in src/lib/model-capability-additions.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-code-versions.ac3",
+            "title": "Given changelog.mdx, when the RELEASE STEP comment is read, then it contains the minClaudeCodeVersion reminder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "capability-field",
+        "to": "claude-code-requirements",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-version",
+        "to": "claude-code-requirements",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-requirements",
+        "to": "launch-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-gate",
+        "to": "launch-sites-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-gate",
+        "to": "launch-sites-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-requirements",
+        "to": "claude-code-status",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-status",
+        "to": "claude-code-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-status",
+        "to": "upgrade-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-code-status",
+        "to": "doctor-claude-code",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
