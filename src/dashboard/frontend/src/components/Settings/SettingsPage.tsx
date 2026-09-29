@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Loader2,
 } from 'lucide-react';
@@ -299,9 +300,15 @@ export function SettingsPage() {
     flushAutosave,
   });
 
-  // A preset writes config.yaml outside the autosave pipeline (PAN-4400).
+  // A preset writes config.yaml outside the autosave pipeline (PAN-4400), so
+  // formData is stale afterwards. Replace it with the fresh document, or the
+  // next autosave's whole-document PUT reverts the preset's paths.
   const handlePresetChanged = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['settings'] });
+    void queryClient.fetchQuery({ queryKey: ['settings'], queryFn: fetchSettings, staleTime: 0 })
+      .then((fresh) => { setFormData(fresh); })
+      .catch((err: unknown) => {
+        toast.error(`Reload Settings before editing: ${err instanceof Error ? err.message : String(err)}`);
+      });
   }, [queryClient]);
 
   const scrollToSection = useCallback((id: string) => {

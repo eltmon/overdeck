@@ -97,6 +97,16 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).not.toContain("from './AgentCards'");
   });
 
+  it('mounts the model presets above the workhorse panel and refreshes formData after a preset write', () => {
+    const presetsIndex = SETTINGS_PAGE_SOURCE.indexOf('<ModelPresetsBar onPresetChanged={handlePresetChanged} />');
+    expect(presetsIndex).toBeGreaterThanOrEqual(0);
+    expect(presetsIndex).toBeLessThan(SETTINGS_PAGE_SOURCE.indexOf('<WorkhorsePanel />'));
+    // A preset writes config.yaml outside the autosave pipeline; a stale formData
+    // would revert it on the next whole-document PUT (PAN-4400 D14).
+    expect(SETTINGS_PAGE_SOURCE).toContain("queryClient.fetchQuery({ queryKey: ['settings'], queryFn: fetchSettings, staleTime: 0 })");
+    expect(SETTINGS_PAGE_SOURCE).toContain('setFormData(fresh)');
+  });
+
   it('includes the TTS sidebar item and settings section controls', () => {
     expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('id="tts"');
