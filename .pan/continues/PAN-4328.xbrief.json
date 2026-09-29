@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:15:42.006Z",
+  "updated": "2026-09-29T10:15:55.036Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "setup-offer.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T10:15:42.006Z"
+    },
+    "setup-offer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:55.036Z"
     }
   }
 }
