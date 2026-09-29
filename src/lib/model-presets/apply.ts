@@ -27,6 +27,8 @@ import {
   parseConfigDocument,
   planPresetApplyFromText,
   readRawValue,
+  redactPresetPlan,
+  redactPresetRows,
   UnknownPresetError,
   type PresetPlan,
   type PresetPlanDeps,
@@ -105,9 +107,20 @@ function defaultApplyDeps(): PresetApplyDeps {
   return { ...defaultPresetPlanDeps, ...configFileDeps(getGlobalConfigPath()) };
 }
 
-function stringifyDocument(doc: Document): string {
+/**
+ * yaml re-emits every flow collection with one padding style. Match the
+ * file's dominant style (`[a]` vs `[ a ]`) so untouched lines keep their
+ * text; with no flow collections, keep yaml's default.
+ */
+function flowCollectionPadding(originalText: string): boolean {
+  const padded = originalText.match(/:\s+[[{] /g)?.length ?? 0;
+  const unpadded = originalText.match(/:\s+[[{][^\s\]}]/g)?.length ?? 0;
+  return unpadded <= padded;
+}
+
+function stringifyDocument(doc: Document, originalText: string): string {
   // lineWidth 0: never fold long scalars, so untouched lines keep their text.
-  return doc.toString({ lineWidth: 0 });
+  return doc.toString({ lineWidth: 0, flowCollectionPadding: flowCollectionPadding(originalText) });
 }
 
 function isEmptyNode(value: unknown): boolean {
@@ -198,6 +211,11 @@ export interface PresetApplyResult {
   skipped: PresetPlanRow[];
 }
 
+/** Display copy of an apply result with literal API keys masked (see redactPresetRows). */
+export function redactPresetApplyResult(result: PresetApplyResult): PresetApplyResult {
+  return { plan: redactPresetPlan(result.plan), applied: redactPresetRows(result.applied), skipped: redactPresetRows(result.skipped) };
+}
+
 export function applyPreset(presetId: string, options: { expectedDigest: string }, deps: PresetApplyDeps = defaultApplyDeps()): Promise<PresetApplyResult> {
   const preset = getPreset(presetId);
   if (!preset) return Promise.reject(new UnknownPresetError(presetId));
@@ -215,7 +233,7 @@ export function applyPreset(presetId: string, options: { expectedDigest: string 
       writeRawValue(doc, row.segments, row.after);
     }
     validateCandidate(text, doc, applied);
-    await compareAndSwap(deps, text, stringifyDocument(doc));
+    await compareAndSwap(deps, text, stringifyDocument(doc, text));
 
     const appliedAt = new Date().toISOString();
     const changes: PresetUndoChange[] = applied.map((row) => ({ path: row.path, segments: [...row.segments], before: row.before, after: row.after }));
@@ -260,7 +278,7 @@ export function undoLastPresetApply(deps: PresetApplyDeps = defaultApplyDeps()):
       writeRawValue(doc, container.segments, container.before);
     }
     validateCandidate(text, doc, restoredChanges);
-    await compareAndSwap(deps, text, stringifyDocument(doc));
+    await compareAndSwap(deps, text, stringifyDocument(doc, text));
     await writePresetState({});
     return { restored, leftAsIs };
   });

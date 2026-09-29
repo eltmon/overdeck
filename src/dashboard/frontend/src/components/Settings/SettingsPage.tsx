@@ -500,7 +500,7 @@ export function SettingsPage() {
           Model Routing
         </h2>
 
-        <ModelPresetsBar onPresetChanged={handlePresetChanged} />
+        <ModelPresetsBar onPresetChanged={handlePresetChanged} beforePreview={flushAutosave} />
         <WorkhorsePanel />
         <RolesPanel />
       </section>

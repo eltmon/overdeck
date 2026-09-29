@@ -6,9 +6,9 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { createInterface } from 'readline/promises';
-import { applyPreset, listPresetStatus, undoLastPresetApply } from '../../lib/model-presets/apply.js';
+import { applyPreset, listPresetStatus, redactPresetApplyResult, undoLastPresetApply } from '../../lib/model-presets/apply.js';
 import { formatPresetPlanText } from '../../lib/model-presets/format.js';
-import { planPresetApply } from '../../lib/model-presets/plan.js';
+import { planPresetApply, redactPresetPlan } from '../../lib/model-presets/plan.js';
 
 interface JsonOption {
   json?: boolean;
@@ -57,13 +57,15 @@ export async function runPresetList(options: JsonOption): Promise<void> {
 }
 
 export async function runPresetShow(id: string, options: JsonOption): Promise<void> {
-  const plan = await planPresetApply(id);
+  // Display copy; its digest is the unredacted plan's, so apply still matches.
+  const plan = redactPresetPlan(await planPresetApply(id));
   console.log(options.json ? JSON.stringify(plan, null, 2) : formatPresetPlanText(plan));
   if (plan.blocked) process.exitCode = 1;
 }
 
 export async function runPresetApply(id: string, options: ApplyOptions): Promise<void> {
-  const plan = await planPresetApply(id);
+  // Display copy; its digest is the unredacted plan's, so apply still matches.
+  const plan = redactPresetPlan(await planPresetApply(id));
   if (options.dryRun || !options.yes || plan.blocked) {
     console.log(options.json ? JSON.stringify(plan, null, 2) : formatPresetPlanText(plan));
   }
@@ -83,7 +85,7 @@ export async function runPresetApply(id: string, options: ApplyOptions): Promise
     console.log('Not applied.');
     return;
   }
-  const result = await applyPreset(id, { expectedDigest: plan.digest });
+  const result = redactPresetApplyResult(await applyPreset(id, { expectedDigest: plan.digest }));
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
     return;

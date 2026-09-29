@@ -106,6 +106,27 @@ describe('model preset routes', () => {
     expect(mocks.planPresetApply).toHaveBeenCalledWith('anthropic');
   });
 
+  it('GET /api/model-presets/:id/plan masks literal API keys but keeps $VAR references and the digest', async () => {
+    const literal = ['sk', 'literal', 'secret'].join('-');
+    const node = { enabled: false, api_key: literal };
+    const plan = {
+      presetId: 'openai',
+      rows: [
+        { path: 'models.providers.openai', before: node, after: { ...node, enabled: true, harness: 'codex' }, status: 'change' },
+        { path: 'models.providers.anthropic', before: { enabled: true, api_key: '$ANTHROPIC_API_KEY' }, after: { enabled: true, api_key: '$ANTHROPIC_API_KEY' }, status: 'same' },
+      ],
+      notes: [],
+      digest: 'digest-of-unredacted-rows',
+    };
+    mocks.planPresetApply.mockResolvedValue(plan);
+    const result = await call('GET', '/api/model-presets/openai/plan');
+    expect(JSON.stringify(result.body)).not.toContain(literal);
+    const rows = result.body.rows as Array<{ before: Record<string, unknown>; after: Record<string, unknown> }>;
+    expect(rows[0]!.after).toEqual({ enabled: true, api_key: '[redacted]', harness: 'codex' });
+    expect(rows[1]!.before.api_key).toBe('$ANTHROPIC_API_KEY');
+    expect(result.body.digest).toBe('digest-of-unredacted-rows');
+  });
+
   it('GET /api/model-presets/:id/plan returns 404 for an unknown preset', async () => {
     mocks.planPresetApply.mockRejectedValue(new UnknownPresetError('nope'));
     const result = await call('GET', '/api/model-presets/nope/plan');
@@ -132,9 +153,10 @@ describe('model preset routes', () => {
   });
 
   it('POST apply applies with the digest and refreshes the TTS runtime', async () => {
-    mocks.applyPreset.mockResolvedValue({ applied: [], skipped: [] });
+    const plan = { presetId: 'anthropic', rows: [], notes: [], digest: 'abc' };
+    mocks.applyPreset.mockResolvedValue({ plan, applied: [], skipped: [] });
     const result = await call('POST', '/api/model-presets/anthropic/apply', { body: { expectedDigest: 'abc' } });
-    expect(result).toEqual({ status: 200, body: { applied: [], skipped: [] } });
+    expect(result).toEqual({ status: 200, body: { plan, applied: [], skipped: [] } });
     expect(mocks.applyPreset).toHaveBeenCalledWith('anthropic', { expectedDigest: 'abc' });
     expect(mocks.refreshTtsRuntimeConfig).toHaveBeenCalled();
     expect(mocks.syncTtsPlaybackWithConfig).toHaveBeenCalled();

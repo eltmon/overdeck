@@ -38,28 +38,36 @@ interface PresetUndoResult {
   leftAsIs: { path: string; reason: string }[];
 }
 
-async function responseError(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === 'string' ? body.error : `${fallback} (HTTP ${res.status})`;
+async function responseError(res: Response, fallback: string): Promise<{ message: string; code?: string }> {
+  const body = await res.json().catch(() => null) as { error?: unknown; code?: unknown } | null;
+  return {
+    message: typeof body?.error === 'string' ? body.error : `${fallback} (HTTP ${res.status})`,
+    ...(typeof body?.code === 'string' ? { code: body.code } : {}),
+  };
 }
 
 async function fetchPresetStatus(): Promise<PresetStatusList> {
   const res = await fetch('/api/model-presets');
-  if (!res.ok) throw new Error(await responseError(res, 'Failed to load model presets'));
+  if (!res.ok) throw new Error((await responseError(res, 'Failed to load model presets')).message);
   return res.json();
 }
 
 async function fetchPresetPlan(id: string): Promise<PresetPlan> {
   const res = await fetch(`/api/model-presets/${encodeURIComponent(id)}/plan`);
-  if (!res.ok) throw new Error(await responseError(res, 'Failed to preview preset'));
+  if (!res.ok) throw new Error((await responseError(res, 'Failed to preview preset')).message);
   return res.json();
 }
 
 interface ModelPresetsBarProps {
   onPresetChanged: () => void;
+  /**
+   * Settles pending Settings autosaves before a preview, so a debounced save
+   * holding an older snapshot cannot land after the preset and revert it.
+   */
+  beforePreview?: () => Promise<unknown>;
 }
 
-export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
+export function ModelPresetsBar({ onPresetChanged, beforePreview }: ModelPresetsBarProps) {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['model-presets'], queryFn: fetchPresetStatus });
   const [plan, setPlan] = useState<PresetPlan | null>(null);
@@ -83,7 +91,7 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
         body: '{}',
       });
       if (!res.ok) {
-        toast.error(await responseError(res, 'Failed to undo preset'));
+        toast.error((await responseError(res, 'Failed to undo preset')).message);
         return;
       }
       const result = await res.json() as PresetUndoResult;
@@ -99,6 +107,7 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
     setLoadingId(id);
     try {
       setApplyError(null);
+      await beforePreview?.();
       setPlan(await fetchPresetPlan(id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -118,7 +127,14 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
         body: JSON.stringify({ expectedDigest: plan.digest }),
       });
       if (!res.ok) {
-        setApplyError(await responseError(res, 'Failed to apply preset'));
+        const failure = await responseError(res, 'Failed to apply preset');
+        if (failure.code === 'stale-plan') {
+          // Replace the stale preview so the next confirm applies what is shown.
+          setPlan(await fetchPresetPlan(plan.presetId));
+          setApplyError('config.yaml changed since this preview. The preview is refreshed; review the changes and apply again.');
+        } else {
+          setApplyError(failure.message);
+        }
         return;
       }
       const label = plan.label;

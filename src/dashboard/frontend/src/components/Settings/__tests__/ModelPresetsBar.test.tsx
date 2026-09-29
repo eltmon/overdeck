@@ -71,11 +71,11 @@ function installFetchMock(opts: { plan?: Record<string, unknown>; applyStatus?: 
   return fetchMock;
 }
 
-function renderBar(onPresetChanged = vi.fn()) {
+function renderBar(onPresetChanged = vi.fn(), beforePreview?: () => Promise<unknown>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <ModelPresetsBar onPresetChanged={onPresetChanged} />
+      <ModelPresetsBar onPresetChanged={onPresetChanged} beforePreview={beforePreview} />
     </QueryClientProvider>,
   );
   return { onPresetChanged };
@@ -125,15 +125,28 @@ describe('ModelPresetsBar', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('shows the server error in the dialog when the apply is refused', async () => {
-    installFetchMock({ applyStatus: 409 });
+  it('refreshes the preview when the apply is refused as stale', async () => {
+    const fetchMock = installFetchMock({ applyStatus: 409 });
     const { onPresetChanged } = renderBar();
     await userEvent.click(await screen.findByRole('button', { name: 'Apply Anthropic defaults' }));
     await userEvent.click(await screen.findByRole('button', { name: /Apply 2 changes/ }));
 
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'config.yaml changed since this preview');
+    expect((await screen.findByRole('alert')).textContent).toContain('The preview is refreshed');
     expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(fetchMock.mock.calls.filter(([url]) => url.toString().endsWith('/plan'))).toHaveLength(2);
     expect(onPresetChanged).not.toHaveBeenCalled();
+  });
+
+  it('settles pending autosaves before fetching the preview', async () => {
+    const fetchMock = installFetchMock();
+    const order: string[] = [];
+    const beforePreview = vi.fn(async () => {
+      order.push(`flush (plan fetches so far: ${fetchMock.mock.calls.filter(([url]) => url.toString().endsWith('/plan')).length})`);
+    });
+    renderBar(vi.fn(), beforePreview);
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply Anthropic defaults' }));
+    await screen.findByRole('dialog');
+    expect(order).toEqual(['flush (plan fetches so far: 0)']);
   });
 
   it('a blocked plan disables confirm and shows the reason', async () => {

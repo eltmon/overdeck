@@ -98,7 +98,7 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('mounts the model presets above the workhorse panel and refreshes formData after a preset write', () => {
-    const presetsIndex = SETTINGS_PAGE_SOURCE.indexOf('<ModelPresetsBar onPresetChanged={handlePresetChanged} />');
+    const presetsIndex = SETTINGS_PAGE_SOURCE.indexOf('<ModelPresetsBar onPresetChanged={handlePresetChanged} beforePreview={flushAutosave} />');
     expect(presetsIndex).toBeGreaterThanOrEqual(0);
     expect(presetsIndex).toBeLessThan(SETTINGS_PAGE_SOURCE.indexOf('<WorkhorsePanel />'));
     // A preset writes config.yaml outside the autosave pipeline; a stale formData

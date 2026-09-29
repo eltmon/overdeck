@@ -22,9 +22,10 @@ import {
   PresetValidationError,
   applyPreset,
   listPresetStatus,
+  redactPresetApplyResult,
   undoLastPresetApply,
 } from '../../../lib/model-presets/apply.js';
-import { UnknownPresetError, planPresetApply } from '../../../lib/model-presets/plan.js';
+import { UnknownPresetError, planPresetApply, redactPresetPlan } from '../../../lib/model-presets/plan.js';
 import { jsonResponse } from '../http-helpers.js';
 import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
@@ -70,7 +71,7 @@ const getModelPresetPlanRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     return yield* Effect.promise(async () => {
       try {
-        return jsonResponse(await planPresetApply(id));
+        return jsonResponse(redactPresetPlan(await planPresetApply(id)));
       } catch (err) {
         return presetErrorResponse(err);
       }
@@ -97,7 +98,7 @@ const applyModelPresetRoute = HttpRouter.add(
       try {
         const result = await applyPreset(id, { expectedDigest });
         await syncRuntimeWithConfig();
-        return jsonResponse(result);
+        return jsonResponse(redactPresetApplyResult(result));
       } catch (err) {
         return presetErrorResponse(err);
       }
