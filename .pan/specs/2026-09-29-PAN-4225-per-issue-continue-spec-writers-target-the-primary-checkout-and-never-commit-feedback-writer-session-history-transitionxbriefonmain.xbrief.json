@@ -1,0 +1,938 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T02:17:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4225: Per-issue continue/spec writers target the primary checkout and never commit (feedback-writer, session history, transitionXBriefOnMain)",
+    "updated": "2026-09-29T02:26:07.135Z"
+  },
+  "plan": {
+    "id": "pan-4225",
+    "title": "Per-issue continue/spec writers target the primary checkout and never commit (feedback-writer, session history, transitionXBriefOnMain)",
+    "status": "proposed",
+    "uid": "1d5bb37d-7e50-47c0-9458-96abf2f705bd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T02:17:07Z",
+    "updated": "2026-09-29T02:26:07.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4225",
+        "label": "PAN-4225",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4225.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pan-dir",
+      "xbrief",
+      "continue-state",
+      "plan-home",
+      "feedback",
+      "primary-checkout"
+    ],
+    "narratives": {
+      "Problem": "Per-issue writers (feedback-writer clear/append, session-history appends on plan restart/reopen/resume, transitionXBriefOnMain at start/close-out/cancel/pan scope, and the swarm slot ledger) pass the project root to resolvePlanHome, so they write .pan/continues and .pan/specs into the operator's primary checkout and never commit. Readers (handoff-context, test-skip-waiver, the state-md route) read the primary copy while pan task / pan done write the workspace copy. The stray primary files block local main from following merged PRs (PAN-4224) and per-issue state diverges from the branch copy that ships. updateContinueState also overwrites an unparseable continue file with an empty state, wiping item statuses.",
+      "Proposal": "Add resolveIssueWorkspacePlanHome (base workspace's plan home or null) and route the lifecycle-io continue adapters through it, so every existing caller lands in the workspace; skip when the workspace is gone. Readers read the workspace copy first, then the primary. Rename transitionXBriefOnMain to transitionIssueXBrief(planHome, …): start writes the workspace spec, close-out stops writing, cancel writes the workspace spec or skips, pan scope commits and pushes on main when no workspace exists. The server never commits in a workspace; pan done commits pending .pan/continues and .pan/specs before its rebase. Make continue writes atomic and refuse to overwrite unreadable files. Resolve the slot ledger to the base workspace. Update docs/XBRIEF.md and concerns.md.",
+      "NonGoals": "- Cleaning up stray files already present in the operator's primary checkout\n- Any server-side git commit or push inside an issue workspace\n- Cross-process locking of the continue file\n- Changing command-deck.ts legacy .pan/continue.json reads, autonomous-work-dispatch.ts primary-spec reads, or issue-reads.ts\n- A write path for remote (Fly) agents whose workspace is not on this host (their local writes skip)\n- Removing feedback[] or sessionHistory[] from the continue schema\n- Editing CLAUDE.md or src/cli/commands/start.ts\n- Changing pan scope restore's completed/cancelled guard (a merged issue's spec now stays active on main, so restore refuses it)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Per-issue continue/spec/ledger writes go to the base workspace's plan home (<project>/workspaces/feature-<issue>), never a slot/strike workspace and never the primary checkout",
+        "rationale": "The issue asks for one location, the workspace plan home; slot workspaces are separate sibling checkouts, so resolving from the caller's own path would split state"
+      },
+      {
+        "summary": "When the base workspace does not exist, writers skip (return false, log) instead of falling back to the primary checkout",
+        "rationale": "The issue allows 'commit on main or not write at all' after the workspace is gone; skipping keeps the primary checkout clean and the skipped data (feedback, resume breadcrumbs) is non-authoritative"
+      },
+      {
+        "summary": "The server never commits inside a workspace; server writes stay uncommitted and are committed by the agent's own pan task / pan done",
+        "rationale": "Start transitions run after spawn and feedback lands while the agent is live; a server commit would race index.lock and move HEAD under sha-pinned gates"
+      },
+      {
+        "summary": "pan done commits pending .pan/continues and .pan/specs before its rebase",
+        "rationale": "git rebase refuses a dirty tracked file, so without this commit point a server-dirtied continue file would break pan done"
+      },
+      {
+        "summary": "Close-out no longer writes the spec's completed status",
+        "rationale": "Completion is derivable from the merged PR and closed issue; no reader gates on a spec's completed status (verified by grep), and committing on main per close-out would add churn this issue removes"
+      },
+      {
+        "summary": "pan scope verbs write the workspace spec when the workspace exists, else commit and push on main like pan orders",
+        "rationale": "They are explicit operator actions; after the workspace is gone the issue requires a commit on main rather than an uncommitted primary write"
+      },
+      {
+        "summary": "Continue writes become atomic and updateContinueState refuses to overwrite an unparseable file; no cross-process lock",
+        "rationale": "Moving server writes into the same file pan task writes makes the empty-state overwrite a live item-loss path; fs-lock.ts is async-only and the sync call sites cannot use it"
+      },
+      {
+        "summary": "transitionXBriefOnMain is renamed transitionIssueXBrief(planHome, …) and loses its unused commitMessage parameter and always-false committed field",
+        "rationale": "The old name and header claim it commits on main, which it never does; an explicit plan-home parameter makes routing visible at each call site"
+      },
+      {
+        "summary": "The slot ledger keeps its .pan/continues/<ISSUE>.slots.json filename",
+        "rationale": "Minimal change; only its resolution moves from the primary checkout to the base workspace"
+      }
+    ],
+    "items": [
+      {
+        "id": "continue-adapters-route",
+        "title": "Route lifecycle-io continue adapters through the base workspace plan home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/lifecycle-io.ts",
+            "src/lib/reopen.ts",
+            "tests/unit/lib/xbrief/lifecycle-io-continue-adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/lifecycle-io-continue-adapters.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lifecycle-io-continue-adapters.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6"
+          ],
+          "foundationFor": [
+            "feedback-writer-plan-home",
+            "start-transition-workspace",
+            "cancel-spec-workspace",
+            "scope-verbs-plan-home",
+            "continue-readers-plan-home"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/xbrief/lifecycle-io.ts add baseWorkspaceFor (private), exported resolveIssueWorkspacePlanHome(projectRoot, issueId): string|null (resolvePlanHome(<project>/workspaces/feature-<issue>) when that dir exists, else null; project root via findProjectByPath(projectRoot)?.path ?? projectRoot) and exported issueContinueReadPlanHomes (workspace home first, then resolvePlanHome(root), de-duped). readContinueStateForIssue returns the first non-null state over issueContinueReadPlanHomes. appendContinueSessionEntryForIssue / appendFeedbackEntryForIssue / clearFeedbackForIssue return boolean: false (and log one line, write nothing) when resolveIssueWorkspacePlanHome is null; clearFeedbackForIssue also returns false without writing when continueStatePath(planHome, issueId) does not exist. src/lib/reopen.ts:52-56 assigns result.continueFileUpdated from the adapter's return value. Rewrite the existing test fixtures to create <tmp>/workspaces/feature-pan-1919/ and add the no-workspace and read-fallback cases. Do not touch planning-sessions.ts, agents/resume.ts, or routes/issues.ts."
+        },
+        "items": [
+          {
+            "id": "continue-adapters-route.ac1",
+            "title": "Given <tmp>/workspaces/feature-pan-1919/ exists, when appendContinueSessionEntryForIssue(<tmp>, 'PAN-1919', …) runs, then it returns true, writes <tmp>/workspaces/feature-pan-1919/.pan/continues/PAN-1919.xbrief.json, and <tmp>/.pan does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-adapters-route.ac2",
+            "title": "Given no base workspace, when appendFeedbackEntryForIssue runs, then it returns false and creates no file under <tmp>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-adapters-route.ac3",
+            "title": "Given a base workspace with no continue file, when clearFeedbackForIssue runs, then it returns false and creates no continue file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-adapters-route.ac4",
+            "title": "Given continue files in both the workspace and the primary plan home, readContinueStateForIssue returns the workspace copy; with only the primary copy it returns the primary copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-adapters-route.ac5",
+            "title": "Given the base workspace is gone, reopenWorkspaceState returns continueFileUpdated: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "continue-write-hardening",
+        "title": "Make continue writes atomic and refuse to overwrite an unreadable continue file",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/continue-state.ts",
+            "tests/unit/lib/xbrief/continue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/continue-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "continue-state.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/xbrief/continue-state.ts: writeContinueState writes `${path}.${process.pid}.tmp` then renameSync to path. Add exported ContinueStateUnreadableError(path, cause). updateContinueState: if the file is absent start from emptyState; if it exists and JSON.parse throws, throw ContinueStateUnreadableError and write nothing. readContinueState keeps its lenient null-on-error contract. No lock, no .gitignore change."
+        },
+        "items": [
+          {
+            "id": "continue-write-hardening.ac1",
+            "title": "Given a continue file containing '{\"items\": {', when updateContinueState runs, then it throws ContinueStateUnreadableError and the file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-write-hardening.ac2",
+            "title": "When writeContinueState completes, then no *.tmp file remains in .pan/continues/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-write-hardening.ac3",
+            "title": "Given an absent continue file, updateContinueState creates it with the mutation applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-write-hardening.ac4",
+            "title": "Given an existing items map, a feedback-appending updateContinueState mutation preserves every items entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-writer-plan-home",
+        "title": "Keep feedback-writer writes out of the primary checkout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-writer.ts",
+            "tests/unit/lib/cloister/feedback-writer-plan-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/feedback-writer-plan-home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feedback-writer-plan-home.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. src/lib/cloister/feedback-writer.ts: routing comes from continue-adapters-route (the adapters now return boolean). Keep the .pan/feedback/ mirror write and the success/filePath result exactly as today, including when the workspace directory is missing: callers (verification-runner.ts ~:388, review-verdict-feedback.ts ~:221) nudge the agent only when success is true, so success semantics must not change. Log '[continue-state skipped]' when an adapter returns false or throws. Update the module header to say feedback goes to the base workspace's continue file (uncommitted; committed by the work agent's pan task / pan done) plus the .pan/feedback/ mirror. New test mocks ../projects.js resolveProjectFromIssueSync to { projectPath: <tmp>, projectKey: 'x' } and creates <tmp>/workspaces/feature-pan-4242/."
+        },
+        "items": [
+          {
+            "id": "feedback-writer-plan-home.ac1",
+            "title": "Given a base workspace, writeFeedbackFile({ specialist: 'review-agent', outcome: 'changes-requested', … }) writes feedback[0] to the workspace continue file and creates .pan/feedback/001-review-agent-changes-requested.md in the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-writer-plan-home.ac2",
+            "title": "When writeFeedbackFile and clearFeedbackFiles have run, then <tmp>/.pan does not exist (the primary plan home stays untouched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-writer-plan-home.ac3",
+            "title": "Given a base workspace with no continue file, clearFeedbackFiles leaves <workspace>/.pan/continues absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-writer-plan-home.ac4",
+            "title": "Given a base workspace, writeFeedbackFile returns success: true with filePath under <workspace>/.pan/feedback/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transition-rename",
+        "title": "Rename transitionXBriefOnMain to transitionIssueXBrief(planHome, …) with no git and no commit fields",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/lifecycle-io.ts",
+            "src/cli/commands/start-status.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/lib/overdeck/issue-transitions.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "src/cli/commands/scope.ts",
+            "tests/unit/lib/xbrief/transition-issue-xbrief.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/transition-issue-xbrief.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "transition-issue-xbrief.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Behavior-preserving rename. In lifecycle-io.ts rename transitionXBriefOnMain → transitionIssueXBrief(planHome, issueId, targetDir, newStatus); remove the commitMessage parameter and the committed field of XBriefTransitionResult; rewrite its doc comment (writes files only, never runs git; caller chooses the plan home). Update every caller to pass resolvePlanHome(projectPath) (same behavior as today) and delete the `if (result.committed)` log lines in workflows.ts, spawn.ts, issue-transitions.ts. scope.ts keeps its per-verb commit messages as local constants for scope-verbs-plan-home and its header comment stops naming transitionXBriefOnMain. workflows.ts must not grow past 1160 lines. Remove the ensureXBriefDirs(projectRoot) call from the transition: it scaffolds empty legacy vbrief/<lifecycle>/ directories in whatever plan home it is given, which would now be every workspace; .pan/specs writes already mkdir their own directory. invalidateXBriefIndex is called with the planHome argument."
+        },
+        "items": [
+          {
+            "id": "transition-rename.ac1",
+            "title": "`git grep -n transitionXBriefOnMain -- src` prints nothing and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transition-rename.ac2",
+            "title": "Given a temp plan home with a proposed spec, transitionIssueXBrief(home, 'PAN-7', 'active', 'running') sets top-level status 'active' and plan.status 'running' and returns moved: true, statusUpdated: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transition-rename.ac3",
+            "title": "A second identical call returns moved: false and statusUpdated: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transition-rename.ac4",
+            "title": "When transitionIssueXBrief is called on a plan home that is not a git repository, then it returns a result without throwing, proving it runs no git command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transition-rename.ac5",
+            "title": "When transitionIssueXBrief runs on a plan home without a vbrief/ directory, then no vbrief/ directory exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-transition-workspace",
+        "title": "Start transitions write the base workspace's spec, uncommitted",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start-status.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "tests/unit/lib/xbrief/transition-issue-xbrief.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/transition-issue-xbrief.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transition-issue-xbrief.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. start-status.ts transitionStartedXBrief(projectRoot, id): planHome = resolveIssueWorkspacePlanHome(projectRoot, id); null → throw Error('no base workspace for <ID>; spec transition skipped') (start.ts:1229-1231 already catches and prints it; do not edit start.ts). spawn.ts markWorkStartAccepted (~:611-635): same resolution; null → console.log('[start-agent] no base workspace for <ID>; spec transition skipped') and skip. No git commit anywhere (the agent is already running)."
+        },
+        "items": [
+          {
+            "id": "start-transition-workspace.ac1",
+            "title": "Given <tmp>/workspaces/feature-pan-7/.pan/specs/<spec> in proposed status, transitionStartedXBrief(<tmp>, 'PAN-7') sets that spec's plan.status to 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-transition-workspace.ac2",
+            "title": "When transitionStartedXBrief has flipped the workspace spec, then <tmp>/.pan/specs is byte-identical to before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-transition-workspace.ac3",
+            "title": "Given no base workspace, transitionStartedXBrief rejects with a message containing 'no base workspace' and writes no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-skip-spec",
+        "title": "Close-out stops writing the spec and reports the step skipped",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workflows.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Replace completeXBriefStep's body (workflows.ts ~:572-599) with a stepSkipped('close-out:vbrief-completed', ['Spec status for <ID> is derived from the merged PR; close-out does not write it']). Keep the function name and its export (~:1098). Remove the now-unused dynamic import. Test fixture: seed agent state under getOverdeckHome()/agents/ (two-agent-roots trap in concerns.md)."
+        },
+        "items": [
+          {
+            "id": "closeout-skip-spec.ac1",
+            "title": "Given a primary plan home holding an 'active' spec, when the close-out workflow runs, then the close-out:vbrief-completed step reports skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-skip-spec.ac2",
+            "title": "When close-out has run, then the fixture spec file is byte-identical to before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-skip-spec.ac3",
+            "title": "When the item is committed, wc -l src/lib/lifecycle/workflows.ts prints at most 1160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-spec-workspace",
+        "title": "Cancel writes the base workspace's spec or skips when the workspace is gone",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/issue-transitions.ts",
+            "tests/unit/lib/xbrief/transition-issue-xbrief.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/transition-issue-xbrief.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transition-issue-xbrief.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In issue-transitions.ts resolve resolveIssueWorkspacePlanHome(ctx.projectPath, id) BEFORE running the reset/cancel workflow (it may delete the workspace). Add exported transitionCancelledSpec(issueId, planHome: string|null): Promise<string> that calls transitionIssueXBrief(planHome, id, 'cancelled', 'cancelled') only when planHome is non-null and existsSync(planHome), returning a cleanup-log line; otherwise returns 'xBRIEF cancel transition skipped: no workspace'. The cancel branch pushes its return value to cleanupLog. Tests go in a describe('cancel') block."
+        },
+        "items": [
+          {
+            "id": "cancel-spec-workspace.ac1",
+            "title": "Given an existing workspace plan home with an active spec, transitionCancelledSpec sets the spec's top-level status to 'cancelled' and returns a line mentioning 'cancelled'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-spec-workspace.ac2",
+            "title": "Given planHome null or a deleted directory, transitionCancelledSpec returns 'xBRIEF cancel transition skipped: no workspace' and creates no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-spec-workspace.ac3",
+            "title": "When transitionCancelledSpec runs in either branch, then the primary plan home's .pan/specs stays byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-verbs-plan-home",
+        "title": "pan scope verbs write the workspace spec, or commit and push on main when no workspace exists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/scope.ts",
+            "tests/unit/cli/commands/scope-plan-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/scope-plan-home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "scope-plan-home.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In scope.ts export resolveScopeTarget(projectPath, issueId): { planHome, onMain } (workspace home when resolveIssueWorkspacePlanHome is non-null, else resolvePlanHome(projectPath) with onMain true) and finishScopeTransition(target, message): Promise<string|null> — null when !onMain; else commitPlanArtifacts({ cwd: planHome, paths: [join('.pan','specs')], message }), then when committed or 'nothing to commit' pushPlanArtifacts(planHome) and surfacePlanArtifactPush(push, { planHome, command: 'pan scope' }), returning a one-line warning or null (pattern: src/cli/commands/orders.ts:72-79). propose/approve/complete/cancel/restore resolve the target, call transitionIssueXBrief(target.planHome, …), print formatTransition, then print any warning in yellow; restoreCommand's findXBriefByIssueSync uses target.planHome."
+        },
+        "items": [
+          {
+            "id": "scope-verbs-plan-home.ac1",
+            "title": "Given <tmp>/workspaces/feature-pan-9/ exists, resolveScopeTarget(<tmp>, 'PAN-9') returns that workspace as planHome with onMain false; without it, onMain is true and planHome is <tmp>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-verbs-plan-home.ac2",
+            "title": "Given a temp git repo with no upstream and a modified spec, finishScopeTransition({ onMain: true }, msg) creates exactly one commit whose changed paths are all under .pan/specs/ and returns a warning string instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-verbs-plan-home.ac3",
+            "title": "Given onMain false, finishScopeTransition returns null and succeeds in a directory that is not a git repository",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "done-commit-pending-artifacts",
+        "title": "pan done commits pending .pan/continues and .pan/specs changes before its rebase",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/done.ts",
+            "tests/unit/cli/commands/done-plan-artifact-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/done-plan-artifact-commit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "done-plan-artifact-commit.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add exported commitPendingIssueArtifacts(workspacePath, issueId) beside recordTestWaiver in done.ts: planHome = resolvePlanHome(workspacePath); paths = ['.pan/continues','.pan/specs'] filtered to those that exist; none → return; commitPlanArtifacts({ cwd: planHome, paths, message: planArtifactCommitMessage(issueId) }); throw when not committed and reason !== 'nothing to commit'. Call it in doneCommand immediately before the '// Step 1: rebase onto the target branch and push.' block, inside the existing try, with and without --force."
+        },
+        "items": [
+          {
+            "id": "done-commit-pending-artifacts.ac1",
+            "title": "Given a temp git repo with a modified tracked .pan/continues/PAN-5.xbrief.json and a modified src/a.ts, commitPendingIssueArtifacts creates one commit whose changed paths list only the continue file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-commit-pending-artifacts.ac2",
+            "title": "When commitPendingIssueArtifacts has committed, then git status still shows src/a.ts as modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-commit-pending-artifacts.ac3",
+            "title": "Given a clean tree, commitPendingIssueArtifacts creates no commit and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-commit-pending-artifacts.ac4",
+            "title": "Given a repo with no .pan directory, commitPendingIssueArtifacts returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "continue-readers-plan-home",
+        "title": "Continue readers read the workspace copy first, then the primary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/handoff-context.ts",
+            "src/lib/cloister/test-skip-waiver.ts",
+            "src/dashboard/server/routes/workspaces.ts",
+            "tests/unit/lib/cloister/continue-readers-plan-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/continue-readers-plan-home.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "continue-readers-plan-home.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. handoff-context.ts (~:122-125) and test-skip-waiver.ts (~:47) call readContinueStateForIssue(project.path, issueId.toUpperCase()) from ../xbrief/lifecycle-io.js; drop imports left unused. routes/workspaces.ts readWorkspaceContinueFile (~:177-190) replaces its two dynamic imports with one import of lifecycle-io.js and calls readContinueStateForIssue(projectPath, issueId); the file must stay at or below 1358 lines. Test mocks resolveProjectForIssue in ../overdeck/issue-projects.js to { path: <tmp> }."
+        },
+        "items": [
+          {
+            "id": "continue-readers-plan-home.ac1",
+            "title": "Given a D-test-removal-waived:<sha> decision only in the workspace continue file, resolveActiveTestSkipWaiver(issue, <sha>) returns a waiver with that sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-readers-plan-home.ac2",
+            "title": "Given an agent whose workspace continue file has decisions [{ id: 'D1' }], captureHandoffContext returns continueState.decisions[0].id === 'D1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-readers-plan-home.ac3",
+            "title": "wc -l src/dashboard/server/routes/workspaces.ts reports at most 1358 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slot-ledger-base-workspace",
+        "title": "Swarm slot ledger resolves to the base workspace plan home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/swarm-slot-store.ts",
+            "tests/unit/lib/cloister/swarm-slot-store-plan-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/swarm-slot-store-plan-home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "swarm-slot-store-plan-home.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. swarmSlotStatePath (~:93-96): projectRoot = resolve(workspacePath,'..','..'); planHome = resolvePlanHome(join(projectRoot,'workspaces',`feature-${issueId.toLowerCase()}`)); filename unchanged. Update the header comment to say the base workspace owns the ledger and why slot paths must not resolve to themselves."
+        },
+        "items": [
+          {
+            "id": "slot-ledger-base-workspace.ac1",
+            "title": "Given an unregistered temp project, swarmSlotStatePath for <tmp>/workspaces/feature-pan-3 and for <tmp>/workspaces/feature-pan-3-slot-2 both return <tmp>/workspaces/feature-pan-3/.pan/continues/PAN-3.slots.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-ledger-base-workspace.ac2",
+            "title": "updateSwarmSlotState followed by readSwarmSlotState round-trips the written state through that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-ledger-base-workspace.ac3",
+            "title": "When those calls have run, then <tmp>/.pan does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-plan-home",
+        "title": "Document where per-issue continue/spec state is written and who commits it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T02:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4225",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'commits and pushes that transition on the feature branch before returning' docs/XBRIEF.md || true"
+          ],
+          "expected_outputs": [
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. docs/XBRIEF.md: replace line ~88 ('pan start … commits and pushes that transition on the feature branch before returning') and line ~94 ('All transitions are commits on the feature branch.') with the new behavior: start writes the base workspace's spec uncommitted; pan task and pan done commit it (pan done commits pending .pan/continues and .pan/specs before rebasing); close-out does not write the spec because completion is derived from the merged PR; cancel writes the workspace spec only if the workspace exists; pan scope verbs commit and push on main when no workspace exists. In the 'Task state and concurrency' table (~:135) and 'Canonical continue files' (~:426) add that server-side writers (verification/review/CI/UAT feedback, resume/reopen/plan-restart session history) write the base workspace's continue file, never the primary checkout, and skip when the workspace is gone; readers read the workspace copy first, then the primary. concerns.md: replace the PAN-4225 'still target the primary checkout' bullet with the invariant (resolveIssueWorkspacePlanHome; server never commits in a workspace; a server-dirtied .pan/continues file before pan done is expected and exempt via isOverdeckOwnedOnlyStatus) and bump <!-- last-verified: -->. CLAUDE.md is not edited. Also state in docs/XBRIEF.md that because close-out no longer marks a merged issue's spec completed, `pan scope restore` refuses for merged issues (their spec on main stays active, which restore treats as already active)."
+        },
+        "items": [
+          {
+            "id": "docs-plan-home.ac1",
+            "title": "docs/XBRIEF.md no longer contains the sentence 'commits and pushes that transition on the feature branch before returning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-plan-home.ac2",
+            "title": "docs/XBRIEF.md states that close-out does not write the spec and that pan done commits pending .pan/continues and .pan/specs before rebasing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-plan-home.ac3",
+            "title": "docs/XBRIEF.md states that server-side feedback and session-history writers write the base workspace's continue file and skip when the workspace is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-plan-home.ac4",
+            "title": ".overdeck/context/codebase/concerns.md no longer contains 'still target the primary checkout' and names resolveIssueWorkspacePlanHome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "continue-adapters-route",
+        "to": "feedback-writer-plan-home",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-adapters-route",
+        "to": "transition-rename",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-adapters-route",
+        "to": "continue-readers-plan-home",
+        "type": "blocks"
+      },
+      {
+        "from": "transition-rename",
+        "to": "start-transition-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "transition-rename",
+        "to": "closeout-skip-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "transition-rename",
+        "to": "cancel-spec-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "transition-rename",
+        "to": "scope-verbs-plan-home",
+        "type": "blocks"
+      },
+      {
+        "from": "start-transition-workspace",
+        "to": "cancel-spec-workspace",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4225-per-issue-continue-spec-writers-target-the-primary-checkout-and-never-commit-feedback-writer-session-history-transitionxbriefonmain.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
