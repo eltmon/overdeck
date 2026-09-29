@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4337",
   "created": "2026-09-29T02:00:38.123Z",
-  "updated": "2026-09-29T02:11:57.040Z",
+  "updated": "2026-09-29T02:13:38.972Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-4337",
       "claimedAt": "2026-09-29T02:10:59.230Z",
       "doneAt": "2026-09-29T02:11:57.039Z"
+    },
+    "shim-branch-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:13:38.972Z"
     }
   }
 }
