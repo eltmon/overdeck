@@ -63,7 +63,7 @@ export function autoMergeFromLabels(labels: readonly string[]): boolean | undefi
  * GitHub issue, so a non-GitHub tracker is asked through its tracker client,
  * and a GitHub lookup must resolve to the project's own `github_repo`.
  */
-async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
+export async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
   const project = resolveProjectFromIssueSync(issueId);
   const config = project ? getProjectSync(project.projectKey) : null;
   if (config?.tracker && config.tracker !== 'github') return readTrackerIssueLabels(issueId, config.tracker);
