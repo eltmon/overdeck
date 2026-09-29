@@ -128,6 +128,20 @@ describe('pan spawn', () => {
     expect(started[0].spec.kind).toBe('codex');
   });
 
+  it('stamps OVERDECK_CLAIM_ID with the pane agent name (PAN-4339 FR-7)', async () => {
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code' },
+      { resolveBackend: async () => fakeBackend(started) },
+    );
+
+    expect(started[0].spec.name).toBe('pan-1-item-a');
+    expect(started[0].spec.env?.OVERDECK_CLAIM_ID).toBe('pan-1-item-a');
+    expect(started[0].spec.env?.OVERDECK_CLAIM_ID).toBe(started[0].spec.name);
+    expect(started[0].spec.env?.OVERDECK_ISSUE_ID).toBe('PAN-1');
+    expect(started[0].spec.env?.OVERDECK_ITEM_ID).toBe('item-a');
+    expect(started[0].spec.env).not.toHaveProperty('OVERDECK_AGENT_ID');
+  });
+
   it('gives an item with a files_scope its own worktree under .swarm/', async () => {
     mocks.readPlan.mockReturnValue(plan({ files_scope: ['src/lib/**'] }));
     const createWorktree = vi.fn(async (workspacePath: string, itemId: string) => `${workspacePath}/.swarm/${itemId}`);

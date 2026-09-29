@@ -12,6 +12,10 @@
  *
  * Nothing about the pane is persisted: the backend is the owner of session
  * liveness and is read live.
+ *
+ * The pane's `OVERDECK_CLAIM_ID` is its agent name (PAN-4339 FR-7), so
+ * `pan task claim` records a claimant id that liveness can actually probe,
+ * rather than the exited `pan spawn` CLI process's own pid.
  */
 
 import { existsSync } from 'node:fs';
@@ -118,13 +122,14 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
     }
   }
 
+  const agentName = `${issueId.toLowerCase()}-${item.id}`;
   const pane = await Effect.runPromise(
     backend.startAgent(workspace, {
       kind: harness,
       argv: ['--model', options.model],
-      env: { OVERDECK_ISSUE_ID: issueId, OVERDECK_ITEM_ID: item.id },
+      env: { OVERDECK_ISSUE_ID: issueId, OVERDECK_ITEM_ID: item.id, OVERDECK_CLAIM_ID: agentName },
       tokens: { issue: issueId, role: 'worker', harness, model: options.model },
-      name: `${issueId.toLowerCase()}-${item.id}`,
+      name: agentName,
       cwd,
     }),
   );
