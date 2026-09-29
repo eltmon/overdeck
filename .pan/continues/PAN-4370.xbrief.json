@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:13:37.635Z",
+  "updated": "2026-09-29T16:13:52.044Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "expansion-reasons.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T16:13:37.634Z"
+    },
+    "memory-doctor-cause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:13:52.044Z"
     }
   }
 }
