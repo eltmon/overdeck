@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3308",
   "created": "2026-09-29T01:57:57.115Z",
-  "updated": "2026-09-29T03:10:29.549Z",
+  "updated": "2026-09-29T03:10:44.433Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "raise-guard.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T03:10:29.549Z"
+    },
+    "raise-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:10:44.432Z"
     }
   }
 }
