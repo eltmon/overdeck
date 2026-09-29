@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:59:41.881Z",
+  "updated": "2026-09-29T02:06:13.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
       "claimedBy": "agent-pan-4334",
       "claimedAt": "2026-09-29T01:58:47.880Z",
       "doneAt": "2026-09-29T01:59:41.881Z"
+    },
+    "live-checkpoint": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:06:13.111Z"
     }
   }
 }
