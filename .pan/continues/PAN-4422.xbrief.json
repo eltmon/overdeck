@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T22:00:21.009Z",
+  "updated": "2026-09-29T22:00:33.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "frontend-pickers.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T22:00:21.008Z"
+    },
+    "friendly-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:00:33.086Z"
     }
   }
 }
