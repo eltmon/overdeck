@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:36:37.499Z",
+  "updated": "2026-09-29T06:36:50.755Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -586,6 +586,10 @@
     "cli-exclude-secrets.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:36:37.498Z"
+    },
+    "cli-hooks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:50.754Z"
     }
   }
 }
