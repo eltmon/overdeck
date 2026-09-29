@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-29T23:02:14.037Z",
+  "updated": "2026-09-29T23:02:18.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-2444",
       "claimedAt": "2026-09-29T23:01:02.219Z",
       "doneAt": "2026-09-29T23:02:14.037Z"
+    },
+    "sageox-upload-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:02:18.403Z"
     }
   }
 }
