@@ -1,0 +1,591 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T01:54:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1728: bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch",
+    "updated": "2026-09-29T01:58:01.295Z"
+  },
+  "plan": {
+    "id": "pan-1728",
+    "title": "bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch",
+    "status": "proposed",
+    "uid": "864cb482-420e-426d-9505-ad8e22e0ca92",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T01:54:40Z",
+    "updated": "2026-09-29T01:58:01.295Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1728",
+        "label": "PAN-1728",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1728.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "verification",
+      "xbrief",
+      "gate",
+      "plan-integrity"
+    ],
+    "narratives": {
+      "Problem": "Specs in .pan/specs/ are committed on the feature branch, so a work agent can edit its own acceptance criteria or item statuses and the edit rides the merge to main (PAN-1700 commit d897ca1f4). docs/XBRIEF.md declares the spec immutable after planning except for lifecycle status and explicit re-planning, but nothing enforces it and roles/work.md never forbids it.",
+      "Proposal": "Add a required plan-integrity verification check, run after test-skip and before the quality gates, that compares the issue's spec at HEAD with a reference copy and fails on any change outside top-level status, plan.status, plan.updated, plan.sequence and xBRIEFInfo.updated, naming each changed item id and the git restore remediation. The reference is the newest finalize commit carrying a verified Plan-Finalized: <sha256> trailer (written by planning finalize in the repo that holds the spec), then a legacy finalize-subject commit, then the merge-base copy, then the commit that first added the spec. Legitimate re-plans pass because they move the reference. The work role forbids spec edits and trailers, and PIPELINE-GATES.md and XBRIEF.md document the gate. Full detail: .pan/drafts/PAN-1728.md.",
+      "NonGoals": "- No stored state: no record, DB row or journal field for the reference; it is derived from git each run\n- No forgery resistance beyond the trailer hash check; an agent deliberately writing a trailer is out of scope\n- No one-off audit script for in-flight branches\n- No change to how pan start commits its status transition (PAN-4225); only the XBRIEF.md sentence is corrected\n- No change to .pan/continues/, pan task, vbrief-conflicts or vbrief-ac behavior\n- No review-convoy prompt changes; #4348 reuses resolvePlanReference separately"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Follow the operator-approved design in the 2026-09-29 issue comment (plan-integrity check, Plan-Finalized trailer, merge-base fallback) instead of the original 'things to check' list.",
+        "rationale": "The comment states it replaces that list and was approved on 2026-09-28."
+      },
+      {
+        "summary": "Extend the reference chain with a legacy finalize-subject marker and a first-commit-that-added-the-spec fallback after the merge-base copy.",
+        "rationale": "Specs are added on the feature branch, so in-flight branches and pan start --auto specs have no trailer and no merge-base copy; without these fallbacks the gate would either skip them or false-fail re-planned branches their agents cannot fix."
+      },
+      {
+        "summary": "The trailer value is SHA-256 over the spec's exact committed bytes and the gate verifies it; a mismatched trailer is ignored and reported.",
+        "rationale": "Gives the design's '<sha256>' a checkable meaning; forgery resistance is explicitly out of scope."
+      },
+      {
+        "summary": "Keep polyrepo in scope: finalize commits the trailer in the repo that holds the spec, and the gate runs in resolvePlanHome(workspacePath).",
+        "rationale": "The design requires the check to run in the plan home, and today's wrapper finalize commit never contains a polyrepo spec."
+      },
+      {
+        "summary": "A HEAD spec with merge-conflict markers passes plan-integrity with evidence and is left to the existing vbrief-conflicts check.",
+        "rationale": "plan-integrity runs first; failing it would replace vbrief-conflicts' specific resolution instructions with generic feedback."
+      },
+      {
+        "summary": "Fail closed on git errors inside a valid plan-home work tree; pass with evidence when the plan home is not a git work tree or no spec exists.",
+        "rationale": "Matches the test-skip gate (PR #3872 finding 4) and keeps existing runner tests on non-git temp dirs unaffected."
+      },
+      {
+        "summary": "Put the remediation (git restore --source=<ref> -- <spec>, pan task done, ask for re-planning) in the gate evidence.",
+        "rationale": "The shared failure feedback says 'fix the code', which does not tell an agent how to undo a spec edit."
+      },
+      {
+        "summary": "No one-off audit of in-flight branches.",
+        "rationale": "The gate checks every branch at its next verification, which covers the issue's old check #3."
+      }
+    ],
+    "items": [
+      {
+        "id": "trailer-helper",
+        "title": "Add the Plan-Finalized trailer helper module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1728",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/plan-finalized.ts",
+            "tests/unit/lib/xbrief/plan-finalized.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/plan-finalized.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-finalized.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "finalize-trailer",
+            "plan-integrity-run"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-1728.md WI-1. Create src/lib/xbrief/plan-finalized.ts exporting PLAN_FINALIZED_TRAILER = 'Plan-Finalized', planFinalizedHash(bytes) (sha256 hex via node:crypto createHash), formatPlanFinalizedTrailer(hash) returning 'Plan-Finalized: <hash>', and isLegacyFinalizeSubject(subject, issueId) matching 'chore(plan): complete planning for <issue>' case-insensitively after trim. Exact code is in the PRD. This module is the shared protocol between the finalize writer (finalize-trailer) and the gate reader (plan-integrity-run); do not inline the key or hash elsewhere."
+        },
+        "items": [
+          {
+            "id": "trailer-helper.ac1",
+            "title": "Given the bytes 'abc', when planFinalizedHash runs, then it returns ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trailer-helper.ac2",
+            "title": "Given hash h, when formatPlanFinalizedTrailer(h) runs, then it returns the string 'Plan-Finalized: ' followed by h",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trailer-helper.ac3",
+            "title": "Given subject 'chore(plan): complete planning for pan-1' and issue 'PAN-1', isLegacyFinalizeSubject returns true; given issue 'PAN-12' it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spec-diff",
+        "title": "Add the pure plan-integrity spec diff",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/plan-integrity-gate.ts",
+            "tests/unit/lib/cloister/plan-integrity-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/plan-integrity-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-integrity-gate.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/cloister/plan-integrity-gate.ts with no git and no fs access, exporting PlanIntegrityViolation {subject, kind: 'item-added'|'item-removed'|'item-changed'|'field-changed', keys?} and diffPlanDocuments(reference, head). Normalize both with normalizeXBriefEnvelope (src/lib/xbrief/io.ts), delete the five allowed fields (top-level status, plan.status, plan.updated, plan.sequence, xBRIEFInfo.updated), walk plan.items recursively keyed by id (items without id keyed as plan.items[<n>]), compare each item without its nested items using a key-order-independent deep equal, and report every other changed top-level or plan.* key as field-changed with its dotted path. Write the named test cases listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "spec-diff.ac1",
+            "title": "Given a head spec whose item title differs from the reference, when diffPlanDocuments runs, then it returns one item-changed violation whose subject is that item id and keys include 'title'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-diff.ac2",
+            "title": "Given a head spec whose nested AC x.ac1 status changed from pending to completed, when diffPlanDocuments runs, then it returns a violation with subject 'x.ac1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-diff.ac3",
+            "title": "Given a head spec that differs only in status, plan.status, plan.updated, plan.sequence and xBRIEFInfo.updated, when diffPlanDocuments runs, then it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-diff.ac4",
+            "title": "Given identical documents with reordered object keys, or a legacy vBRIEFInfo reference with equal content, when diffPlanDocuments runs, then it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-diff.ac5",
+            "title": "Given a changed plan.narratives.Problem, an added item and a removed item, when diffPlanDocuments runs, then it returns field-changed 'plan.narratives', item-added and item-removed violations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-integrity-run",
+        "title": "Resolve the reference spec from git and evaluate the plan-integrity gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/plan-integrity-run.ts",
+            "tests/unit/lib/cloister/plan-integrity-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/plan-integrity-run.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "plan-integrity-run.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "readinessReason": "Touches only two new files (plan-integrity-run.ts and its test) that no other item edits; it runs once trailer-helper and spec-diff land."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (steps 1-8) and decisions D1, D2, D5, D6, D7, D8. Create src/lib/cloister/plan-integrity-run.ts mirroring src/lib/cloister/test-skip-run.ts. Export resolvePlanReference(planHome, issueId, baseRef) (a named export #4348 will reuse) and evaluatePlanIntegrityGate(issueId, workspacePath, roots) returning {failed, evidence, error?}. Use promisified execFile only (no execSync; server-reachable). Plan home = resolvePlanHome(workspacePath); target branch from the root whose realpath equals the plan home, else roots[0].targetBranch, else 'main'. Reference chain: newest commit in mergeBase..HEAD with a Plan-Finalized trailer whose value equals planFinalizedHash of the issue's spec blob at that commit (mismatch -> evidence note, keep searching) -> newest legacy finalize subject commit touching the issue spec -> merge-base copy -> first commit on the branch that added an issue spec. Pass with evidence when the plan home is not a git work tree, when there is no spec at HEAD and no reference, or when the HEAD spec has conflict markers (vbrief-conflicts owns those). Fail closed when a git command fails inside a valid work tree. Compare spec filename sets, then diffPlanDocuments per same-named pair. Evidence starts with 'reference: <kind> <sha8>', lists one line per violation naming item ids, and on failure appends the remediation: git restore --source=<refSha> -- <specPath>, commit, record completion with pan task done, and ask for re-planning (pan plan <ISSUE>) if the plan itself is wrong. Tests use real temp git repos with a bare origin and resolvePlanHome mocked; cover every case listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "plan-integrity-run.ac1",
+            "title": "Given a temp repo where a Plan-Finalized trailer commit adds the spec and a later commit changes an AC status, when evaluatePlanIntegrityGate runs, then it returns failed: true and its evidence names the AC id and contains 'git restore --source='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-integrity-run.ac2",
+            "title": "Given a later commit that changes only the five allowed fields, or no spec change at all, when evaluatePlanIntegrityGate runs, then it returns failed: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-integrity-run.ac3",
+            "title": "Given a second commit with a valid Plan-Finalized trailer that changes an item, when evaluatePlanIntegrityGate runs, then it returns failed: false and evidence starts with 'reference: trailer' and the second commit's short sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-integrity-run.ac4",
+            "title": "Given a trailer whose hash does not match the spec blob, a legacy finalize subject, a spec present at the merge base, or a spec added by a plain commit, when resolvePlanReference runs, then it returns kind legacy-finalize, merge-base or first-add respectively and evidence records 'hash mismatch' for the ignored trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-integrity-run.ac5",
+            "title": "Given a HEAD spec with conflict markers or a non-git plan home the gate returns failed: false; given a missing origin/<target> ref inside a git repo it returns failed: true with the git diagnostic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-trailer",
+        "title": "Write the Plan-Finalized trailer on the finalize commit in the repo that holds the spec",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes",
+            "typecheck and lint (including the file-size ratchet) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D4. In src/lib/overdeck/planning-promotion.ts add a trailing optional parameter specPath?: string to commitCompletePlanningWorkspaceGit (keep execImpl as the 4th parameter so existing tests compile). When specPath is set, read its bytes, hash with planFinalizedHash, and find specRepo with execImpl('git', ['rev-parse','--show-toplevel'], {cwd: dirname(specPath)}). If realpath(specRepo) equals realpath(gitRoot), the existing commit becomes ['commit','-m',subject,'-m',formatPlanFinalizedTrailer(hash),'--no-verify']. Otherwise keep the wrapper commit unchanged and, in specRepo, run git add .pan/ and, when git diff --cached --quiet fails, git commit -m subject -m <trailer> --no-verify (no push from specRepo). If rev-parse fails, log a warning and keep today's behavior with no trailer. Pass proposed.path at the one call site (grep 'const committed = await commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);'). If the file grows past 954 lines add the row '<lines> src/lib/overdeck/planning-promotion.ts # PAN-1728' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "finalize-trailer.ac1",
+            "title": "Given a monorepo workspace whose spec repo is gitRoot, when commitCompletePlanningWorkspaceGit runs with a spec path, then the git commit call carries 'Plan-Finalized: <sha256 of the written spec bytes>' as a second -m paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-trailer.ac2",
+            "title": "Given a polyrepo workspace whose spec repo is gitRoot/infra, when commitCompletePlanningWorkspaceGit runs, then the wrapper commit has no trailer and a second commit runs with cwd gitRoot/infra carrying the trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-trailer.ac3",
+            "title": "Given no spec path, when commitCompletePlanningWorkspaceGit runs, then its git commit arguments are unchanged from today's (no trailer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runner-wiring",
+        "title": "Run plan-integrity as a required verification check after test-skip",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner-plan-integrity.test.ts",
+            "tests/unit/lib/cloister/verification-tests-on-ci.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner-plan-integrity.test.ts tests/unit/lib/cloister/verification-tests-on-ci.test.ts tests/unit/lib/cloister/verification-runner-merged.test.ts tests/unit/lib/cloister/verification-runner-gate-output.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all four runner test files pass",
+            "typecheck and lint (including the file-size ratchet) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and decision D9. In src/lib/cloister/verification-runner.ts import evaluatePlanIntegrityGate from './plan-integrity-run.js'. Directly after 'const testSkip = await evaluateTestSkipGate(issueId, repoRoots, testSkipHead);' run it only when test-skip passed, and extend the rawGateResults ternary so a failed plan-integrity yields one row { name: 'plan-integrity', passed: false, required: true, output: evidence, durationMs, error: error ?? 'Diff changes the spec beyond lifecycle status fields' } without calling runQualityGates. The existing failure path then emits verification.failed { failedCheck: 'plan-integrity' }. Keep runner growth to this wiring and add '<lines> src/lib/cloister/verification-runner.ts # PAN-1728' to scripts/file-size-allowlist.txt in the same commit. Add a vi.mock of plan-integrity-run.js returning {failed:false, evidence:''} to verification-tests-on-ci.test.ts. Create verification-runner-plan-integrity.test.ts by copying that file's vi.mock scaffold and verify() helper."
+        },
+        "items": [
+          {
+            "id": "runner-wiring.ac1",
+            "title": "Given evaluatePlanIntegrityGate returns failed: true, when runVerificationForIssueInProcess runs, then it returns failedCheck 'plan-integrity', never calls runQualityGates, and the journal tail is verification.failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-wiring.ac2",
+            "title": "Given evaluatePlanIntegrityGate returns failed: true with evidence 'item x.ac1: changed status', when verification writes its artifact, then the artifact's plan-integrity gate row carries that evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-wiring.ac3",
+            "title": "Given evaluatePlanIntegrityGate returns failed: false, when runVerificationForIssueInProcess runs, then the quality gates run and the outcome is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runner-wiring.ac4",
+            "title": "Given the test-skip gate fails, when runVerificationForIssueInProcess runs, then evaluatePlanIntegrityGate is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-role-guidance",
+        "title": "Forbid spec edits and Plan-Finalized trailers in the work role",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Plan-Finalized' roles/work.md",
+            "grep -n 'plan-integrity' roles/work.md"
+          ],
+          "expected_outputs": [
+            "each grep prints a line inside the Per-Task Workflow section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In roles/work.md, section '## Per-Task Workflow', after the paragraph beginning 'Never batch multiple tasks into a single commit.', add the paragraph quoted in the PRD: never edit .pan/specs/, never write a Plan-Finalized trailer, completion goes to the continue file through pan task done, the required plan-integrity check fails any spec change beyond lifecycle status fields, and a wrong plan means stop and ask for re-planning."
+        },
+        "items": [
+          {
+            "id": "work-role-guidance.ac1",
+            "title": "Given roles/work.md, when grepped for 'Plan-Finalized', then a line in the Per-Task Workflow section forbids writing that trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-role-guidance.ac2",
+            "title": "Given roles/work.md, when grepped for 'plan-integrity', then a line in the Per-Task Workflow section states that the check fails spec changes beyond lifecycle status fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the plan-integrity gate and correct the xBRIEF lifecycle text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:54:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1728",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/XBRIEF.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Plan-integrity gate (PAN-1728)' docs/PIPELINE-GATES.md",
+            "grep -n 'plan-integrity' docs/XBRIEF.md",
+            "! grep -n 'commits and pushes that transition' docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "the first two greps print a match and the third prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. docs/PIPELINE-GATES.md: add '## Plan-integrity gate (PAN-1728)' directly after the 'Test-skip gate' section covering the compared documents and five allowed fields, the reference chain with the trailer hash check, the threat model (catches misguided edits, not forgery), pass-with-evidence cases and the fail-closed rule, the remediation text, polyrepo plan-home behavior, and its order (after test-skip, before quality gates). docs/XBRIEF.md: append to 'The canonical spec is immutable after planning…' that the plan-integrity check enforces it with a link to the new section; add to lifecycle step 2 that finalize commits the spec with a Plan-Finalized: <sha256> trailer in the repo that holds it; replace step 3's 'then commits and pushes that transition on the feature branch before returning' with the code's real behavior (status written in the plan home, reaches the branch with a later commit, changes only fields plan-integrity allows). .overdeck/context/codebase/concerns.md: add a bullet naming the plan-integrity gate and its five allowed fields for future spec writers."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when read, then a '## Plan-integrity gate (PAN-1728)' section after the test-skip section names the five allowed fields, the Plan-Finalized trailer and the git restore remediation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/XBRIEF.md, when read, then the immutability sentence links the plan-integrity check and lifecycle step 2 names the Plan-Finalized trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/XBRIEF.md, when grepped for 'commits and pushes that transition', then it prints nothing and step 3 states the status change reaches the branch with a later commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trailer-helper",
+        "to": "plan-integrity-run",
+        "type": "blocks"
+      },
+      {
+        "from": "spec-diff",
+        "to": "plan-integrity-run",
+        "type": "blocks"
+      },
+      {
+        "from": "trailer-helper",
+        "to": "finalize-trailer",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-integrity-run",
+        "to": "runner-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-integrity-run",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "finalize-trailer",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "finalize-trailer",
+        "to": "runner-wiring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One protocol with a writer and a reader: planning finalize writes the Plan-Finalized trailer and the verification gate reads it. Splitting them into sibling issues would ship a trailer nobody checks or a gate whose reference never exists, so neither half is independently useful. The 16 files are small new modules, their tests, one allowlist row, one role paragraph and two doc sections; the subsystem count is inflated by tests/, scripts/, roles/, docs/ and .overdeck/ each counting as a subsystem.",
+      "canonicalFilename": "2026-09-29-PAN-1728-bug-work-pan-1700-agent-committed-pan-specs-vbrief-json-mutations-pan-1124-immutability-violated-on-feature-branch.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
