@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:39:43.441Z",
+  "updated": "2026-09-29T01:39:53.115Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "memory-providers-omit-sampling.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T01:39:43.441Z"
+    },
+    "memory-providers-omit-sampling.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:53.115Z"
     }
   }
 }
