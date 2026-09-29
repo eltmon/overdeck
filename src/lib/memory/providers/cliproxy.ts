@@ -1,4 +1,5 @@
 import { CLIPROXY_AUTH_TOKEN, CLIPROXY_BASE_URL } from '../../cliproxy.js';
+import { modelSupportsSamplingParams } from '../../model-capabilities.js';
 import {
   buildJsonExtractionPrompt,
   calculateExtractionCost,
@@ -50,7 +51,8 @@ export class CliproxyExtractionProvider implements ExtractionProvider {
       body: JSON.stringify({
         model,
         max_tokens: options.maxTokens ?? 2048,
-        temperature: options.temperature ?? 0,
+        // Sampling-restricted models (Sonnet 5+, Opus 4.7+, Fable) 400 on temperature (PAN-4327).
+        ...(modelSupportsSamplingParams(model) ? { temperature: options.temperature ?? 0 } : {}),
         messages: [{ role: 'user', content: buildJsonExtractionPrompt(prompt, jsonSchema) }],
       }),
       signal: options.signal,
