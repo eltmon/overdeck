@@ -279,24 +279,24 @@ Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessi
 
 ## Skill packs
 
-A **skill pack** is a third-party git repository of skills, such as [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
+A **skill pack** is a third-party git repository of skills, such as [eltmon/skills](https://github.com/eltmon/skills), a fork of [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
 
 ### Adding a pack
 
 ```bash
-pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3
+pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3
 ```
 
 Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it writes anything:
 
 ```
 Pack mattpocock
-  Source       https://github.com/mattpocock/skills @ v1.2.3 (c55ee46)
+  Source       https://github.com/eltmon/skills @ v1.2.3 (6acc160)
   Adapter      claude-plugin
   License      MIT
   Skills       25 (1 opt-in: setup-matt-pocock-skills)
-  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh, …
-  Not applied  none
+  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh, skills/engineering/wizard/template.sh
+  Not applied  executables (2), project-mutating skills (1)
 Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
 ```
 
@@ -312,6 +312,23 @@ pan skills pack update mattpocock --ref v1.3.0
 ```
 
 `update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
+
+### Matt Pocock's skills from a fork
+
+Overdeck's default source for the `mattpocock` pack is the operator-controlled fork `eltmon/skills`, pinned to the `v1.2.3` commit. A fork lets the operator decide when upstream changes arrive: sync the fork on GitHub, then run `pan skills pack update mattpocock --ref <tag>` to preview and re-pin. Any url works here; `KNOWN_PACKS` applies the `mattpocock` defaults by pack id, not by url.
+
+`setup-matt-pocock-skills` is opt-in: turning the pack on never turns it on. Only `pan skills set mattpocock/setup-matt-pocock-skills on [--project <key>|--issue <id>]` does.
+
+```bash
+pan skills set --pack mattpocock on                              # global: on
+pan skills set --pack mattpocock off                             # global: undo
+
+pan skills set --pack mattpocock on --project <key>               # project: on
+pan skills set --pack mattpocock inherit --project <key>          # project: undo
+
+pan skills set --pack mattpocock on --issue <id>                  # issue: on
+pan skills set --pack mattpocock inherit --issue <id>              # issue: undo
+```
 
 ### Names: `pack/skill` and `pack:skill`
 

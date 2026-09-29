@@ -372,6 +372,12 @@ describe('pan skills pack', () => {
     expect(JSON.parse(logs.join('\n'))[0]).toMatchObject({ cached: false, skills: 0, updateAvailable: 'f'.repeat(40) });
   });
 
+  it('prints the fork add hint when no packs are registered', async () => {
+    mocks.listPackCatalog.mockResolvedValue([]);
+    await run('pack', 'list', '--offline');
+    expect(logs.join('\n')).toBe('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3');
+  });
+
   it('reports an up-to-date pack without asking', async () => {
     mocks.updatePack.mockResolvedValue({ written: false, preview });
     await run('pack', 'update', 'mattpocock');
