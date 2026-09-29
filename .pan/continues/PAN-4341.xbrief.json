@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4341",
   "created": "2026-09-29T04:22:08.600Z",
-  "updated": "2026-09-29T05:31:01.636Z",
+  "updated": "2026-09-29T05:31:17.241Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "critic-dispatch.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T05:31:01.636Z"
+    },
+    "finalize-cli-critic.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:17.240Z"
     }
   }
 }
