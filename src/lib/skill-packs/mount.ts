@@ -14,14 +14,17 @@
  * once renamed into place. Nothing here imports `src/lib/skill-overrides/`.
  */
 import { createHash } from 'node:crypto';
-import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix } from 'node:path';
+import { getOverdeckHome } from '../paths.js';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
 
 export const MOUNT_FORMAT_VERSION = 1;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
 export const CODEX_PACK_BLOCK_BEGIN = '# overdeck:skill-packs:begin';
 export const CODEX_PACK_BLOCK_END = '# overdeck:skill-packs:end';
+/** Name of the per-launch Claude plugin link under `<OVERDECK_HOME>/launch/<launchKey>/`. */
+export const CLAUDE_PLUGIN_LINK_NAME = 'skill-packs';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
@@ -243,4 +246,62 @@ export async function writeCodexPackBlock(codexHome: string, mount: Mount | null
   await writeFile(path, next ? `${next}\n` : '', { mode: 0o600 });
   await chmod(path, 0o600);
   await syncCodexPackCache(codexHome, mount);
+}
+
+async function realpathOrNull(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * PD-12: remove launch plugin links whose target is gone, then mounts that no
+ * link references and whose mtime is older than `maxAgeMs`, plus stray
+ * `.tmp-*` build dirs of the same age. Reusing a mount touches it, so a mount
+ * in active use stays young.
+ */
+export async function gcMounts(opts: { maxAgeMs: number; now?: number }): Promise<{ removedMounts: string[]; removedLinks: string[] }> {
+  const now = opts.now ?? Date.now();
+  const removedLinks: string[] = [];
+  const referenced = new Set<string>();
+  const launchRoot = join(getOverdeckHome(), 'launch');
+  for (const key of await listDirNames(launchRoot)) {
+    const link = join(launchRoot, key, CLAUDE_PLUGIN_LINK_NAME);
+    let stats;
+    try {
+      stats = await lstat(link);
+    } catch {
+      continue;
+    }
+    if (!stats.isSymbolicLink()) continue;
+    const target = await realpathOrNull(link);
+    if (target === null) {
+      await rm(link, { force: true });
+      removedLinks.push(link);
+    } else {
+      referenced.add(dirname(target));
+    }
+  }
+
+  const removedMounts: string[] = [];
+  const root = mountsDir();
+  for (const name of await listDirNames(root)) {
+    const path = join(root, name);
+    let stats;
+    try {
+      stats = await lstat(path);
+    } catch {
+      continue;
+    }
+    if (now - stats.mtimeMs <= opts.maxAgeMs) continue;
+    if (!name.startsWith('.tmp-')) {
+      const resolved = await realpathOrNull(path);
+      if (resolved !== null && referenced.has(resolved)) continue;
+    }
+    await rm(path, { recursive: true, force: true });
+    removedMounts.push(path);
+  }
+  return { removedMounts, removedLinks };
 }

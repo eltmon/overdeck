@@ -1,6 +1,6 @@
 /**
- * PAN-4334 WI-5/6: content-addressed pack mounts, the Claude plugin link, and
- * the Codex config block and plugin cache, against real files under a temp
+ * PAN-4334 WI-5/6/7: content-addressed pack mounts, the Claude plugin link,
+ * the Codex config block and plugin cache, and mount garbage collection, against real files under a temp
  * OVERDECK_HOME.
  */
 import {
@@ -14,6 +14,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,6 +34,7 @@ import {
   buildMount,
   CODEX_PACK_BLOCK_BEGIN,
   CODEX_PACK_MARKETPLACE,
+  gcMounts,
   linkClaudeMount,
   mountHash,
   mountsDir,
@@ -234,5 +236,54 @@ describe('writeCodexPackBlock', () => {
     expect(readFileSync(configToml, 'utf8')).toBe(`${skillBlock}\n`);
     expect(existsSync(cacheRoot)).toBe(false);
     expect(statSync(configToml).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe('gcMounts', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.parse('2026-09-28T12:00:00Z');
+  const launchRoot = join(overdeckHome, 'launch');
+  const age = (path: string, days: number): void => {
+    const when = new Date(now - days * DAY);
+    utimesSync(path, when, when);
+  };
+
+  beforeEach(() => {
+    rmSync(launchRoot, { recursive: true, force: true });
+  });
+
+  it('removes old unreferenced mounts, stray temp dirs and dangling links only', async () => {
+    const referenced = await buildMount({ packs: [alpha()] });
+    const oldUnused = await buildMount({ packs: [beta()] });
+    const freshUnused = await buildMount({ packs: [alpha(['one'])] });
+    if (!referenced || !oldUnused || !freshUnused) throw new Error('expected mounts');
+    await linkClaudeMount(join(launchRoot, 'live', 'skill-packs'), referenced);
+    const danglingLink = join(launchRoot, 'gone', 'skill-packs');
+    mkdirSync(join(launchRoot, 'gone'), { recursive: true });
+    symlinkSync(join(mountsDir(), 'missing', 'plugins'), danglingLink);
+    const staleTmp = join(mountsDir(), '.tmp-stale');
+    mkdirSync(staleTmp);
+    age(referenced.path, 30);
+    age(oldUnused.path, 30);
+    age(freshUnused.path, 1);
+    age(staleTmp, 30);
+
+    const result = await gcMounts({ maxAgeMs: 7 * DAY, now });
+    expect(result.removedLinks).toEqual([danglingLink]);
+    expect(result.removedMounts.sort()).toEqual([oldUnused.path, staleTmp].sort());
+    expect(existsSync(referenced.path)).toBe(true);
+    expect(existsSync(freshUnused.path)).toBe(true);
+    expect(existsSync(oldUnused.path)).toBe(false);
+    expect(() => lstatSync(danglingLink)).toThrow();
+  });
+
+  it('touches a reused mount so it stays young', async () => {
+    const mount = await buildMount({ packs: [alpha()] });
+    if (!mount) throw new Error('expected a mount');
+    age(mount.path, 30);
+    await buildMount({ packs: [alpha()] });
+    const result = await gcMounts({ maxAgeMs: 7 * DAY, now: Date.now() });
+    expect(result.removedMounts).toEqual([]);
+    expect(existsSync(mount.path)).toBe(true);
   });
 });
