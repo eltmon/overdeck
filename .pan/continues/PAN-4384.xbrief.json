@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T13:06:15.836Z",
+  "updated": "2026-09-29T13:07:50.701Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-29T13:06:08.191Z"
     },
     "head-bound-review-request": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4384",
-      "claimedAt": "2026-09-29T13:06:15.835Z"
+      "claimedAt": "2026-09-29T13:06:15.835Z",
+      "doneAt": "2026-09-29T13:07:50.701Z"
     }
   }
 }
