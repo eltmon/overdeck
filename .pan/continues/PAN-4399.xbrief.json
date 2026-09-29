@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T15:54:07.703Z",
+  "updated": "2026-09-29T15:54:52.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "deferral-reason.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T15:54:07.703Z"
+    },
+    "deferral-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:52.707Z"
     }
   }
 }
