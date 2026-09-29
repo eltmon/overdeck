@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T04:43:58.089Z",
+  "updated": "2026-09-29T04:44:11.748Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4361",
       "claimedAt": "2026-09-29T04:38:59.868Z",
       "doneAt": "2026-09-29T04:43:58.089Z"
+    },
+    "anthropic-path-and-run-info": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4361",
+      "claimedAt": "2026-09-29T04:44:11.748Z"
     }
   }
 }
