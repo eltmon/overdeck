@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:14:19.239Z",
+  "updated": "2026-09-29T16:14:32.781Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "doctor-memory-row.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:14:19.239Z"
+    },
+    "doctor-memory-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:14:32.780Z"
     }
   }
 }
