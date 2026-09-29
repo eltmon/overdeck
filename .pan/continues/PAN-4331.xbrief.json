@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T19:14:37.290Z",
+  "updated": "2026-09-29T19:14:54.814Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "run-matrix.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T19:14:37.290Z"
+    },
+    "file-blockers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4331",
+      "claimedAt": "2026-09-29T19:14:54.814Z"
     }
   }
 }
