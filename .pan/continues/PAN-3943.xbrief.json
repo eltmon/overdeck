@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:39:15.679Z",
+  "updated": "2026-09-29T23:39:29.698Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "deft-skill-map.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T23:39:15.678Z"
+    },
+    "deft-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:29.698Z"
     }
   }
 }
