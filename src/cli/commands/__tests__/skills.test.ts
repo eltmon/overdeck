@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => {
     applyCodexPacks: vi.fn(),
     writeCodexPackBlock: vi.fn(),
     getPack: vi.fn(),
+    resolveSageoxLaunch: vi.fn(),
     loadSkillOverrideLayers: vi.fn(),
     SageoxConfigError,
     listSageoxUploads: vi.fn(),
@@ -52,6 +53,8 @@ vi.mock('../../../lib/skill-overrides/store.js', () => ({
   listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides,
   loadSkillOverrideLayers: mocks.loadSkillOverrideLayers,
 }));
+
+vi.mock('../../../lib/sageox/launch.js', () => ({ SAGEOX_PACK_ID: 'sageox', resolveSageoxLaunch: mocks.resolveSageoxLaunch }));
 
 vi.mock('../../../lib/sageox/config.js', () => ({
   SageoxConfigError: mocks.SageoxConfigError,
@@ -112,6 +115,7 @@ beforeEach(() => {
   mocks.setSkillOverride.mockResolvedValue({});
   mocks.applyClaudePacks.mockResolvedValue([]);
   mocks.applyCodexPacks.mockResolvedValue([]);
+  mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
 });
 
 afterEach(() => {
@@ -265,7 +269,7 @@ describe('pan skills launch-settings', () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
     mocks.applyClaudePacks.mockResolvedValue(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
     await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--issue', 'PAN-1', '--plugin-link', '/tmp/none/skill-packs');
-    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/tmp/none/skill-packs');
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/tmp/none/skill-packs', new Set(['sageox']));
     expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
     expect(errors).toEqual(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
   });
@@ -288,13 +292,50 @@ describe('pan skills launch-settings', () => {
   it('applies Codex packs after the skill-override block and clears them on failure', async () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
-    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch');
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set(['sageox']));
     expect(mocks.writeCodexSkillOverrides.mock.invocationCallOrder[0]).toBeLessThan(mocks.applyCodexPacks.mock.invocationCallOrder[0] ?? 0);
 
     mocks.applyCodexPacks.mockRejectedValue(new Error('boom'));
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
     expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: boom']);
     expect(mocks.writeCodexPackBlock).toHaveBeenCalledWith('/ch', null);
+  });
+});
+
+describe('pan skills launch-settings SageOx wiring (PAN-2444)', () => {
+  const env = { OX_HOST_MANAGED: '1', OX_HOST_NETWORK: 'off' };
+  const events = ['SessionStart', 'PreCompact', 'PostToolUse', 'Stop', 'SessionEnd', 'UserPromptSubmit'];
+  const hooks = Object.fromEntries(events.map(event => [event, [{ matcher: '', hooks: [{ type: 'command', command: `ox agent hook ${event}` }] }]]));
+
+  it('merges env and hooks into the settings JSON and mounts sageox when active', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: true, settings: { env, hooks }, warnings: [] });
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
+    expect(mocks.resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, 'claude-code');
+    const printed = stdout.join('');
+    expect(printed.trimEnd().split('\n')).toHaveLength(1);
+    const settings = JSON.parse(printed) as { env: Record<string, string>; hooks: Record<string, unknown> };
+    expect(settings.env.OX_HOST_MANAGED).toBe('1');
+    expect(Object.keys(settings.hooks)).toEqual(events);
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/tmp/none/skill-packs', new Set());
+  });
+
+  it('prints the warning, adds no SageOx keys and excludes sageox when inactive', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx not applied: probe failed'] });
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
+    expect(errors).toEqual(['[launcher] WARNING: SageOx not applied: probe failed']);
+    expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/tmp/none/skill-packs', new Set(['sageox']));
+  });
+
+  it('excludes sageox from Codex and prints the Codex warning', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx is on but supports Claude Code launches only'] });
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, 'codex');
+    expect(errors).toEqual(['[launcher] WARNING: SageOx is on but supports Claude Code launches only']);
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set(['sageox']));
   });
 });
 

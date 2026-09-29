@@ -143,15 +143,22 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     console.error('--codex-home is required for --harness codex');
     process.exit(1);
   }
-  const launch = await import('../../lib/skill-overrides/launch.js');
+  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }] = await Promise.all([
+    import('../../lib/skill-overrides/launch.js'),
+    import('../../lib/sageox/launch.js'),
+  ]);
   const ctx = { cwd: options.cwd, issueId: options.issue };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
+  // PAN-2444: SageOx wiring fails closed; when it is off, its skills are not mounted either.
+  const sageox = await resolveSageoxLaunch(ctx, options.harness);
+  for (const warning of sageox.warnings) console.error(warning);
+  const exclude = new Set(sageox.active ? [] : [SAGEOX_PACK_ID]);
   if (options.harness === 'claude-code') {
-    const json = launch.claudeSkillSettingsJson(disabled);
+    const json = launch.claudeSkillSettingsJson(disabled, sageox.settings);
     const link = options.pluginLink;
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
-      await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link), async () => {
+      await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link, exclude), async () => {
         const { rm } = await import('node:fs/promises');
         await rm(link, { force: true });
       });
@@ -162,7 +169,7 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
   }
   const codexHome = options.codexHome as string;
   await launch.writeCodexSkillOverrides(codexHome, disabled);
-  await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome), async () => {
+  await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome, exclude), async () => {
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
