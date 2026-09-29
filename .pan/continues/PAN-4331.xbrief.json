@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T19:19:52.737Z",
+  "updated": "2026-09-29T19:20:04.527Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "docs-windows.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T19:19:52.737Z"
+    },
+    "docs-windows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T19:20:04.527Z"
     }
   }
 }
