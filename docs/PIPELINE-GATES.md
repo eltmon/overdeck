@@ -500,6 +500,88 @@ strike request (nothing sends one now); it passes the same gate against the
 cannot stand in for it, and refuses when the PR the forge reports is on any
 other branch.
 
+## Conflict repair (PAN-4384)
+
+An approved, green PR that turns CONFLICTING with main fails the merge gate on
+its last condition (`PR is not mergeable (state=conflicting)`), so no merge
+door ever reaches the merge executor's conflict step. The pre-review conflict
+gate runs only before review dispatch, and the merge-train reconciler never
+sees a conflicting PR. Before PAN-4384 such a PR sat until someone noticed:
+PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
+
+**The predicate.** `evaluateConflictRepairGate` in `cloister/merge-gate.ts`
+calls a PR *merge-ready but conflicting* when the forge reports
+`mergeable: false` and every other merge-gate condition holds under the same
+policy as `evaluateIssueMergeGate`: open, not a draft, no change request,
+checks green, the CI test job passed in `verification.tests: ci` projects, no
+failed required UAT at the head, and approval proven at the head. A verdict
+marker naming the head proves the approval; otherwise the GitHub reviews are
+read directly, because `withForgeApprovalAtHead` skips unmergeable PRs.
+Nothing is stored: the answer comes from `getPrFacts` at the moment it is
+asked.
+
+**The patrol.** `startConflictRepairPatrol`
+(`dashboard/server/services/conflict-repair-patrol.ts`) runs
+`tickConflictRepair` (`cloister/conflict-repair.ts`) every 60 seconds in the
+dashboard process, where prompt-carrying dispatch and the guarded review
+request live. A tick reads forge facts only for workspaces whose journal shows
+the last `review.verdict` as `APPROVED` with no `merge.completed` after it, so
+it costs about one cached `gh` read per approved open PR per minute. It does
+nothing while the Deacon is frozen, on a peer dashboard, or with
+`OVERDECK_DISABLE_CONFLICT_REPAIR=1`, and it skips a paused issue. An
+overlapping tick is skipped, and one issue's failure never stops the rest.
+
+**One repair per head.** The episode key is the PR head sha (8 characters) at
+detection. The first tick that sees a merge-ready but conflicting head with no
+repair sends the issue's work agent one repair instruction through
+`resolveIssueFeedbackTarget` (wake the live agent, else resume or start one)
+and journals `conflict.repair-requested` with `data.head`. The prompt tells the
+agent to commit or discard uncommitted work, run `pan sync-main <id>`, resolve
+both intents, build and run the gates, commit, push, and run
+`pan review request <id>`. It also gives the rules for generated files:
+
+- `scripts/file-size-allowlist.txt`: take main's rows, never raise a cap, and
+  shrink a file that is over its cap.
+- `.overdeck/context/codebase/*.md`: keep both sides and refresh the
+  `last-verified` date.
+- `bun.lock`: take main's version, then run `bun install`.
+- The slash-command manifest: run `npm run generate:slash-commands`.
+- `.pan/continues` and `.pan/specs`: `pan sync-main` already prefers main.
+
+The count is journal-derived, so a dashboard restart never re-sends a repair.
+
+**Escalation.** If the same head is still merge-ready but conflicting 45
+minutes after its repair entry, the patrol raises Needs-you once through
+`surfaceIssueFeedbackNeedsYou` and journals `conflict.repair-escalated`
+(`data.head`, `data.reason`). It never sends a second repair for that head,
+and an escalated head gets no further action. When the work agent cannot be
+reached (`resolveIssueFeedbackTarget` returns needs-you, or delivery fails),
+the patrol escalates at once with `reason: 'unreachable'` and journals no
+repair. A new head starts a new episode.
+
+**The head-bound review request.** GitHub does not dismiss an approval on push
+in this repository (`main` has no branch protection), so after the repair's
+push `reviewDecision` still says `APPROVED` while the merge gate needs an
+approval at the new head. The guarded review request (`requestReviewGuarded`,
+behind `POST /api/review/:id/request`, `pan review request`, and `pan done`)
+therefore short-circuits an approved PR as `already-passed` or
+`tests-requeued` only when the approval is not proven stale. When
+`readApprovalStandsAtHead` (`cloister/merge-gate.ts`) proves the approval
+does not stand at the current head, the request starts the review pipeline.
+An approval that stands, or one that cannot be read, keeps the old behavior.
+
+**The review backstop.** After a repair, the agent's own
+`pan review request` normally starts re-review. If a repair entry exists for
+head H1, the PR is now at a different head that the forge calls mergeable, no
+`review.requested` entry follows the repair, and the repair is at least 15
+minutes old, the patrol asks the guarded review door once (source
+`conflict-repair`). The door journals `review.requested`, which ends the
+backstop. The patrol logs the door's answer, and raises Needs-you once per head
+when the door refuses for a reason the operator must fix (`circuit-breaker`,
+`no-project`, `dirty-workspace`). The guarded request reads the PR by branch
+so no cached pre-push head answers for the new one. When the new head is approved, the existing auto-merge scheduler
+re-arms the issue under the same policy as before the conflict.
+
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
@@ -647,7 +729,8 @@ Auto-resume is intentionally suppressible:
   - `pan unpause` (and the dashboard Unpause) clears `stoppedByUser` on those
     rows. It then re-requests the review through the guarded review request
     (`requestReviewGuarded`, the logic of `POST /api/review/:id/request`:
-    merged check, approved-head check, re-request breaker; source
+    merged check, approved-head check (a stale approval is re-reviewed,
+    PAN-4384), re-request breaker; source
     `pan-unpause`), before the work agent resumes. That dispatches a fresh
     synthesis parent and convoy for the current head. A merged issue or an
     approved head is reported as "no review re-requested", not as a request.
@@ -920,7 +1003,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
-| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched, and by the conflict-repair review backstop (source `conflict-repair`) |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
@@ -929,6 +1012,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
+| `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
 | `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
 | `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |

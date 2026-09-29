@@ -1,0 +1,561 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T06:18:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4384: Approved, green PRs that turn CONFLICTING sit forever: route them back for a sync-main repair",
+    "updated": "2026-09-29T13:04:35.135Z"
+  },
+  "plan": {
+    "id": "pan-4384",
+    "title": "Approved, green PRs that turn CONFLICTING sit forever: route them back for a sync-main repair",
+    "status": "running",
+    "uid": "cbe3a993-3d7d-40f5-81cd-c81aa2a9e8de",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T06:18:08Z",
+    "updated": "2026-09-29T13:04:35.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4384",
+        "label": "PAN-4384",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4384.md",
+        "label": "PRD draft (.pan/drafts/PAN-4384.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "merge",
+      "conflict",
+      "review",
+      "cloister",
+      "dashboard-server"
+    ],
+    "metadata": {
+      "sizeJustification": "Six vertical items across cloister, the review route, the dashboard service host and two docs; well under the 25-file and 6-subsystem limits.",
+      "canonicalFilename": "2026-09-29-PAN-4384-approved-green-prs-that-turn-conflicting-sit-forever-route-them-back-for-a-sync-main-repair.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "An approved PR with green checks that becomes CONFLICTING with main sits forever. The merge gate refuses it before any merge door can rebase it, the pre-review conflict gate only runs before review dispatch, and the merge-train reconciler only runs after a merge with merge_train enabled and never sees CONFLICTING PRs. Even after a manual sync, GitHub does not dismiss approvals on this repo, so requestReviewGuarded short-circuits the re-request as already-passed while the merge gate needs approval at the new head. PR #4317 (PAN-1166) and #4322 (PAN-4311) sat CONFLICTING/DIRTY/APPROVED for about 13 hours on 2026-09-28/29.",
+      "Proposal": "Add a dashboard-process conflict-repair patrol (60 s tick) that derives 'merge-ready except for mergeable:false' from live PR facts with the merge gate's own policy, delivers one sync-main repair instruction per PR head to the work agent through resolveIssueFeedbackTarget + messageAgent, journals conflict.repair-requested, escalates once to Needs-you (surfaceIssueFeedbackNeedsYou + conflict.repair-escalated) when the conflict survives the repair for 45 minutes or the agent is unreachable, and backstops the re-review of the repaired head. Make requestReviewGuarded head-bound so a stale approval no longer blocks re-review. The existing auto-merge scheduler re-arms the repaired, re-approved head. Document the step in docs/PIPELINE-GATES.md and docs/MERGE-WORKFLOW.md.",
+      "NonGoals": "- No server-side automatic rebase, merge, or conflict resolution of a conflicting branch\n- No change to merge_train flags, merge-train-reconciler.ts, or merge-train-deps.ts\n- No change to the pre-review conflict gate (conflict-gate.ts) behavior or its prompt\n- No stored status column, table, or flag; the journal entries record actions only\n- No new HTTP route\n- No agent pause and no 'needs-you:' pause reason for this escalation\n- No change to reReviewGuardError on the /api/review/:id/trigger path\n- No edits to src/lib/cloister/pr-facts.ts (at 993 of the 1000-line ceiling)\n- No change to auto-merge-executor.ts, auto-merge-scheduler.ts, or merge-sync.ts\n- No GitHub branch-protection change"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Host the patrol in the dashboard process (a service beside auto-merge-executor.ts started from main.ts), not in deacon-lite.",
+        "rationale": "Deacon-lite runs in the deacon child, which has no resume-with-prompt precedent (grep for resumeAgent/spawnRun/messageAgent in its routines finds none) and POST /api/agents takes no prompt; every prompt-carrying dispatch (review-verdict-feedback, conflict-gate) runs in the dashboard process, and requestReviewGuarded is callable in-process there."
+      },
+      {
+        "summary": "Dispatch through resolveIssueFeedbackTarget then messageAgent(owesRework, feedbackRedelivery, dedupKey conflict-repair:<issue>:<head8>).",
+        "rationale": "It is the established feedback door: wakes a live agent, resumes or starts a stopped one, respects operator pauses, and returns needsYou when nothing is reachable, matching the issue's 'wake, or spawn one if none is alive'."
+      },
+      {
+        "summary": "One repair per PR head; the episode key is the head sha (8 chars) journaled as data.head.",
+        "rationale": "A repair moves the head, so a later conflict on a new approved head is a genuinely new episode; journal-derived counting survives dashboard restarts."
+      },
+      {
+        "summary": "Escalate after a 45-minute grace if the same head is still merge-ready but conflicting.",
+        "rationale": "A sync-main, resolution, gates and push take tens of minutes; deacon-lite's review recovery uses a 60-minute cooldown; 45 minutes bounds operator wait far below the 13 hours observed."
+      },
+      {
+        "summary": "Read AC3 ('a second failed repair raises Needs-you') as: the second time the patrol would repair the same episode, it escalates instead.",
+        "rationale": "The issue's Wanted section says escalate if the conflict survives one repair attempt; this reading satisfies both and never loops."
+      },
+      {
+        "summary": "Needs-you = surfaceIssueFeedbackNeedsYou plus a conflict.repair-escalated journal entry; no agent pause.",
+        "rationale": "It is the Needs-you door every feedback relay uses; a 'needs-you:' pause is lifted by the resurrection ladder and would stop an agent that may still be repairing."
+      },
+      {
+        "summary": "Make requestReviewGuarded head-bound via readApprovalStandsAtHead in merge-gate.ts; false starts a review, true/unknown keep today's behavior.",
+        "rationale": "GitHub branch protection is absent on eltmon/overdeck (API 404), so approvals are not dismissed on push and the guard would return already-passed for the repaired head; without this AC2 cannot hold."
+      },
+      {
+        "summary": "The patrol also re-requests review once (15-minute backstop) when a repaired head is mergeable and no review.requested followed the repair.",
+        "rationale": "AC2 must not depend on the work agent remembering to run pan review request."
+      },
+      {
+        "summary": "AC2 relies on the existing auto-merge scheduler, which re-arms a blocked/failed row for a new head once the merge gate passes.",
+        "rationale": "latestAutoMergeAllowsSchedule already re-arms new heads; adding another merge door would duplicate the merge path. 'Without operator action' means beyond what the issue's auto-merge policy already requires."
+      },
+      {
+        "summary": "The repair prompt names concrete per-file rules for generated files (file-size allowlist, codebase-map md, bun.lock, slash-command manifest, .pan state).",
+        "rationale": "The two stuck PRs conflict on scripts/file-size-allowlist.txt and .overdeck/context/codebase/concerns.md; the pre-push guard refuses agent allowlist raises, so the agent must be told not to raise caps."
+      }
+    ],
+    "items": [
+      {
+        "id": "conflict-repair-gate",
+        "title": "Add evaluateConflictRepairGate and readApprovalStandsAtHead to merge-gate.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4384",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "head-bound-review-request",
+            "conflict-repair-core",
+            "conflict-repair-review-backstop"
+          ],
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-gate-conflict-repair.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. In src/lib/cloister/merge-gate.ts add evaluateConflictRepairGate(issueId, deps) returning { conflicting, reason?, facts }: conflicting only when facts are open, mergeable === false, not draft, no change request, checks green, approval proven at head (facts.approvedAtHead or forgeApprovalAtHead read directly, never withForgeApprovalAtHead), and evaluateMergeReadiness({...facts, mergeable: true}) with the same ciTestsRequired/uatRequired/requireApprovalAtHead policy as evaluateIssueMergeGate is ready. Add readApprovalStandsAtHead(issueId, deps) returning true/false/undefined as specified. Import forgeApprovalAtHead from ./pr-facts.js; do not edit pr-facts.ts. Write the new test file with injected getFacts/readReviews/overdeckLogins/ciTestsRequired/uatRequired."
+        },
+        "items": [
+          {
+            "id": "conflict-repair-gate.ac1",
+            "title": "Given an open GitHub PR approved at its head, checks green and mergeable false, evaluateConflictRepairGate returns conflicting: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-gate.ac2",
+            "title": "evaluateConflictRepairGate returns conflicting: false when mergeable is true or null, checks are red or pending, changes are requested, or the only approving review names an older commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-gate.ac3",
+            "title": "readApprovalStandsAtHead returns true for a marker at head, false for an approving review of an older commit, and undefined when the facts carry an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-gate.ac4",
+            "title": "git diff shows src/lib/cloister/pr-facts.ts unchanged and merge-gate-conflict-repair.test.ts passes under npx vitest run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "head-bound-review-request",
+        "title": "Make requestReviewGuarded re-review an approved PR whose approval is stale at the head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4384",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/lib/cloister/request-review-pipeline.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-stale-approval.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-stale-approval.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/routes/workspaces/review-pipeline.ts"
+          ],
+          "expected_outputs": [
+            "review-pipeline-stale-approval.test.ts passes",
+            "typecheck completes without errors",
+            "review-pipeline.ts line count is at most 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. In requestReviewGuarded (review-pipeline.ts) change the approved short-circuit to `derived.pr?.reviewState === 'approved' && await (options.approvalStandsAtHead ?? readApprovalStandsAtHead)(canonicalIssueId) !== false`, add the optional approvalStandsAtHead test seam to its options type, update its doc comment to say a stale approval is re-reviewed, and import readApprovalStandsAtHead from lib/cloister/merge-gate.js. Add 'conflict-repair' to the RequestReviewSource union in src/lib/cloister/request-review-pipeline.ts. Keep review-pipeline.ts at or under 1000 lines. Write the new test following review-pipeline-route.test.ts mocking patterns."
+        },
+        "items": [
+          {
+            "id": "head-bound-review-request.ac1",
+            "title": "Given reviewState approved and approvalStandsAtHead resolving false, requestReviewGuarded starts the review pipeline instead of returning already-passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-bound-review-request.ac2",
+            "title": "Given reviewState approved, checks green and approvalStandsAtHead resolving true or undefined, requestReviewGuarded returns already-passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-bound-review-request.ac3",
+            "title": "Given reviewState approved, checks pending and approvalStandsAtHead resolving true, requestReviewGuarded returns tests-requeued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-bound-review-request.ac4",
+            "title": "wc -l shows review-pipeline.ts at or under 1000 lines and RequestReviewSource accepts 'conflict-repair' under npm run typecheck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-repair-core",
+        "title": "Conflict-repair tick: detect, send one repair per head, escalate once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4384",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/conflict-repair.ts",
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/conflict-repair.test.ts src/lib/cloister/__tests__/pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conflict-repair.test.ts and pipeline-journal.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. Add 'conflict.repair-requested' and 'conflict.repair-escalated' to PipelineJournalEntryType. Create src/lib/cloister/conflict-repair.ts exporting CONFLICT_REPAIR_INTERVAL_MS (60_000), CONFLICT_REPAIR_GRACE_MS (45 min), CONFLICT_REPAIR_REVIEW_BACKSTOP_MS (15 min), ConflictRepairDeps (all I/O injectable with the defaults listed in the PRD), isConflictRepairCandidate, buildConflictRepairPrompt (the exact prompt text in the PRD, including push and pan review request), tickConflictRepair (journal pre-filter, pause check, evaluateConflictRepairGate, then repair / wait / escalate per head8 exactly as the PRD decision list says, per-issue try/catch), and __resetConflictRepairStateForTests. Escalation calls surfaceIssueFeedbackNeedsYou then appends conflict.repair-escalated. Tests use vi.useFakeTimers + vi.setSystemTime, a real temp-dir journal, and injected deps; no source-grep, no skipIf."
+        },
+        "items": [
+          {
+            "id": "conflict-repair-core.ac1",
+            "title": "Given an approved-verdict journal and a gate answering conflicting, the first tickConflictRepair sends one repair message and records one conflict.repair-requested entry whose data.head is the head's first 8 chars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-core.ac2",
+            "title": "A second tick 10 minutes later, and a tick after __resetConflictRepairStateForTests, sends no second repair for the same head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-core.ac3",
+            "title": "When the same head is still conflicting 45 minutes after the repair entry, the tick calls surfaceNeedsYou once and records one conflict.repair-escalated entry; a later tick records nothing new",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-core.ac4",
+            "title": "When resolveTarget returns needsYou, the tick records conflict.repair-escalated with reason 'unreachable' and no conflict.repair-requested entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-core.ac5",
+            "title": "The tick skips a paused issue, a journal whose last verdict is CHANGES_REQUESTED or is followed by merge.completed, and a gate answering not conflicting; buildConflictRepairPrompt output contains 'pan sync-main', 'push', and 'pan review request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-repair-review-backstop",
+        "title": "Backstop: re-request review once for a repaired, mergeable head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4384",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/conflict-repair.ts",
+            "src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conflict-repair.test.ts passes including the backstop cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 in conflict-repair.ts. When the gate says not conflicting, take the latest conflict.repair-requested entry R and call deps.requestReview(issueId) (default: getGuardedReviewRequester() from ./request-review-pipeline.js with source 'conflict-repair'; log and skip when none is registered) only when the PR is open and mergeable true, the current head8 differs from R.data.head, no review.requested entry follows R, R is at least CONFLICT_REPAIR_REVIEW_BACKSTOP_MS old, no conflict entry exists for the current head, and the issue is unpaused. Guard repeats with an in-memory per-issue lastBackstopAt window. Reuse the gate's facts; no extra forge read. Add fake-timer test cases."
+        },
+        "items": [
+          {
+            "id": "conflict-repair-review-backstop.ac1",
+            "title": "Given a repair entry for head A, a PR now at head B and mergeable, and no review.requested after the repair, a tick 15 minutes after the repair calls requestReview exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-review-backstop.ac2",
+            "title": "The tick does not call requestReview when a review.requested entry follows the repair, when the head is still A, or when the repair entry is younger than 15 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-review-backstop.ac3",
+            "title": "When requestReview refuses, the next tick inside the 15-minute window sends no second request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-repair-host",
+        "title": "Run the conflict-repair patrol on a 60 s tick in the dashboard process",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4384",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conflict-repair-patrol.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/services/__tests__/conflict-repair-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conflict-repair-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conflict-repair-patrol.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Create src/dashboard/server/services/conflict-repair-patrol.ts mirroring auto-merge-executor.ts runTick/start/stop: startConflictRepairPatrol returns false for OVERDECK_DISABLE_CONFLICT_REPAIR=1, a peer dashboard (isPeerDashboardProcess), or an already running timer; the interval is CONFLICT_REPAIR_INTERVAL_MS with unref; runTick skips an overlapping tick and returns before tickConflictRepair while isDeaconGloballyPaused() is true. Accept an injectable tick function for tests. In main.ts start it beside startAutoMergeExecutor with started/SKIPPED log lines and call stopConflictRepairPatrol next to stopAutoMergeExecutor on shutdown."
+        },
+        "items": [
+          {
+            "id": "conflict-repair-host.ac1",
+            "title": "Given startConflictRepairPatrol has run, advancing fake timers by 60 000 ms runs the injected tick exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-host.ac2",
+            "title": "startConflictRepairPatrol returns false when OVERDECK_DISABLE_CONFLICT_REPAIR is '1', and no tick runs while isDeaconGloballyPaused returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-host.ac3",
+            "title": "When a tick is still in flight, the next interval returns without starting a second tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-host.ac4",
+            "title": "main.ts calls startConflictRepairPatrol beside startAutoMergeExecutor and stopConflictRepairPatrol beside stopAutoMergeExecutor, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-repair-docs",
+        "title": "Document conflict repair in PIPELINE-GATES.md and MERGE-WORKFLOW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:18:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4384",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'conflict.repair-requested' docs/PIPELINE-GATES.md",
+            "grep -n 'PAN-4384' docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "both greps print at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. In docs/PIPELINE-GATES.md add a '## Conflict repair (PAN-4384)' section before '## Review Convergence Gate' covering the predicate, the 60 s dashboard-process patrol, one repair per head, the 45-minute grace, the Needs-you escalation, the 15-minute review backstop, the pause/freeze/peer/env skips, and the generated-file rules; add writers-table rows for conflict.repair-requested and conflict.repair-escalated and add conflict-repair to the review.requested sources; state that the guarded review request re-reviews an approval that does not stand at the head. In docs/MERGE-WORKFLOW.md rewrite 'After another feature merges', correct 'Review freshness', and add the merge-gate sentence to 'Merge-executor escalation' step 3."
+        },
+        "items": [
+          {
+            "id": "conflict-repair-docs.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a 'Conflict repair (PAN-4384)' section naming the 45-minute grace, the one-repair-per-head rule, and Needs-you escalation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-docs.ac2",
+            "title": "The PIPELINE-GATES.md journal writers table contains rows for conflict.repair-requested and conflict.repair-escalated naming cloister/conflict-repair.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-docs.ac3",
+            "title": "The MERGE-WORKFLOW.md 'After another feature merges' section routes a conflicting approved PR to the conflict-repair patrol and no longer contains 'nothing here is silently re-dispatched'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-repair-docs.ac4",
+            "title": "The MERGE-WORKFLOW.md 'Review freshness' section contains the statement that approvals are not dismissed on push here and the guarded review request is head-bound",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conflict-repair-gate",
+        "to": "head-bound-review-request",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-repair-gate",
+        "to": "conflict-repair-core",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-repair-core",
+        "to": "conflict-repair-review-backstop",
+        "type": "blocks"
+      },
+      {
+        "from": "head-bound-review-request",
+        "to": "conflict-repair-review-backstop",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-repair-core",
+        "to": "conflict-repair-host",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-repair-review-backstop",
+        "to": "conflict-repair-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-repair-host",
+        "to": "conflict-repair-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
