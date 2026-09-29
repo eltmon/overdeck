@@ -4,17 +4,17 @@
     "created": "2026-09-29T04:32:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4369: Optional Jev (TypeSafe System One) judgment client: config, key slot, cost, evals (off by default)",
-    "updated": "2026-09-29T04:36:30.047Z"
+    "updated": "2026-09-29T04:37:35.892Z"
   },
   "plan": {
     "id": "pan-4369",
     "title": "Optional Jev (TypeSafe System One) judgment client: config, key slot, cost, evals (off by default)",
-    "status": "proposed",
+    "status": "running",
     "uid": "65f2349b-1871-459b-892c-c70e8a2b5aa5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T04:32:15Z",
-    "updated": "2026-09-29T04:36:30.047Z",
+    "updated": "2026-09-29T04:37:35.892Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4369",
