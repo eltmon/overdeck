@@ -4,17 +4,17 @@
     "created": "2026-09-29T14:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3762: Overdeck Anywhere: adopt t3code-style multi-machine environment federation",
-    "updated": "2026-09-29T14:14:15.385Z"
+    "updated": "2026-09-29T14:15:14.100Z"
   },
   "plan": {
     "id": "pan-3762",
     "title": "Overdeck Anywhere: adopt t3code-style multi-machine environment federation",
-    "status": "proposed",
+    "status": "running",
     "uid": "8577c8cc-2e6b-495f-8980-1fbca78a7c07",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T14:30:00Z",
-    "updated": "2026-09-29T14:14:15.385Z",
+    "updated": "2026-09-29T14:15:14.100Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3762",
@@ -1196,5 +1196,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
