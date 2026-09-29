@@ -12,8 +12,10 @@
  * A ref's version is the SHA-1 of the ref file bytes. `casRefs` (and `casRef`,
  * its single-op form) is serialized within the process by a promise chain and
  * across processes by an O_EXCL lock file next to each ref, taken in ascending
- * name order; a stale lock (older than 30 s) is reclaimed. Writes publish at
- * once, so `discardUnpublished` has nothing to drop.
+ * name order; a stale lock (older than 30 s) is reclaimed. A batch is written
+ * file by file in the order the caller gave, so a crash can leave a prefix of
+ * it on disk. Writes publish at once, so `discardUnpublished` has nothing to
+ * drop.
  * Imports only Node built-ins and the sibling types module.
  */
 import { createHash } from 'node:crypto';
@@ -155,19 +157,21 @@ export class DirVaultStore implements VaultStore {
 
   async casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult> {
     assertDistinctRefNames(ops);
-    const sorted = ops
-      .map((op) => ({ ...op, path: this.refPath(op.name) }))
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    const run = this.casQueue.then(() => this.casRefsLocked(sorted));
+    const resolved = ops.map((op) => ({ ...op, path: this.refPath(op.name) }));
+    const run = this.casQueue.then(() => this.casRefsLocked(resolved));
     this.casQueue = run.catch(() => undefined);
     return run;
   }
 
-  /** `ops` is in ascending name order, so two batches always take their locks in the same order. */
+  /**
+   * Locks are taken in ascending name order, so two batches always take them
+   * in the same order. The writes keep the caller's order.
+   */
   private async casRefsLocked(ops: ReadonlyArray<RefOp & { path: string }>): Promise<CasResult> {
     for (const { path } of ops) await mkdir(dirname(path), { recursive: true });
+    const lockOrder = [...ops].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     const withLocks = (index: number): Promise<CasResult> => {
-      const op = ops[index];
+      const op = lockOrder[index];
       if (op !== undefined) return withFileLock(`${op.path}.lock`, () => withLocks(index + 1));
       return this.casRefsHeld(ops);
     };

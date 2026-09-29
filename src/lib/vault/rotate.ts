@@ -10,7 +10,10 @@
  *      (ref names are HMACs under the key), every old name gets a retired-ref
  *      marker sealed under `K`, and the header is re-sealed under `K'` with
  *      `K` at the front of its key ring, all in one `casRefs` batch. That
- *      batch is the point of no return;
+ *      batch is the point of no return. Its ops are ordered new-name refs,
+ *      then markers, then the header: a backend that writes a batch file by
+ *      file (the directory store) and dies part-way leaves the header under
+ *      `K`, so the next run retries the batch and moves what is left;
  *   3. the keywrap slot is replaced or removed, then `K'` becomes the key file.
  *
  * Chunks and WIP parts are not re-encrypted; they decode through the ring.
@@ -150,11 +153,6 @@ async function readMovable(name: string, bytes: Uint8Array, keys: VaultSubkeys):
   return null;
 }
 
-interface Batch {
-  ops: RefOp[];
-  records: number;
-  machines: number;
-}
 
 async function buildBatch(
   store: VaultStore,
@@ -163,8 +161,9 @@ async function buildBatch(
   oldKeys: VaultSubkeys,
   newKeys: VaultSubkeys,
   at: string,
-): Promise<Batch> {
-  const batch: Batch = { ops: [], records: 0, machines: 0 };
+): Promise<RefOp[]> {
+  const moves: RefOp[] = [];
+  const markers: RefOp[] = [];
   const marker: RetiredRefMarker = { v: 1, type: 'retired', at };
   const listed = [...(await store.listRefs('r/')), ...(await store.listRefs('m/'))];
   for (const { name } of listed) {
@@ -174,29 +173,28 @@ async function buildBatch(
     // A value stored under a name other than its own is not a vault ref; leave it behind.
     if (moved === null || refName(moved.kind, moved.id, oldKeys.K_ref) !== name) continue;
     const newName = refName(moved.kind, moved.id, newKeys.K_ref);
-    batch.ops.push({
+    moves.push({
       name: newName,
       expectedVersion: (await store.readRef(newName))?.version ?? null,
       value: await encryptRef(newName, moved.value, newKeys),
     });
-    batch.ops.push({ name, expectedVersion: ref.version, value: await encryptRef(name, marker, oldKeys) });
-    if (moved.kind === 'record') batch.records++;
-    else batch.machines++;
+    markers.push({ name, expectedVersion: ref.version, value: await encryptRef(name, marker, oldKeys) });
   }
   const nextHeader: VaultHeader = {
     ...header.value,
     rotatedAt: at,
     keyRing: [currentKey.toString('base64'), ...(header.value.keyRing ?? [])],
   };
-  batch.ops.push({
-    name: HEADER_REF_NAME,
-    expectedVersion: header.ref.version,
-    value: await encryptRef(HEADER_REF_NAME, nextHeader, newKeys),
-  });
-  return batch;
+  // Write order matters on a backend that is not atomic: a marker never lands
+  // before its own new-name ref, and the header, which commits the rotation, is last.
+  return [
+    ...moves,
+    ...markers,
+    { name: HEADER_REF_NAME, expectedVersion: header.ref.version, value: await encryptRef(HEADER_REF_NAME, nextHeader, newKeys) },
+  ];
 }
 
-/** Records and machines readable under `keys`: what an earlier run's batch moved. */
+/** Records and machines readable under `keys`: everything the rotation moved, in this run or an earlier one. */
 async function countMoved(store: VaultStore, keys: VaultSubkeys): Promise<{ records: number; machines: number }> {
   const counts = { records: 0, machines: 0 };
   for (const { name } of [...(await store.listRefs('r/')), ...(await store.listRefs('m/'))]) {
@@ -219,12 +217,12 @@ export async function rotateVaultKey(options: RotateOptions): Promise<RotateResu
   const oldKeys = deriveSubkeys(currentKey);
   const newKeys = deriveSubkeys(newKey);
 
-  let outcome: { committed: 'now' | 'earlier'; records: number; machines: number } | null = null;
-  for (let attempt = 0; attempt < maxAttempts && outcome === null; attempt++) {
+  let committed: 'now' | 'earlier' | null = null;
+  for (let attempt = 0; attempt < maxAttempts && committed === null; attempt++) {
     await store.refresh();
     const headerRef = await store.readRef(HEADER_REF_NAME);
     if ((await openHeader(headerRef, newKeys)) !== null) {
-      outcome = { committed: 'earlier', ...(await countMoved(store, newKeys)) };
+      committed = 'earlier';
       break;
     }
     const header = await openHeader(headerRef, oldKeys);
@@ -232,14 +230,13 @@ export async function rotateVaultKey(options: RotateOptions): Promise<RotateResu
       throw new Error('The vault key on this machine does not open the vault; nothing was rotated.');
     }
     await store.discardUnpublished();
-    const batch = await buildBatch(store, { ref: headerRef, value: header }, currentKey, oldKeys, newKeys, now().toISOString());
-    if ((await store.casRefs(batch.ops)) === 'ok') {
-      outcome = { committed: 'now', records: batch.records, machines: batch.machines };
-    }
+    const ops = await buildBatch(store, { ref: headerRef, value: header }, currentKey, oldKeys, newKeys, now().toISOString());
+    if ((await store.casRefs(ops)) === 'ok') committed = 'now';
   }
-  if (outcome === null) throw new VaultRotationConflictError();
+  if (committed === null) throw new VaultRotationConflictError();
+  const moved = await countMoved(store, newKeys);
 
   if (options.keywrap !== undefined) await store.putSlot(KEYWRAP_OBJECT_NAME, options.keywrap);
   await saveVaultKey(newKey);
-  return { newKey, resumed: pending !== null, ...outcome };
+  return { newKey, resumed: pending !== null, committed, ...moved };
 }

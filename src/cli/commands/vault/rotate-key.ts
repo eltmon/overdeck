@@ -7,6 +7,10 @@
  * 24-word recovery phrase is printed once, and every other machine must
  * re-join with it (or with the passphrase).
  *
+ * A pending `key.next` whose rotation can no longer finish here (another
+ * machine rotated first, so neither the local key nor the pending key opens
+ * the header) is refused with the re-join hint; `pan vault join` removes it.
+ *
  * Every refusal (flag conflict, declined confirmation, weak passphrase, a
  * missing passphrase flag off a TTY, a key that does not open the vault, an
  * unreachable backend) happens before `vault/key.next` exists, so a refused
@@ -52,6 +56,8 @@ export const ROTATE_NEEDS_YES_MESSAGE = 'Pass --yes to rotate the vault key with
 export const ROTATE_NEEDS_PASSPHRASE_FLAG_MESSAGE =
   'This vault has a passphrase. Pass --passphrase-file <path>, --generate-passphrase or --no-passphrase.';
 export const ROTATE_KEY_MISMATCH_MESSAGE = 'The vault key on this machine does not open the vault; nothing was rotated.';
+export const ROTATE_PASSPHRASE_FLAG_CONFLICT_MESSAGE =
+  'Use only one of --passphrase-file, --generate-passphrase and --no-passphrase.';
 
 /** What happens to `keywrap/v1`: a new wrap under this passphrase, removal, or nothing. */
 type KeywrapPlan = { passphrase: string; generated: boolean } | 'remove' | 'none';
@@ -95,8 +101,9 @@ export async function rotateKeyCommand(options: RotateKeyOptions = {}, io: CliIo
     io.err(`Session Vault backend is set to ${backend} but the key file is missing. Run: pan vault join ${backend}`);
     return io.exit(1);
   }
-  if (options.passphraseFile && options.generatePassphrase) {
-    io.err('Use either --passphrase-file or --generate-passphrase, not both.');
+  const passphraseFlags = [options.passphraseFile !== undefined, options.generatePassphrase === true, options.passphrase === false];
+  if (passphraseFlags.filter(Boolean).length > 1) {
+    io.err(ROTATE_PASSPHRASE_FLAG_CONFLICT_MESSAGE);
     return io.exit(1);
   }
   const offline = async (): Promise<never> => {
@@ -125,7 +132,7 @@ export async function rotateKeyCommand(options: RotateKeyOptions = {}, io: CliIo
     await store.refresh();
     const header = await store.readRef(HEADER_REF_NAME);
     if (!(await opensHeader(header, key)) && !(pending !== null && (await opensHeader(header, pending)))) {
-      io.err(ROTATE_KEY_MISMATCH_MESSAGE);
+      io.err(`${ROTATE_KEY_MISMATCH_MESSAGE} If the key was rotated on another machine, run: pan vault join ${backend}`);
       return io.exit(1);
     }
     hasWrap = (await store.getObject(KEYWRAP_OBJECT_NAME)) !== null;

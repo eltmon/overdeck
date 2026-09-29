@@ -75,7 +75,11 @@ stops a sync.
 **One batch.** New-name refs, markers and the new header are written in one
 `VaultStore.casRefs` call. On git that is one commit (`vault: batch`) and one push, so no
 reader sees a half-rotated vault. A conflict (another machine settled in between) re-reads
-every ref and retries, up to 5 times, with no delay.
+every ref and retries, up to 5 times, with no delay. The dir backend cannot publish a batch
+atomically; it writes the ops in the order given. The batch is therefore ordered new-name
+refs, then markers, then the header. If the process dies part-way, the header is still
+sealed under `K`, and running `pan vault rotate-key` again retries the batch with the same
+`K'` and moves what is left.
 
 **Crash-safe order.** `src/lib/vault/rotate.ts` does, in this order:
 
@@ -91,6 +95,9 @@ Running `rotate-key` again resumes: if the header already opens with the key in 
 the batch was committed and only steps 3 to 6 run; otherwise the batch is retried with the
 same key. Every refusal of the verb (declined prompt, weak passphrase, missing flag, a key
 that does not open the vault, an unreachable backend) happens before `key.next` exists.
+If another machine rotates first, a `key.next` left here can no longer finish: `rotate-key`
+refuses with the re-join hint, and `pan vault join` removes `key.next` when it saves the
+new key.
 
 **Write guard.** `openVault` hands every verb a `KeyGuardedStore` bound to the header
 version its key opened. Every ref write carries an assert of that version in the same

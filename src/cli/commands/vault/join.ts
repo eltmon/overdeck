@@ -15,6 +15,8 @@
  * published (they are sealed under the retired key), and replaces the key in
  * place. The local index and list cache are kept: vault ids survive a
  * rotation, so the next save continues each owned record under its new name.
+ * A `key.next` left by a rotation this machine started and never committed is
+ * removed: it belongs to the key that was just replaced.
  */
 import { rm } from 'node:fs/promises';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -28,6 +30,7 @@ import {
   parseKeywrap,
   unwrapVaultKey,
 } from '../../../lib/vault/keywrap.js';
+import { clearNextKey } from '../../../lib/vault/rotate.js';
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
 import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
 import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../../lib/vault/store/types.js';
@@ -153,6 +156,8 @@ export async function joinCommand(url: string, options: JoinOptions = {}, io: Cl
   // Objects this machine wrote under a retired key and never published must not reach the backend.
   await store.discardUnpublished();
   await saveVaultKey(key);
+  // A pending rotation here started from the key this join replaces; it must not resume.
+  await clearNextKey();
   await writeVaultConfig({ backend: url });
   const me = await ensureEnvironmentIdentity();
   const report = await syncOnce({ store, keys });

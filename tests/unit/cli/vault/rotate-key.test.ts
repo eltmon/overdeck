@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { joinCommand } from '../../../../src/cli/commands/vault/join.js';
 import { passphraseSetCommand } from '../../../../src/cli/commands/vault/passphrase.js';
 import {
   ROTATE_CONFIRM_PROMPT,
   ROTATE_KEY_MISMATCH_MESSAGE,
+  ROTATE_PASSPHRASE_FLAG_CONFLICT_MESSAGE,
   rotateKeyCommand,
 } from '../../../../src/cli/commands/vault/rotate-key.js';
 import { saveCommand } from '../../../../src/cli/commands/vault/save.js';
@@ -13,7 +15,7 @@ import { GENERATED_PASSPHRASE_PREFIX } from '../../../../src/cli/commands/vault/
 import { statusCommand } from '../../../../src/cli/commands/vault/status.js';
 import { syncCommand } from '../../../../src/cli/commands/vault/sync.js';
 import { VAULT_OFF_MESSAGE } from '../../../../src/lib/vault/config.js';
-import { createVaultKey, phraseToKey } from '../../../../src/lib/vault/identity.js';
+import { createVaultKey, keyToPhrase, phraseToKey } from '../../../../src/lib/vault/identity.js';
 import { PASSPHRASE_LATER_HINT, PASSPHRASE_LENGTH_MESSAGE, unwrapVaultKey } from '../../../../src/lib/vault/keywrap.js';
 import { DirVaultStore } from '../../../../src/lib/vault/store/dir.js';
 import { Fixture, captureIo, runCli, type CapturedIo } from './helpers.js';
@@ -151,7 +153,18 @@ describe('pan vault rotate-key', () => {
     const before = await backendState();
     const conflict = captureIo();
     expect(await runCli(() => rotateKeyCommand({ yes: true, passphraseFile: file('p.txt', PASSPHRASE), generatePassphrase: true }, conflict))).toBe(1);
-    expect(conflict.stderr).toEqual(['Use either --passphrase-file or --generate-passphrase, not both.']);
+    expect(conflict.stderr).toEqual([ROTATE_PASSPHRASE_FLAG_CONFLICT_MESSAGE]);
+    expect(conflict.stderr).toEqual(['Use only one of --passphrase-file, --generate-passphrase and --no-passphrase.']);
+    // --no-passphrase never silently wins over a passphrase flag.
+    expect(await runCli(() => passphraseSetCommand({ passphraseFile: file('set.txt', PASSPHRASE) }, captureIo()))).toBe(0);
+    const withWrap = await backendState();
+    for (const flags of [{ passphraseFile: file('p.txt', PASSPHRASE) }, { generatePassphrase: true }]) {
+      const mixed = captureIo();
+      expect(await runCli(() => rotateKeyCommand({ yes: true, passphrase: false, ...flags }, mixed))).toBe(1);
+      expect(mixed.stderr).toEqual([ROTATE_PASSPHRASE_FLAG_CONFLICT_MESSAGE]);
+    }
+    expect(await backendState()).toEqual(withWrap);
+    await (await DirVaultStore.open(vaultRoot)).putSlot('keywrap/v1', null);
     const weak = captureIo();
     expect(await runCli(() => rotateKeyCommand({ yes: true, passphraseFile: file('short.txt', 'twelve chars\n') }, weak))).toBe(1);
     expect(weak.stderr).toEqual([PASSPHRASE_LENGTH_MESSAGE]);
@@ -203,9 +216,40 @@ describe('pan vault rotate-key', () => {
     const before = await backendState();
     const io = captureIo();
     expect(await runCli(() => rotateKeyCommand({ yes: true }, io))).toBe(1);
-    expect(io.stderr).toEqual([ROTATE_KEY_MISMATCH_MESSAGE]);
+    expect(io.stderr).toEqual([`${ROTATE_KEY_MISMATCH_MESSAGE} If the key was rotated on another machine, run: pan vault join ${url}`]);
     expect(await backendState()).toEqual(before);
     expect(existsSync(nextKeyPath)).toBe(false);
+  });
+
+  it('a stale key.next after another machine rotated is refused with the join hint, and join removes it', async () => {
+    // This machine's rotation never committed; key.next stayed behind.
+    const stale = createVaultKey();
+    writeFileSync(nextKeyPath, stale, { mode: 0o600 });
+    // Another machine rotates the vault to its own new key.
+    const { overdeckHome: homeB } = fx.useMachine('b');
+    const phraseFile = file('old-phrase.txt', keyToPhrase(oldKey));
+    expect(await runCli(() => joinCommand(url, { phraseFile }, captureIo()))).toBe(0);
+    expect(await runCli(() => rotateKeyCommand({ yes: true }, captureIo()))).toBe(0);
+    const keyB = readFileSync(join(homeB, 'vault', 'key'));
+    const rotated = await backendState();
+
+    fx.useMachine('a');
+    const refused = captureIo();
+    expect(await runCli(() => rotateKeyCommand({}, refused))).toBe(1);
+    expect(refused.stderr).toEqual([`${ROTATE_KEY_MISMATCH_MESSAGE} If the key was rotated on another machine, run: pan vault join ${url}`]);
+    expect(await backendState()).toEqual(rotated);
+
+    expect(await runCli(() => joinCommand(url, { phraseFile: file('new-phrase.txt', keyToPhrase(keyB)) }, captureIo()))).toBe(0);
+    expect(readFileSync(keyPath).equals(keyB)).toBe(true);
+    expect(existsSync(nextKeyPath)).toBe(false);
+
+    // With no pending key, rotate-key is an ordinary rotation again: it asks first.
+    const asks = captureIo();
+    expect(await runCli(() => rotateKeyCommand({}, asks))).toBe(1);
+    expect(asks.stderr).toEqual(['Pass --yes to rotate the vault key without a prompt.']);
+    expect(readFileSync(keyPath).equals(keyB)).toBe(true);
+    const status = captureIo();
+    expect(await runCli(() => statusCommand({}, status))).toBe(0);
   });
 
   it('with the vault off it prints the off message and exits 0', async () => {

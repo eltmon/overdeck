@@ -31,6 +31,7 @@ import {
   saveNextKey,
 } from '../../../../src/lib/vault/rotate.js';
 import { settle } from '../../../../src/lib/vault/settle.js';
+import { syncOnce } from '../../../../src/lib/vault/sync.js';
 import { DirVaultStore } from '../../../../src/lib/vault/store/dir.js';
 import { initGitVault } from '../../../../src/lib/vault/store/git.js';
 import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type RefOp, type VaultStore } from '../../../../src/lib/vault/store/types.js';
@@ -240,6 +241,74 @@ describe('vault key rotation (PAN-4333)', () => {
     const newName = refName('record', 'late', newKeys.K_ref);
     expect(await readSessionRecord(newName, (await store.readRef(newName))!.value, newKeys)).toEqual(late);
     expect(await decryptRef(lateName, (await store.readRef(lateName))!.value, oldKeys)).toMatchObject({ type: 'retired' });
+  });
+
+  it('a dir rotation killed during its write loop is repaired by the next run: every record is readable under the new key', async () => {
+    const store = await DirVaultStore.open(join(root, 'backend'));
+    const { vaultIds, lines, environmentId } = await seed(store);
+    const before = await Promise.all(vaultIds.map((vaultId) => recordUnder(store, vaultId, key)));
+    const oldKeys = deriveSubkeys(key);
+
+    // The batch is ordered so that the header, which commits the rotation, is written last.
+    const probe = wrapStore(store, { casRefs: async (ops) => { order.push(...ops.map((op) => op.name)); return 'conflict'; } });
+    const order: string[] = [];
+    await expect(rotateVaultKey({ store: probe, currentKey: key, now, maxAttempts: 1 })).rejects.toBeInstanceOf(VaultRotationConflictError);
+    expect(order.at(-1)).toBe(HEADER_REF_NAME);
+    const oldNames = new Set((await store.listRefs('')).map((ref) => ref.name));
+    const firstMarker = order.findIndex((name) => oldNames.has(name));
+    expect(order.slice(0, firstMarker).some((name) => oldNames.has(name))).toBe(false);
+    expect(order.slice(firstMarker, -1).every((name) => oldNames.has(name))).toBe(true);
+
+    for (const written of [1, 3, order.length - 1]) {
+      // Each round starts from a vault under the key that is current at that point.
+      const current = (await loadVaultKey())!;
+      const names = [...vaultIds, 'gone'].map((vaultId) => refName('record', vaultId, deriveSubkeys(current).K_ref));
+      const recordsBefore = await Promise.all(vaultIds.map((vaultId) => recordUnder(store, vaultId, current)));
+      await clearNextKey();
+      // The process dies after `written` files of the batch reached the disk.
+      const dying = wrapStore(store, {
+        casRefs: async (ops) => {
+          for (const op of ops.slice(0, written)) {
+            expect(await store.casRefs([op])).toBe('ok');
+          }
+          throw new Error('killed');
+        },
+      });
+      await expect(rotateVaultKey({ store: dying, currentKey: current, now })).rejects.toThrow('killed');
+      const pending = (await loadNextKey())!;
+      expect((await loadVaultKey())!.equals(current)).toBe(true);
+      expect(await readVaultHeader((await store.readRef(HEADER_REF_NAME))!.value, deriveSubkeys(current))).not.toBeNull();
+
+      const repaired = await rotateVaultKey({ store, currentKey: current, now });
+      expect(repaired).toMatchObject({ records: 3, machines: 1, resumed: true, committed: 'now' });
+      expect(repaired.newKey.equals(pending)).toBe(true);
+      for (const [index, vaultId] of vaultIds.entries()) {
+        expect(await recordUnder(store, vaultId, repaired.newKey)).toEqual(recordsBefore[index]);
+      }
+      for (const name of names) {
+        expect(await decryptRef(name, (await store.readRef(name))!.value, deriveSubkeys(current))).toMatchObject({ type: 'retired' });
+      }
+      const synced = await syncOnce({ store: (await openKeyring(store, repaired.newKey)).store, keys: (await openKeyring(store, repaired.newKey)).keys, config });
+      expect(synced.records).toBe(3);
+      expect(synced.unreadable).toBe(0);
+    }
+
+    // After three repaired rotations the first chunk still decodes and the content never changed.
+    const finalKey = (await loadVaultKey())!;
+    const opened = await openKeyring(store, finalKey);
+    expect(opened.keys.previous).toHaveLength(3);
+    expect(opened.keys.previous!.at(-1)).toEqual(oldKeys);
+    const record = await recordUnder(store, vaultIds[0]!, finalKey);
+    expect(record).toEqual(before[0]);
+    expect((await decodeChunk((await store.getObject(record.log[0]!))!, record.log[0]!, opened.keys)).lines).toEqual(lines[0]);
+    expect(environmentId).toBe((await ensureEnvironmentIdentity()).environmentId);
+
+    // The owner's next save appends to the moved record; it does not mint a truncated one.
+    const nativePath = join(root, '11111111-2222-4333-8444-555555555555.jsonl');
+    writeFileSync(nativePath, `${[...lines[0]!, user('after the repaired rotation', cwd, '11111111-2222-4333-8444-555555555555')].join('\n')}\n`);
+    const saved = await settle({ nativePath, harness: 'claude-code', store: opened.store, keys: opened.keys, config });
+    expect(saved).toMatchObject({ verdict: 'append', vaultId: vaultIds[0], lines: 1, version: 2 });
+    expect((await recordUnder(store, vaultIds[0]!, finalKey)).log).toHaveLength(2);
   });
 
   it('gives up after maxAttempts conflicts, keeps key.next, and leaves the vault and the key file as they were', async () => {

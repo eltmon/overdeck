@@ -47,6 +47,10 @@ export interface VaultStore {
    * expectedVersion, write every op that carries a value and publish them together;
    * otherwise write nothing and return 'conflict'. An op without a value only
    * asserts. Throws for duplicate names.
+   *
+   * A backend that cannot publish a batch atomically (the directory store)
+   * writes the valued ops in the order given, so a caller that must survive a
+   * crash between two writes puts the op that commits the batch last.
    */
   casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult>;
   /**

@@ -159,6 +159,20 @@ export function runVaultStoreContract(backend: 'dir' | 'git', makeStore: () => P
       expect(Buffer.from((await store.readRef(names[2]!))!.value).toString()).toBe('h1');
     });
 
+    it('casRefs takes its locks in name order whatever order the ops come in: opposite-order batches both finish', async () => {
+      const store = await makeStore();
+      const nameA = 'r/' + ID_A;
+      const nameB = 'r/' + ID_B;
+      const results = await Promise.all([
+        store.casRefs([{ name: nameB, expectedVersion: null, value: Buffer.from('1b') }, { name: nameA, expectedVersion: null, value: Buffer.from('1a') }]),
+        store.casRefs([{ name: nameA, expectedVersion: null, value: Buffer.from('2a') }, { name: nameB, expectedVersion: null, value: Buffer.from('2b') }]),
+      ]);
+      expect(results.sort()).toEqual(['conflict', 'ok']);
+      await store.refresh();
+      const values = [Buffer.from((await store.readRef(nameA))!.value).toString(), Buffer.from((await store.readRef(nameB))!.value).toString()];
+      expect([['1a', '1b'], ['2a', '2b']]).toContainEqual(values);
+    });
+
     it('casRefs.ac2: one stale version writes nothing and returns conflict', async () => {
       const store = await makeStore();
       const nameA = 'r/' + ID_A;
