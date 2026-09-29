@@ -1,0 +1,531 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T01:55:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3308: The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file",
+    "updated": "2026-09-29T01:57:02.402Z"
+  },
+  "plan": {
+    "id": "pan-3308",
+    "title": "The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file",
+    "status": "proposed",
+    "uid": "467424d6-a22f-4ef8-808f-74a3c7d0390e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T01:55:16Z",
+    "updated": "2026-09-29T01:57:02.402Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3308",
+        "label": "PAN-3308",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3308.md",
+        "label": "PAN-3308 PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Deft adoption PRD, Issue 1",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "file-size-guard",
+      "pre-push",
+      "gate-integrity",
+      "scripts",
+      "ratchet"
+    ],
+    "narratives": {
+      "Problem": "scripts/lint-file-size.sh:171-176 offers raising the allowlist ceiling as an equal remedy and prints the paste-ready row with the new, larger count. Two of three agents that hit the guard on launcher-generator.ts raised the cap instead of shrinking the file. The planner prompt (src/lib/cloister/prompts/planning.md:168) also tells planners to prescribe allowlist rows. Nothing distinguishes an agent's raise from the operator's, and the Flywheel (conv-flywheel) is exempt from the main-push guard because it is a conversation.",
+      "Proposal": "Rewrite the guard's failure text to name only the shrink path and state that the allowlist number must not increase. Extract a shared pusher-identity helper (scripts/lib/pusher-identity.sh) that keeps the conv-* exemption but always classifies the Flywheel as an agent, and use it in guard-agent-main-push.sh. Add scripts/guard-allowlist-raise.sh, run from .husky/pre-push, which refuses an agent push whose range raises any path's effective allowlist cap above max(allowance at base, allowance at the remote tip), with OVERDECK_OPERATOR_PUSH=1 as the operator escape. Rewrite the planner prompt sentence and document the operator-only raise in the A3 doc. Full detail in .pan/drafts/PAN-3308.md.",
+      "NonGoals": "- Closing the `git push --no-verify` bypass of pre-push guards\n- Running the raise guard in CI `npm run lint` (CI has no pusher identity)\n- Building #4344 (main-push guard for registered projects), #4345 (gate-integrity bundled rule) or #4346 (context-budget ratchet)\n- Changing how lint-file-size.sh computes allowed counts, or an absolute ban on raises that would also block the operator\n- Any new exemption: OVERDECK_CONVERSATION=conv-* without a conv-* OVERDECK_AGENT_ID must not become an operator conversation\n- Editing existing rows in scripts/file-size-allowlist.txt\n- Any change to src/**/*.ts production code"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Raises are operator-only (refused for agent pushers at pre-push), not banned outright as the issue body's request #2 asked.",
+        "rationale": "The operator-approved design posted on the issue (2026-09-29, from .pan/drafts/deft-adoption.md Issue 1) supersedes the older issue body and explicitly keeps an operator raise path; an absolute ban would block the operator too. Issue AC2 is satisfied for every agent pusher by the raise-guard item's tests."
+      },
+      {
+        "summary": "A raise is measured against max(allowance at base, allowance at the remote tip), with the remote tip passed as --prior by the pre-push hook.",
+        "rationale": "Feature-branch base is merge-base(origin/main, tip), so an operator raise pushed with OVERDECK_OPERATOR_PUSH=1 would stay in range forever and block every later agent or server-side push of that branch. Grandfathering what is already on the remote branch keeps the gate about what this push introduces."
+      },
+      {
+        "summary": "Flywheel detection uses OVERDECK_AGENT_ID=conv-flywheel, OVERDECK_CONVERSATION=conv-flywheel, or OVERDECK_AGENT_STARTED_BY=flywheel:*.",
+        "rationale": "OVERDECK_AGENT_ID is exported for conversations only under Herdr/supervisor/pi/codex/acp (conversation-runtime.ts:799) while OVERDECK_CONVERSATION is exported for every conversation (:804); OVERDECK_AGENT_STARTED_BY is exported into spawned agents (spawn.ts:447,866). The design asked to exclude conv-flywheel and any flywheel:-started context."
+      },
+      {
+        "summary": "Tighten the main-push guard for conv-flywheel in the same change via the shared helper.",
+        "rationale": "The design says to tighten the exemption in the same change and #4344/#4346 reuse the tightened identity test. The Flywheel's only main pushes are .pan/flywheel/*.md (pan-flywheel SKILL.md:197-232), which are not code paths, so it keeps working."
+      },
+      {
+        "summary": "Rewrite the planner prompt sentence at src/lib/cloister/prompts/planning.md:168 as part of this issue.",
+        "rationale": "It instructs planners to prescribe an allowlist row whenever an item grows a god file, which is the same teaching surface the issue removes from the guard message."
+      },
+      {
+        "summary": "verify_commands use targeted vitest files plus npm run lint/typecheck instead of the issue's `npm test`.",
+        "rationale": "The repo rule forbids running the full npm test on the host; CI runs it against the PR head."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One coherent gate change in shell scripts and their tests: 13 files, mostly scripts/ plus one test per script. The subsystem count comes from path roots (scripts, scripts/lib, tests, .husky, sync-sources, src prompt text, docs), not independent features. The pieces are not independently shippable as sibling issues: the raise guard is inert until wired into the hook, the message change without the guard leaves the raise unguarded, and the helper exists only for the two guards. Items are already split small with a 3-edge DAG.",
+      "canonicalFilename": "2026-09-29-PAN-3308-the-file-size-guard-hands-agents-a-paste-ready-ratchet-up-line-2-of-3-agents-raised-the-ceiling-instead-of-shrinking-the-file.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "guard-message",
+        "title": "File-size guard failure text names only the shrink remedy and prints no allowlist row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-file-size.sh",
+            "tests/unit/scripts/lint-file-size.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-file-size.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/lint-file-size.test.ts passes",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In scripts/lint-file-size.sh rewrite the header comment (lines 4-6), the failure block (lines 171-176, anchor 'Shrink the file, or add an audited exception') to: '  Fix: shrink $f to $allowed lines or fewer (extract a module). The allowlist number must not increase.' and '  Raising a ceiling is an operator decision made in its own commit — see docs/codebase-health/A3-file-size-guard.md.', and both trailers (lines 182, 184, anchor 'without an issue-referenced allowlist entry') to 'Shrink each file above to its allowed count; do not raise the allowlist.'. In tests/unit/scripts/lint-file-size.test.ts rename the first test to 'rejects a new god file and names only the shrink remedy', replace the paste-line assertion at line 72 with not.toMatch(/^\\s*\\d+ \\S+ # /m) plus toContain checks for the three new phrases, add the not.toMatch assertion to the growth test, and rewrite the comment at lines 133-135."
+        },
+        "items": [
+          {
+            "id": "guard-message.ac1",
+            "title": "Given a temp repo with a 1001-line new src file, when lint-file-size.sh runs, then it exits 1 and its output contains no line matching ^\\s*\\d+ \\S+ # ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-message.ac2",
+            "title": "Given the same failure, the output contains 'shrink src/new-god-file.ts to 1000 lines or fewer', 'The allowlist number must not increase' and 'Raising a ceiling is an operator decision'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-message.ac3",
+            "title": "Given an existing 1200-line god file grown to 1201, the guard exits 1 and its output contains no line matching ^\\s*\\d+ \\S+ # ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "identity-helper",
+        "title": "Shared scripts/lib/pusher-identity.sh classifies the Flywheel as an agent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3308",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "main-push-helper",
+            "raise-guard"
+          ],
+          "files_scope": [
+            "scripts/lib/pusher-identity.sh",
+            "tests/unit/scripts/pusher-identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/pusher-identity.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/pusher-identity.test.ts passes all seven table cases",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly: create scripts/lib/pusher-identity.sh (sourced, no top-level side effects) defining overdeck_pusher_is_agent with the order: flywheel tokens (OVERDECK_AGENT_ID==conv-flywheel, OVERDECK_CONVERSATION==conv-flywheel, OVERDECK_AGENT_STARTED_BY==flywheel:*) → return 0; OVERDECK_AGENT_ID==conv-* → return 1; non-empty OVERDECK_AGENT_ID → return 0; git user.name ending in [bot] → return 0; else return 1. The OVERDECK_OPERATOR_PUSH escape is NOT in the helper. Add tests/unit/scripts/pusher-identity.test.ts that runs `bash -c 'source <helper>; overdeck_pusher_is_agent'` in a temp git repo, stripping OVERDECK_AGENT_ID, OVERDECK_CONVERSATION, OVERDECK_AGENT_STARTED_BY and OVERDECK_OPERATOR_PUSH from the inherited env, covering the seven cases in the PRD table."
+        },
+        "items": [
+          {
+            "id": "identity-helper.ac1",
+            "title": "Given OVERDECK_AGENT_ID=conv-flywheel, or only OVERDECK_CONVERSATION=conv-flywheel with a human git user, overdeck_pusher_is_agent returns exit status 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identity-helper.ac2",
+            "title": "Given OVERDECK_AGENT_ID=conv-123 with an overdeck-agent[bot] git user, overdeck_pusher_is_agent returns exit status 1; adding OVERDECK_AGENT_STARTED_BY=flywheel:conv-flywheel makes it return 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identity-helper.ac3",
+            "title": "Given no Overdeck env, it returns 0 for a [bot] git user and 1 for 'Human Operator'; given OVERDECK_AGENT_ID=agent-pan-1 it returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-push-helper",
+        "title": "Main-push guard sources the identity helper so conv-flywheel code pushes to main are refused",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-agent-main-push.sh",
+            "tests/unit/scripts/guard-agent-main-push.test.ts",
+            "sync-sources/skills/pan-release/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-agent-main-push.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/guard-agent-main-push.test.ts passes, including the three new flywheel cases and the unchanged conv-* case",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In scripts/guard-agent-main-push.sh: source scripts/lib/pusher-identity.sh after the cd; replace the conv-* early exit (lines 21-23) in the same position with `if ! overdeck_pusher_is_agent; then exit 0; fi`; delete the is_agent block (lines 38-53); rewrite the header comment (lines 7-12) to say conv-* is exempt except conv-flywheel and drop the stale operator-authorized-merges.md reference. Add three tests to guard-agent-main-push.test.ts (conv-flywheel src range refused; OVERDECK_CONVERSATION=conv-flywheel with 'Human Operator' git user and no agent id refused; conv-flywheel .pan/flywheel/state.md range allowed), passing OVERDECK_CONVERSATION/OVERDECK_AGENT_STARTED_BY as undefined where a case must not inherit them. Update sync-sources/skills/pan-release/SKILL.md lines 133-134 to 'exempts `conv-` prefixed agent ids except `conv-flywheel`, and never pipeline roles'."
+        },
+        "items": [
+          {
+            "id": "main-push-helper.ac1",
+            "title": "Given OVERDECK_AGENT_ID=conv-flywheel and a range touching src/, guard-agent-main-push.sh exits non-zero and its output contains 'agents land code via PR'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-push-helper.ac2",
+            "title": "Given no agent id, a 'Human Operator' git user and OVERDECK_CONVERSATION=conv-flywheel, a src/ range exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-push-helper.ac3",
+            "title": "Given OVERDECK_AGENT_ID=conv-123 a src/ range still exits 0, and given conv-flywheel a range touching only .pan/flywheel/state.md exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-push-helper.ac4",
+            "title": "sync-sources/skills/pan-release/SKILL.md contains the text 'except `conv-flywheel`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "raise-guard",
+        "title": "New scripts/guard-allowlist-raise.sh refuses agent pushes that raise a file-size ceiling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-allowlist-raise.sh",
+            "tests/unit/scripts/guard-allowlist-raise.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-allowlist-raise.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/guard-allowlist-raise.test.ts passes all twelve PRD WI-4 cases",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 steps 1-12. Interface: `bash scripts/guard-allowlist-raise.sh --range <base>..<head> [--prior <sha>]`. Order: OVERDECK_OPERATOR_PUSH=1 → exit 0; malformed/missing range → fail closed exit 1 with 'trust gate'; non-agent pusher (overdeck_pusher_is_agent) → exit 0; unresolvable base/head → fail closed; allowlist untouched in range → exit 0. Effective cap per path = LAST row. Allowance at rev = effective cap if present, else max(line count at rev, CEILING=1000) if the file exists, else 1000. Priors = base plus --prior when non-empty, not all zeros, and resolvable. Refuse (exit 1, stderr listing '<path> <prior> → <head_cap>' and naming OVERDECK_OPERATOR_PUSH=1 and the A3 doc) when any head effective cap exceeds the max prior allowance. Print no line in allowlist-row format. Tests template on guard-agent-main-push.test.ts; installScript copies both the guard and scripts/lib/pusher-identity.sh; strip OVERDECK_CONVERSATION, OVERDECK_AGENT_STARTED_BY, OVERDECK_OPERATOR_PUSH unless a case sets them."
+        },
+        "items": [
+          {
+            "id": "raise-guard.ac1",
+            "title": "Given a range raising src/x.ts from 1012 to 1018 with OVERDECK_AGENT_ID=agent-pan-1 or conv-flywheel, the guard exits non-zero and its output contains 'src/x.ts 1012 → 1018'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-guard.ac2",
+            "title": "Given the same raise with OVERDECK_AGENT_ID=conv-123, or with OVERDECK_OPERATOR_PUSH=1, or with a human git identity and no agent env, the guard exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-guard.ac3",
+            "title": "Given an agent range that only lowers a row, or does not touch the allowlist, the guard exits 0; an appended later row for the same path with a higher value is refused (last row wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-guard.ac4",
+            "title": "Given a new row above the base allowance (1100 for an absent file, 1250 for a 1200-line file with no base row) the guard exits non-zero, and rows at the allowance (1000, 1200) exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-guard.ac5",
+            "title": "Given a raise already present at the --prior sha, an agent range base..B exits 0; the same range without --prior exits non-zero; --range '' exits non-zero with 'trust gate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pre-push-wiring",
+        "title": "Pre-push hook runs the allowlist raise guard with the push range and remote tip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".husky/pre-push*",
+            "tests/unit/scripts/pre-push-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/pre-push-hook.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/pre-push-hook.test.ts passes, including the new invocation test",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "filesScopeNote": "The narrow glob .husky/pre-push* names the single hook file .husky/pre-push; the quality lint rejects extensionless paths without a glob."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In .husky/pre-push, inside `elif [ -n \"$base\" ]; then` right after the lint-ratchet-audit.sh call (line 67), call `bash scripts/guard-allowlist-raise.sh --range \"$base..$local_sha\" --prior \"$remote_sha\" </dev/null` when remote_sha != zero, else without --prior. Add a PAN-3308 line to the comment at lines 30-33. In tests/unit/scripts/pre-push-hook.test.ts add a stub scripts/guard-allowlist-raise.sh (exit 0) to makeHookFixture (lines 9-25) so existing tests do not fail with 127, and add a test that a main push invokes it with `--range <remote>..<local> --prior <remote>` (stub writes \"$*\" to raise-args.txt; the guard-agent-main-push.sh stub must exist and exit 0)."
+        },
+        "items": [
+          {
+            "id": "pre-push-wiring.ac1",
+            "title": "Given a push of HEAD to refs/heads/main from <local> over <remote>, the hook invokes guard-allowlist-raise.sh with exactly '--range <remote>..<local> --prior <remote>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pre-push-wiring.ac2",
+            "title": "Given the new stub in makeHookFixture, every pre-existing test in tests/unit/scripts/pre-push-hook.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planner-prompt",
+        "title": "Planner prompt instructs an extraction item instead of an allowlist row for god-file growth",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/planning.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'must add an audited' src/lib/cloister/prompts/planning.md || true",
+            "grep -c 'Never plan an allowlist raise' src/lib/cloister/prompts/planning.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 1",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In src/lib/cloister/prompts/planning.md line 168 (anchor 'The file-size ratchet is derived, not stored.') keep the first sentence and replace the rest with the PRD WI-6 text: an item must not grow a god file past its allowed count; plan an extraction item instead; never plan an allowlist raise because raising a ceiling is an operator decision refused from agents at pre-push; shrinking needs no metadata change. No Prompt-Change trailer is needed (check-prompt-change-trailer.sh covers only roles/*.md and the flywheel SKILL)."
+        },
+        "items": [
+          {
+            "id": "planner-prompt.ac1",
+            "title": "Given the edited prompt, `grep -c 'must add an audited' src/lib/cloister/prompts/planning.md` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planner-prompt.ac2",
+            "title": "The prompt contains 'Never plan an allowlist raise' and 'plan an extraction item'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a3-docs",
+        "title": "A3 doc documents that raising a ceiling is an operator decision",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:55:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3308",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/codebase-health/A3-file-size-guard.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '## Raising a ceiling is an operator decision (PAN-3308)' docs/codebase-health/A3-file-size-guard.md",
+            "grep -c 'OVERDECK_OPERATOR_PUSH=1 git push' docs/codebase-health/A3-file-size-guard.md"
+          ],
+          "expected_outputs": [
+            "first grep prints 1",
+            "second grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Insert the section '## Raising a ceiling is an operator decision (PAN-3308)' after the 'Update (PAN-3116)' note (line 10) and before '## Glossary' (line 12) of docs/codebase-health/A3-file-size-guard.md, using the PRD text verbatim: shrink is the fix; lowering is free (--lower or hand edit); raising or adding a row above the base allowance is refused for agent pushers by scripts/guard-allowlist-raise.sh from .husky/pre-push (identity from scripts/lib/pusher-identity.sh, Flywheel included); the operator raises in its own issue-referenced commit and pushes with `OVERDECK_OPERATOR_PUSH=1 git push`; the primary checkout commits as overdeck-agent[bot] so a plain terminal push needs it too; raises already on the remote branch are not re-checked."
+        },
+        "items": [
+          {
+            "id": "a3-docs.ac1",
+            "title": "docs/codebase-health/A3-file-size-guard.md renders a heading '## Raising a ceiling is an operator decision (PAN-3308)' placed before '## Glossary'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-docs.ac2",
+            "title": "The section states that agent pushes are refused by scripts/guard-allowlist-raise.sh, that conv-flywheel counts as an agent, and gives the recipe 'OVERDECK_OPERATOR_PUSH=1 git push'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "identity-helper",
+        "to": "main-push-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "identity-helper",
+        "to": "raise-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "raise-guard",
+        "to": "pre-push-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
