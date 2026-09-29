@@ -41,8 +41,36 @@ pan vault setup git@github.com:you/session-vault.git --hooks
 pan vault join git@github.com:you/session-vault.git
 ```
 
-Enter the 24 words when prompted (or pass `--phrase-file <path>`). A wrong phrase prints
+Enter the 24 words when prompted (or pass `--phrase-file <path>`). If the vault has a
+passphrase, you are asked for that first; see below. A wrong phrase prints
 `The recovery phrase does not match this vault.` and writes nothing.
+
+## Passphrase unlock
+
+Most people do not have the 24 words at hand when they set up a new machine. A vault
+passphrase lets a new machine join by typing the passphrase instead.
+
+Setup offers it right after printing the recovery phrase. On a terminal it suggests a
+generated 6-word passphrase: press Enter to use it, type your own (16 or more characters), or
+type `skip`. For scripts, pass `--generate-passphrase`, `--passphrase-file <path>` or
+`--no-passphrase`.
+
+Turn it on, change it, or turn it off later:
+
+```bash
+pan vault passphrase set                          # prompt; Enter generates one
+pan vault passphrase set --generate               # print a generated 6-word passphrase once
+pan vault passphrase set --passphrase-file <path>
+pan vault passphrase remove
+```
+
+When a passphrase is set, `pan vault join` asks for it first. Press Enter to use the
+recovery phrase instead, or pass `--passphrase-file <path>`. A wrong passphrase prints
+`The passphrase did not unlock this vault.` and writes nothing.
+
+<Warning>
+The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: the vault key never changes, and removing the passphrase never locks you out.
+</Warning>
 
 ## Save and sync
 
