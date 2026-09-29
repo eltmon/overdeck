@@ -49,6 +49,7 @@ export type SessionOutcomeKind =
   | 'plan-finalized'
   | 'stopped-by-operator'
   | 'stopped-by-close-out'
+  | 'handed-to-review'
   | 'ended-unexpectedly'
   | 'ended';
 
@@ -102,6 +103,7 @@ export const SESSION_ENDED_FALLBACK: SessionOutcome = {
 const RECORDED_ERROR_STATUSES = new Set(['error', 'failed', 'dead']);
 const RECORDED_LIVE_STATUSES = new Set(['running', 'starting']);
 const PRIMARY_ROLES = new Set<SessionOutcomeRole>(['plan', 'work', 'strike']);
+const HANDED_OFF_STATES = new Set<IssueState>(['in-review', 'changes-requested', 'ready']);
 
 /**
  * Pick the outcome for an ended session (call only when the session has
@@ -224,7 +226,23 @@ export function deriveSessionOutcome(facts: SessionOutcomeFacts): SessionOutcome
     };
   }
 
-  // 11 — primary agent ended cleanly with no outcome on a known open, unmerged issue
+  // 11 — work/strike agent handed off: its PR is open for review, and no
+  // earlier row (recorded error/live status) outranked it.
+  if (
+    (facts.role === 'work' || facts.role === 'strike')
+    && !facts.synthesized
+    && facts.issueState !== undefined
+    && HANDED_OFF_STATES.has(facts.issueState)
+  ) {
+    return {
+      kind: 'handed-to-review',
+      label: 'Handed to review',
+      detail: 'The work agent handed off; its PR is open for review.',
+      tone: 'quiet',
+    };
+  }
+
+  // 12 — primary agent ended cleanly with no outcome on a known open, unmerged issue
   if (
     PRIMARY_ROLES.has(facts.role)
     && !facts.synthesized
@@ -240,7 +258,7 @@ export function deriveSessionOutcome(facts: SessionOutcomeFacts): SessionOutcome
     };
   }
 
-  // 12 — fallback
+  // 13 — fallback
   return SESSION_ENDED_FALLBACK;
 }
 
