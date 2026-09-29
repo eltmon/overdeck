@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:59:49.123Z",
+  "updated": "2026-09-29T22:00:00.914Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "settings-catalog-order.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T21:59:49.122Z"
+    },
+    "frontend-pickers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:00:00.913Z"
     }
   }
 }
