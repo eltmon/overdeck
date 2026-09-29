@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:47:29.472Z",
+  "updated": "2026-09-29T11:47:40.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "enrichment-poll-schedule.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:47:29.471Z"
+    },
+    "enrichment-poll-schedule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:40.112Z"
     }
   }
 }
