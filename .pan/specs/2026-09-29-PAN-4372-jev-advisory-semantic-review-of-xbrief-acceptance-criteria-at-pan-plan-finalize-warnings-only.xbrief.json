@@ -4,17 +4,17 @@
     "created": "2026-09-29T09:38:59Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4372: Jev advisory semantic review of xBRIEF acceptance criteria at pan plan finalize (warnings only)",
-    "updated": "2026-09-29T09:43:09.151Z"
+    "updated": "2026-09-29T09:43:39.014Z"
   },
   "plan": {
     "id": "pan-4372",
     "title": "Jev advisory semantic review of xBRIEF acceptance criteria at pan plan finalize (warnings only)",
-    "status": "proposed",
+    "status": "running",
     "uid": "1e512d3f-3dfc-43cd-b74b-3a211fdc18f7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T09:38:59Z",
-    "updated": "2026-09-29T09:43:09.151Z",
+    "updated": "2026-09-29T09:43:39.014Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4372",
