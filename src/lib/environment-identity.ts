@@ -11,7 +11,7 @@
  * `pan vault` CLI can load it without the dashboard or Effect runtime layers.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
@@ -99,10 +99,19 @@ export async function ensureEnvironmentIdentity(): Promise<EnvironmentIdentity> 
   await mkdir(home, { recursive: true });
   try {
     await writeFile(temp, `${JSON.stringify(identity, null, 2)}\n`, { mode: 0o600 });
-    await rename(temp, target);
+    // link() fails with EEXIST when another process minted the identity
+    // between our read and now; rename() would silently replace it.
+    await link(temp, target);
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      await unlink(temp).catch(() => undefined);
+      const raced = await readEnvironmentIdentity();
+      if (raced) return raced;
+    }
     await unlink(temp).catch(() => undefined);
     throw error;
+  } finally {
+    await unlink(temp).catch(() => undefined);
   }
   return identity;
 }

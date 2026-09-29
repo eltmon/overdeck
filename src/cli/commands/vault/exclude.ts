@@ -6,7 +6,7 @@
  * its ref value with a tombstone through casRef; `pan vault list` hides
  * tombstoned rows. Chunk objects stay in the backend's history as ciphertext.
  */
-import { resolve } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 import { encryptRef, refName, type SessionTombstone } from '../../../lib/vault/format.js';
 import { addExclusion, removeExclusion } from '../../../lib/vault/exclude.js';
 import { listOwned, readListCache, removeOwned, replaceListCache } from '../../../lib/vault/local-index.js';
@@ -16,6 +16,22 @@ import { resolveVaultId } from './show.js';
 export interface ExcludeOptions {
   origin?: string;
   session?: string;
+}
+
+/**
+ * A `--session` value may be a vaultId (or prefix) or a native session id. A
+ * native id is the transcript's file name, so it resolves through the local
+ * index of owned transcripts to the record that saved it.
+ */
+export async function resolveSessionVaultId(session: string): Promise<string | null> {
+  const owned = await listOwned();
+  for (const [nativePath, entry] of Object.entries(owned)) {
+    if (basename(nativePath, extname(nativePath)) === session) return entry.vaultId;
+  }
+  const rows = await readListCache();
+  const byVault = await resolveVaultId(session).catch(() => null);
+  if (byVault && (rows.some((row) => row.vaultId === byVault) || Object.values(owned).some((entry) => entry.vaultId === byVault))) return byVault;
+  return null;
 }
 
 function nothingGiven(path: string | undefined, options: ExcludeOptions): boolean {
@@ -54,9 +70,12 @@ export async function excludeCommand(path: string | undefined, options: ExcludeO
     io.out(`Excluded conversations whose git origin is ${options.origin}.`);
   }
   if (options.session) {
-    const vaultId = await resolveVaultId(options.session).catch(() => null);
+    const vaultId = await resolveSessionVaultId(options.session);
     if (vaultId) {
       await addExclusion('sessions', vaultId);
+      // A native session id (the transcript file name) is recorded too, so the
+      // file stays excluded even if it is saved again under a new record.
+      if (vaultId !== options.session && /^[0-9a-f-]{36}$/i.test(options.session)) await addExclusion('sessions', options.session);
       const outcome = await tombstoneRecord(vaultId, vault);
       io.out(outcome === 'ok'
         ? `Excluded ${vaultId.slice(0, 8)} and replaced its saved record with a tombstone.`
@@ -84,7 +103,7 @@ export async function includeCommand(path: string | undefined, options: ExcludeO
     io.out(`Included conversations whose git origin is ${options.origin} again.`);
   }
   if (options.session) {
-    const vaultId = await resolveVaultId(options.session).catch(() => null);
+    const vaultId = await resolveSessionVaultId(options.session);
     await removeExclusion('sessions', vaultId ?? options.session);
     if (vaultId && vaultId !== options.session) await removeExclusion('sessions', options.session);
     io.out(`Included session ${options.session} again. A tombstoned record stays a tombstone; new lines start a new record.`);

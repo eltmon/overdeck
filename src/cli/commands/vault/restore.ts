@@ -4,6 +4,7 @@
  * Rebuild an evicted transcript byte for byte at its original path (FR-16).
  * Refuses when a file already exists there.
  */
+import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { listOwned } from '../../../lib/vault/local-index.js';
 import { restoreNative } from '../../../lib/vault/materialize.js';
 import { defaultIo, openVault, type CliIo } from './shared.js';
@@ -33,7 +34,10 @@ export async function restoreCommand(id: string, options: RestoreOptions = {}, i
     return io.exit(1);
   }
   try {
-    const result = await restoreNative({ record, store: vault.store, keys: vault.keys, nativePath });
+    // Rebuild THIS machine's segment, not the current owner's: after an adoption
+    // elsewhere, the owner's segment is another machine's file.
+    const me = await ensureEnvironmentIdentity();
+    const result = await restoreNative({ record, store: vault.store, keys: vault.keys, nativePath, environmentId: me.environmentId });
     io.out(`Restored ${result.lines} line${result.lines === 1 ? '' : 's'} to ${result.path}`);
   } catch (error) {
     io.err((error as Error).message);

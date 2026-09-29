@@ -27,8 +27,8 @@ describe('pan vault exclude / include / allow-secret', () => {
   let secretProj: string;
   let openProj: string;
   let discovered: DiscoveredTranscript[];
-  const secretSession = 'ex100000-0000-4000-8000-000000000000';
-  const openSession = 'ex200000-0000-4000-8000-000000000000';
+  const secretSession = 'e1000000-0000-4000-8000-000000000000';
+  const openSession = 'e2000000-0000-4000-8000-000000000000';
 
   beforeEach(async () => {
     fx = new Fixture();
@@ -100,6 +100,19 @@ describe('pan vault exclude / include / allow-secret', () => {
     await runCli(() => listCommand({}, listAfterSync));
     expect(listAfterSync.stdout.join('\n')).not.toContain('open-proj');
 
+    // Excluding by the NATIVE session id (the file name) tombstones the saved record too (FR-7).
+    const other = (await readListCache()).find((row) => row.title.includes('secret-proj') && !row.tombstone)!;
+    const byNative = captureIo();
+    expect(await runCli(() => excludeCommand(undefined, { session: secretSession }, byNative))).toBe(0);
+    expect(byNative.stdout[0]).toContain('tombstone');
+    expect((await readVaultConfig()).exclude.sessions).toEqual(expect.arrayContaining([target.vaultId, other.vaultId, secretSession]));
+    const otherName = refName('record', other.vaultId, keys.K_ref);
+    const otherValue = await readSessionRecord(otherName, (await store.readRef(otherName))!.value, keys);
+    expect(otherValue && isTombstone(otherValue)).toBe(true);
+    const listEmpty = captureIo();
+    await runCli(() => listCommand({}, listEmpty));
+    expect(listEmpty.stdout.join('\n')).not.toContain('secret-proj');
+
     // --origin exclusions are recorded too.
     await runCli(() => excludeCommand(undefined, { origin: 'git@github.com:x/y.git' }, captureIo()));
     expect((await readVaultConfig()).exclude.origins).toEqual(['git@github.com:x/y.git']);
@@ -108,7 +121,7 @@ describe('pan vault exclude / include / allow-secret', () => {
   });
 
   it('ac3: after allow-secret, the next save appends the blocked line', async () => {
-    const session = 'ex300000-0000-4000-8000-000000000000';
+    const session = 'e3000000-0000-4000-8000-000000000000';
     const path = join(fx.root, `${session}.jsonl`);
     writeFileSync(path, `${user(session, 'fine', openProj)}\n${user(session, `key ${API_KEY}`, openProj)}\n`);
     const blocked = captureIo();

@@ -7,8 +7,11 @@
  * stores the backend URL and prints the 24-word recovery phrase exactly once.
  */
 import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
-import { readVaultConfig, writeVaultConfig } from '../../../lib/vault/config.js';
+import { readVaultConfig, vaultDir, writeVaultConfig } from '../../../lib/vault/config.js';
 import { HEADER_REF_NAME, encryptRef, newVaultHeader, readVaultHeader, VaultAuthenticationError } from '../../../lib/vault/format.js';
 import { createVaultKey, deriveSubkeys, keyToPhrase, loadVaultKey, saveVaultKey } from '../../../lib/vault/identity.js';
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
@@ -24,14 +27,23 @@ export interface SetupOptions {
   hooks?: boolean;
 }
 
+const execFileAsync = promisify(execFile);
+
 async function openOrInitStore(url: string): Promise<VaultStore> {
   if (url.startsWith(DIR_BACKEND_PREFIX)) return DirVaultStore.open(url.slice(DIR_BACKEND_PREFIX.length));
   const cloneDir = gitVaultCloneDir();
+  let existing: GitVaultStore | null = null;
   try {
-    return await GitVaultStore.open(cloneDir);
+    existing = await GitVaultStore.open(cloneDir);
   } catch {
-    return initGitVault(url, cloneDir);
+    existing = null;
   }
+  if (!existing) return initGitVault(url, cloneDir);
+  const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: cloneDir, encoding: 'utf8' });
+  if (stdout.trim() !== url) {
+    throw new Error(`The vault clone at ${cloneDir} tracks ${stdout.trim()}, not ${url}. Remove it or run pan vault setup with that URL.`);
+  }
+  return existing;
 }
 
 export async function setupCommand(url: string, options: SetupOptions = {}, io: CliIo = defaultIo): Promise<void> {
@@ -61,6 +73,13 @@ export async function setupCommand(url: string, options: SetupOptions = {}, io: 
     return io.exit(1);
   }
 
+  // Save the key BEFORE the header reaches the remote: a crash in between must
+  // never leave a vault locked by a key that was neither stored nor shown.
+  if (!existingKey) await saveVaultKey(key);
+  const forgetNewKey = async (): Promise<void> => {
+    if (!existingKey) await rm(join(vaultDir(), 'key'), { force: true });
+  };
+
   const header = await store.readRef(HEADER_REF_NAME);
   if (header) {
     try {
@@ -69,6 +88,7 @@ export async function setupCommand(url: string, options: SetupOptions = {}, io: 
     } catch (error) {
       if (!(error instanceof VaultAuthenticationError) && !(error instanceof Error)) throw error;
       io.err(`${url} is already a vault protected by another key. Run: pan vault join ${url}`);
+      await forgetNewKey();
       if (!existingKey && !url.startsWith(DIR_BACKEND_PREFIX)) await rm(gitVaultCloneDir(), { recursive: true, force: true });
       return io.exit(1);
     }
@@ -76,12 +96,12 @@ export async function setupCommand(url: string, options: SetupOptions = {}, io: 
     const outcome = await store.casRef(HEADER_REF_NAME, null, await encryptRef(HEADER_REF_NAME, newVaultHeader(), keys));
     if (outcome !== 'ok') {
       io.err(`Another machine initialized ${url} first. Run: pan vault join ${url}`);
+      await forgetNewKey();
       return io.exit(1);
     }
   }
 
   const me = await ensureEnvironmentIdentity();
-  if (!existingKey) await saveVaultKey(key);
   await writeVaultConfig({ backend: url });
   // Register this machine (m/ ref) and prime the list cache.
   await syncOnce({ store, keys });

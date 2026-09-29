@@ -44,6 +44,19 @@ describe('vault continuity: splitSettleableLines', () => {
     expect(second.consumedBytes).toBe(Buffer.byteLength(`${lines.join('\n')}\n${completed}\n`));
   });
 
+  it('a final complete line with no newline consumes exactly its bytes, and blank lines stay outside', () => {
+    const lines = jsonLines(2);
+    const noNewline = splitSettleableLines(`${lines.join('\n')}\n${lines[1]}`);
+    expect(noNewline.lines).toEqual([...lines, lines[1]]);
+    expect(noNewline.consumedBytes).toBe(Buffer.byteLength(`${lines.join('\n')}\n${lines[1]}`));
+    const blankTail = splitSettleableLines(`${lines.join('\n')}\n\n`);
+    expect(blankTail.lines).toEqual(lines);
+    expect(blankTail.consumedBytes).toBe(Buffer.byteLength(`${lines.join('\n')}\n`));
+    const blankMiddle = splitSettleableLines(`${lines[0]}\n\n${lines[1]}\n`);
+    expect(blankMiddle.lines).toEqual(lines);
+    expect(blankMiddle.consumedBytes).toBe(Buffer.byteLength(`${lines[0]}\n\n${lines[1]}\n`));
+  });
+
   it('drops a trailing complete-looking line that is not valid JSON', () => {
     const lines = jsonLines(1);
     const result = splitSettleableLines(`${lines[0]}\n{"broken":\n`);

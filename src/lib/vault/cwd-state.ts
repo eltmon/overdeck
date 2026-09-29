@@ -33,7 +33,13 @@ export type CwdStateField = keyof CwdState;
 
 async function git(cwd: string, args: string[]): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    // GIT_OPTIONAL_LOCKS=0: never take the user's index.lock for a read-only status refresh.
+    const { stdout } = await execFileAsync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+    });
     return stdout;
   } catch {
     return null;

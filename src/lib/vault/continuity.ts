@@ -63,12 +63,21 @@ export function splitSettleableLines(buffer: Uint8Array | string): SettleableLin
   const parts = text.split('\n');
   const endsWithNewline = text.endsWith('\n');
   if (endsWithNewline) parts.pop();
-  const lines = parts.filter((line) => line.length > 0);
-  if (lines.length > 0 && !isCompleteJson(lines[lines.length - 1]!)) {
-    lines.pop();
-  }
-  let consumedBytes = 0;
-  for (const line of lines) consumedBytes += Buffer.byteLength(line, 'utf8') + 1;
+  // Byte offset just past each part (its newline included when it has one).
+  const ends: number[] = [];
+  let offset = 0;
+  parts.forEach((part, index) => {
+    const terminated = index < parts.length - 1 || endsWithNewline;
+    offset += Buffer.byteLength(part, 'utf8') + (terminated ? 1 : 0);
+    ends.push(offset);
+  });
+  const kept: number[] = [];
+  parts.forEach((part, index) => {
+    if (part.length > 0) kept.push(index);
+  });
+  if (kept.length > 0 && !isCompleteJson(parts[kept[kept.length - 1]!]!)) kept.pop();
+  const lines = kept.map((index) => parts[index]!);
+  const consumedBytes = kept.length > 0 ? ends[kept[kept.length - 1]!]! : 0;
   return { lines, consumedBytes };
 }
 

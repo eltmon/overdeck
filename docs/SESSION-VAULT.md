@@ -153,6 +153,7 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
 | `${OVERDECK_HOME}/vault/allowed-secrets.json` | Allowed line hashes per record. |
 | `${OVERDECK_HOME}/vault/eviction-batch.json` | Pending-deletion batch and declines. |
 | `${OVERDECK_HOME}/environment-id.json` | Machine identity shared with PAN-3762. |
+| `${OVERDECK_HOME}/vault/git.lock`, `index.json.lock`, `allowed-secrets.json.lock`, `eviction-batch.json.lock` | Cross-process lock files (O_EXCL, reclaimed after 30 s if a holder crashed). Every `pan vault` process shares the clone, the index, the allow-list and the batch, so each read-modify-write runs under its lock. |
 
 ## Troubleshooting
 
@@ -162,6 +163,11 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
 - **`diverged`** — a saved line changed or the file shrank. The vault never overwrites saved
   history. Compare `pan vault show <id>` with the native file; excluding the session and
   saving again starts a new record.
+- **`error: …` in `save --all` or `sync`** — one transcript's settlement threw (for example an
+  unreadable file). The other transcripts still settle; fix or exclude the named file.
+- **A transcript never becomes eligible for eviction** — eviction requires that restore would
+  reproduce the file byte for byte and that the LOG holds exactly this machine's lines. A file
+  with blank lines or no final newline, or a record whose LOG was appended twice, is kept on disk.
 - **`blocked at line N: <pattern>`** — a secret was found in a new line. Rotate the secret if
   it is real, then `pan vault allow-secret <id|path> N`, or exclude the session.
 - **`Already continued on <label>`** — another machine adopted the record first. Run
