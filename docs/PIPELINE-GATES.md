@@ -773,7 +773,9 @@ spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
 App installation tokens). Readers aggregate the last 60 minutes from the
 current and previous hour files; files older than 3 hours are deleted on the
 hour rollover. The dashboard, the deacon child, CLI processes and the agent
-`gh` shim (beside the agent git guard, count-only) all write it.
+`gh` shim (beside the agent git guard; conversations get it alone), which
+counts every call and, for agent panes and the Flywheel conversation, refuses
+grant-label writes (PAN-4343), all write it.
 `src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),
 `withGitHubCaller` (the caller context), the App/PAT metering in
 `rest-meter.ts`, and the pause gate.

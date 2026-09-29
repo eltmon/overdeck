@@ -86,12 +86,17 @@ const SWARM_SLOT_FILENAME_SUFFIX = '.slots.json';
 /**
  * `<planHome>/.pan/continues/<ISSUE>.slots.json` — beside the issue's continue
  * file, because the slot ledger is the same kind of thing: per-issue progress
- * the repo owns. Callers hand in a workspace path (the natural handle at every
- * call site), so the plan home is resolved here; for a polyrepo project that is
- * the infra repo, not the workspace.
+ * the repo owns. The BASE workspace (`<project>/workspaces/feature-<issue>`)
+ * owns the ledger, never a slot or strike sibling worktree — those are
+ * separate checkouts that get torn down independently, so resolving from
+ * whichever slot path called in would split the ledger across as many files
+ * as there are slots. Callers hand in a workspace path (a slot's own path
+ * included), so the base workspace is always recomputed from the project
+ * root rather than trusted from the argument (PAN-4225).
  */
 export function swarmSlotStatePath(workspacePath: string, issueId: string): string {
-  const planHome = resolvePlanHome(resolve(workspacePath, '..', '..'));
+  const projectRoot = resolve(workspacePath, '..', '..');
+  const planHome = resolvePlanHome(join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`));
   return join(planHome, '.pan', 'continues', `${issueId.toUpperCase()}${SWARM_SLOT_FILENAME_SUFFIX}`);
 }
 

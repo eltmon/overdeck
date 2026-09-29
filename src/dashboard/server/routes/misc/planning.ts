@@ -317,7 +317,7 @@ Continue the PLANNING session. Do NOT implement anything.
         await writeFile(continuationPromptPath, continuationPrompt);
 
         const agentCwd = workspacePath;
-        const harnessLaunch = await prepareHarnessLaunch('claude-code');
+        const harnessLaunch = await prepareHarnessLaunch('claude-code', { model: msgPlanningModel });
 
         if (existsSync(outputFile)) {
           const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);

@@ -26,6 +26,10 @@
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
+- **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI.
+  Live-model evals call `runPromptScenario` in `evals/lib/prompt-harness.ts` and
+  need `OVERDECK_EVAL_MODEL` (no fallback); `typecheck:evals` covers `evals/**`.
+  Unit tests for eval helpers live in `tests/unit/evals/`.
 - **Lint:** `npm run lint` is ESLint plus ~20 chained shell guards in `scripts/`
   (skill/CLI drift, state doors, prompt trailers, file size, circular deps,
   ratchet audit, …). `npm run typecheck` chains root + hooks + evals + the two
@@ -45,4 +49,4 @@
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-09-28 -->
+<!-- last-verified: 2026-09-29 -->

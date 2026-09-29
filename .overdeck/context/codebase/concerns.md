@@ -191,16 +191,26 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   session ever drafted reads as "tracked", and the walk is slow. Ask history
   questions of `HEAD` (or a named branch) instead — PAN-4212.
 
-- **Per-issue continue/spec writers still target the primary checkout,
-  uncommitted** (PAN-4225) — unlike the plan-home push path fixed in PAN-4224
-  (`pushPlanArtifacts`, `promoteWorkspacePrdDraft`), the feedback-writer, session
-  history, and `transitionXBriefOnMain` still write per-issue `.pan/`
-  artifacts into the primary checkout instead of the issue's workspace, and
-  never commit them. `pushPlanArtifacts` tolerates the untracked collisions
-  this leaves behind (clears an identical one, backs up a differing one under
-  `.overdeck/plan-artifact-backups/<stamp>/`) — that's a safety net, not a fix
-  for the write-site bug. Don't add another primary-checkout writer without
-  routing it through the workspace like the fixed paths.
+- **Per-issue continue/spec writers target the issue's base workspace, never
+  the primary checkout** (PAN-4225) — `resolveIssueWorkspacePlanHome(projectRoot,
+  issueId)` in `xbrief/lifecycle-io.ts` is the one place that resolves
+  `<project>/workspaces/feature-<issue>`'s plan home; every per-issue writer
+  (feedback, session history, `transitionIssueXBrief`, the swarm slot ledger)
+  routes through it and writes nothing once that workspace is gone. Readers
+  (`readContinueStateForIssue`) check the workspace copy first, then the
+  primary. Routine server writes leave `.pan/continues/`/`.pan/specs/` dirty
+  and uncommitted in the workspace — `isOverdeckOwnedOnlyStatus`
+  (`state-plane.ts`) already exempts both paths from the "uncommitted work"
+  gate, so a server-dirtied file sitting there is expected, not a bug. The
+  server is NOT lock-free of commits in a workspace, though:
+  `commitPendingIssueArtifacts` (`overdeck/plan-artifact-commit.ts`) commits
+  both paths at the two spots that would otherwise hit `git rebase`'s refusal
+  on a dirty tree — `pan done`'s rebase-and-push step, and the merge
+  pipeline's in-place feature-branch rebase (`cloister/merge-rebase.ts`) —
+  and `autoCommitWorkspaceChangesBeforeSync` (`merge-agent.ts`, pre-dating
+  PAN-4225) already committed `.pan/continues/` before a sync-main rebase for
+  the same reason. Don't add a writer that resolves the primary checkout
+  directly; route it through `resolveIssueWorkspacePlanHome` like the rest.
 - **A `verification.passed` journal tail is ambiguous** (PAN-4221) — quick
   review mode writes no `review.dispatched`, so the tail stays
   `verification.passed` while a healthy quick reviewer runs, AND when a

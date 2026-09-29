@@ -8,9 +8,8 @@
  * waiver expires the moment the branch moves — a new commit gets a fresh gate,
  * not an open door. It never waives an added `.skip`/`.only`.
  */
-import { resolvePlanHome } from '../pan-dir/paths.js';
 import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
-import { readContinueState } from '../xbrief/continue-state.js';
+import { readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
 
 /** Decision id prefix the waiver is recorded under on the continue file. */
 const TEST_SKIP_WAIVER_DECISION_PREFIX = 'D-test-removal-waived:';
@@ -44,7 +43,7 @@ export function resolveActiveTestSkipWaiver(issueId: string, head: string | unde
   try {
     const project = resolveProjectForIssue(issueId);
     if (!project) return null;
-    const state = readContinueState(resolvePlanHome(project.path), issueId.toUpperCase());
+    const state = readContinueStateForIssue(project.path, issueId.toUpperCase());
     for (const decision of state?.decisions ?? []) {
       if (!decision.id.startsWith(TEST_SKIP_WAIVER_DECISION_PREFIX)) continue;
       const sha = decision.id.slice(TEST_SKIP_WAIVER_DECISION_PREFIX.length);

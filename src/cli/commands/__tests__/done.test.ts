@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
+import { augmentCommentWithWaiver, commitPendingIssueArtifacts, recordTestWaiver } from '../done.js';
 import { verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
 import { readContinueState } from '../../../lib/xbrief/continue-state.js';
 
@@ -84,6 +84,67 @@ describe('recordTestWaiver', () => {
     expect(state?.decisions[0].id).toBe('D-test-waived');
     expect(state?.decisions[0].summary).toBe('Test gate waived: covered by existing test at abc123');
     rmSync(workspace, { recursive: true, force: true });
+  });
+});
+
+describe('commitPendingIssueArtifacts (PAN-4225)', () => {
+  async function makeRepo(): Promise<string> {
+    const dir = mkdtempSync(join(tmpdir(), 'pan-done-commit-artifacts-'));
+    await git(dir, ['init', '-q', '-b', 'main']);
+    await git(dir, ['config', 'user.email', 'test@test.local']);
+    await git(dir, ['config', 'user.name', 'Test']);
+    return dir;
+  }
+
+  it('ac1: commits only .pan/continues (and .pan/specs) when a source file is also dirty', async () => {
+    const dir = await makeRepo();
+    mkdirSync(join(dir, '.pan', 'continues'), { recursive: true });
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, '.pan', 'continues', 'PAN-5.xbrief.json'), '{"a":1}\n', 'utf-8');
+    writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 1;\n', 'utf-8');
+    await execFileAsync('git', ['add', '-A'], { cwd: dir });
+    await execFileAsync('git', ['-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'init'], { cwd: dir });
+
+    writeFileSync(join(dir, '.pan', 'continues', 'PAN-5.xbrief.json'), '{"a":2}\n', 'utf-8');
+    writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 2;\n', 'utf-8');
+
+    await commitPendingIssueArtifacts(dir, 'PAN-5');
+
+    const { stdout: log } = await execFileAsync('git', ['log', '--format=%H'], { cwd: dir });
+    expect(log.trim().split('\n')).toHaveLength(2);
+    const { stdout: changed } = await execFileAsync('git', ['diff', '--name-only', 'HEAD~1', 'HEAD'], { cwd: dir });
+    const changedPaths = changed.trim().split('\n').filter(Boolean);
+    expect(changedPaths).toEqual(['.pan/continues/PAN-5.xbrief.json']);
+
+    // ac2: the source file is still modified — untouched by the commit.
+    const { stdout: status } = await execFileAsync('git', ['status', '--porcelain', '--', 'src/a.ts'], { cwd: dir });
+    expect(status.trim()).toContain('src/a.ts');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('ac3: creates no commit and does not throw on a clean tree', async () => {
+    const dir = await makeRepo();
+    mkdirSync(join(dir, '.pan', 'continues'), { recursive: true });
+    writeFileSync(join(dir, '.pan', 'continues', 'PAN-5.xbrief.json'), '{}\n', 'utf-8');
+    await execFileAsync('git', ['add', '-A'], { cwd: dir });
+    await execFileAsync('git', ['-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'init'], { cwd: dir });
+
+    await expect(commitPendingIssueArtifacts(dir, 'PAN-5')).resolves.toBeUndefined();
+
+    const { stdout: log } = await execFileAsync('git', ['log', '--format=%H'], { cwd: dir });
+    expect(log.trim().split('\n')).toHaveLength(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('ac4: returns without throwing when there is no .pan directory', async () => {
+    const dir = await makeRepo();
+    writeFileSync(join(dir, 'README.md'), '# test\n');
+    await execFileAsync('git', ['add', '-A'], { cwd: dir });
+    await execFileAsync('git', ['-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'init'], { cwd: dir });
+
+    await expect(commitPendingIssueArtifacts(dir, 'PAN-5')).resolves.toBeUndefined();
+    expect(existsSync(join(dir, '.pan'))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

@@ -62,6 +62,15 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
 vi.mock('../../../src/lib/shadow-utils.js', () => ({
   getLinearApiKey: () => Effect.succeed(null),
 }));
+// commitPendingIssueArtifacts (PAN-4225) runs before the rebase step; the
+// mocked fs (existsSync always true) makes it think .pan/continues and
+// .pan/specs exist under the fake workspace path, so the real implementation
+// would try `git add` in a directory that doesn't exist. This suite is about
+// the review-request step, not artifact commits, so treat it as a no-op.
+vi.mock('../../../src/lib/overdeck/plan-artifact-commit.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/overdeck/plan-artifact-commit.js')>()),
+  commitPendingIssueArtifacts: async () => undefined,
+}));
 vi.mock('../../../src/cli/exit.js', () => ({
   exitCli: exitCliMock,
 }));
