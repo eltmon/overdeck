@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:49:52.658Z",
+  "updated": "2026-09-29T15:50:07.792Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "preset-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T15:49:52.658Z"
+    },
+    "preset-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:50:07.791Z"
     }
   }
 }
