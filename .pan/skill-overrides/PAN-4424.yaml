@@ -1,4 +1,0 @@
-# Overdeck per-issue skill overrides (PAN-3942). true = on, false = off; absent = inherit.
-issue: PAN-4424
-packs:
-  mattpocock: true
