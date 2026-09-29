@@ -377,13 +377,66 @@ describe('generateLauncherScript', () => {
       }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
       case "\\$_overdeck_git_command" in
-        rebase|stash|reset) ;;
+        rebase|stash|reset|commit|push|merge|cherry-pick) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
       esac
       _overdeck_git_target="\\$(_overdeck_git_target_dir "\\$@")"
       case "\\$_overdeck_git_target" in
         "\\$_OVERDECK_GUARD_ROOT"|"\\$_OVERDECK_GUARD_ROOT"/*) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
+      case "\\$_overdeck_git_command" in
+        commit|push|merge|cherry-pick)
+          _overdeck_top="\\$("\\$_OVERDECK_REAL_GIT" -C "\\$_overdeck_git_target" rev-parse --show-toplevel 2>/dev/null)"
+          _overdeck_expected=""
+          _overdeck_expect_attempt=0
+          if [ -n "\\$_overdeck_top" ] && [ -f "\\$_overdeck_top/.git" ]; then
+            case "\\$_overdeck_top" in
+              */.swarm/*) _overdeck_ws="\\\${_overdeck_top%/.swarm/*}"; _overdeck_item="\\\${_overdeck_top##*/.swarm/}" ;;
+              *) _overdeck_ws="\\$_overdeck_top"; _overdeck_item="" ;;
+            esac
+            _overdeck_ws_name="\\\${_overdeck_ws##*/}"
+            case "\\$_overdeck_ws_name" in
+              feature-*-strike)
+                _overdeck_strike_id="\\\${_overdeck_ws_name#feature-}"
+                _overdeck_strike_id="\\\${_overdeck_strike_id%-strike}"
+                _overdeck_expected="strike/\\$_overdeck_strike_id"
+                ;;
+              feature-*-slot-[0-9]*)
+                _overdeck_expected="feature/\\\${_overdeck_ws_name#feature-}"
+                _overdeck_expect_attempt=1
+                ;;
+              feature-?*)
+                _overdeck_expected="feature/\\\${_overdeck_ws_name#feature-}"
+                ;;
+            esac
+            case "\\$_overdeck_item" in
+              */*) _overdeck_expected=""; _overdeck_expect_attempt=0 ;;
+              ?*)
+                [ -z "\\$_overdeck_expected" ] || _overdeck_expected="\\$_overdeck_expected-\\$_overdeck_item"
+                _overdeck_expect_attempt=0
+                ;;
+            esac
+          fi
+          if [ -n "\\$_overdeck_expected" ]; then
+            _overdeck_branch="\\$("\\$_OVERDECK_REAL_GIT" -C "\\$_overdeck_git_target" branch --show-current 2>/dev/null)"
+            _overdeck_branch_ok=0
+            if [ "\\$_overdeck_branch" = "\\$_overdeck_expected" ]; then
+              _overdeck_branch_ok=1
+            elif [ "\\$_overdeck_expect_attempt" = 1 ]; then
+              case "\\$_overdeck_branch" in
+                "\\$_overdeck_expected"-attempt-[0-9]*) _overdeck_branch_ok=1 ;;
+              esac
+            fi
+            if [ "\\$_overdeck_branch_ok" != 1 ]; then
+              _overdeck_actual="branch \\$_overdeck_branch"
+              [ -n "\\$_overdeck_branch" ] || _overdeck_actual="a detached HEAD"
+              echo "Overdeck refused git \\$_overdeck_git_command: \\$_overdeck_top must be on branch \\$_overdeck_expected, but it is on \\$_overdeck_actual. Stop and report this via pan tell; do not commit or push from this worktree." >&2
+              exit 1
+            fi
+          fi
+          exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+          ;;
       esac
       case "\\$_overdeck_git_command" in
         rebase)
@@ -579,13 +632,66 @@ describe('generateLauncherScript', () => {
       }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
       case "\\$_overdeck_git_command" in
-        rebase|stash|reset) ;;
+        rebase|stash|reset|commit|push|merge|cherry-pick) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
       esac
       _overdeck_git_target="\\$(_overdeck_git_target_dir "\\$@")"
       case "\\$_overdeck_git_target" in
         "\\$_OVERDECK_GUARD_ROOT"|"\\$_OVERDECK_GUARD_ROOT"/*) ;;
         *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
+      case "\\$_overdeck_git_command" in
+        commit|push|merge|cherry-pick)
+          _overdeck_top="\\$("\\$_OVERDECK_REAL_GIT" -C "\\$_overdeck_git_target" rev-parse --show-toplevel 2>/dev/null)"
+          _overdeck_expected=""
+          _overdeck_expect_attempt=0
+          if [ -n "\\$_overdeck_top" ] && [ -f "\\$_overdeck_top/.git" ]; then
+            case "\\$_overdeck_top" in
+              */.swarm/*) _overdeck_ws="\\\${_overdeck_top%/.swarm/*}"; _overdeck_item="\\\${_overdeck_top##*/.swarm/}" ;;
+              *) _overdeck_ws="\\$_overdeck_top"; _overdeck_item="" ;;
+            esac
+            _overdeck_ws_name="\\\${_overdeck_ws##*/}"
+            case "\\$_overdeck_ws_name" in
+              feature-*-strike)
+                _overdeck_strike_id="\\\${_overdeck_ws_name#feature-}"
+                _overdeck_strike_id="\\\${_overdeck_strike_id%-strike}"
+                _overdeck_expected="strike/\\$_overdeck_strike_id"
+                ;;
+              feature-*-slot-[0-9]*)
+                _overdeck_expected="feature/\\\${_overdeck_ws_name#feature-}"
+                _overdeck_expect_attempt=1
+                ;;
+              feature-?*)
+                _overdeck_expected="feature/\\\${_overdeck_ws_name#feature-}"
+                ;;
+            esac
+            case "\\$_overdeck_item" in
+              */*) _overdeck_expected=""; _overdeck_expect_attempt=0 ;;
+              ?*)
+                [ -z "\\$_overdeck_expected" ] || _overdeck_expected="\\$_overdeck_expected-\\$_overdeck_item"
+                _overdeck_expect_attempt=0
+                ;;
+            esac
+          fi
+          if [ -n "\\$_overdeck_expected" ]; then
+            _overdeck_branch="\\$("\\$_OVERDECK_REAL_GIT" -C "\\$_overdeck_git_target" branch --show-current 2>/dev/null)"
+            _overdeck_branch_ok=0
+            if [ "\\$_overdeck_branch" = "\\$_overdeck_expected" ]; then
+              _overdeck_branch_ok=1
+            elif [ "\\$_overdeck_expect_attempt" = 1 ]; then
+              case "\\$_overdeck_branch" in
+                "\\$_overdeck_expected"-attempt-[0-9]*) _overdeck_branch_ok=1 ;;
+              esac
+            fi
+            if [ "\\$_overdeck_branch_ok" != 1 ]; then
+              _overdeck_actual="branch \\$_overdeck_branch"
+              [ -n "\\$_overdeck_branch" ] || _overdeck_actual="a detached HEAD"
+              echo "Overdeck refused git \\$_overdeck_git_command: \\$_overdeck_top must be on branch \\$_overdeck_expected, but it is on \\$_overdeck_actual. Stop and report this via pan tell; do not commit or push from this worktree." >&2
+              exit 1
+            fi
+          fi
+          exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+          ;;
       esac
       case "\\$_overdeck_git_command" in
         rebase)
