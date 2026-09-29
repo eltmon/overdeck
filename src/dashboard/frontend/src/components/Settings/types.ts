@@ -153,7 +153,7 @@ export const BACKGROUND_AI_FEATURE_META: ReadonlyArray<{
   // PAN-4369: optional TypeSafe Jev judgment calls, off by default. Each description is part of
   // the data-disclosure surface: it names exactly what the feature sends to TypeSafe.
   { key: 'jevTurnEndAssessment', label: 'Jev: turn-end classification', description: "Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped." },
-  { key: 'jevAcceptanceCriteriaReview', label: 'Jev: acceptance-criteria review', description: 'Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings.' },
+  { key: 'jevAcceptanceCriteriaReview', label: 'Jev: acceptance-criteria review', description: "Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings." },
   { key: 'jevMemoryRelevance', label: 'Jev: memory relevance filter', description: 'Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection.' },
 ];
 

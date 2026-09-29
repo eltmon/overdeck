@@ -76,17 +76,19 @@ does without Jev: no request, no startup check, and no warning.
 
 ## What is sent to TypeSafe
 
-This release sends nothing: the client exists, but no feature calls it yet.
+`jevAcceptanceCriteriaReview` is live. The other two toggles send nothing until their features ship.
 
 When each feature ships, turning its toggle on sends the following data:
 
 | Toggle | What it sends (when that feature ships) |
 | --- | --- |
 | `jevTurnEndAssessment` | Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
-| `jevAcceptanceCriteriaReview` | Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings. |
+| `jevAcceptanceCriteriaReview` | Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings. |
 | `jevMemoryRelevance` | Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection. |
 
 The same text appears under each toggle in Settings.
+
+Acceptance-criteria text can quote issue text that anyone wrote in a public tracker, so Overdeck treats the Jev result as advice only: it prints warnings and never blocks plan finalize.
 
 ## Privacy
 
