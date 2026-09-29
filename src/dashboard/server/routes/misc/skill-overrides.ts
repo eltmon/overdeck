@@ -1,18 +1,22 @@
 /**
- * Per-skill on/off overrides (PAN-3942).
+ * Per-skill on/off overrides (PAN-3942) and skill pack toggles (PAN-4334).
  *
- *   GET /api/skills/overrides?project=<key>&issue=<id>
- *   PUT /api/skills/overrides  { level, skill, enabled: true|false|null, projectKey?, issueId? }
+ *   GET /api/skills/overrides?project=<key>&issue=<id>[&checkUpdates=1]
+ *   PUT /api/skills/overrides  { level, skill | pack, enabled: true|false|null, projectKey?, issueId? }
  *
- * Both return the effective state of every catalog skill for the context.
- * The global context (no project, no issue) also reports which projects and
- * issues override each skill below global.
+ * Both return `{ project, issue, skills, packs }`: the effective state of
+ * every catalog skill and every registered pack for the context. The global
+ * context (no project, no issue) also reports `overriddenBelow` (skills) and
+ * `packOverriddenBelow` (pack toggles) from projects and issues. Only a GET
+ * with `checkUpdates=1` fills `packs[].updateAvailable`, because that runs
+ * `git ls-remote`; the PUT response never does.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   listLowerLevelOverrides,
+  listLowerLevelPackOverrides,
   listSkillStates,
   parseSkillOverrideUpdate,
   setSkillOverride,
@@ -39,10 +43,11 @@ function errorResponse(error: unknown) {
   return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
 }
 
-async function skillStatesResponseBody(ctx: { projectKey?: string; issueId?: string }) {
-  const list = await listSkillStates(ctx);
+async function skillStatesResponseBody(ctx: { projectKey?: string; issueId?: string }, checkUpdates = false) {
+  const list = checkUpdates ? await listSkillStates(ctx, { checkUpdates: true }) : await listSkillStates(ctx);
   if (ctx.projectKey || ctx.issueId) return list;
-  return { ...list, overriddenBelow: await listLowerLevelOverrides() };
+  const [overriddenBelow, packOverriddenBelow] = await Promise.all([listLowerLevelOverrides(), listLowerLevelPackOverrides()]);
+  return { ...list, overriddenBelow, packOverriddenBelow };
 }
 
 const getSkillOverridesRoute = HttpRouter.add(
@@ -53,9 +58,10 @@ const getSkillOverridesRoute = HttpRouter.add(
     const url = new URL(request.url, 'http://localhost');
     const projectKey = url.searchParams.get('project') || undefined;
     const issueId = url.searchParams.get('issue') || undefined;
+    const checkUpdates = url.searchParams.get('checkUpdates') === '1';
     return yield* Effect.promise(async () => {
       try {
-        return jsonResponse(await skillStatesResponseBody({ projectKey, issueId }));
+        return jsonResponse(await skillStatesResponseBody({ projectKey, issueId }, checkUpdates));
       } catch (error) {
         return errorResponse(error);
       }
