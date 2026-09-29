@@ -291,5 +291,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`xbrief/plan-finalized.ts`) or every open branch fails verification. For a
   polyrepo `pan_records.repo` project, finalize makes that commit in the nested
   plan-home repo, not the wrapper.
+- **The stall sweeper is not scheduled** — PAN-3917 W4 (`94255f055fe`) cut the
+  only call site of `runStallSweeperPatrol` (`cloister/stall-sweeper.ts`); it
+  runs only in tests. Live parked-row readers are `pan parked` and
+  `/api/velocity` (both via `parked/resolver.ts`) and `/api/parked`
+  (`routes/parked.ts`, its own derivation). Anything added to sweeper output
+  has no live emitter until the sweeper is rescheduled (operator decision).
 
 <!-- last-verified: 2026-09-29 -->

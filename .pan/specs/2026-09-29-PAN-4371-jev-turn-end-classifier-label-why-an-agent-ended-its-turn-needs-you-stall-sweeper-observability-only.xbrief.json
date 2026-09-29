@@ -4,17 +4,17 @@
     "created": "2026-09-29T09:43:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4371: Jev turn-end classifier: label why an agent ended its turn (Needs-you + stall sweeper), observability only",
-    "updated": "2026-09-29T09:48:23.625Z"
+    "updated": "2026-09-29T09:48:57.708Z"
   },
   "plan": {
     "id": "pan-4371",
     "title": "Jev turn-end classifier: label why an agent ended its turn (Needs-you + stall sweeper), observability only",
-    "status": "proposed",
+    "status": "running",
     "uid": "68c897df-5f30-4e63-a740-38928e2edfe3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T09:43:00Z",
-    "updated": "2026-09-29T09:48:23.625Z",
+    "updated": "2026-09-29T09:48:57.708Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4371",
