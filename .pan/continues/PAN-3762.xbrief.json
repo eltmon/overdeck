@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:27:20.011Z",
+  "updated": "2026-09-29T16:27:34.370Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "cli-devices.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:27:20.011Z"
+    },
+    "browser-pairing-landing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:27:34.370Z"
     }
   }
 }
