@@ -116,6 +116,52 @@ describe('vault sync: syncOnce', () => {
     expect(await readListCache()).toEqual([expect.objectContaining({ vaultId: 'gone', tombstone: true })]);
   });
 
+  it('tolerant.ac1: a ref sealed under an unknown key is counted unreadable and sync completes', async () => {
+    useHome(homeA);
+    const nativePath = join(root, 'a-session.jsonl');
+    writeFileSync(nativePath, `${user('a readable conversation', cwd)}\n`);
+    const saved = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+    expect(saved.verdict).toBe('append');
+    const unknown = deriveSubkeys(createVaultKey());
+    const junkRecord = `r/${'0'.repeat(40)}`;
+    const junkMachine = `m/${'1'.repeat(40)}`;
+    await store.casRef(junkRecord, null, await encryptRef(junkRecord, { v: 1, type: 'session', vaultId: 'junk', tombstone: true }, unknown));
+    await store.casRef(junkMachine, null, Buffer.from('not an envelope'));
+
+    const report = await syncOnce({ store, keys, config });
+    expect(report.offline).toBe(false);
+    expect(report.unreadable).toBe(2);
+    expect(report.retired).toBe(0);
+    expect(report.records).toBe(1);
+    expect(report.machines).toHaveLength(1);
+    expect((await readListCache()).map((row) => row.vaultId)).toEqual([(saved as { vaultId: string }).vaultId]);
+  });
+
+  it('tolerant.ac2: a retired-ref marker under a ring key is counted retired, not listed', async () => {
+    useHome(homeA);
+    const retired = deriveSubkeys(createVaultKey());
+    const current = { ...keys, previous: [deriveSubkeys(createVaultKey()), retired] };
+    const marker = { v: 1 as const, type: 'retired' as const, at: '2026-09-29T00:00:00.000Z' };
+    const oldRecord = refName('record', 'moved', retired.K_ref);
+    const oldMachine = refName('machine', 'env-old', retired.K_ref);
+    await store.casRef(oldRecord, null, await encryptRef(oldRecord, marker, retired));
+    await store.casRef(oldMachine, null, await encryptRef(oldMachine, marker, retired));
+    const liveName = refName('record', 'moved', current.K_ref);
+    await store.casRef(liveName, null, await encryptRef(liveName, { v: 1, type: 'session', vaultId: 'moved', tombstone: true }, current));
+
+    const report = await syncOnce({ store, keys: current, config });
+    expect(report.offline).toBe(false);
+    expect(report.retired).toBe(2);
+    expect(report.unreadable).toBe(0);
+    expect(report.skipped).toBe(0);
+    expect(report.records).toBe(1);
+    expect((await readListCache()).map((row) => row.vaultId)).toEqual(['moved']);
+    // Without the ring the same markers are unreadable, and sync still completes.
+    const blind = await syncOnce({ store, keys, config });
+    expect(blind.retired).toBe(0);
+    expect(blind.unreadable).toBe(2);
+  });
+
   it('an offline refresh returns { offline: true } and touches nothing', async () => {
     useHome(homeA);
     const offlineStore = { ...store, refresh: async () => { const { VaultOfflineError } = await import('../../../../src/lib/vault/store/types.js'); throw new VaultOfflineError('down'); } };

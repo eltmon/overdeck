@@ -8,6 +8,7 @@
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { readMachineRecord, type MachineRecord } from '../../../lib/vault/format.js';
 import { listOwned, readListCache } from '../../../lib/vault/local-index.js';
+import { readTolerant } from '../../../lib/vault/sync.js';
 import { defaultIo, openVault, type CliIo } from './shared.js';
 
 export interface StatusOptions {
@@ -24,8 +25,9 @@ export async function statusCommand(options: StatusOptions = {}, io: CliIo = def
   for (const { name } of await vault.store.listRefs('m/')) {
     const ref = await vault.store.readRef(name);
     if (!ref) continue;
-    const record = await readMachineRecord(name, ref.value, vault.keys);
-    if (record) machines.push(record);
+    // A ref under a retired or unknown key is skipped, not fatal (PAN-4333).
+    const read = await readTolerant(name, ref.value, vault.keys, readMachineRecord);
+    if (read !== 'retired' && read !== 'unreadable' && read.value) machines.push(read.value);
   }
   machines.sort((a, b) => a.label.localeCompare(b.label));
   const mine = machines.find((machine) => machine.environmentId === me.environmentId);
