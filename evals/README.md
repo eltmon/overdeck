@@ -89,7 +89,7 @@ Estimates below assume the flywheel system prompt (≈16 KB ≈ 4K tokens per ca
 
 Measured values from the first live runs are listed below; replace the estimates when a model is measured.
 
-- `gpt-6-luna` (via `cliproxy`): pending operator run.
+- `gpt-6-luna` (via `cliproxy`, effort `high`, 2026-09-29): `flywheel launch-vs-report decision` — 2 calls, 9,486 input tokens (incl. cache reads), 413 output tokens, $0.000464. `flywheel order-book drain completion` — 2 calls, 8,871 input tokens (incl. cache reads), 1,346 output tokens, $0.000869. `review synthesis canonical blocker format` — 1 call, 3,317 input tokens (incl. cache reads), 1,019 output tokens, $0.000588. All 5 calls total: 21,674 input tokens, 2,778 output tokens, $0.0019, cost basis `api-equivalent` (billed against a CLIProxy ChatGPT subscription, not the API).
 - `claude-sonnet-5-5`: pending operator run — `OVERDECK_EVAL_MODEL=claude-sonnet-5-5 npm run eval` (needs an `ANTHROPIC_API_KEY` credential not present in the reference agent environment).
 
 ### Known limits

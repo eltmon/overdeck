@@ -14,5 +14,8 @@ export default defineConfig({
     environment: 'node',
     globalSetup: [],
     setupFiles: [],
+    // Live evals call a real model at effort 'high' (adaptive thinking / reasoning.effort);
+    // Evalite's default 30s testTimeout is too short for that and times out mid-run.
+    testTimeout: 180_000,
   },
 });
