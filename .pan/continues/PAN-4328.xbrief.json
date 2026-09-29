@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T09:46:35.329Z",
+  "updated": "2026-09-29T09:48:07.084Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-29T09:46:26.085Z"
     },
     "keywrap": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4328",
-      "claimedAt": "2026-09-29T09:46:35.329Z"
+      "claimedAt": "2026-09-29T09:46:35.329Z",
+      "doneAt": "2026-09-29T09:48:07.084Z"
     }
   }
 }
