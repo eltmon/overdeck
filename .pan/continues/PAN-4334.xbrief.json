@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:08:22.962Z",
+  "updated": "2026-09-29T01:08:28.947Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4334",
       "claimedAt": "2026-09-29T01:00:45.758Z",
       "doneAt": "2026-09-29T01:08:22.961Z"
+    },
+    "mount-claude": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:08:28.947Z"
     }
   }
 }
