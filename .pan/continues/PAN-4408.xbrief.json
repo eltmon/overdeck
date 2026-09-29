@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:00:38.801Z",
+  "updated": "2026-09-29T16:00:55.064Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "vendor-script.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:00:38.801Z"
+    },
+    "vendor-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:00:55.063Z"
     }
   }
 }
