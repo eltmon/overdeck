@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4372",
   "created": "2026-09-29T09:44:00.403Z",
-  "updated": "2026-09-29T10:24:15.711Z",
+  "updated": "2026-09-29T10:24:37.183Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4372",
       "claimedAt": "2026-09-29T10:12:27.904Z",
       "doneAt": "2026-09-29T10:24:15.711Z"
+    },
+    "finalize-jev-warnings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:24:37.183Z"
     }
   }
 }
