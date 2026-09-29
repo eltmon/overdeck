@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:15:52.767Z",
+  "updated": "2026-09-29T11:16:03.756Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,6 +328,10 @@
     "summary-prompts-extract.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T11:15:52.767Z"
+    },
+    "handoff-render-export.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:03.756Z"
     }
   }
 }
