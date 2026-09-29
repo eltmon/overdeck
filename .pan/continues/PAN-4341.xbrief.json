@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4341",
   "created": "2026-09-29T04:22:08.600Z",
-  "updated": "2026-09-29T05:13:16.577Z",
+  "updated": "2026-09-29T05:26:11.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4341",
       "claimedAt": "2026-09-29T05:11:01.547Z",
       "doneAt": "2026-09-29T05:13:16.576Z"
+    },
+    "plan-digest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:11.565Z"
     }
   }
 }
