@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:46:46.519Z",
+  "updated": "2026-09-29T11:46:57.061Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "enrichment-attach.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:46:46.519Z"
+    },
+    "enrichment-attach.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:57.061Z"
     }
   }
 }
