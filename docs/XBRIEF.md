@@ -6,7 +6,7 @@ Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable wo
 
 The xBRIEF checklist is the task source of truth. Completion state lives in `.pan/continues/<issue-lowercase>.xbrief.json`, plus the `Item: <item-id>` trailer on the commit that finished it — nothing is duplicated into a separate pipeline record.
 
-Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. Two agents may race to claim an item; exactly one claim succeeds, and the loser rereads the plan and selects the next dispatchable item.
+Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. `pan task claim` refuses (exit 1, nothing written) when a running agent holds the item, or holds another item whose `files_scope` overlaps it — a low-confidence `files_scope` on either side counts as overlap, since Overdeck can't prove the two touch different files. Liveness is read live at claim time, never leased or cached. Two concurrent `pan task claim` processes on the same item are serialized by the task-state lock, so exactly one wins; the loser rereads the plan and selects the next dispatchable item. `--steal` is the foreman/operator override for both refusal kinds — a worker should never pass it.
 
 ## xBRIEF v0.8
 
@@ -132,7 +132,7 @@ There is no workspace-local copy of the spec during work execution. Work agents 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
 | `.pan/specs/<file>` | Planning and lifecycle writers only | Dashboard, agents (via `findPlan()`) | None — structure is immutable during work; explicit re-planning may replace the document at the same canonical filename |
-| `.pan/continues/<issue>.xbrief.json` | `pan task claim`/`pan task done` | Dashboard, agents | Serialized per issue |
+| `.pan/continues/<issue>.xbrief.json` | `pan task claim`/`done`/`block`/`unblock`/`reopen`/`cancel` | Dashboard, agents | Serialized per issue by the task-state lock (`overdeck-task-state.lock` in the plan home's git dir) |
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |

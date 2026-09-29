@@ -47,11 +47,20 @@ Either way, give the worker an exact file-ownership map (which files/paths
 this item owns) restated in its dispatch prompt — concurrent workers in one
 worktree WILL clobber shared files. Items whose ownership maps overlap run
 serially, in the same wave, never concurrently; disjoint items run
-concurrently.
+concurrently. `pan task claim` now enforces the no-overlap rule itself: it
+refuses an item whose `files_scope` overlaps another item a running agent
+already holds, so a dispatch mistake fails the claim instead of silently
+clobbering files.
 
 ## Per-item protocol (every worker follows this)
 
 1. `pan task claim <id> <item-id>` — claims the item in the continue file.
+   The claim refuses (exit 1, nothing written) when a running agent already
+   holds this item, or holds another item whose `files_scope` overlaps it. A
+   worker that gets refused runs `pan task next` and picks a different item —
+   only the foreman or the operator passes `--steal` to override the refusal.
+   A `pan spawn` worker pane claims under its own pane name
+   (`OVERDECK_CLAIM_ID`, set by `pan spawn`), so its claim can be liveness-checked.
 2. Implement. One item, one concern.
 3. One commit with the trailer `Item: <item-id>`, on the worker's own branch
    (its worktree branch for an in-harness subagent, or the feature branch

@@ -24,6 +24,7 @@ does:
 
 1. `pan task claim <issue-id> <item-id>` — claim it in the continue file
    (`.pan/continues/<issue-id>.xbrief.json`).
+   If the claim is refused, run `pan task next` and pick another item — never pass `--steal` for a worker.
 2. Implement only that item, then run only the tests it touched, with the
    project's test runner scoped to those files (`npx vitest run <files>` in a
    vitest project). Never run the full suite yourself — the verification gate

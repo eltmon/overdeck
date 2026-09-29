@@ -44,13 +44,21 @@ to delegate a bounded brief and read its answer.
 
 Every worker gets an exact file-ownership map in its dispatch prompt. Items
 whose maps overlap run serially in the same wave; disjoint items run
-concurrently.
+concurrently. `pan task claim` now enforces this itself: it refuses an item
+whose `files_scope` overlaps another item a running agent already holds, so a
+dispatch mistake fails the claim instead of silently clobbering files.
 
 ## Per-item protocol
 
 Every worker, whichever way it was dispatched, follows the same loop:
 
 1. `pan task claim <id> <item-id>` — claims the item in `.pan/continues/<id>.xbrief.json`.
+   The claim refuses (exit 1, nothing written) when a running agent already
+   holds this item, or holds another item whose `files_scope` overlaps it. A
+   worker that gets refused runs `pan task next` and picks a different item —
+   only the foreman or the operator passes `--steal` to override the refusal.
+   A `pan spawn` worker pane claims under its own pane name
+   (`OVERDECK_CLAIM_ID`, set by `pan spawn`), so its claim can be liveness-checked.
 2. Implement only that item, and run only the tests it touched, with the
    project's test runner scoped to those files (`npx vitest run <files>` in a
    vitest project). Never the full suite — the verification gate runs it
