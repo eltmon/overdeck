@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:08:46.057Z",
+  "updated": "2026-09-29T11:08:59.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "eval-timeout.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:08:46.057Z"
+    },
+    "fixture-loader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:59.897Z"
     }
   }
 }
