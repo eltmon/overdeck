@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:11:16.116Z",
+  "updated": "2026-09-29T11:11:29.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,10 @@
     "review-recall-fixtures.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:11:16.115Z"
+    },
+    "review-recall-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:29.463Z"
     }
   }
 }
