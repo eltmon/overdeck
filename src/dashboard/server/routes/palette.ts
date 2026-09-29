@@ -1,16 +1,13 @@
 /**
  * Palette route module — Ctrl+K unified search.
  *
- * Phase 1 (this file):
  *   GET /api/palette/commands       → curated `pan` command catalog (static)
- *   GET /api/palette/search?q=&limit= → memory FTS fanout across all projects
+ *   GET /api/palette/search?q=&limit= → memory FTS fanout plus conversation search
  *
- * Phase 2 (tracked separately) will add semantic conversation indexing with
- * excerpts pointing to the relevant message inside a JSONL session. The
- * keyword-only conversation surface is intentionally NOT included here so
- * we don't ship a half-built semantic-search story; that work needs its
- * own embedding pipeline and config (see linked GitHub issue at end of
- * commit).
+ * Conversation search fuses BM25 + vector chunk hits with overdeck.db title
+ * matches into one row per conversation (PAN-4358), banded into `title` >
+ * `text` > `path` tiers so a conversation is findable by topic even when its
+ * transcript never says the word, and path/tool-output noise ranks last.
  */
 
 import { Effect, Layer } from 'effect';
@@ -21,7 +18,8 @@ import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
 import { getConversationByClaudeSessionId } from '../../../lib/overdeck/conversations.js';
-import { type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
+import { searchConversationTitles } from '../../../lib/overdeck/conversation-title-search.js';
+import { groupConversationHits, type ConversationIdentity, type GroupedConversationHit } from '../../../lib/conversation-search/group-hits.js';
 import { searchConversationChunks } from '../services/conversation-search-service.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
@@ -188,8 +186,10 @@ function splitTags(value: string): string[] {
 }
 
 export interface PaletteConversationHit {
+  /** Best chunk's session id; title-only rows: the conversation's Claude session locator, else conversationId. */
   sessionId: string;
   conversationId: string;
+  /** Best chunk's encoded ~/.claude/projects dir; '' for title-only rows. */
   projectId: string;
   /** Dashboard project key (name ?? key) this conversation's cwd lives under, so
    *  the palette can route to the right deck. Null when under no registered project. */
@@ -198,35 +198,61 @@ export interface PaletteConversationHit {
   parentSessionId: string | null;
   /** Bare subagent id (`agent-<id>.jsonl` → `<id>`), the rail's `?subagent=` value. */
   subagentId: string | null;
+  /** Conversation title (manual or AI-refined); null when the row has none or no conversation row exists. */
+  title: string | null;
+  /** True when the conversation row is archived (PAN-4358). */
+  archived: boolean;
+  /** Ranking band: title match > prose/semantic transcript match > path/tool-output-only match. */
+  matchTier: 'title' | 'text' | 'path';
+  /** Chunk hits for this conversation in the candidate pool; 0 for title-only rows. */
+  hitCount: number;
+  /** Best chunk's role; '' for title-only rows. */
   role: string;
+  /** Best chunk's timestamp; title-only rows: last activity (last_attached_at ?? created_at) as ISO. */
   ts: string | null;
-  byteOffset: number;
+  /** Byte offset of the best chunk; null for title-only rows (open without a message target). */
+  byteOffset: number | null;
+  /** Best chunk text (first 240 chars); title-only rows: the title. */
   displayContent: string;
   excerpt: string;
   excerptSegments: Array<{ text: string; match: boolean }>;
+  /** 1-based position in the grouped, tiered order. */
   rank: number;
 }
 
 interface RouteableConversation {
   name: string;
   projectKey: string | null;
+  title: string | null;
+  archived: boolean;
 }
 
 function routeableConversation(sessionId: string, cache: Map<string, RouteableConversation>): RouteableConversation {
   const cached = cache.get(sessionId);
   if (cached) return cached;
-  let routeable: RouteableConversation = { name: sessionId, projectKey: null };
+  let routeable: RouteableConversation = { name: sessionId, projectKey: null, title: null, archived: false };
   try {
     const conversation = getConversationByClaudeSessionId(sessionId);
     routeable = {
       name: conversation?.name ?? sessionId,
       projectKey: conversation?.projectKey ?? null,
+      title: conversation?.title ?? null,
+      archived: conversation?.archivedAt != null,
     };
   } catch {
-    routeable = { name: sessionId, projectKey: null };
+    routeable = { name: sessionId, projectKey: null, title: null, archived: false };
   }
   cache.set(sessionId, routeable);
   return routeable;
+}
+
+function toIdentity(conversation: RouteableConversation): ConversationIdentity {
+  return {
+    conversationId: conversation.name,
+    projectKey: conversation.projectKey,
+    title: conversation.title,
+    archived: conversation.archived,
+  };
 }
 
 interface ProjectDirMatch {
@@ -272,38 +298,84 @@ function resolveConversationProjectKey(projectId: string, dirs: ProjectDirMatch[
 }
 
 function toPaletteConversationHit(
-  hit: ConversationSearchHit,
-  routeableConversations: Map<string, RouteableConversation>,
+  row: GroupedConversationHit,
+  rank: number,
   projectDirs: ProjectDirMatch[],
 ): PaletteConversationHit {
-  // A subagent transcript opens through its parent conversation (PAN-3982).
-  const parentSessionId = hit.parentSessionId ?? null;
-  const conversation = routeableConversation(parentSessionId ?? hit.sessionId, routeableConversations);
-  const explicitProject = conversation.projectKey
-    ? projectDirs.find((dir) => dir.yamlKey === conversation.projectKey || dir.key === conversation.projectKey)
+  const { identity, tier, hitCount, bestHit, titleMatch } = row;
+
+  if (bestHit) {
+    // A subagent transcript opens through its parent conversation (PAN-3982).
+    const parentSessionId = bestHit.parentSessionId ?? null;
+    const explicitProject = identity.projectKey
+      ? projectDirs.find((dir) => dir.yamlKey === identity.projectKey || dir.key === identity.projectKey)
+      : undefined;
+    return {
+      sessionId: bestHit.sessionId,
+      conversationId: identity.conversationId,
+      projectId: bestHit.projectId,
+      projectKey: explicitProject?.key ?? resolveConversationProjectKey(bestHit.projectId, projectDirs),
+      parentSessionId,
+      subagentId: parentSessionId ? bestHit.sessionId.replace(/^agent-/, '') : null,
+      title: identity.title,
+      archived: identity.archived,
+      matchTier: tier,
+      hitCount,
+      role: bestHit.role,
+      ts: bestHit.ts,
+      byteOffset: bestHit.byteOffset,
+      displayContent: bestHit.text.slice(0, 240),
+      excerpt: bestHit.excerpt,
+      excerptSegments: bestHit.excerptSegments,
+      rank,
+    };
+  }
+
+  // Title-only row: no chunk hit in the candidate pool, open with no message target (D13).
+  const explicitProject = titleMatch?.projectKey
+    ? projectDirs.find((dir) => dir.yamlKey === titleMatch.projectKey || dir.key === titleMatch.projectKey)
     : undefined;
   return {
-    sessionId: hit.sessionId,
-    conversationId: conversation.name,
-    projectId: hit.projectId,
-    projectKey: explicitProject?.key ?? resolveConversationProjectKey(hit.projectId, projectDirs),
-    parentSessionId,
-    subagentId: parentSessionId ? hit.sessionId.replace(/^agent-/, '') : null,
-    role: hit.role,
-    ts: hit.ts,
-    byteOffset: hit.byteOffset,
-    displayContent: hit.text.slice(0, 240),
-    excerpt: hit.excerpt,
-    excerptSegments: hit.excerptSegments,
-    rank: hit.rank,
+    sessionId: titleMatch?.sessionId ?? identity.conversationId,
+    conversationId: identity.conversationId,
+    projectId: '',
+    projectKey: explicitProject?.key ?? resolveConversationProjectKey((titleMatch?.cwd ?? '').replace(/[/.]/g, '-'), projectDirs),
+    parentSessionId: null,
+    subagentId: null,
+    title: identity.title,
+    archived: identity.archived,
+    matchTier: tier,
+    hitCount,
+    role: '',
+    ts: row.lastActivityAt,
+    byteOffset: null,
+    displayContent: identity.title ?? '',
+    excerpt: '',
+    excerptSegments: [],
+    rank,
   };
 }
 
+const CONVERSATION_CHUNK_POOL = 300;
+
 async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
-  const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
+  const [hits, titleMatches] = await Promise.all([
+    searchConversationChunks({ rawQuery, matchQuery, limit: CONVERSATION_CHUNK_POOL, candidateLimit: CONVERSATION_CHUNK_POOL }),
+    Promise.resolve().then(() => searchConversationTitles(rawQuery)).catch((error: unknown) => {
+      console.error('[palette] conversation title search failed:', error);
+      return [];
+    }),
+  ]);
   const routeableConversations = new Map<string, RouteableConversation>();
   const projectDirs = registeredProjectDirs();
-  return hits.map((hit) => toPaletteConversationHit(hit, routeableConversations, projectDirs));
+  const grouped = groupConversationHits({
+    hits,
+    titleMatches,
+    query: rawQuery,
+    resolve: (root) => toIdentity(routeableConversation(root, routeableConversations)),
+    limit,
+  });
+  return grouped.map((row, index) => toPaletteConversationHit(row, index + 1, projectDirs));
 }
 
 async function searchProjectMemory(
