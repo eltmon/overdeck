@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4398",
   "created": "2026-09-29T13:13:55.090Z",
-  "updated": "2026-09-29T13:43:49.534Z",
+  "updated": "2026-09-29T13:44:06.880Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "handed-to-review-row.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T13:43:49.534Z"
+    },
+    "planner-finalized-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:44:06.879Z"
     }
   }
 }
