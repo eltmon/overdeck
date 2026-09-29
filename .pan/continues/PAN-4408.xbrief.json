@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:01:59.453Z",
+  "updated": "2026-09-29T16:02:14.776Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "vendor-apply-v010.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:01:59.453Z"
+    },
+    "pin-workflow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:02:14.776Z"
     }
   }
 }
