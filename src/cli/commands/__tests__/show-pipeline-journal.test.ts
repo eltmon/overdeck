@@ -37,6 +37,13 @@ describe('summarizePipelineEntry', () => {
       .toBe('lint (attempt 2)');
   });
 
+  it('names the head and outcome of a conflict repair (PAN-4384)', () => {
+    expect(summarizePipelineEntry(entry('conflict.repair-requested', { head: 'aaaa1111', agentId: 'agent-pan-1166' })))
+      .toBe('head=aaaa1111 sync-main repair to agent-pan-1166');
+    expect(summarizePipelineEntry(entry('conflict.repair-escalated', { head: 'aaaa1111', reason: 'unreachable' })))
+      .toBe('head=aaaa1111 needs you — unreachable');
+  });
+
   it('names who asked for the review', () => {
     expect(summarizePipelineEntry(entry('review.requested', undefined, 'pan-done'))).toBe('pan-done');
   });

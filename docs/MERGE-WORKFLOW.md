@@ -122,7 +122,9 @@ bypasses it.
 3. **Agent conflict resolution:** deterministic rebase reports conflicts →
    engage the work agent, wait for the resolved branch to be pushed. A
    non-conflict workspace failure uses the same path since the agent may be
-   able to repair the workspace.
+   able to repair the workspace. The merge gate refuses a CONFLICTING PR
+   before any rebase, so a conflict that appears after approval never reaches
+   this step; the conflict-repair patrol handles it (PAN-4384).
 
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
@@ -142,10 +144,13 @@ for strike branches.
 ## Review freshness
 
 A review verdict is a PR review against a specific commit. A push after
-approval is visible on the PR itself (GitHub marks the approval stale on
-some branch-protection configs, or the new commits simply postdate the
-review) — there is no separate "stale" flag to maintain; `pan done` or
-`pan review request` triggers the re-review directly.
+approval is visible on the PR itself: the new commits postdate the review.
+This repository does not dismiss approvals on push, so `reviewDecision` stays
+`APPROVED` after a push. There is no separate "stale" flag to maintain. The
+guarded review request behind `pan done` and `pan review request` is
+head-bound (PAN-4384): it re-reviews an approved PR whose approval does not
+stand at the current head, and stays a no-op only when the approval names the
+head or cannot be read.
 
 ## Single Merge Oracle
 
@@ -180,12 +185,16 @@ repository read-only to bypass a real stranded branch.
 
 ## After another feature merges
 
-A merge does not trigger a background scan of sibling branches. An open
-feature branch advances only when its work agent or operator explicitly
-runs `pan sync-main <id>`, which brings the branch forward to current
-`main` and surfaces any real conflict for the work agent to resolve. If CI
-fails after the merge, treat the failing check as the evidence: fix it and
-let review/verification run again — nothing here is silently re-dispatched.
+A merge does not rebase sibling branches. When another merge (or a direct
+push to `main`) makes an approved, green PR conflict, the forge reports it
+non-mergeable and the merge gate refuses it. The conflict-repair patrol
+(PAN-4384) finds it within one 60-second tick and sends the issue's work agent
+one repair per PR head: run `pan sync-main <id>`, resolve the conflict, push,
+and run `pan review request <id>`. If the same head still conflicts 45 minutes
+later, or the agent cannot be reached, the patrol raises Needs-you once. See
+[Conflict repair](PIPELINE-GATES.md#conflict-repair-pan-4384). If CI fails
+after the merge, treat the failing check as the evidence: fix it and let
+review and verification run again.
 
 ## Stash Discipline
 

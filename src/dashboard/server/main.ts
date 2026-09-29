@@ -60,6 +60,7 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
@@ -698,6 +699,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
+  stopConflictRepairPatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -834,6 +836,16 @@ if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
+}
+
+// PAN-4384: routes an approved, green PR that turned CONFLICTING back to its
+// work agent for a sync-main repair.
+if (startConflictRepairPatrol()) {
+  console.log('[overdeck] Conflict-repair patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Conflict-repair patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Conflict-repair patrol SKIPPED (OVERDECK_DISABLE_CONFLICT_REPAIR=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker
