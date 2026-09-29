@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T05:03:57.302Z",
+  "updated": "2026-09-29T05:04:15.084Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -219,6 +219,10 @@
     "docs-claude-code-versions.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T05:03:57.302Z"
+    },
+    "claude-code-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:04:15.084Z"
     }
   }
 }
