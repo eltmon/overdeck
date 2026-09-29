@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T05:18:14.512Z",
+  "updated": "2026-09-29T05:26:15.502Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4361",
       "claimedAt": "2026-09-29T05:12:05.849Z",
       "doneAt": "2026-09-29T05:18:14.512Z"
+    },
+    "eval-model-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:15.502Z"
     }
   }
 }
