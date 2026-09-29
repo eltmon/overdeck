@@ -1,0 +1,546 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T09:38:59Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4372: Jev advisory semantic review of xBRIEF acceptance criteria at pan plan finalize (warnings only)",
+    "updated": "2026-09-29T09:43:09.151Z"
+  },
+  "plan": {
+    "id": "pan-4372",
+    "title": "Jev advisory semantic review of xBRIEF acceptance criteria at pan plan finalize (warnings only)",
+    "status": "proposed",
+    "uid": "1e512d3f-3dfc-43cd-b74b-3a211fdc18f7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T09:38:59Z",
+    "updated": "2026-09-29T09:43:09.151Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4372",
+        "label": "PAN-4372",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4372.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/jev-integration.md",
+        "label": "Jev integration research",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "jev",
+      "xbrief",
+      "quality-lint",
+      "plan-finalize",
+      "background-ai"
+    ],
+    "metadata": {
+      "sizeJustification": "14 files in four real areas (src/lib/jev, src/cli plan-finalize, evals, docs). The projected-surface lint counts 9 subsystems only because single files at a repo root each count as one (evals/jev-acceptance-criteria.eval.ts, evals/README.md, docs/XBRIEF.md, configuration/jev.mdx). The disclosure text must ship with the feature it discloses, so splitting into sibling issues would ship an undisclosed data flow or a disclosure for a feature that does not exist.",
+      "canonicalFilename": "2026-09-29-PAN-4372-jev-advisory-semantic-review-of-xbrief-acceptance-criteria-at-pan-plan-finalize-warnings-only.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "lintItem in src/lib/xbrief/quality-lint.ts flags ac-not-observable when an AC title contains none of the 49 OBSERVABLE_TERMS substrings. 'Given the page loads then it works' passes and 'The CLI exit code is 2 on a missing file' fails, so planners add magic words instead of writing testable criteria. Nothing detects an AC that packs several behaviors into one line.",
+      "Proposal": "Add reviewAcceptanceCriteria(doc) in src/lib/jev/acceptance-criteria.ts. It sends one assess('jevAcceptanceCriteriaReview', ...) request per plan with two Nouls per non-cancelled AC (observable_<id>, compound_<id>) and returns warn-only QualityIssues ac-semantic-not-observable and ac-semantic-compound, thresholds in src/lib/jev/questions.ts. pan plan finalize calls it after the keyword quality gate passes and merges its warnings into the existing warnings block; the exit code never changes. An answered review appends ids and Nouls (no AC text) to a local shadow eval log. An evalite eval with 60+ labeled ACs from .pan/specs measures agreement. The keyword rule stays the gate; quality-lint.ts and planning-promotion.ts are untouched. Full brief: .pan/drafts/PAN-4372.md.",
+      "NonGoals": "- Changing, removing or relaxing the keyword rule ac-not-observable or OBSERVABLE_TERMS; src/lib/xbrief/quality-lint.ts gets zero diff lines\n- Making any Jev result an error, or letting any Jev outcome change the pan plan finalize exit code\n- Calling Jev from lintPlanQuality, assertPlanQuality, src/lib/overdeck/planning-promotion.ts, the dashboard complete-planning route or the Deacon\n- Calling createJevClient directly from production code (only assess(); the eval is the one exception, as in evals/jev-smoke.eval.ts)\n- Any hardcoded or fallback Jev model id\n- Reading the shadow eval log back for any decision\n- Writing AC title text to the shadow eval log\n- Positional question keys (follow-up only if the live eval proves dotted keys are rejected)\n- Tuning thresholds beyond the 0.5 defaults\n- Settings UI changes beyond the toggle description string\n- Any output change when Jev is unavailable (no jev block, toggle off, or cheap mode)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "State is { criteria: { \"<acId>\": \"<title>\" } } (object keyed by AC id, plan order) rather than an array of {id,title}.",
+        "rationale": "The issue writes the question as criteria[<id>]; an object keyed by id carries the same id and title data and makes the question text resolve literally."
+      },
+      {
+        "summary": "Question keys use the raw AC id (observable_<acId>, compound_<acId>), including dotted ids like foo.ac2.",
+        "rationale": "Matches the issue's acceptance criterion naming (observable_ac1). SDK types allow any string key; if the server rejects dots the result is a visible failed/bad-request line, harmless, and the eval exercises real dotted ids to find out."
+      },
+      {
+        "summary": "Thresholds JEV_AC_OBSERVABLE_MIN_NOUL = 0.5 (warn below) and JEV_AC_COMPOUND_MAX_NOUL = 0.5 (warn above) in questions.ts; QUESTION_SET_VERSION bumped to origin/main + 1.",
+        "rationale": "Neutral starting point matching JEV_SMOKE_NOUL_THRESHOLD; the eval and shadow log exist to tune them. The version bump is required by the memo-key contract in questions.ts."
+      },
+      {
+        "summary": "--no-quality-lint also skips the Jev review; a failing keyword gate exits 3 before any Jev call.",
+        "rationale": "No gate ran, so there is nothing to advise on; and the issue requires assertPlanQuality behavior to be independent of Jev."
+      },
+      {
+        "summary": "failed prints exactly one dim stderr line 'Jev acceptance-criteria review did not run (<reason>)' in text mode; unavailable and skipped print nothing; --json prints nothing extra.",
+        "rationale": "The issue pins only the unavailable case as unchanged. An operator who enabled the toggle should learn when it breaks; one who did not must see no change."
+      },
+      {
+        "summary": "Semantic warnings merge into the existing '⚠ xBRIEF quality warnings:' block and the qualityWarnings JSON stderr line.",
+        "rationale": "Keeps one output shape; formatQualityIssues already renders '[warn] <rule>: <message>', which is exactly what the issue's acceptance criterion checks for."
+      },
+      {
+        "summary": "Shadow log path is ~/.overdeck/jev/eval-log/acceptance-criteria/<YYYY-MM-DD>.jsonl (via getOverdeckHome()), written in a separate module src/lib/jev/eval-log.ts, ids and Nouls only.",
+        "rationale": "Follows the rag-runs append-only JSONL pattern; keeping AC text out limits what persists locally; a separate module keeps its tests independent."
+      },
+      {
+        "summary": "The fixture-count requirement (60+ ACs) is checked by a node -e verify command, not a new unit test.",
+        "rationale": "Repo lint rejects new tests that read files to grep them; a verify command gives the same mechanical check."
+      },
+      {
+        "summary": "plan.metadata.sizeJustification set instead of splitting into sibling issues.",
+        "rationale": "The 9-subsystem count is an artifact of single root files; the disclosure text must land with the feature."
+      }
+    ],
+    "items": [
+      {
+        "id": "ac-review-module",
+        "title": "Add reviewAcceptanceCriteria with observable/compound Nouls in src/lib/jev",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4372",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ac-eval-log",
+            "finalize-jev-warnings",
+            "ac-eval-fixtures"
+          ],
+          "files_scope": [
+            "src/lib/jev/questions.ts",
+            "src/lib/jev/acceptance-criteria.ts",
+            "src/lib/jev/__tests__/acceptance-criteria.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/acceptance-criteria.test.ts",
+            "npx vitest run src/lib/jev/__tests__/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "acceptance-criteria.test.ts reports its 5 named tests as passed",
+            "client.test.ts still reports all tests passed after the QUESTION_SET_VERSION bump",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In src/lib/jev/questions.ts add JEV_AC_OBSERVABLE_MIN_NOUL = 0.5, JEV_AC_COMPOUND_MAX_NOUL = 0.5 and acceptanceCriteriaQuestions(acIds) building observable_<id> and compound_<id> Nouls with the exact PRD D2 texts; set QUESTION_SET_VERSION to origin/main's value + 1. Create src/lib/jev/acceptance-criteria.ts exporting buildAcceptanceCriteriaRequest(doc) (non-cancelled items only, ACs via subItemsOf filtered on metadata.kind acceptance_criterion, first duplicate id wins, state { criteria: { [acId]: title } }) and async reviewAcceptanceCriteria(doc, options) that returns skipped with no call when there are zero ACs, otherwise calls assess('jevAcceptanceCriteriaReview', state, questions, options) exactly once and maps answered Nouls to warn-severity QualityIssues ac-semantic-not-observable (noul < 0.5) and ac-semantic-compound (noul > 0.5) with itemId = parent item id and the PRD message format; unavailable/failed return zero issues. Never call createJevClient. Write the 5 named tests from the PRD using the client.test.ts harness (cost-events mock, resetJevMemo in beforeEach, injected config, fake fetch, evalLogHome in a mkdtemp dir). Answers are a NoulResponse|ScoreResponse|ChoiceResponse union under the wide Questions type, so narrow before reading: const a = answers[key]; const n = a?.type === 'noul' ? a.noul : null; a null answer produces no issue."
+        },
+        "items": [
+          {
+            "id": "ac-review-module.ac1",
+            "title": "Given the jevAcceptanceCriteriaReview toggle off, reviewAcceptanceCriteria returns status unavailable with zero issues and the fake fetch records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-review-module.ac2",
+            "title": "Given a plan of 3 items with 5 ACs where one item is cancelled, the fake fetch records exactly one request whose body.questions keys are observable_/compound_ for only the 4 active AC ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-review-module.ac3",
+            "title": "Given a stubbed noul of 0.1 for observable_ac1 and 0.9 for compound_ac1, the result contains one ac-semantic-not-observable and one ac-semantic-compound issue naming ac1, each with severity warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-review-module.ac4",
+            "title": "Given a plan with no active acceptance criteria, reviewAcceptanceCriteria returns status skipped and the fake fetch records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-review-module.ac5",
+            "title": "Given the fake fetch answers HTTP 500, reviewAcceptanceCriteria resolves (never throws) and returns status failed with zero issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac-eval-log",
+        "title": "Append the shadow eval log of keyword verdict versus Jev Nouls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/eval-log.ts",
+            "src/lib/jev/__tests__/eval-log.test.ts",
+            "src/lib/jev/acceptance-criteria.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/eval-log.test.ts src/lib/jev/__tests__/acceptance-criteria.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "eval-log.test.ts reports its 4 named tests as passed and acceptance-criteria.test.ts still reports all tests passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Create src/lib/jev/eval-log.ts exporting AcceptanceCriteriaEvalRow, resolveAcceptanceCriteriaEvalLogPath(home, date) = join(home, 'jev', 'eval-log', 'acceptance-criteria', '<UTC YYYY-MM-DD>.jsonl') and async appendAcceptanceCriteriaEvalLog(rows, { home?, now? }) that mkdirs the parent and appends one JSON line per row with fs/promises, defaulting home to getOverdeckHome() from src/lib/paths.ts and swallowing every write error. In reviewAcceptanceCriteria, after an answered result only, build one row per reviewed AC { timestamp, planId: doc.plan.id, acId, questionSetVersion, model, keywordVerdict, jevNoul: { observable, compound } } where keywordVerdict is 'observable' when OBSERVABLE_TERMS (imported from src/lib/xbrief/quality-lint.ts, which must not be edited) matches the lowercased title, and await the append. Never include the AC title. Write the 4 named tests from the PRD using a mkdtemp home."
+        },
+        "items": [
+          {
+            "id": "ac-eval-log.ac1",
+            "title": "Given an answered review of 2 ACs, the log file under <home>/jev/eval-log/acceptance-criteria/<date>.jsonl contains 2 lines each carrying acId, keywordVerdict, jevNoul.observable and jevNoul.compound",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-log.ac2",
+            "title": "Given an answered review, the written log file contains none of the reviewed AC title strings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-log.ac3",
+            "title": "Given an unavailable or failed review, no log file exists under the eval-log directory afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-log.ac4",
+            "title": "Given evalLogHome points below a regular file so mkdir rejects, reviewAcceptanceCriteria still returns status answered with its warn issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-jev-warnings",
+        "title": "Print Jev AC warnings in pan plan finalize without changing the exit code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "tests/unit/cli/plan-finalize-jev-review.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-jev-review.test.ts tests/unit/cli/plan-finalize-report.test.ts tests/unit/cli/plan-finalize-promote-deferred.test.ts tests/unit/cli/plan-finalize-prd-gate-message.test.ts",
+            "git diff --stat origin/main -- src/lib/xbrief/quality-lint.ts src/lib/overdeck/planning-promotion.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-finalize-jev-review.test.ts reports its 5 named tests as passed and the 3 existing plan-finalize test files still report all tests passed",
+            "the git diff --stat command prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/cli/commands/plan-finalize.ts, inside the else branch after the !qualityGate.ok early return (grep anchor: const warnings = qualityGate.issues.filter), await reviewAcceptanceCriteria(planDoc) once, merge its issues after the keyword warnings into the same warnings array so the existing text block and the --json qualityWarnings stderr line print them, and when the review status is failed and not --json print exactly one chalk.dim stderr line 'ℹ Jev acceptance-criteria review did not run (<reason>)'. Do not touch evaluatePlanFinalizeQualityGate, the exit codes, quality-lint.ts or planning-promotion.ts. Create tests/unit/cli/plan-finalize-jev-review.test.ts with the PRD harness (vi.mock of src/cli/exit.js recording codes, src/lib/activity-logger.js, src/lib/projects.js and src/lib/jev/client.js assess; OVERDECK_HOME stubbed to a mkdtemp dir; a feature-pan-9999 workspace with a lint-clean .overdeck/spec.vbrief.json whose AC id is ac1 and a 20+ line .pan/drafts/PAN-9999.md; planFinalizeCommand({ workspace, promote: false })) and the 5 named tests. Fixture recipe (PRD WI-3): copy the ac()/item()/doc() helper shapes from src/lib/xbrief/__tests__/quality-lint.test.ts lines 11-62 (not makeDoc() from plan-finalize-report.test.ts, which is not lint-clean); one item with kind backend, readiness sequential, requiresInspection false, files_scope ['src/item-1.ts'], files_scope_confidence high, an 8+ word Action, and exactly two ACs ac1 'Given a valid request then it returns success' and ac2 'The command rejects invalid requests with a clear error'; plan.metadata.docsJustification set. The keyword-error fixture changes only ac2's title to 'The response is fine' and the test asserts the lint errors are exactly ['ac-not-observable']."
+        },
+        "items": [
+          {
+            "id": "finalize-jev-warnings.ac1",
+            "title": "Given assess returns unavailable, planFinalizeCommand prints no line matching /ac-semantic|Jev/ and exitCli records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-jev-warnings.ac2",
+            "title": "Given assess answers a noul of 0.1 for observable_ac1, stderr contains '[warn] ac-semantic-not-observable' naming ac1, assess is called exactly once, and exitCli records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-jev-warnings.ac3",
+            "title": "Given a plan whose AC fails the keyword rule and an assess stub answering 0.99, finalize exits via exitCli(3), assess records zero calls, and assertPlanQuality throws PlanQualityLintError for the same plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-jev-warnings.ac4",
+            "title": "Given qualityLint: false (--no-quality-lint), finalize completes and assess records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-jev-warnings.ac5",
+            "title": "Given assess returns failed with reason timeout, stderr contains exactly one line with 'Jev acceptance-criteria review did not run (timeout)' and exitCli records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac-eval-fixtures",
+        "title": "Add the Jev acceptance-criteria evalite eval with 60+ labeled ACs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "evals/jev-acceptance-criteria.eval.ts",
+            "evals/fixtures/jev-acceptance-criteria.json",
+            "evals/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const c=require('./evals/fixtures/jev-acceptance-criteria.json');const s=new Set(c.map(x=>x.specFile));const no=c.filter(x=>x.observable===false).length;const co=c.filter(x=>x.compound===true).length;console.log({n:c.length,specs:s.size,no,co});if(c.length<60||s.size<10||no<8||co<8)process.exit(1)\"",
+            "npm run typecheck:evals",
+            "grep -c 'jev-acceptance-criteria.eval.ts' evals/README.md"
+          ],
+          "expected_outputs": [
+            "node prints n >= 60, specs >= 10, no >= 8, co >= 8 and exits 0",
+            "typecheck:evals completes without errors",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Create evals/fixtures/jev-acceptance-criteria.json with at least 60 entries { specFile, itemId, acId, title, observable, compound } copied verbatim from .pan/specs/*.xbrief.json (at least 10 distinct spec files, real dotted acIds, at least 8 labeled observable:false and at least 8 labeled compound:true; label each title against the exact PRD D2 question texts; do not invent ACs). Create evals/jev-acceptance-criteria.eval.ts modeled on evals/jev-smoke.eval.ts: resolveJevConfig(loadConfigSync().config), evalite.skip with a printed '[jev-acceptance-criteria] skipped: <reason>' when not ok, one case per specFile group, the task builds a minimal XBriefDocument and calls buildAcceptanceCriteriaRequest(doc) then createJevClient(resolution.config).systemOne({ state, questions, model }), and two scorers (observable agreement, compound agreement) using JEV_AC_OBSERVABLE_MIN_NOUL and JEV_AC_COMPOUND_MAX_NOUL. Add the PRD's table row to evals/README.md."
+        },
+        "items": [
+          {
+            "id": "ac-eval-fixtures.ac1",
+            "title": "The fixture check command prints n >= 60, specs >= 10, no >= 8 and co >= 8 and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-fixtures.ac2",
+            "title": "Given jev.model is unset, the eval prints '[jev-acceptance-criteria] skipped: model-not-configured' and registers via evalite.skip instead of calling Jev",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-fixtures.ac3",
+            "title": "The eval task builds its state and questions through buildAcceptanceCriteriaRequest, and npm run typecheck:evals exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-eval-fixtures.ac4",
+            "title": "evals/README.md contains a table row linking jev-acceptance-criteria.eval.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-xbrief-advisory",
+        "title": "Document the advisory semantic AC review in docs/XBRIEF.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Advisory semantic AC review (PAN-4372)' docs/XBRIEF.md",
+            "grep -c 'ac-semantic-not-observable' docs/XBRIEF.md",
+            "grep -c 'ac-semantic-compound' docs/XBRIEF.md",
+            "grep -ci 'never blocks' docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "each grep prints a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Add a '### Advisory semantic AC review (PAN-4372)' subsection to docs/XBRIEF.md under '## Quality Lint and Constraints (PAN-3151)', after the projected-surface example and before the '---' preceding '## Resilience'. State that ac-not-observable stays the gate; that with jevAcceptanceCriteriaReview on and Jev configured, finalize sends one request per plan and may print [warn] ac-semantic-not-observable and [warn] ac-semantic-compound; that the check never blocks finalize and never changes its exit code; that thresholds live in src/lib/jev/questions.ts; that a failed request prints one 'did not run' line; that a local shadow log at ~/.overdeck/jev/eval-log/acceptance-criteria/ records ids and Nouls only; and link configuration/jev.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-xbrief-advisory.ac1",
+            "title": "docs/XBRIEF.md contains the heading 'Advisory semantic AC review (PAN-4372)' under the Quality Lint section, before '## Resilience'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-xbrief-advisory.ac2",
+            "title": "The new subsection contains both rule names ac-semantic-not-observable and ac-semantic-compound and a sentence stating the check never blocks finalize",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-xbrief-advisory.ac3",
+            "title": "The new subsection contains the path src/lib/jev/questions.ts and a link to configuration/jev.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disclosure-text",
+        "title": "Disclose the exact data the AC review sends in Settings and jev.mdx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:38:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/background-ai/registry.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "configuration/jev.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"of the plan's non-cancelled items to TypeSafe at plan finalize\" src/lib/background-ai/registry.ts src/dashboard/frontend/src/components/Settings/types.ts configuration/jev.mdx",
+            "grep -c 'This release sends nothing' configuration/jev.mdx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep prints 1 for each of the three files",
+            "grep prints 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Replace the jevAcceptanceCriteriaReview description in src/lib/background-ai/registry.ts (line ~105), src/dashboard/frontend/src/components/Settings/types.ts (line ~156) and the configuration/jev.mdx table row (line ~86) with exactly: Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings. Replace the jev.mdx sentence 'This release sends nothing: the client exists, but no feature calls it yet.' with '`jevAcceptanceCriteriaReview` is live. The other two toggles send nothing until their features ship.' and add after the table: 'Acceptance-criteria text can quote issue text that anyone wrote in a public tracker, so Overdeck treats the Jev result as advice only: it prints warnings and never blocks plan finalize.' Mind the TypeScript string quoting of the apostrophe in plan's."
+        },
+        "items": [
+          {
+            "id": "disclosure-text.ac1",
+            "title": "Each of registry.ts, Settings/types.ts and jev.mdx contains the exact sentence 'Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-text.ac2",
+            "title": "configuration/jev.mdx no longer contains 'This release sends nothing' and contains a sentence stating jevAcceptanceCriteriaReview is live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-text.ac3",
+            "title": "configuration/jev.mdx contains a sentence stating the Jev result is advice only and never blocks plan finalize",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ac-review-module",
+        "to": "ac-eval-log",
+        "type": "blocks"
+      },
+      {
+        "from": "ac-review-module",
+        "to": "finalize-jev-warnings",
+        "type": "blocks"
+      },
+      {
+        "from": "ac-review-module",
+        "to": "ac-eval-fixtures",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
