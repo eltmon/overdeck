@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:40:07.962Z",
+  "updated": "2026-09-29T23:40:22.122Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "deft-adapter.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T23:40:07.961Z"
+    },
+    "deft-mount-transform.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:40:22.121Z"
     }
   }
 }
