@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4225",
   "created": "2026-09-29T02:27:12.817Z",
-  "updated": "2026-09-29T03:10:58.412Z",
+  "updated": "2026-09-29T03:11:04.245Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4225",
       "claimedAt": "2026-09-29T02:53:24.085Z",
       "doneAt": "2026-09-29T03:10:58.411Z"
+    },
+    "transition-rename": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:11:04.245Z"
     }
   }
 }
