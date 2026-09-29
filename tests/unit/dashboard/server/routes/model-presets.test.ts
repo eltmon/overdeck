@@ -144,7 +144,7 @@ describe('model preset routes', () => {
     mocks.applyPreset.mockRejectedValue(new PresetPlanStaleError());
     const result = await call('POST', '/api/model-presets/anthropic/apply', { body: { expectedDigest: 'old' } });
     expect(result.status).toBe(409);
-    expect(result.body.code).toBe('preset-plan-stale');
+    expect(result.body.code).toBe('stale-plan');
   });
 
   it('POST undo returns the restore report, or 409 with nothing to undo', async () => {

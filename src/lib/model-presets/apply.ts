@@ -51,7 +51,7 @@ export class PresetBlockedError extends Error {
 }
 
 export class PresetPlanStaleError extends Error {
-  readonly code = 'preset-plan-stale';
+  readonly code = 'stale-plan';
   constructor() {
     super('config.yaml changed since this preview; review the changes again and re-apply.');
     this.name = 'PresetPlanStaleError';

@@ -62,7 +62,7 @@ function installFetchMock(opts: { plan?: Record<string, unknown>; applyStatus?: 
     }
     if (url.endsWith('/apply') && init?.method === 'POST') {
       const status = opts.applyStatus ?? 200;
-      const body = status === 200 ? { applied: [], skipped: [] } : { error: 'config.yaml changed since this preview', code: 'preset-plan-stale' };
+      const body = status === 200 ? { applied: [], skipped: [] } : { error: 'config.yaml changed since this preview', code: 'stale-plan' };
       return Promise.resolve({ ok: status === 200, status, json: () => Promise.resolve(body) } as Response);
     }
     return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) } as Response);
