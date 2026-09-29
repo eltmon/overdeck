@@ -4,17 +4,17 @@
     "created": "2026-09-29T09:40:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4329: Session Vault: carry uncommitted work with a conversation (encrypted WIP snapshots)",
-    "updated": "2026-09-29T09:47:49.855Z"
+    "updated": "2026-09-29T09:48:21.574Z"
   },
   "plan": {
     "id": "pan-4329",
     "title": "Session Vault: carry uncommitted work with a conversation (encrypted WIP snapshots)",
-    "status": "proposed",
+    "status": "running",
     "uid": "00647642-c3ba-413f-a143-73a0565a9256",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T09:40:12Z",
-    "updated": "2026-09-29T09:47:49.855Z",
+    "updated": "2026-09-29T09:48:21.574Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4329",
