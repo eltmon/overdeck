@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4305",
   "created": "2026-09-29T00:33:19.689Z",
-  "updated": "2026-09-29T00:58:49.046Z",
+  "updated": "2026-09-29T00:58:50.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,9 @@
       "doneAt": "2026-09-29T00:58:33.177Z"
     },
     "parser-unwrap-pasted.ac5": {
+      "status": "cancelled"
+    },
+    "composer-echo-matching.ac5": {
       "status": "cancelled"
     }
   }
