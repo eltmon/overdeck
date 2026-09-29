@@ -363,6 +363,9 @@ Invoke-Step '4d' 'CRLF counts of lf.txt and crlf.txt' {
     $counts[$name] = $crlf
     $lines += "${name}: $($bytes.Length) bytes, $crlf CRLF, hex $([Convert]::ToHexString($bytes))"
   }
+  if ($null -eq $counts['lf.txt'] -or $null -eq $counts['crlf.txt']) {
+    return @{ status = 'fail'; evidence = ($lines -join "`n"); note = 'lf.txt or crlf.txt is missing' }
+  }
   $ok = $counts['lf.txt'] -eq 0 -and $counts['crlf.txt'] -eq 2
   @{ status = $(if ($ok) { 'pass' } else { 'partial' }); evidence = ($lines -join "`n")
      note = $(if ($ok) { '' } else { 'line endings differ from the Linux working tree (lf.txt 0 CRLF, crlf.txt 2 CRLF)' }) }
@@ -431,6 +434,9 @@ Invoke-Step '3f' 'record HOME, USERPROFILE, os.homedir(), OVERDECK_HOME and the 
 
 $launchArgs = @('vault', 'resume', $FixtureInfo.vaultId, '--cwd', $ClonePath, '--on-drift', 'continue')
 Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 90 s, stdin closed)" {
+  # After 3c adopted the session this machine owns it, so resume prints nothing
+  # of its own before spawning claude: any output is claude's or a spawn error.
+  if (-not $NewSessionId) { return @{ status = 'not-run'; note = '3c failed: the session was not adopted' } }
   $r = Invoke-Pan $launchArgs 90 $ClonePath
   if ($r.Output -match 'EINVAL|ENOENT|spawn .*claude') {
     return @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'spawn error' }
