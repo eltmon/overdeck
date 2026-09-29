@@ -1,6 +1,6 @@
 /**
  * PAN-4363: `pan doctor` reports the Codex per-model client-version floor
- * (gpt-6-sol/gpt-6-luna under ChatGPT sign-in).
+ * (gpt-6-sol/gpt-6-luna/gpt-6.1-sol under ChatGPT sign-in).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -19,7 +19,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => '0.153.4',
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3);
     for (const result of results) {
       expect(result.status).toBe('warn');
       expect(result.fix).toBe('Upgrade: npm install -g @openai/codex');
@@ -27,15 +27,17 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
     expect(results.map(r => r.message).join('\n')).toContain('gpt-6-sol');
     expect(results.map(r => r.message).join('\n')).toContain('gpt-6-luna');
     expect(results.map(r => r.message).join('\n')).toContain('0.156.1');
+    expect(results.map(r => r.message).join('\n')).toContain('gpt-6.1-sol');
+    expect(results.map(r => r.message).join('\n')).toContain('0.159.0');
   });
 
-  it('is ok for both floored models at or above the floor', async () => {
+  it('is ok for all floored models at or above the floor', async () => {
     const results = await checkCodexModelFloors({
       resolveBinary: binary,
-      readVersion: async () => '0.158.0',
+      readVersion: async () => '0.159.0',
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3);
     for (const result of results) {
       expect(result.status).toBe('ok');
     }
@@ -47,7 +49,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => '0.153.4',
       authMode: async () => 'api-key',
     });
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3);
     for (const result of results) {
       expect(result.status).toBe('ok');
       expect(result.message).toContain('API-key auth, no client-version floor');
@@ -60,7 +62,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => undefined,
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3);
     for (const result of results) {
       expect(result.status).toBe('warn');
       expect(result.message).toContain('version unknown');
