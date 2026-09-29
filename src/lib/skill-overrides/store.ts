@@ -7,6 +7,10 @@
  * - issue:   `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, committed and
  *            pushed on the plan home's branch through the plan-artifact door
  *
+ * Pack toggles (PAN-4334) sit beside them: global `skills.pack_overrides`,
+ * project `skill_pack_overrides`, and the issue file's `packs:` map. Pack
+ * skills use the same per-skill maps with `pack/skill` keys.
+ *
  * Server-reachable: every config read here is async. Writes validate against
  * the skill catalog and reject core skills.
  */
@@ -26,12 +30,18 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
-import { listSkillCatalog } from './catalog.js';
+import { notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
+import { packUpdateAvailable } from '../skill-packs/sources.js';
+import { listPackCatalog, listSkillCatalog, readInstalledClaudePluginNames, type PackCatalogEntry } from './catalog.js';
 import {
   isCoreSkill,
+  resolvePackSkill,
+  resolvePackToggle,
   resolveSkillStates,
+  type PackSkillSource,
   type SkillOverrideLayers,
   type SkillOverrideLevel,
+  type SkillOverrideMap,
   type SkillState,
 } from './resolve.js';
 
@@ -60,7 +70,15 @@ export interface SkillOverrideWriteResult {
   reason?: string;
 }
 
-type ProjectWithSkillOverrides = ProjectConfig & { skill_overrides?: Record<string, boolean> };
+type ProjectWithSkillOverrides = ProjectConfig & {
+  skill_overrides?: Record<string, boolean>;
+  skill_pack_overrides?: Record<string, boolean>;
+};
+
+interface IssueOverrides {
+  skills: Record<string, boolean>;
+  packs: Record<string, boolean>;
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -100,6 +118,12 @@ export async function readGlobalSkillOverrides(): Promise<Record<string, boolean
   return booleanEntries(config?.skills?.overrides);
 }
 
+export async function readGlobalPackOverrides(): Promise<Record<string, boolean>> {
+  const config = parseYamlOrNull(await readTextOrEmpty(getGlobalConfigPath())) as
+    { skills?: { pack_overrides?: unknown } } | null;
+  return booleanEntries(config?.skills?.pack_overrides);
+}
+
 async function findProject(projectKey: string): Promise<ProjectWithSkillOverrides | null> {
   const match = (await listProjectsAsync()).find(project => project.key === projectKey);
   return (match?.config as ProjectWithSkillOverrides | undefined) ?? null;
@@ -107,6 +131,10 @@ async function findProject(projectKey: string): Promise<ProjectWithSkillOverride
 
 export async function readProjectSkillOverrides(projectKey: string): Promise<Record<string, boolean>> {
   return booleanEntries((await findProject(projectKey))?.skill_overrides);
+}
+
+export async function readProjectPackOverrides(projectKey: string): Promise<Record<string, boolean>> {
+  return booleanEntries((await findProject(projectKey))?.skill_pack_overrides);
 }
 
 /** `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` */
@@ -135,15 +163,19 @@ async function projectForIssue(issueId: string): Promise<{ projectKey: string; p
   return project ? { projectKey: resolved.projectKey, project } : null;
 }
 
-async function readIssueFile(path: string): Promise<Record<string, boolean>> {
-  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown } | null;
-  return booleanEntries(parsed?.skills);
+async function readIssueFile(path: string): Promise<IssueOverrides> {
+  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown; packs?: unknown } | null;
+  return { skills: booleanEntries(parsed?.skills), packs: booleanEntries(parsed?.packs) };
+}
+
+async function readIssueOverrides(issueId: string): Promise<IssueOverrides> {
+  const owner = await projectForIssue(issueId);
+  if (!owner) return { skills: {}, packs: {} };
+  return readIssueFile(issueSkillOverridesPath(planHomeFor(owner.project), issueId));
 }
 
 export async function readIssueSkillOverrides(issueId: string): Promise<Record<string, boolean>> {
-  const owner = await projectForIssue(issueId);
-  if (!owner) return {};
-  return readIssueFile(issueSkillOverridesPath(planHomeFor(owner.project), issueId));
+  return (await readIssueOverrides(issueId)).skills;
 }
 
 /**
@@ -152,22 +184,122 @@ export async function readIssueSkillOverrides(issueId: string): Promise<Record<s
  */
 export async function loadSkillOverrideLayers(ctx: { projectKey?: string; issueId?: string }): Promise<SkillOverrideLayers> {
   const projectKey = ctx.projectKey ?? (ctx.issueId ? (await projectForIssue(ctx.issueId))?.projectKey : undefined);
-  const [global, project, issue] = await Promise.all([
+  const [global, globalPacks, project, projectPacks, issue] = await Promise.all([
     readGlobalSkillOverrides(),
+    readGlobalPackOverrides(),
     projectKey ? readProjectSkillOverrides(projectKey) : Promise.resolve(undefined),
-    ctx.issueId ? readIssueSkillOverrides(ctx.issueId) : Promise.resolve(undefined),
+    projectKey ? readProjectPackOverrides(projectKey) : Promise.resolve(undefined),
+    ctx.issueId ? readIssueOverrides(ctx.issueId) : Promise.resolve(undefined),
   ]);
   return {
     global,
     ...(project ? { project } : {}),
-    ...(issue ? { issue } : {}),
+    ...(issue ? { issue: issue.skills } : {}),
+    packs: {
+      global: globalPacks,
+      ...(projectPacks ? { project: projectPacks } : {}),
+      ...(issue ? { issue: issue.packs } : {}),
+    },
   };
+}
+
+export interface PackSkillState {
+  /** `pack/skill`. */
+  id: string;
+  name: string;
+  description: string;
+  optIn: boolean;
+  /** A native skill with the same name exists (the harness shows both, as `name` and `pack:name`). */
+  bundledOverlap: boolean;
+  global: boolean | null;
+  project: boolean | null;
+  issue: boolean | null;
+  enabled: boolean;
+  source: PackSkillSource;
+  /** What the narrowest context level would resolve to without its own per-skill value. */
+  inherited: { enabled: boolean; source: PackSkillSource };
+}
+
+export interface PackState {
+  id: string;
+  url: string;
+  ref: string;
+  commit: string;
+  adapter: PackAdapterId;
+  license: string | null;
+  cached: boolean;
+  notApplied: string[];
+  /** The same upstream plugin is also installed in Claude Code, so its skills would appear twice. */
+  duplicatePluginInstall: boolean;
+  /** Filled only when asked (`checkUpdates`): the newer remote commit, or null. */
+  updateAvailable?: string | null;
+  global: boolean | null;
+  project: boolean | null;
+  issue: boolean | null;
+  enabled: boolean;
+  source: SkillOverrideLevel | 'default';
+  inherited: { enabled: boolean; source: SkillOverrideLevel | 'default' };
+  /** Empty when the pack is not cached. */
+  skills: PackSkillState[];
 }
 
 export interface SkillStateList {
   project: string | null;
   issue: string | null;
   skills: SkillState[];
+  packs: PackState[];
+}
+
+function valueAt(map: SkillOverrideMap | undefined, key: string): boolean | null {
+  if (!map || !Object.prototype.hasOwnProperty.call(map, key)) return null;
+  const value = map[key];
+  return typeof value === 'boolean' ? value : null;
+}
+
+function resolvePackStates(
+  packs: readonly PackCatalogEntry[],
+  layers: SkillOverrideLayers,
+  narrowest: SkillOverrideLevel,
+  nativeNames: ReadonlySet<string>,
+  installedPlugins: ReadonlySet<string>,
+): PackState[] {
+  return packs.map((pack): PackState => {
+    const manifest = pack.manifest;
+    const skills = (manifest?.skills ?? [])
+      .map((skill): PackSkillState => {
+        const id = `${pack.id}/${skill.name}`;
+        return {
+          id,
+          name: skill.name,
+          description: skill.description,
+          optIn: skill.optIn,
+          bundledOverlap: nativeNames.has(skill.name),
+          global: valueAt(layers.global, id),
+          project: valueAt(layers.project, id),
+          issue: valueAt(layers.issue, id),
+          ...resolvePackSkill(id, skill.optIn, layers),
+          inherited: resolvePackSkill(id, skill.optIn, layers, narrowest),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      id: pack.id,
+      url: pack.url,
+      ref: pack.ref,
+      commit: pack.commit,
+      adapter: pack.adapter,
+      license: manifest?.license ?? null,
+      cached: pack.cached,
+      notApplied: manifest ? notAppliedLabels(manifest.capabilities) : [],
+      duplicatePluginInstall: manifest?.pluginName ? installedPlugins.has(manifest.pluginName) : false,
+      global: valueAt(layers.packs?.global, pack.id),
+      project: valueAt(layers.packs?.project, pack.id),
+      issue: valueAt(layers.packs?.issue, pack.id),
+      ...resolvePackToggle(pack.id, layers),
+      inherited: resolvePackToggle(pack.id, layers, narrowest),
+      skills,
+    };
+  });
 }
 
 /**
@@ -175,7 +307,10 @@ export interface SkillStateList {
  * resolves its own project; the catalog includes that project's
  * `.pan/skills`, so project skills appear only in project and issue context.
  */
-export async function listSkillStates(ctx: { projectKey?: string; issueId?: string }): Promise<SkillStateList> {
+export async function listSkillStates(
+  ctx: { projectKey?: string; issueId?: string },
+  opts: { checkUpdates?: boolean } = {},
+): Promise<SkillStateList> {
   const issueId = ctx.issueId?.toUpperCase();
   let projectKey = ctx.projectKey;
   let project: ProjectConfig | null = null;
@@ -188,11 +323,21 @@ export async function listSkillStates(ctx: { projectKey?: string; issueId?: stri
     projectKey = owner.projectKey;
     project = owner.project;
   }
-  const [catalog, layers] = await Promise.all([
+  const [catalog, layers, packCatalog, installedPlugins] = await Promise.all([
     listSkillCatalog(project ? { projectRoot: project.path } : {}),
     loadSkillOverrideLayers({ projectKey, issueId }),
+    listPackCatalog(),
+    readInstalledClaudePluginNames(),
   ]);
-  return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, layers) };
+  const narrowest: SkillOverrideLevel = issueId ? 'issue' : projectKey ? 'project' : 'global';
+  const nativeNames = new Set(catalog.map(entry => entry.name));
+  const packs = resolvePackStates(packCatalog, layers, narrowest, nativeNames, installedPlugins);
+  if (opts.checkUpdates) {
+    await Promise.all(packs.map(async (pack) => {
+      pack.updateAvailable = await packUpdateAvailable(pack);
+    }));
+  }
+  return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, layers), packs };
 }
 
 export interface LowerLevelOverrides {
@@ -200,17 +345,16 @@ export interface LowerLevelOverrides {
   issues: string[];
 }
 
-/**
- * For each skill, the projects and issues that override it (either way).
- * Answers "why is this off for my agent" on the global page.
- */
-export async function listLowerLevelOverrides(): Promise<Record<string, LowerLevelOverrides>> {
+async function collectLowerLevel(
+  projectMap: (config: ProjectWithSkillOverrides) => unknown,
+  issueMap: (overrides: IssueOverrides) => Record<string, boolean>,
+): Promise<Record<string, LowerLevelOverrides>> {
   const out: Record<string, LowerLevelOverrides> = {};
   const entry = (name: string): LowerLevelOverrides => (out[name] ??= { projects: [], issues: [] });
   const planHomes = new Set<string>();
   for (const { key, config } of await listProjectsAsync()) {
     if (!config.path) continue;
-    for (const name of Object.keys(booleanEntries((config as ProjectWithSkillOverrides).skill_overrides))) {
+    for (const name of Object.keys(booleanEntries(projectMap(config as ProjectWithSkillOverrides)))) {
       entry(name).projects.push(key);
     }
     planHomes.add(planHomeFor(config));
@@ -225,11 +369,24 @@ export async function listLowerLevelOverrides(): Promise<Record<string, LowerLev
     }
     for (const file of files.filter(name => name.endsWith('.yaml')).sort()) {
       const issue = file.slice(0, -'.yaml'.length);
-      for (const name of Object.keys(await readIssueFile(join(dir, file)))) entry(name).issues.push(issue);
+      for (const name of Object.keys(issueMap(await readIssueFile(join(dir, file))))) entry(name).issues.push(issue);
     }
   }
   for (const value of Object.values(out)) value.projects.sort();
   return out;
+}
+
+/**
+ * For each skill, the projects and issues that override it (either way).
+ * Answers "why is this off for my agent" on the global page.
+ */
+export async function listLowerLevelOverrides(): Promise<Record<string, LowerLevelOverrides>> {
+  return collectLowerLevel(config => config.skill_overrides, overrides => overrides.skills);
+}
+
+/** For each pack id, the projects and issues that set its pack toggle (either way). */
+export async function listLowerLevelPackOverrides(): Promise<Record<string, LowerLevelOverrides>> {
+  return collectLowerLevel(config => config.skill_pack_overrides, overrides => overrides.packs);
 }
 
 // ── writes ───────────────────────────────────────────────────────────────
@@ -347,7 +504,7 @@ async function setIssue(issueId: string, skill: string, enabled: boolean | null)
   if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
   const planHome = planHomeFor(owner.project);
   const path = issueSkillOverridesPath(planHome, issue);
-  const skills = await readIssueFile(path);
+  const { skills } = await readIssueFile(path);
   const had = Object.prototype.hasOwnProperty.call(skills, skill);
 
   if (enabled === null) {

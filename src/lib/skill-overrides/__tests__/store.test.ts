@@ -26,6 +26,30 @@ vi.mock('../catalog.js', () => ({
     { name: 'grilling', description: '' },
     { name: 'codebase-design', description: '' },
   ]),
+  listPackCatalog: vi.fn(async () => [
+    {
+      id: 'mattpocock',
+      url: 'https://github.com/mattpocock/skills',
+      ref: 'v1.2.3',
+      commit: 'c'.repeat(40),
+      adapter: 'claude-plugin',
+      cached: true,
+      manifest: {
+        skills: [
+          { name: 'grilling', dir: 'skills/productivity/grilling', description: 'Grill.', optIn: false },
+          { name: 'tdd', dir: 'skills/engineering/tdd', description: 'Test first.', optIn: false },
+          { name: 'setup-matt-pocock-skills', dir: 'skills/engineering/setup-matt-pocock-skills', description: 'Setup.', optIn: true },
+        ],
+        capabilities: {
+          hooks: false, mcpServers: false, commands: false, agents: false, contextInjection: false, gitHooks: false,
+          executables: [], projectMutatingSkills: ['setup-matt-pocock-skills'], requiresCli: [],
+        },
+        license: 'MIT',
+        pluginName: 'mattpocock-skills',
+      },
+    },
+  ]),
+  readInstalledClaudePluginNames: vi.fn(async () => new Set<string>()),
 }));
 
 vi.mock('../../overdeck/plan-artifact-commit.js', async importOriginal => ({
@@ -37,6 +61,8 @@ import { invalidateProjectsConfigCache } from '../../projects.js';
 import {
   issueSkillOverridesPath,
   listLowerLevelOverrides,
+  listLowerLevelPackOverrides,
+  listSkillStates,
   loadSkillOverrideLayers,
   parseSkillOverrideUpdate,
   readGlobalSkillOverrides,
@@ -146,7 +172,9 @@ describe('issue overrides', () => {
     expect(git('show', '--name-only', '--format=', 'HEAD')).toContain('.pan/skill-overrides/TST-1.yaml');
 
     const layers = await loadSkillOverrideLayers({ issueId: 'TST-1' });
-    expect(layers).toEqual({ global: {}, project: {}, issue: { grilling: false } });
+    expect(layers).toEqual({
+      global: {}, project: {}, issue: { grilling: false }, packs: { global: {}, project: {}, issue: {} },
+    });
   });
 
   it('deletes the file and commits the deletion when the last key is cleared', async () => {
@@ -217,5 +245,69 @@ describe('parseSkillOverrideUpdate', () => {
   it('normalizes an issue id to upper case', () => {
     expect(parseSkillOverrideUpdate({ level: 'issue', issueId: 'tst-9', skill: 'grilling', enabled: null }))
       .toEqual({ level: 'issue', issueId: 'TST-9', skill: 'grilling', enabled: null });
+  });
+});
+
+describe('pack states (PAN-4334)', () => {
+  const packSkill = (list: Awaited<ReturnType<typeof listSkillStates>>, name: string) => {
+    const skill = list.packs[0]?.skills.find(entry => entry.name === name);
+    if (!skill) throw new Error(`missing pack skill ${name}`);
+    return skill;
+  };
+
+  it('lists every pack skill off by default', async () => {
+    const list = await listSkillStates({});
+    expect(list.packs).toHaveLength(1);
+    expect(list.packs[0]).toMatchObject({
+      id: 'mattpocock', license: 'MIT', cached: true, notApplied: ['project-mutating skills (1)'],
+      duplicatePluginInstall: false, global: null, enabled: false, source: 'default',
+    });
+    expect(list.packs[0]?.updateAvailable).toBeUndefined();
+    expect(list.packs[0]?.skills.map(skill => [skill.name, skill.enabled, skill.source])).toEqual([
+      ['grilling', false, 'default'],
+      ['setup-matt-pocock-skills', false, 'default'],
+      ['tdd', false, 'default'],
+    ]);
+  });
+
+  it('turns the pack on at global but leaves the opt-in skill off', async () => {
+    writeFileSync(configPath, 'skills:\n  pack_overrides:\n    mattpocock: true\n');
+    const list = await listSkillStates({});
+    expect(list.packs[0]).toMatchObject({ global: true, enabled: true, source: 'global' });
+    expect(packSkill(list, 'tdd')).toMatchObject({ id: 'mattpocock/tdd', enabled: true, source: 'global-pack' });
+    expect(packSkill(list, 'setup-matt-pocock-skills')).toMatchObject({ optIn: true, enabled: false, source: 'default' });
+  });
+
+  it('flags a pack skill whose name a native skill also uses', async () => {
+    const list = await listSkillStates({});
+    expect(packSkill(list, 'grilling').bundledOverlap).toBe(true);
+    expect(packSkill(list, 'tdd').bundledOverlap).toBe(false);
+  });
+
+  it('keeps the native skills unchanged and reads issue-file pack toggles', async () => {
+    const path = issueSkillOverridesPath(repo, 'TST-1');
+    mkdirSync(join(repo, '.pan', 'skill-overrides'), { recursive: true });
+    writeFileSync(path, 'issue: TST-1\nskills:\n  grilling: false\n  mattpocock/tdd: false\npacks:\n  mattpocock: true\n');
+    const list = await listSkillStates({ issueId: 'tst-1' });
+    expect(list.skills.map(skill => Object.keys(skill).sort())).toEqual(
+      list.skills.map(() => ['core', 'description', 'enabled', 'global', 'issue', 'name', 'project', 'projectSkill', 'source']),
+    );
+    expect(list.skills.find(skill => skill.name === 'grilling')).toMatchObject({ enabled: false, source: 'issue' });
+    expect(list.packs[0]).toMatchObject({ issue: true, enabled: true, source: 'issue', inherited: { enabled: false, source: 'default' } });
+    expect(packSkill(list, 'tdd')).toMatchObject({
+      issue: false, enabled: false, source: 'issue', inherited: { enabled: true, source: 'issue-pack' },
+    });
+    expect(packSkill(list, 'grilling')).toMatchObject({ enabled: true, source: 'issue-pack' });
+    const layers = await loadSkillOverrideLayers({ issueId: 'TST-1' });
+    expect(layers.packs).toEqual({ global: {}, project: {}, issue: { mattpocock: true } });
+    expect(await listLowerLevelPackOverrides()).toEqual({ mattpocock: { projects: [], issues: ['TST-1'] } });
+  });
+
+  it('reports project pack toggles below global', async () => {
+    writeFileSync(projectsPath, `projects:\n  tst:\n    name: Test\n    path: ${repo}\n    issue_prefix: TST\n    skill_pack_overrides:\n      mattpocock: false\n`);
+    invalidateProjectsConfigCache();
+    const list = await listSkillStates({ projectKey: 'tst' });
+    expect(list.packs[0]).toMatchObject({ project: false, enabled: false, source: 'project' });
+    expect(await listLowerLevelPackOverrides()).toEqual({ mattpocock: { projects: ['tst'], issues: [] } });
   });
 });

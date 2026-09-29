@@ -1,11 +1,22 @@
 /**
  * Skill catalog (PAN-3942): the skill names Overdeck can see, for override
  * listing and write validation. A skill is a directory holding a SKILL.md.
+ *
+ * Pack skills (PAN-4334) have their own catalog, `listPackCatalog()`, because
+ * they default off while native skills default on.
  */
-import { readdir, readFile } from 'node:fs/promises';
+import { lstat, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import {
+  detectAdapter,
+  KNOWN_PACKS,
+  readPackManifest,
+  readSkillFrontmatter,
+  type PackAdapterId,
+  type PackManifest,
+} from '../skill-packs/adapters.js';
+import { listPacks, packExtractDir } from '../skill-packs/sources.js';
 
 export interface SkillCatalogEntry {
   name: string;
@@ -16,17 +27,7 @@ export interface SkillCatalogEntry {
 
 /** First line of the SKILL.md frontmatter `description`, or '' when absent or unparseable. */
 export function parseSkillDescription(content: string): string {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return '';
-  try {
-    const frontmatter: unknown = parseYaml(match[1]);
-    if (!frontmatter || typeof frontmatter !== 'object') return '';
-    const description = (frontmatter as Record<string, unknown>)['description'];
-    if (typeof description !== 'string') return '';
-    return description.trim().split('\n')[0]?.trim() ?? '';
-  } catch {
-    return '';
-  }
+  return readSkillFrontmatter(content).description;
 }
 
 async function readRoot(root: string, projectSkill: boolean): Promise<SkillCatalogEntry[]> {
@@ -69,4 +70,58 @@ export async function listSkillCatalog(
     }
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export interface PackCatalogEntry {
+  id: string;
+  url: string;
+  ref: string;
+  commit: string;
+  adapter: PackAdapterId;
+  cached: boolean;
+  /** Null when the trusted commit is not extracted (or its manifest cannot be read). */
+  manifest: PackManifest | null;
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Registered packs with the manifest of their trusted commit, sorted by id. Reads the cache only; no git. */
+export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
+  const packs = await listPacks();
+  return Promise.all(
+    packs.map(async (entry): Promise<PackCatalogEntry> => {
+      const dir = packExtractDir(entry.id, entry.commit);
+      const cached = await isDirectory(dir);
+      const known = KNOWN_PACKS[entry.id];
+      const adapter = entry.adapter ?? known?.adapter ?? (cached ? await detectAdapter(dir) : 'plain');
+      let manifest: PackManifest | null = null;
+      if (cached) {
+        try {
+          manifest = await readPackManifest(dir, adapter, { optIn: known?.optIn ?? [] });
+        } catch {
+          manifest = null;
+        }
+      }
+      return { id: entry.id, url: entry.url, ref: entry.ref, commit: entry.commit, adapter, cached, manifest };
+    }),
+  );
+}
+
+/** Plugin names from `~/.claude/plugins/installed_plugins.json` (the part before `@`); empty when missing or invalid. */
+export async function readInstalledClaudePluginNames(opts: { home?: string } = {}): Promise<Set<string>> {
+  const path = join(opts.home ?? homedir(), '.claude', 'plugins', 'installed_plugins.json');
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
+    const plugins = (parsed as { plugins?: unknown } | null)?.plugins;
+    if (!plugins || typeof plugins !== 'object' || Array.isArray(plugins)) return new Set();
+    return new Set(Object.keys(plugins).map((key) => key.split('@')[0] ?? key).filter(Boolean));
+  } catch {
+    return new Set();
+  }
 }
