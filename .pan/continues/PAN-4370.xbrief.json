@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:09:52.319Z",
+  "updated": "2026-09-29T16:10:07.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "search-match-mode.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:09:52.319Z"
+    },
+    "search-match-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:10:07.471Z"
     }
   }
 }
