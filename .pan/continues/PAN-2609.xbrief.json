@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:23:09.040Z",
+  "updated": "2026-09-29T06:23:23.710Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -338,6 +338,10 @@
     "store-contract.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T06:23:09.040Z"
+    },
+    "store-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:23:23.710Z"
     }
   }
 }
