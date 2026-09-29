@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T00:48:31.776Z",
+  "updated": "2026-09-29T00:48:35.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4327",
       "claimedAt": "2026-09-29T00:46:11.331Z",
       "doneAt": "2026-09-29T00:48:31.776Z"
+    },
+    "sonnet-55-frontend-pickers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:48:35.908Z"
     }
   }
 }
