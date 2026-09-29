@@ -7,7 +7,7 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningComplete, normalizeXBriefEnvelope, readPlanSync, readWorkspacePlanSync, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningComplete, normalizeXBriefEnvelope, parseXBriefDocument, readPlanSync, XBriefMergeConflictError, readWorkspacePlanSync, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { planBuilder } from '../builder.js';
 import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js';
 
@@ -333,6 +333,31 @@ describe('readPlan', () => {
     const badPath = join(PROJECT_ROOT, 'bad.json');
     writeFileSync(badPath, 'not valid json!!!');
     expect(() => readPlanSync(badPath)).toThrow();
+  });
+});
+
+describe('parseXBriefDocument', () => {
+  it('normalizes a legacy vBRIEFInfo envelope to xBRIEFInfo', () => {
+    const raw = JSON.stringify({ vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' }, plan: makePlanDoc().plan });
+
+    const result = parseXBriefDocument(raw, 'model output');
+
+    expect(result.xBRIEFInfo).toEqual({ version: '0.5', created: '2026-01-01T00:00:00Z' });
+    expect(result.vBRIEFInfo).toBeUndefined();
+    expect(result.plan.id).toBe('TEST');
+  });
+
+  it('throws XBriefMergeConflictError naming the source when all three conflict markers are present', () => {
+    const conflicted = ['<'.repeat(7) + ' HEAD', '{}', '='.repeat(7), '{}', '>'.repeat(7) + ' main'].join('\n');
+
+    expect(() => parseXBriefDocument(conflicted, 'model output')).toThrow(XBriefMergeConflictError);
+    expect(() => parseXBriefDocument(conflicted, 'model output')).toThrow(/model output/);
+  });
+
+  it('names the source label when the envelope is missing', () => {
+    expect(() => parseXBriefDocument(JSON.stringify({ plan: makePlanDoc().plan }), 'model output')).toThrow(
+      /Invalid xBRIEF format in model output/,
+    );
   });
 });
 
