@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3308",
   "created": "2026-09-29T01:57:57.115Z",
-  "updated": "2026-09-29T02:14:26.882Z",
+  "updated": "2026-09-29T02:14:33.859Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3308",
       "claimedAt": "2026-09-29T02:05:22.100Z",
       "doneAt": "2026-09-29T02:14:26.882Z"
+    },
+    "main-push-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:14:33.859Z"
     }
   }
 }
