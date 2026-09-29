@@ -94,6 +94,10 @@ export function classifyDeftSkill(name: string): DeftSkillEntry {
   return Object.hasOwn(DEFT_SKILL_MAP, name) ? DEFT_SKILL_MAP[name]! : UNREVIEWED;
 }
 
+/**
+ * Covered by the mount hash. Bump it whenever DEFT_HOST_NOTICE changes, including
+ * through DEFT_SKILL_MAP edits to conflicting entries, or old mounts keep the old notice.
+ */
 export const DEFT_HOST_NOTICE_VERSION = 1;
 
 const OVERDECK_EQUIVALENTS = Object.entries(DEFT_SKILL_MAP)
