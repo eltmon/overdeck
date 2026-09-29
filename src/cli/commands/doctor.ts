@@ -819,7 +819,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     });
   }
 
-  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout()); // PAN-3327, PAN-3881
+  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout(), (await import('./doctor-okf-skill.js')).checkOkfSkillVersion()); // PAN-3327, PAN-3881, PAN-4408
   checks.push(await checkCliGenerationLink());
 
   // Check environment variables

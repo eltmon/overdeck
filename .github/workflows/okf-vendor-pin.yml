@@ -1,0 +1,33 @@
+name: okf-vendor-pin
+
+# sync-sources/skills/okf/ is a vendored copy of an eltmon/okf release tag
+# (.okf-skill-version). This fails when the vendored tree differs from that
+# tag. Fix: edit the skill in eltmon/okf, tag a release, and run
+# scripts/vendor-okf-skill.sh <tag>.
+
+on:
+  pull_request:
+    paths:
+      - 'sync-sources/skills/okf/**'
+      - 'scripts/vendor-okf-skill.sh'
+      - '.github/workflows/okf-vendor-pin.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sync-sources/skills/okf/**'
+      - 'scripts/vendor-okf-skill.sh'
+      - '.github/workflows/okf-vendor-pin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Compare vendored okf skill against its pinned tag
+        run: bash scripts/vendor-okf-skill.sh --check

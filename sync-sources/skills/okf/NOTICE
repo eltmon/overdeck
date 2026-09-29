@@ -1,0 +1,9 @@
+OKF skill
+Copyright (c) 2026 Edward Becker
+
+This repository is licensed under the MIT License (see LICENSE), except as noted below.
+
+references/spec.md is a vendored copy of the Open Knowledge Format specification
+from https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a/okf/SPEC.md
+by the GoogleCloudPlatform/knowledge-catalog contributors, licensed under the
+Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
