@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T13:25:36.369Z",
+  "updated": "2026-09-29T13:25:57.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4384",
       "claimedAt": "2026-09-29T13:07:56.373Z",
       "doneAt": "2026-09-29T13:25:36.369Z"
+    },
+    "conflict-repair-review-backstop": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:25:57.105Z"
     }
   }
 }
