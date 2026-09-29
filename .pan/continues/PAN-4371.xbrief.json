@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:43:46.668Z",
+  "updated": "2026-09-29T11:43:58.272Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "turn-end-assessor.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:43:46.668Z"
+    },
+    "turn-end-assessor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:43:58.271Z"
     }
   }
 }
