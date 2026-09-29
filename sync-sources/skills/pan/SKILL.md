@@ -59,6 +59,7 @@ MANAGED NOUNS
   pan workspace <subcommand>  Workspace lifecycle
   pan project <subcommand>    Project configuration
   pan cost <subcommand>       Cost tracking
+  pan models preset <cmd>     Apply provider model presets
 
 SYSTEM / DAEMON
   pan up / pan down           Start/stop dashboard
