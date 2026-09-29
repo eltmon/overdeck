@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4341",
   "created": "2026-09-29T04:22:08.600Z",
-  "updated": "2026-09-29T05:33:26.942Z",
+  "updated": "2026-09-29T05:33:40.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "server-critique-gate.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T05:33:26.942Z"
+    },
+    "docs-critic-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:40.077Z"
     }
   }
 }
