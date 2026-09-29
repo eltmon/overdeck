@@ -1,0 +1,653 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:34:01.359Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4370: Prompt-time memory injection almost never injects a memory: query expansion fails 100% with extraction-failed, no extraction cost events",
+    "updated": "2026-09-29T04:38:04.226Z"
+  },
+  "plan": {
+    "id": "pan-4370",
+    "title": "Prompt-time memory injection almost never injects a memory: query expansion fails 100% with extraction-failed, no extraction cost events",
+    "status": "proposed",
+    "uid": "4bc99b39-2214-4818-a576-e6281a58eb61",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T04:34:01.359Z",
+    "updated": "2026-09-29T04:38:04.226Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4370",
+        "label": "PAN-4370",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4374",
+        "label": "PAN-4374 (claude-cli provider, split out)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4373",
+        "label": "PAN-4373 (blocked by this issue)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4370.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "memory",
+      "rag",
+      "fts",
+      "providers",
+      "doctor",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Prompt-time memory injection almost never injects observations (8 of 5,950 user-prompt decisions since 2026-09-14). Two independent causes were proven during planning. (A) memory.extraction.provider is 'anthropic', which uses the Anthropic SDK; the operator host has no ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN in the dashboard or hook environment, so every extraction and query expansion throws 'Could not resolve authentication method' (health.json last_failure_detail), no observations have been extracted since 2026-08-13, and query expansion reports the generic 'extraction-failed'. (B) searchMemory's buildMatchQuery ANDs every quoted term, so the raw-prompt fallback query and even a successful 3-5 term expansion return 0 hits against the 694 existing overdeck observations (measured), while keyword-filtered OR ranks a relevant observation first.",
+      "Proposal": "Fix retrieval: add matchMode 'all'|'any' and buildPromptKeywordQuery to search.ts, and make prompt-time injection search in OR mode over the stopword-filtered keyword query of expansion.query. Name failures: a typed ExtractionProviderAuthError thrown by the anthropic provider (env preflight for its default client, SDK 401/403) and by cliproxy (HTTP 401/403); the provider policy records health reason 'provider-auth-failed' with detail; health.json gains last_failure_reason; query expansion reports 'provider-auth-failed' and 'timeout' instead of 'extraction-failed'. Surface: pan memory doctor prints failures= counts and a cause line; pan doctor gains a 'Memory extraction' row built from health.json evidence with per-reason fix text. Docs: configuration/workspaces.mdx memory section and docs/MODEL-CALLS.md.",
+      "NonGoals": "- Adding a subscription-backed claude-cli extraction provider (PAN-4374).\n- Changing memory.extraction provider/model defaults, auto-switching providers when credentials are missing, or editing the operator's ~/.overdeck/config.yaml.\n- Adding api_keys.anthropic to the config schema or Settings UI.\n- Changing PROMPT_TIME_EXPANSION_TIMEOUT_MS (750 ms).\n- Changing pan memory search (CLI) match semantics; the CLI keeps AND.\n- Relevance filtering or reranking of OR-mode hits (PAN-4373).\n- Fixing cliproxy's unmapped default model gpt-4.1-nano (noted in PAN-4374).\n- De-duplicating health writes (expansion calls and the pipeline's second extraction-failed write both increment extractions_attempted).\n- Changing the provider policy's returned dropped.reason union (extract.ts, rollup.ts, feature-registry-population.ts stay untouched).\n- Recording cost events for failed provider calls."
+    },
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4370.md",
+      "sizeJustification": "One bug in one subsystem (agent memory: src/lib/memory) plus the CLI surfaces the issue explicitly asks for (pan memory doctor, pan doctor). The 7-subsystem count comes from the first-two-path-segment heuristic counting single files as subsystems: scripts/file-size-allowlist.txt (one required allowlist row), configuration/workspaces.mdx and docs/MODEL-CALLS.md (the required docs item), and tests/lib + tests/cli mirroring src/lib + src/cli. 23 files, under the 25-file limit. The subscription provider, the only independently shippable slice, was already split out to PAN-4374.",
+      "canonicalFilename": "2026-09-29-PAN-4370-prompt-time-memory-injection-almost-never-injects-a-memory-query-expansion-fails-100-with-extraction-failed-no-extraction-cost-events.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Prompt-time injection searches in OR mode (matchMode 'any') over a stopword-filtered keyword query; pan memory search keeps AND.",
+        "rationale": "Measured on the real index: AND returns 0 hits for both the raw prompt and a successful expansion; unfiltered OR matches all 694 rows; keyword-filtered OR ranks the relevant observation first. The CLI is an explicit operator query where AND is expected."
+      },
+      {
+        "summary": "Do not auto-switch providers or change defaults when credentials are missing; report the failure with a fix hint.",
+        "rationale": "The operator's config names 'anthropic' explicitly; a silent switch is the same hazard as a hardcoded model fallback (repo rule)."
+      },
+      {
+        "summary": "Split the claude-cli subscription provider into sibling issue PAN-4374.",
+        "rationale": "Independently shippable, measured at 6.3 s per call (too slow for the 750 ms expansion budget), and carries its own review questions (process spawn per turn, one-shot-exec rule, notional cost cap). No acceptance criterion here needs it: retrieval works from the 694 existing observations."
+      },
+      {
+        "summary": "Keep the 750 ms prompt-time expansion budget; report elapsed budgets as reason 'timeout'.",
+        "rationale": "No provider on this host meets 750 ms today (cliproxy gpt-5.5 2.3 s, claude -p 6.3 s); making timeouts measurable comes before retuning, and OR-mode fallback retrieval makes injection work regardless."
+      },
+      {
+        "summary": "Keep the policy's returned dropped.reason as 'extraction-failed'; classify via the dropped result's error field and record 'provider-auth-failed' only in health.",
+        "rationale": "Avoids a type ripple into extract.ts, rollup.ts, and feature-registry-population.ts that the issue does not need."
+      },
+      {
+        "summary": "pan doctor's memory row reads health.json evidence rather than checking env vars in its own process.",
+        "rationale": "pan doctor runs in the operator's shell, whose environment differs from the dashboard's and the hooks'; an env check there can report OK while every extraction fails."
+      },
+      {
+        "summary": "Document in configuration/workspaces.mdx (Memory scopes) and docs/MODEL-CALLS.md instead of configuration/memory-governor.mdx.",
+        "rationale": "memory-governor.mdx documents the RAM governor, not agent memory; the issue allows 'or the memory doc'."
+      }
+    ],
+    "items": [
+      {
+        "id": "search-match-mode",
+        "title": "searchMemory gains matchMode and buildPromptKeywordQuery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/search.ts",
+            "src/lib/memory/__tests__/search-match-mode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/memory/__tests__/search-match-mode.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "search-match-mode.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Add matchMode?: 'all' | 'any' to SearchMemoryInput (default 'all'), make buildMatchQuery(query, matchMode) join quoted terms with ' OR ' in 'any' mode, and pass input.matchMode from searchMemory. Add and export buildPromptKeywordQuery(text) using the exact stopword set, 3-character minimum, lowercase dedupe, and 12-term cap given in the PRD. Write src/lib/memory/__tests__/search-match-mode.test.ts using the setup of search-scopes.test.ts (setupOverdeckTestDb, writeObservation, closeMemoryFtsDatabases) and import searchMemory from ../search.js."
+        },
+        "items": [
+          {
+            "id": "search-match-mode.ac1",
+            "title": "buildPromptKeywordQuery('Fix the review agent so it posts findings to the PR before the verification gate times out') returns 'fix review agent posts findings verification gate times'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-match-mode.ac2",
+            "title": "Given a seeded matching observation, searchMemory with the long raw prompt returns 0 hits in default mode and returns the matching observation first when matchMode is 'any' over the keyword query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-match-mode.ac3",
+            "title": "buildMatchQuery('a b') returns '\"a\" \"b\"' and buildMatchQuery('a b', 'any') returns '\"a\" OR \"b\"', so pan memory search defaults to AND unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "injection-or-keyword-query",
+        "title": "Prompt-time injection searches OR mode over the keyword query",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/injection.ts",
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/injection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "injection.test.ts reports all tests green including the new fallback-hit test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In injectPromptTimeMemory compute searchQuery = buildPromptKeywordQuery(expansion.query) after resolveQueryExpansion; pass query: searchQuery and matchMode: 'any' to all three search() calls, and log query: searchQuery in the three post-search finalize payloads (leave the disabled path's input.prompt). Add the fallback-hit test using the file's insertRow helper, then re-run the file and adjust only assertions changed by the intended OR/keyword behavior. Then run the PRD's implementation checkpoint: write the gitignored scratch script .tmp/pan-4370-live-check.ts exactly as described, passing the dropped-result expansion stub so no provider policy, health write, or event emit runs, run it with npx tsx, and keep its printed hitCounts/expansion output for the PR description (fallback: record the tsx import error in the PR and rely on the unit test; never change production code to make the script run; never commit .tmp/)."
+        },
+        "items": [
+          {
+            "id": "injection-or-keyword-query.ac1",
+            "title": "Given an inserted observation for the same workspace and issue and an expansion stub that returns dropped, injectPromptTimeMemory for 'Why did the verification gate block the review findings again?' logs hitCounts.observations >= 1 with outcome injected or budget-truncated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-or-keyword-query.ac2",
+            "title": "The rag-decision line logs query 'verification gate block review findings' and expansion.status 'fallback' for that prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-or-keyword-query.ac3",
+            "title": "When the scratch live check runs against the real overdeck memory home, it prints hitCounts with observations >= 1, or the PR records the tsx import error per the checkpoint fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-auth-error",
+        "title": "Providers throw ExtractionProviderAuthError on missing or rejected credentials",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "policy-auth-health",
+            "expansion-reasons"
+          ],
+          "files_scope": [
+            "src/lib/memory/providers/types.ts",
+            "src/lib/memory/providers/anthropic.ts",
+            "src/lib/memory/providers/cliproxy.ts",
+            "src/lib/memory/providers/index.ts",
+            "tests/lib/memory/providers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/providers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "providers.test.ts reports all tests green including the new auth cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add ExtractionProviderAuthError and isExtractionProviderAuthError to providers/types.ts and re-export them from providers/index.ts. In anthropic.ts replace the eager default client with an optional injected client plus a hasCredentials() seam defaulting to an ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN env check; when no client was injected and credentials are missing, throw ExtractionProviderAuthError before constructing the SDK client; lazily create and memoize the default client otherwise; rethrow Anthropic.AuthenticationError and PermissionDeniedError as ExtractionProviderAuthError. In cliproxy.ts throw ExtractionProviderAuthError on HTTP 401/403 and keep the plain Error for other statuses. Do not change registry.ts or any default model."
+        },
+        "items": [
+          {
+            "id": "provider-auth-error.ac1",
+            "title": "new AnthropicExtractionProvider(undefined, () => false).extract() rejects with ExtractionProviderAuthError whose message contains ANTHROPIC_API_KEY, without constructing an SDK client",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-auth-error.ac2",
+            "title": "An injected client whose create throws an Anthropic 401 AuthenticationError makes extract() reject with ExtractionProviderAuthError, and an injected client with no env key still returns its result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-auth-error.ac3",
+            "title": "CliproxyExtractionProvider rejects with ExtractionProviderAuthError on HTTP 401 and with a plain Error (not the auth class) on HTTP 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-auth-health",
+        "title": "Provider policy records provider-auth-failed and health keeps last_failure_reason",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/providers/policy.ts",
+            "src/lib/memory/health.ts",
+            "tests/lib/memory/provider-policy.test.ts",
+            "tests/lib/memory/health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/provider-policy.test.ts tests/lib/memory/health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "provider-policy.test.ts and health.test.ts report all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Type MemoryExtractionPolicyDeps.recordHealth with MemoryHealthUpdate. When all attempts fail, record reason 'provider-auth-failed' if isExtractionProviderAuthError(lastError), else 'extraction-failed', always with the describeExtractionError detail; keep the returned dropped.reason 'extraction-failed'. In health.ts add last_failure_reason to MemoryHealthSnapshot, set it from update.reason only when the update carries a detail, preserve it on detail-less failures, and clear it to null on success. Give the cost-cap health write a detail ('daily memory extraction cap $<cap> reached (spend $<spend>)') so last_failure_reason can become 'cost-cap', and update the exact-object assertion in the existing cost-cap policy test (provider-policy.test.ts lines 150-154) to include that detail. Add the policy and health tests described in the PRD, driving the real updateMemoryHealth with a no-op emitHealthChanged under a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "policy-auth-health.ac1",
+            "title": "When the only provider throws ExtractionProviderAuthError, the policy records health { status: 'failing', reason: 'provider-auth-failed', detail containing ANTHROPIC_API_KEY } and returns dropped with reason 'extraction-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-auth-health.ac2",
+            "title": "Given that auth failure through the real updateMemoryHealth, health.json persists failed_by_reason['provider-auth-failed'] = 1 and last_failure_reason 'provider-auth-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-auth-health.ac3",
+            "title": "A later detail-less extraction-failed update preserves last_failure_reason 'provider-auth-failed', and a success update resets it to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-auth-health.ac4",
+            "title": "A plain Error from the provider still records health reason 'extraction-failed' (existing policy test at line 185 stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-auth-health.ac5",
+            "title": "When today's spend reaches the cap, the policy records health reason 'cost-cap' with a detail containing 'daily memory extraction cap', so health.json persists last_failure_reason 'cost-cap'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "expansion-reasons",
+        "title": "Query expansion reports provider-auth-failed and timeout reasons",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/query-expansion.ts",
+            "src/lib/memory/injection.ts",
+            "tests/lib/memory/query-expansion.test.ts",
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/query-expansion.test.ts tests/lib/memory/injection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "query-expansion.test.ts and injection.test.ts report all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Widen QueryExpansionResult.reason with 'provider-auth-failed' and 'timeout'. Route both the dropped branch and the catch in expandMemoryQuery through classifyDroppedExpansion(error, signal): aborted signal gives 'timeout', ExtractionProviderAuthError gives 'provider-auth-failed', anything else 'extraction-failed'. In injection.ts make withTimeout reject with a local QueryExpansionTimeoutError and have resolveQueryExpansion's catch report 'timeout' for it. Tests use vi.useFakeTimers() for the budget; no real-time waits."
+        },
+        "items": [
+          {
+            "id": "expansion-reasons.ac1",
+            "title": "An expand stub returning dropped with an ExtractionProviderAuthError makes expandMemoryQuery return reason 'provider-auth-failed' and logs a query-expansion rag-runs line with that reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "expansion-reasons.ac2",
+            "title": "When the prompt-time 750 ms budget elapses under fake timers, the rag-decision line records expansion.reason 'timeout' and the late query-expansion line also logs 'timeout'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "expansion-reasons.ac3",
+            "title": "A dropped result with a plain Error still returns reason 'extraction-failed' (existing injection test at line 694 stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-doctor-cause",
+        "title": "pan memory doctor prints failure counts and cause",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "tests/cli/commands/memory-doctor-format.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/memory-doctor-format.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-doctor-format.test.ts reports all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Move the text-mode printing of the `pan memory doctor` action in src/cli/commands/memory.ts into an exported pure function formatMemoryDoctorLines(result: MemoryDoctorResult): string[] and print its lines. Per workspace row append ' failures=<reason>:<n>,…' when failed_by_reason is non-empty and add an indented '  cause: <last_failure_reason ?? unknown> — <last_failure_detail>' line when a detail exists. JSON mode is unchanged."
+        },
+        "items": [
+          {
+            "id": "memory-doctor-cause.ac1",
+            "title": "For a row with failed_by_reason {'provider-auth-failed': 3} and a detail, formatMemoryDoctorLines returns a line containing 'failures=provider-auth-failed:3' and a line containing 'cause: provider-auth-failed — anthropic/claude-haiku-4-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-doctor-cause.ac2",
+            "title": "For a healthy row, formatMemoryDoctorLines returns no 'cause:' line and preserves the existing 'health= pending= last_success=' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-memory-row",
+        "title": "pan doctor shows a Memory extraction row from health.json evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-memory-provider.ts",
+            "src/cli/commands/doctor.ts",
+            "scripts/file-size-allowlist.txt",
+            "tests/cli/commands/doctor-memory-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/doctor-memory-provider.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doctor-memory-provider.test.ts reports all tests green",
+            "typecheck completes without errors",
+            "lint completes without file-size ratchet errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Create src/cli/commands/doctor-memory-provider.ts exporting checkMemoryExtraction({ memoryBase? }) that asynchronously reads every <memoryBase>/<project>/<workspace>/health.json (default resolveMemoryBase()), skips unreadable or corrupt files, picks the snapshot with the newest last_success/last_failure, and returns an ok or warn CheckResult with the exact per-reason fix strings from the PRD. Call it from doctor.ts right after checkTierFitnessConfig with a PAN-4370 comment, and add the audited '<new line count> src/cli/commands/doctor.ts # PAN-4370' row to scripts/file-size-allowlist.txt in the same commit. No sync fs calls."
+        },
+        "items": [
+          {
+            "id": "doctor-memory-row.ac1",
+            "title": "Given an empty memory base, checkMemoryExtraction returns status ok with message 'no memory extraction activity recorded'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-memory-row.ac2",
+            "title": "Given two workspaces where the newest event is a provider-auth-failed failure, checkMemoryExtraction returns warn whose message contains the reason and detail and whose fix contains ANTHROPIC_API_KEY and PAN-4374",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-memory-row.ac3",
+            "title": "When the newest event is a success, checkMemoryExtraction returns ok, and a corrupt health.json is skipped instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-memory-row.ac4",
+            "title": "npm run lint passes the file-size ratchet for doctor.ts with the new PAN-4370 allowlist row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-docs",
+        "title": "Document extraction credentials, failure reasons, and rag-runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:34:01.359Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/workspaces.mdx",
+            "docs/MODEL-CALLS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'provider-auth-failed' configuration/workspaces.mdx docs/MODEL-CALLS.md",
+            "grep -n 'rag-decision' configuration/workspaces.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints matches in both doc files",
+            "grep prints the annotated rag-decision example line in workspaces.mdx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. In configuration/workspaces.mdx under '## Memory scopes' add '### Extraction providers and memory health' (anthropic needs ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in the dashboard service and agent-session environment; a subscription login does not authenticate it; where pan memory doctor and pan doctor show the cause; a reason table for provider-auth-failed, extraction-failed, malformed-response, cost-cap, timeout) and '### Reading RAG decision logs' (path, the two line types, one annotated rag-decision example, and the OR keyword-query retrieval behavior). Update the memoryExtraction and memoryQueryExpansion rows in docs/MODEL-CALLS.md with the credential requirement, provider-auth-failed, and the 750 ms timeout reason, fixing the anthropic.ts line anchor if it moved."
+        },
+        "items": [
+          {
+            "id": "memory-docs.ac1",
+            "title": "configuration/workspaces.mdx contains a reason table listing provider-auth-failed, extraction-failed, malformed-response, cost-cap, and timeout with what each means and what to do",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-docs.ac2",
+            "title": "configuration/workspaces.mdx contains an annotated rag-decision example that shows outcome, reason, query, hitCounts.observations, and expansion.reason, and states that a subscription login does not authenticate the anthropic provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-docs.ac3",
+            "title": "The memoryExtraction and memoryQueryExpansion rows of docs/MODEL-CALLS.md each contain ANTHROPIC_API_KEY or provider-auth-failed, and the memoryQueryExpansion row contains the 750 ms timeout reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "search-match-mode",
+        "to": "injection-or-keyword-query",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-auth-error",
+        "to": "policy-auth-health",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-auth-error",
+        "to": "expansion-reasons",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-or-keyword-query",
+        "to": "expansion-reasons",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-auth-health",
+        "to": "memory-doctor-cause",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-auth-health",
+        "to": "doctor-memory-row",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-auth-health",
+        "to": "memory-docs",
+        "type": "informs"
+      },
+      {
+        "from": "expansion-reasons",
+        "to": "memory-docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
