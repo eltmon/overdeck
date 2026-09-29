@@ -18,6 +18,7 @@ import {
   handoffFailureReason,
   handoffPreconditionFallbackReason,
   prependFallbackFocus,
+  renderExternalHandoffPrompt,
   requestHandoffFromAgent,
   validateHandoffDoc,
 } from '../summary-fork.js';
@@ -337,6 +338,21 @@ describe('handoff fork handshake', { timeout: 20_000 }, () => {
     expect(handoffFailureReason(error)).toBe('handoff-validation');
     expect(handoffFailureReason(new Error('delivery refused'))).toBe('handoff-request-failed');
     rmSync(home, { recursive: true, force: true });
+  });
+});
+
+describe('renderExternalHandoffPrompt', () => {
+  const template = 'Focus: {{focus}}\nWrite to {{outputPath}}.\n{{transcript}}\nAgain: {{focus}} -> {{outputPath}}';
+
+  it('substitutes every focus, outputPath and transcript marker', () => {
+    expect(renderExternalHandoffPrompt(template, 'ship the fix', 'USER: hi', '/tmp/doc.md')).toBe(
+      'Focus: ship the fix\nWrite to /tmp/doc.md.\nUSER: hi\nAgain: ship the fix -> /tmp/doc.md',
+    );
+  });
+
+  it('falls back to the default no-focus text when focus is blank', () => {
+    expect(renderExternalHandoffPrompt('Focus: {{focus}}', '   ', '', 'x')).toBe('Focus: No specific focus was provided.');
+    expect(renderExternalHandoffPrompt('Focus: {{focus}}', undefined, '', 'x')).toBe('Focus: No specific focus was provided.');
   });
 });
 
