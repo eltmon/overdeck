@@ -733,6 +733,15 @@ The Overdeck desktop app wraps the dashboard in a native Electron window with sy
 | **Cmd+K Palette** | Command palette for quick actions and workspace navigation |
 | **Desktop Settings** | Settings → Desktop App section for tray, notifications, and auto-start config |
 
+### Command palette conversation search
+
+Conversation results in the Cmd+K palette are one row per conversation, labelled by
+its title, with the best-matching excerpt and a hit count. Ranking is title matches
+first, then conversations matching in message text, then conversations matching
+only inside file paths, code blocks, or tool output. Archived conversations are
+included and marked **archived**. Title matching works even when conversation
+search indexing is off. See [DESKTOP-APP.md#cmdk-command-palette](DESKTOP-APP.md#cmdk-command-palette).
+
 ### `pan up` Electron Detection
 
 `pan up` checks for the desktop app before starting the server:

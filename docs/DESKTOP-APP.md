@@ -119,9 +119,20 @@ Type to filter. Press `Enter` to execute, `Escape` to close.
 
 Below the search input, a row of chips filters the result list by type: **All**, plus **Actions**, **Commands**, **Workspaces**, **Issues**, **Conversations**, and **Memory** as each type has results on screen. **Conversations** is always offered, even with zero conversation hits, and narrows the list to conversation search results only. Press `Cmd+J` (macOS) or `Ctrl+J` (Linux/Windows) to open the palette already scoped to Conversations.
 
-Conversation results default to newest-first order. Use the **Newest first** toggle in the palette footer to switch to relevance-rank order; the choice persists per browser.
+### Conversation results
 
-Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette shows no conversation hits.
+Conversation results are grouped to one row per conversation, labelled by its
+title, with the best-matching excerpt and a hit count. Ranking bands
+conversations into tiers: title matches first, then conversations matching in
+message text, then conversations matching only inside file paths, code blocks,
+or tool output. Archived conversations are included and marked **archived**.
+
+Conversation results default to newest-first order, which keeps title matches
+above everything else and preserves the tier order within that. Use the
+**Newest first** toggle in the palette footer to switch to relevance-rank
+order; the choice persists per browser.
+
+Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette still finds conversations by title, but shows no transcript matches.
 
 The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
 
