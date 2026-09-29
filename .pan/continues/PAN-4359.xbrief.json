@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T05:03:16.363Z",
+  "updated": "2026-09-29T05:03:31.573Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -207,6 +207,10 @@
     "doctor-claude-code.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T05:03:16.362Z"
+    },
+    "docs-claude-code-versions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:31.572Z"
     }
   }
 }
