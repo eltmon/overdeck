@@ -269,12 +269,13 @@ if ($SkipServe) {
     @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $script:ServePoll }
   }
 
-  Invoke-Step '2a' "GET /api/{health,conversations,projects,settings,issues} with x-overdeck-internal-token" {
+  # /api/projects has no GET route (POST only), so it is not probed.
+  Invoke-Step '2a' "GET /api/{health,conversations,settings,issues} with x-overdeck-internal-token" {
     if (-not $ServeAnswers) { return @{ status = 'not-run'; note = '1c failed: the server does not answer HTTP' } }
     # Failing endpoints first, so the summary cell (first evidence line) names one.
     $bad = @()
     $good = @()
-    foreach ($path in '/api/health', '/api/conversations', '/api/projects', '/api/settings', '/api/issues') {
+    foreach ($path in '/api/health', '/api/conversations', '/api/settings', '/api/issues') {
       $r = Get-HttpStatus 'GET' "http://localhost:$Port$path" @{ 'x-overdeck-internal-token' = $Token } $null
       $body = [string]$r.Body
       $line = "$path -> $($r.Status) $($body.Substring(0, [Math]::Min(300, $body.Length)))"
@@ -283,12 +284,29 @@ if ($SkipServe) {
     @{ status = $(if ($bad.Count -eq 0) { 'pass' } else { 'fail' }); evidence = (($bad + $good) -join "`n") }
   }
 
-  Invoke-Step '2b' "POST /api/conversations {`"message`":`"hello`"} with Origin and x-overdeck-internal-token" {
+  # The POST answers 201 with sessionAlive=false and starts the runtime in the
+  # background, so 2b follows the row: pass once its session is alive, fail on
+  # a spawnError, an ended status, or no live session after 60 s.
+  Invoke-Step '2b' "POST /api/conversations {`"message`":`"hello`"} with Origin and x-overdeck-internal-token; then GET /api/conversations for 60 s" {
     if (-not $ServeAnswers) { return @{ status = 'not-run'; note = '1c failed: the server does not answer HTTP' } }
     $headers = @{ 'Origin' = "http://localhost:$Port"; 'x-overdeck-internal-token' = $Token; 'content-type' = 'application/json' }
     $r = Get-HttpStatus 'POST' "http://localhost:$Port/api/conversations" $headers '{"message":"hello"}'
-    $ok = $r.Status -ge 200 -and $r.Status -lt 300
-    @{ status = $(if ($ok) { 'pass' } else { 'fail' }); evidence = "HTTP $($r.Status)`n$($r.Body)" }
+    $posted = "POST -> HTTP $($r.Status)`n$($r.Body)"
+    if (-not ($r.Status -ge 200 -and $r.Status -lt 300)) { return @{ status = 'fail'; evidence = $posted; note = 'the POST was refused' } }
+    $name = ($r.Body | ConvertFrom-Json).name
+    $row = $null
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt 60) {
+      Start-Sleep -Seconds 3
+      $list = Get-HttpStatus 'GET' "http://localhost:$Port/api/conversations" @{ 'Origin' = "http://localhost:$Port"; 'x-overdeck-internal-token' = $Token } $null
+      try { $row = @($list.Body | ConvertFrom-Json) | Where-Object { $_.name -eq $name } | Select-Object -First 1 } catch { $row = $null }
+      if ($row -and ($row.sessionAlive -or $row.spawnError -or $row.status -eq 'ended')) { break }
+    }
+    $rowText = if ($row) { $row | Select-Object name, status, sessionAlive, spawnError, tmuxSession, harness, cwd | ConvertTo-Json -Compress } else { '(row not found)' }
+    $evidence = "$posted`n--- GET /api/conversations row after $([Math]::Round($clock.Elapsed.TotalSeconds)) s ---`n$rowText"
+    if ($row -and $row.sessionAlive) { return @{ status = 'pass'; evidence = $evidence } }
+    $note = if ($row -and $row.spawnError) { "spawnError: $($row.spawnError)" } elseif ($row -and $row.status -eq 'ended') { 'the conversation ended without a live session' } else { 'no live session 60 s after the POST' }
+    @{ status = 'fail'; evidence = $evidence; note = $note }
   }
 
   $ServeOutput = ''
