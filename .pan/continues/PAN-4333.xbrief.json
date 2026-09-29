@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4333",
+  "created": "2026-09-29T14:11:53.536Z",
+  "updated": "2026-09-29T14:11:53.536Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-cas-refs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4333",
+      "claimedAt": "2026-09-29T14:11:53.536Z"
+    }
+  }
+}
