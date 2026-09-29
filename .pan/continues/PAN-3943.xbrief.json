@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:41:14.111Z",
+  "updated": "2026-09-29T23:41:29.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "directive-detect.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T23:41:14.111Z"
+    },
+    "directive-detect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:29.519Z"
     }
   }
 }
