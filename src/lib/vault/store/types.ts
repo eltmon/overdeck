@@ -20,6 +20,15 @@ export interface VaultRef {
 
 export type CasResult = 'ok' | 'conflict';
 
+/** One ref in a `casRefs` batch. */
+export interface RefOp {
+  name: string;
+  /** The version the ref must be at (`null` = the ref must not exist yet). */
+  expectedVersion: string | null;
+  /** Omitted = assert-only: the ref must be at expectedVersion; nothing is written. */
+  value?: Uint8Array;
+}
+
 export interface VaultStore {
   /** Store objects by id. Re-putting an existing id with the same bytes is a no-op. */
   putObjects(objects: ReadonlyArray<{ id: string; bytes: Uint8Array }>): Promise<void>;
@@ -29,9 +38,22 @@ export interface VaultStore {
   readRef(name: string): Promise<VaultRef | null>;
   /**
    * Replace `name` with `value` only when its current version equals
-   * `expectedVersion` (`null` = the ref must not exist yet).
+   * `expectedVersion` (`null` = the ref must not exist yet). The single-op
+   * form of `casRefs`.
    */
   casRef(name: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult>;
+  /**
+   * All-or-nothing CAS over several distinct refs: when every op's ref is at its
+   * expectedVersion, write every op that carries a value and publish them together;
+   * otherwise write nothing and return 'conflict'. An op without a value only
+   * asserts. Throws for duplicate names.
+   */
+  casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult>;
+  /**
+   * Drop objects no ref write has published yet. A backend that publishes on
+   * write resolves at once.
+   */
+  discardUnpublished(): Promise<void>;
   listRefs(prefix: string): Promise<Array<{ name: string; version: string }>>;
   /**
    * Bring the local view up to date with the remote before a read-heavy pass
@@ -96,4 +118,13 @@ export function assertNotSlotName(id: string): void {
 
 export function assertRefName(name: string): void {
   if (!REF_NAME_PATTERN.test(name)) throw new Error(`Invalid vault ref name: ${JSON.stringify(name)}`);
+}
+
+/** Throws when two ops of a `casRefs` batch name the same ref. */
+export function assertDistinctRefNames(ops: ReadonlyArray<RefOp>): void {
+  const seen = new Set<string>();
+  for (const { name } of ops) {
+    if (seen.has(name)) throw new Error(`Duplicate vault ref name in one batch: ${JSON.stringify(name)}`);
+    seen.add(name);
+  }
 }

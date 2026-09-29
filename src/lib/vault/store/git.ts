@@ -6,13 +6,17 @@
  * `GIT_TERMINAL_PROMPT=0`; credentials come from the user's git setup.
  *
  * - `putObjects` writes files into the clone without committing.
- * - `casRef` runs: fetch, `reset --hard origin/main` (this is the vault's own
- *   clone, never a project repo), compare the ref file's blob SHA with the
- *   expected version, write the ref, commit the pending objects and the ref
- *   in one commit, push. A non-fast-forward rejection repeats the cycle up to
- *   three times, then returns `conflict`. A network failure resets the clone
- *   to `origin/main` and throws `VaultOfflineError`, so no local commit ever
- *   outlives a failed push and there is never a divergent history to rebase.
+ * - `casRefs` runs: fetch, `reset --hard origin/main` (this is the vault's own
+ *   clone, never a project repo), compare every op's ref blob SHA with its
+ *   expected version, write every op that carries a value, commit the pending
+ *   objects and the refs in one commit, push. A non-fast-forward rejection
+ *   repeats the cycle up to three times, then returns `conflict`. A network
+ *   failure resets the clone to `origin/main` and throws `VaultOfflineError`,
+ *   so no local commit ever outlives a failed push and there is never a
+ *   divergent history to rebase. `casRef` is the single-op form.
+ * - `discardUnpublished` resets the clone to `origin/main` and removes the
+ *   untracked files under `objects/` and `refs/`: objects `putObjects` wrote
+ *   that no push has published.
  * - `putSlot` overwrites or deletes a reserved slot (`objects/keywrap/v1`)
  *   and commits and pushes only that path, with the same refresh, retry and
  *   offline-reset rules as `casRef`. Last write wins; there is no CAS.
@@ -39,11 +43,13 @@ import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
   VaultOfflineError,
+  assertDistinctRefNames,
   assertNotSlotName,
   assertRefName,
   assertSlotName,
   objectRelativePath,
   type CasResult,
+  type RefOp,
   type VaultRef,
   type VaultStore,
 } from './types.js';
@@ -274,23 +280,32 @@ export class GitVaultStore implements VaultStore {
   }
 
   async casRef(name: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
-    const rel = this.refRelPath(name);
-    const run = this.casQueue.then(() => this.locked(() => this.casRefSerialized(rel, expectedVersion, value)));
+    return this.casRefs([{ name, expectedVersion, value }]);
+  }
+
+  async casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult> {
+    assertDistinctRefNames(ops);
+    const resolved = ops.map((op) => ({ ...op, rel: this.refRelPath(op.name) }));
+    const run = this.casQueue.then(() => this.locked(() => this.casRefsSerialized(resolved)));
     this.casQueue = run.catch(() => undefined);
     return run;
   }
 
-  private async casRefSerialized(rel: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
+  private async casRefsSerialized(ops: ReadonlyArray<RefOp & { rel: string }>): Promise<CasResult> {
+    const valued = ops.flatMap(({ rel, value }) => (value === undefined ? [] : [{ rel, value }]));
+    const message = valued.length === 1 ? 'vault: settle' : 'vault: batch';
     for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
       await this.refreshUnlocked();
       const remoteMain = await this.hasRemoteMain();
-      const current = remoteMain ? await this.remoteBlobSha(rel) : null;
-      if (current !== expectedVersion) return 'conflict';
+      for (const { rel, expectedVersion } of ops) {
+        const current = remoteMain ? await this.remoteBlobSha(rel) : null;
+        if (current !== expectedVersion) return 'conflict';
+      }
 
-      await writeAtomic(join(this.cloneDir, rel), value);
+      for (const { rel, value } of valued) await writeAtomic(join(this.cloneDir, rel), value);
       if (!remoteMain) await git(this.cloneDir, ['symbolic-ref', 'HEAD', `refs/heads/${GIT_VAULT_BRANCH}`]);
       await git(this.cloneDir, ['add', '-A', '--', '.']);
-      await git(this.cloneDir, [...COMMIT_IDENTITY, 'commit', '--quiet', '--allow-empty', '-m', 'vault: settle']);
+      await git(this.cloneDir, [...COMMIT_IDENTITY, 'commit', '--quiet', '--allow-empty', '-m', message]);
       try {
         await git(this.cloneDir, remoteMain
           ? ['push', '--quiet', 'origin', `HEAD:${GIT_VAULT_BRANCH}`]
@@ -299,7 +314,7 @@ export class GitVaultStore implements VaultStore {
       } catch (error) {
         const failure = error as GitCommandError;
         // Drop the local commit either way; objects are untracked again and
-        // survive for the next attempt. The unpushed ref file must not: a new
+        // survive for the next attempt. The unpushed ref files must not: a new
         // record's ref would otherwise ride along with the next push.
         await this.undoLocalCommit();
         await git(this.cloneDir, ['clean', '-fdq', '--', 'refs']).catch(() => undefined);
@@ -309,6 +324,15 @@ export class GitVaultStore implements VaultStore {
       }
     }
     return 'conflict';
+  }
+
+  async discardUnpublished(): Promise<void> {
+    const run = this.casQueue.then(() => this.locked(async () => {
+      await this.resetToRemote();
+      await git(this.cloneDir, ['clean', '-fdq', '--', 'objects', 'refs']);
+    }));
+    this.casQueue = run.catch(() => undefined);
+    return run;
   }
 
   async putSlot(name: string, bytes: Uint8Array | null): Promise<void> {
