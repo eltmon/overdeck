@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:09:13.393Z",
+  "updated": "2026-09-29T06:09:32.409Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-2609",
       "claimedAt": "2026-09-28T14:57:47.382Z"
+    },
+    "vault-evict-confirm": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:09:32.409Z"
     }
   }
 }
