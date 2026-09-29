@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:14:12.558Z",
+  "updated": "2026-09-29T10:27:13.379Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4329",
       "claimedAt": "2026-09-29T10:12:51.074Z",
       "doneAt": "2026-09-29T10:14:12.558Z"
+    },
+    "wip-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:13.379Z"
     }
   }
 }
