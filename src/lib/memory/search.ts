@@ -40,6 +40,8 @@ export interface SearchMemoryInput {
   includeArchived?: boolean;
   /** Restrict to one FTS doc_type (e.g. 'observation') — the index is shared across observations and daily summaries. */
   docType?: string;
+  /** `all` (default) ANDs every term; `any` ORs them and lets BM25 rank. Prompt-time injection uses `any` (PAN-4370). */
+  matchMode?: 'all' | 'any';
 }
 
 export interface MemorySearchHit {
@@ -92,7 +94,7 @@ interface MemorySearchRow {
 }
 
 export async function searchMemory(input: SearchMemoryInput): Promise<MemorySearchHit[]> {
-  const matchQuery = buildMatchQuery(input.query);
+  const matchQuery = buildMatchQuery(input.query, input.matchMode);
   if (!matchQuery) return [];
 
   const limit = normalizeLimit(input.limit);
@@ -163,12 +165,38 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
     .slice(0, limit);
 }
 
-export function buildMatchQuery(query: string): string {
-  return extractQueryTerms(query).map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
+export function buildMatchQuery(query: string, matchMode: 'all' | 'any' = 'all'): string {
+  const quoted = extractQueryTerms(query).map((term) => `"${term.replaceAll('"', '""')}"`);
+  return quoted.join(matchMode === 'any' ? ' OR ' : ' ');
 }
 
 function extractQueryTerms(query: string): string[] {
   return query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
+}
+
+const KEYWORD_QUERY_MAX_TERMS = 12;
+const KEYWORD_MIN_LENGTH = 3;
+const KEYWORD_STOPWORDS = new Set([
+  'the', 'and', 'are', 'but', 'can', 'could', 'did', 'does', 'for', 'from', 'had', 'has', 'have', 'how',
+  'into', 'its', 'just', 'let', 'not', 'our', 'please', 'should', 'some', 'that', 'their', 'them', 'then',
+  'there', 'these', 'they', 'this', 'was', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will',
+  'with', 'would', 'you', 'your', 'also', 'any', 'all', 'now', 'out', 'get', 'got', 'make', 'need', 'want',
+  'see', 'use', 'about', 'after', 'again', 'been', 'before', 'being', 'both', 'each', 'more', 'most', 'only',
+  'other', 'over', 'same', 'such', 'than', 'too', 'very', 'here', 'yes', 'okay', 'thanks',
+]);
+
+/** Distinct content words of `text` for an OR-mode FTS query (PAN-4370): lowercased, stopwords and <3-char tokens dropped, first 12 kept in order. */
+export function buildPromptKeywordQuery(text: string): string {
+  const seen = new Set<string>();
+  const keywords: string[] = [];
+  for (const term of extractQueryTerms(text)) {
+    const lower = term.toLowerCase();
+    if (lower.length < KEYWORD_MIN_LENGTH || KEYWORD_STOPWORDS.has(lower) || seen.has(lower)) continue;
+    seen.add(lower);
+    keywords.push(lower);
+    if (keywords.length === KEYWORD_QUERY_MAX_TERMS) break;
+  }
+  return keywords.join(' ');
 }
 
 function buildIdentityPredicate(input: SearchMemoryInput): { sql: string; params: string[] } | null {
