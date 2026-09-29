@@ -1,0 +1,164 @@
+---
+title: Remote access
+description: Pair another device with a machine's dashboard, revoke it, and keep the LAN out
+---
+
+# Remote access
+
+Each machine runs its own Overdeck. That machine owns its projects, agents,
+conversations, terminals and credentials, and its dashboard serves only its own
+state. Another device (a laptop, a tablet, a second desktop) reaches a machine
+by **pairing** with it. Pairing gives that device its own revocable session.
+The machine's root internal token never leaves the machine.
+
+Every machine has a stable public identity. `GET /api/environment` returns it
+without a credential:
+
+```json
+{
+  "descriptorVersion": 1,
+  "environmentId": "3f0c…",
+  "label": "desk",
+  "platform": { "os": "linux", "arch": "x64" },
+  "serverVersion": "0.63.0",
+  "protocolVersion": 1,
+  "capabilities": { "pairing": true, "deviceSessions": true, "terminalAuth": true }
+}
+```
+
+The descriptor contains no paths, usernames or tokens.
+
+<Warning>
+Do not expose a dashboard on a network until `GET /api/environment` reports
+`capabilities.terminalAuth: true`. That value means every `/ws/*` connection
+(terminals, RPC, voice) requires a credential.
+</Warning>
+
+## Pair a device
+
+1. On the machine, run `pan pair` with an address the other device can reach:
+
+   ```bash
+   pan pair --url https://desk.tailnet.ts.net
+   ```
+
+   It prints a URL such as `https://desk.tailnet.ts.net/#pair=odp_…`, the
+   expiry time, and the raw credential for manual entry. Use `--json` for
+   `{ url, credential, expiresAt }`.
+2. Open that URL on the other device. The dashboard exchanges the credential
+   for a device session, removes it from the address bar, and loads.
+
+The pairing credential:
+
+- works once, and expires 10 minutes after `pan pair` printed it;
+- lives only in the running dashboard's memory, so a dashboard restart
+  invalidates every credential that has not been used yet;
+- always travels in the URL fragment (`#pair=`), never in a query string, so
+  it never reaches a server or proxy log.
+
+Without `--url`, `pan pair` uses this machine's own dashboard address. When
+that address is `localhost` (or `127.0.0.1`, `::1`, `*.localhost`), the URL only
+works on this machine, and `pan pair` says so.
+
+`pan pair` talks to a dashboard started by `pan up`, which shares this
+machine's internal token. A paired device cannot create more pairing
+credentials.
+
+### Open the dashboard at a non-default address
+
+The dashboard only accepts browser requests from origins it trusts. If you
+open it at an address other than the default (for example through Tailscale),
+add that origin before starting the dashboard:
+
+```bash
+export OVERDECK_TRUSTED_ORIGINS=https://desk.tailnet.ts.net
+pan up
+```
+
+Separate several origins with commas. A later release discovers and advertises
+endpoints automatically
+([PAN-4403](https://github.com/eltmon/overdeck/issues/4403)).
+
+## List and revoke devices
+
+```bash
+pan devices list            # id, name, created, last used, revoked
+pan devices revoke <id>
+```
+
+Revoking a device stops its next HTTP request and closes its open WebSocket and
+live event-stream connections at once. If the dashboard is not running,
+`pan devices revoke` writes the revocation straight into the registry; no
+connections can be open then. The running dashboard also rereads the registry
+every 5 seconds, so a revocation from any process takes effect within 5 seconds.
+
+Device sessions are stored in `~/.overdeck/access-tokens.json` (mode `0600`).
+The file keeps only a SHA-256 hash of each token. If the file is corrupt, the
+dashboard accepts no device session and logs an error naming the file.
+
+## What the LAN can reach
+
+The dashboard binds every interface. Every `/api/*` and `/events/*` request that
+does not come from this machine must carry a credential (the root session, a
+device session, or the internal token), or it gets `401`. "From this machine"
+means a loopback address, or the host-local Traefik and Docker networks that
+front `overdeck.localhost`.
+
+These routes answer without a credential:
+
+| Route | Why |
+| --- | --- |
+| `GET /api/health` | Health probe. |
+| `GET /api/environment` | The public descriptor. |
+| `OPTIONS` and `POST /api/dashboard/session` | The session mint; it checks its own credential. |
+| `POST /api/pairing/exchange` | Pairing itself. Ten failed attempts in 60 seconds lock it for 60 seconds. |
+| `POST /api/webhooks/github` | Verified by its HMAC signature. |
+
+`GET /events/stream` also accepts its `OVERDECK_EVENTS_TOKEN` bearer token when
+that variable is set, so an external consumer such as a TTS sidecar keeps
+working. The dashboard's static page files stay public.
+
+## Local reverse proxies: `require_token_mint`
+
+A local reverse proxy (Tailscale Serve, cloudflared, a Traefik route) connects
+to the dashboard from `127.0.0.1`, so every visitor looks like a local caller.
+Turn on `require_token_mint` whenever such a proxy forwards outside traffic:
+
+```yaml
+# ~/.overdeck/config.yaml
+dashboard:
+  require_token_mint: true
+```
+
+With it on:
+
+- A browser can only get a root session by presenting the internal token (for
+  example the one-time `#overdeck_token=<token>` URL fragment, where the token is
+  the contents of `~/.overdeck/internal-token`). Being local no longer counts.
+- A local request that carries a proxy header (`X-Forwarded-For`,
+  `X-Forwarded-Host` or `Forwarded`) counts as remote, so it needs a credential.
+
+A browser that already holds a session keeps working. A new browser behind the
+proxy needs the `#overdeck_token=` fragment or pairing. The setting is read once at
+startup, so restart the dashboard after changing it.
+
+## What pairing is not
+
+- **The relay is optional reachability.** The Overdeck relay
+  ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356)) is one way to
+  reach a machine. It is not where multi-machine state lives: each machine
+  keeps its own.
+- **Moving a conversation to another machine is Session Vault.** Pairing lets a
+  device use a machine's dashboard. To resume a conversation on a different
+  machine, use [Session Vault](/configuration/session-vault).
+
+## What comes next
+
+- A desktop connection list, environment switcher and version gating:
+  [PAN-4402](https://github.com/eltmon/overdeck/issues/4402).
+- Discovered HTTPS and Tailscale endpoints and advertised origins:
+  [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
+- Launching Overdeck on an SSH host from the desktop app:
+  [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
+- Scoped API tokens, `pan token` and a Settings toggle for
+  `require_token_mint`: [PAN-2351](https://github.com/eltmon/overdeck/issues/2351).
