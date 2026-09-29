@@ -4,17 +4,17 @@
     "created": "2026-09-29T01:56:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4337: The git shim refuses commits and pushes off the workspace's feature branch",
-    "updated": "2026-09-29T01:59:14.657Z"
+    "updated": "2026-09-29T01:59:57.281Z"
   },
   "plan": {
     "id": "pan-4337",
     "title": "The git shim refuses commits and pushes off the workspace's feature branch",
-    "status": "proposed",
+    "status": "running",
     "uid": "88b7a3dd-705e-48a1-bf0d-0d65571de87e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T01:56:04Z",
-    "updated": "2026-09-29T01:59:14.657Z",
+    "updated": "2026-09-29T01:59:57.281Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4337",
