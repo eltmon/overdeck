@@ -27,7 +27,8 @@ import type { XBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import { readContinueState, updateContinueState } from './continue-state.js';
+import { findProjectByPath } from '../projects.js';
+import { continueStatePath, readContinueState, updateContinueState } from './continue-state.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -300,52 +301,110 @@ export interface PromotedXBrief {
   canonicalFilename: string;
 }
 
+/** `<project>/workspaces/feature-<issueId>`, whether or not it exists on disk. */
+function baseWorkspaceFor(projectRoot: string, issueId: string): string {
+  const root = findProjectByPath(projectRoot)?.path ?? projectRoot;
+  return join(root, 'workspaces', `feature-${issueId.toLowerCase()}`);
+}
+
+/**
+ * The plan home inside `issueId`'s workspace worktree, or null when that
+ * worktree does not exist. Per-issue writers (feedback, session history, the
+ * swarm slot ledger) target this — never the primary checkout — so their
+ * writes land on the branch that ships (PAN-4225).
+ */
+export function resolveIssueWorkspacePlanHome(projectRoot: string, issueId: string): string | null {
+  const workspaceDir = baseWorkspaceFor(projectRoot, issueId);
+  if (!existsSync(workspaceDir)) return null;
+  return resolvePlanHome(workspaceDir);
+}
+
+/**
+ * Plan homes to read `issueId`'s continue state from, workspace first: the
+ * live worktree carries progress the primary checkout's copy may lack.
+ */
+export function issueContinueReadPlanHomes(projectRoot: string, issueId: string): string[] {
+  const root = findProjectByPath(projectRoot)?.path ?? projectRoot;
+  const homes = [resolveIssueWorkspacePlanHome(projectRoot, issueId), resolvePlanHome(root)];
+  return [...new Set(homes.filter((home): home is string => home !== null))];
+}
+
 export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  return readContinueState(resolvePlanHome(projectRoot), issueId);
+  for (const planHome of issueContinueReadPlanHomes(projectRoot, issueId)) {
+    const state = readContinueState(planHome, issueId);
+    if (state) return state;
+  }
+  return null;
 }
 
+/** True when the write landed; false (writing nothing) when `issueId` has no workspace worktree. */
 export function appendContinueSessionEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
-): void {
+): boolean {
+  const planHome = resolveIssueWorkspacePlanHome(projectRoot, issueId);
+  if (!planHome) {
+    console.log(`[lifecycle-io] no workspace for ${issueId} under ${projectRoot}; skipping session entry`);
+    return false;
+  }
   const timestamped: ContinueSessionEntry = {
     ...entry,
     timestamp: entry.timestamp ?? new Date().toISOString(),
   };
-  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => ({
+  updateContinueState(planHome, issueId, (current) => ({
     ...current,
     sessionHistory: [...current.sessionHistory, timestamped],
     ...(timestamped.agentModel ? { agentModel: timestamped.agentModel } : {}),
   }));
+  return true;
 }
 
 /**
  * Append specialist feedback, skipping an entry identical to the last one — a
  * specialist that re-delivers the same verdict must not double the list.
+ * True when the write landed; false (writing nothing) when `issueId` has no
+ * workspace worktree.
  */
 export function appendFeedbackEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
-): void {
-  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => {
+): boolean {
+  const planHome = resolveIssueWorkspacePlanHome(projectRoot, issueId);
+  if (!planHome) {
+    console.log(`[lifecycle-io] no workspace for ${issueId} under ${projectRoot}; skipping feedback entry`);
+    return false;
+  }
+  updateContinueState(planHome, issueId, (current) => {
     const feedback = current.feedback ?? [];
     const last = feedback[feedback.length - 1];
     if (last && JSON.stringify(last) === JSON.stringify(entry)) return current;
     return { ...current, feedback: [...feedback, entry] };
   });
+  return true;
 }
 
+/**
+ * True when the clear landed; false (writing nothing) when `issueId` has no
+ * workspace worktree, or that workspace has no continue file yet.
+ */
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
-): void {
-  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => ({
+): boolean {
+  const planHome = resolveIssueWorkspacePlanHome(projectRoot, issueId);
+  if (!planHome) {
+    console.log(`[lifecycle-io] no workspace for ${issueId} under ${projectRoot}; skipping feedback clear`);
+    return false;
+  }
+  if (!existsSync(continueStatePath(planHome, issueId))) return false;
+  updateContinueState(planHome, issueId, (current) => ({
     ...current,
     feedback: [],
   }));
+  return true;
 }

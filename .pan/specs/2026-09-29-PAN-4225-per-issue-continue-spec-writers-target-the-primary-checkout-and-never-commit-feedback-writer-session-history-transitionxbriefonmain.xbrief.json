@@ -4,17 +4,17 @@
     "created": "2026-09-29T02:17:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4225: Per-issue continue/spec writers target the primary checkout and never commit (feedback-writer, session history, transitionXBriefOnMain)",
-    "updated": "2026-09-29T02:26:07.135Z"
+    "updated": "2026-09-29T02:26:52.544Z"
   },
   "plan": {
     "id": "pan-4225",
     "title": "Per-issue continue/spec writers target the primary checkout and never commit (feedback-writer, session history, transitionXBriefOnMain)",
-    "status": "proposed",
+    "status": "running",
     "uid": "1d5bb37d-7e50-47c0-9458-96abf2f705bd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T02:17:07Z",
-    "updated": "2026-09-29T02:26:07.135Z",
+    "updated": "2026-09-29T02:26:52.544Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4225",
