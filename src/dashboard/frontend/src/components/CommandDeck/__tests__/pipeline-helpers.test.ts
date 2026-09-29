@@ -123,6 +123,17 @@ describe('work-not-started classification (PAN-4399)', () => {
     expect(isNeedsYouFeature(feature, derived)).toBe(false);
     expect(sublineFor(makeBucket(feature, derived))).toBe('work agent start retrying');
   });
+
+  // PAN-4210, review non-blocking #3: a Deacon-frozen retry is held, not
+  // actively retrying — the subline must say so.
+  it('a held workStart names the frozen Deacon instead of claiming an active retry', () => {
+    const feature = makeFeature();
+    const derived = derivedState('working', {
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z', held: true },
+    });
+
+    expect(sublineFor(makeBucket(feature, derived))).toBe('work agent start held while the Deacon is frozen');
+  });
 });
 
 describe('isStalledFeature', () => {

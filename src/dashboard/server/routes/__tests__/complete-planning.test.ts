@@ -504,6 +504,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -527,6 +528,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634a',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -547,6 +549,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634b',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -568,6 +571,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634c',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -747,6 +751,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: true,
       workAgentQueued: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -860,6 +865,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1148',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual(['spawn', 'kill:planning-pan-1148']);
   });
@@ -917,6 +923,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1151',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual([]);
   });

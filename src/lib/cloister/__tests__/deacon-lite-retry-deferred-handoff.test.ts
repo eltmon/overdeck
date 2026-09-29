@@ -107,6 +107,9 @@ describe('retryDeferredHandoffs', () => {
     await tick(1); // T0+6: second retry, accepted
     expect(spawn).toHaveBeenCalledTimes(2);
     expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.started', data: { attempt: 2, agentId: 'agent-pan-4155' } });
+    expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('after the spawn guardrails cleared'),
+    }));
 
     await tick(30);
     expect(spawn).toHaveBeenCalledTimes(2);
@@ -282,15 +285,20 @@ describe('retryDeferredHandoffs', () => {
       expect(Date.parse(String(retried.data!['nextRetryAt']))).toBeGreaterThan(T0 + 2 * MINUTE);
     });
 
-    it('starts the work agent once the spawn succeeds', async () => {
+    it('starts the work agent once the spawn succeeds, journals requestedAt, and names the stack recovery', async () => {
       spawn.mockResolvedValueOnce({ spawned: true, agentId: 'agent-pan-4155' });
 
       await tick(2); // T0+2: first retry, accepted
 
-      expect(handoffEntries().at(-1)).toMatchObject({
-        type: 'handoff.started',
-        data: { attempt: 1, agentId: 'agent-pan-4155' },
-      });
+      const started = handoffEntries().at(-1)!;
+      expect(started).toMatchObject({ type: 'handoff.started', data: { attempt: 1, agentId: 'agent-pan-4155' } });
+      expect(typeof started.data!['requestedAt']).toBe('string');
+      // PAN-4399 review fix: requestedAt is stamped before the spawn call, so
+      // it is no later than the entry's own `at`.
+      expect(Date.parse(String(started.data!['requestedAt']))).toBeLessThanOrEqual(Date.parse(started.at));
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('after the workspace docker stack recovered'),
+      }));
     });
 
     it('gives up after two hours with skipReason stack-unhealthy and a pan start warning', async () => {

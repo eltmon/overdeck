@@ -240,6 +240,11 @@ async function retryOne(input: {
   const startedBy = planningHandoffStartedBy(
     input.readAgentState(`planning-${issueId.toLowerCase()}`)?.startedBy,
   );
+  // PAN-4399 review fix: stamped before the spawn call, not after it
+  // resolves — `pan start` writes the work agent's own `startedAt` before
+  // the endpoint answers, so comparing a real start against this entry's own
+  // `at` always reads "started after the hand-off" as false.
+  const requestedAt = new Date().toISOString();
   let result: SpawnWorkAgentResult;
   try {
     result = await (deps.spawn ?? defaultSpawn)(issueId, startedBy);
@@ -252,12 +257,13 @@ async function retryOne(input: {
       type: 'handoff.started',
       issueId,
       source: 'deacon-lite',
-      data: { deferredAt: schedule.deferredAt, attempt, agentId: result.agentId, ...(result.queued ? { queued: true } : {}) },
+      data: { deferredAt: schedule.deferredAt, attempt, agentId: result.agentId, requestedAt, ...(result.queued ? { queued: true } : {}) },
     });
+    const cleared = schedule.reason === 'stack-unhealthy' ? 'after the workspace docker stack recovered' : 'after the spawn guardrails cleared';
     emitActivity({
       source: 'plan',
       level: 'info',
-      message: `${issueId} work agent started on deferred retry ${attempt} after the spawn guardrails cleared`,
+      message: `${issueId} work agent started on deferred retry ${attempt} ${cleared}`,
       issueId,
     });
     return `started the work agent on retry ${attempt}`;

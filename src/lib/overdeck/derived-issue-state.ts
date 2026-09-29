@@ -219,8 +219,9 @@ export function deriveIssueState(facts: IssueStateFacts): DerivedIssueState {
   if (facts.pr) derived.pr = facts.pr;
   if (facts.branch) derived.branch = facts.branch;
   // PAN-4399: a post-planning auto-start's journal read only means anything
-  // while there is no PR and no live pane already telling the same story.
-  if (!facts.pr && !facts.prMerged && facts.panes.filter(isLive).length === 0 && facts.workStart) {
+  // while there is no PR and no live pane already telling the same story,
+  // and the issue is still open — a closed issue is never "waiting on you".
+  if (facts.issueOpen !== false && !facts.pr && !facts.prMerged && facts.panes.filter(isLive).length === 0 && facts.workStart) {
     derived.workStart = facts.workStart;
     if (facts.workStart.status === 'not-started' && !derived.attention) {
       derived.attention = 'work-not-started';

@@ -321,6 +321,9 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
         source: 'complete-planning',
         data: { agentId: 'agent-pan-3230' },
       });
+      // PAN-4399 review fix: requestedAt is stamped before the spawn POST,
+      // so deriveWorkStart can tell a real start apart from a never-started one.
+      expect(typeof entries[0]!.data!['requestedAt']).toBe('string');
     } finally {
       global.fetch = originalFetch;
     }

@@ -97,4 +97,63 @@ describe('deriveWorkStart', () => {
     }), NOW);
     expect(result).toEqual({ status: 'not-started', at: AT, error: 'gave up' });
   });
+
+  // PAN-4399 review fix: `pan start` writes the work agent's own `startedAt`
+  // BEFORE the spawn route answers, and `handoff.started` is journaled only
+  // after that — so a real, successful auto-start always has
+  // workAgentStartedAt < entry.at. Comparing against `requestedAt` (stamped
+  // before the spawn call) instead of the entry's own `at` fixes the false
+  // "never started" read a stopped-but-once-live agent produced.
+  describe('a real accepted spawn (requestedAt ordering)', () => {
+    it('an agent started between requestedAt and the entry\'s own at reads as no signal, even past grace', () => {
+      const requestedAt = new Date(NOW - (WORK_START_GRACE_MS + 90_000)).toISOString();
+      const startedAt = new Date(NOW - (WORK_START_GRACE_MS + 60_000)).toISOString();
+      const at = new Date(NOW - (WORK_START_GRACE_MS + 30_000)).toISOString();
+      const result = deriveWorkStart(facts({
+        lastHandoff: { type: 'handoff.started', at, data: { agentId: 'agent-pan-4399', requestedAt } },
+        workAgentStartedAt: Date.parse(startedAt),
+      }), NOW);
+      expect(result).toBeUndefined();
+    });
+
+    it('an agent that never started (no agent-state row) still reads not-started past grace, requestedAt notwithstanding', () => {
+      const requestedAt = new Date(NOW - (WORK_START_GRACE_MS + 90_000)).toISOString();
+      const at = new Date(NOW - (WORK_START_GRACE_MS + 30_000)).toISOString();
+      const result = deriveWorkStart(facts({
+        lastHandoff: { type: 'handoff.started', at, data: { agentId: 'agent-pan-4399', requestedAt } },
+        workAgentStartedAt: null,
+      }), NOW);
+      expect(result).toEqual({ status: 'not-started', at, error: 'The work agent was accepted but never started' });
+    });
+
+    it('an older agent started before requestedAt still suppresses (a stale run, not this hand-off)', () => {
+      const requestedAt = new Date(NOW - (WORK_START_GRACE_MS + 90_000)).toISOString();
+      const at = new Date(NOW - (WORK_START_GRACE_MS + 30_000)).toISOString();
+      const result = deriveWorkStart(facts({
+        lastHandoff: { type: 'handoff.started', at, data: { agentId: 'agent-pan-4399', requestedAt } },
+        workAgentStartedAt: Date.parse(requestedAt) - 1,
+      }), NOW);
+      expect(result).toEqual({ status: 'not-started', at, error: 'The work agent was accepted but never started' });
+    });
+  });
+
+  // PAN-4210: while the Deacon is frozen, a deferral is journaled but never
+  // actually retried — the badge/subline must say "held", not "retrying".
+  describe('held (PAN-4210)', () => {
+    it('a deferred entry with deaconPaused true reads as retrying and held', () => {
+      const result = deriveWorkStart(facts({
+        lastHandoff: { type: 'handoff.deferred', at: AT, data: { error: 'Agent ceiling reached', nextRetryAt: '2026-09-29T10:00:00.000Z', deaconPaused: true } },
+      }), NOW);
+      expect(result).toEqual({
+        status: 'retrying', at: AT, error: 'Agent ceiling reached', nextRetryAt: '2026-09-29T10:00:00.000Z', held: true,
+      });
+    });
+
+    it('a deferred entry without deaconPaused carries no held field', () => {
+      const result = deriveWorkStart(facts({
+        lastHandoff: { type: 'handoff.deferred', at: AT, data: { error: 'Agent ceiling reached', nextRetryAt: '2026-09-29T10:00:00.000Z' } },
+      }), NOW);
+      expect(result?.held).toBeUndefined();
+    });
+  });
 });

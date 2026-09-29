@@ -80,6 +80,8 @@ export const DerivedWorkStart = Schema.Struct({
   at: Schema.String,
   error: Schema.optional(Schema.String),
   nextRetryAt: Schema.optional(Schema.String),
+  /** The retry is journaled but not actually running because the Deacon is frozen (PAN-4210). Present only when true. */
+  held: Schema.optional(Schema.Literal(true)),
 })
 export type DerivedWorkStart = typeof DerivedWorkStart.Type
 

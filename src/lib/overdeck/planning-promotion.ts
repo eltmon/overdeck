@@ -122,6 +122,8 @@ export interface CompletePlanningAutoSpawnResult {
    */
   workAgentDeferred?: boolean;
   workAgentHttpStatus?: number;
+  /** PAN-4399: stamped before the `/api/agents` POST, since `pan start` writes its own `startedAt` before the route answers. */
+  workAgentRequestedAt?: string;
 }
 
 type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'critiqueGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
@@ -480,6 +482,7 @@ export async function completePlanningAutoSpawn(options: {
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
     : {};
   emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
+  const requestedAt = new Date().toISOString();
   try {
     const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
       method: 'POST',
@@ -517,7 +520,7 @@ export async function completePlanningAutoSpawn(options: {
         workAgentQueued ? 'container startup queued before work-agent spawn' : 'work agent spawn requested',
         { agentId },
       );
-      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId };
+      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId, workAgentRequestedAt: requestedAt };
     }
 
     const error = typeof body['error'] === 'string'
@@ -932,6 +935,7 @@ export async function completePlanningForIssue(options: {
           data: {
             agentId: autoSpawnResult.workAgentSession,
             ...(autoSpawnResult.workAgentQueued ? { queued: true } : {}),
+            ...(autoSpawnResult.workAgentRequestedAt ? { requestedAt: autoSpawnResult.workAgentRequestedAt } : {}),
           },
         });
       }

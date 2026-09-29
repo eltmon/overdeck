@@ -61,6 +61,14 @@ export function resolveFeatureStateBadge(input: FeatureStateBadgeInput): Feature
         title: 'Planning finished but the work agent never started. Start it from Needs you or run pan start.',
       };
     }
+    if (input.workStart?.status === 'retrying' && input.workStart.held) {
+      return {
+        key: 'work-start-held',
+        label: 'Work start held',
+        tone: 'machine',
+        title: 'The automatic work-agent start is deferred and held while the Deacon is frozen — unfreeze it, or run pan start.',
+      };
+    }
     if (input.workStart?.status === 'retrying') {
       return {
         key: 'work-start-retrying',

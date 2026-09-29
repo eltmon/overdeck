@@ -257,6 +257,7 @@ export function sublineFor(entry: BucketedFeature): string {
     return derived.pr?.checks === 'pending' ? 'in review · checks running' : 'reviewer checking the finished work';
   }
   if (derived?.state === 'merged') return 'merged';
+  if (derived?.workStart?.status === 'retrying' && derived.workStart.held) return 'work agent start held while the Deacon is frozen';
   if (derived?.workStart?.status === 'retrying') return 'work agent start retrying';
   if (phase === 'work') return progress ?? 'writing code';
   if (phase === 'plan') return 'planning what to build';

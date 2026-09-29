@@ -58,14 +58,25 @@ export function deriveWorkStart(facts: WorkStartFacts, now: number): DerivedWork
   if (!lastHandoff) return undefined;
 
   const at = Date.parse(lastHandoff.at);
-  if (workAgentStartedAt !== null && workAgentStartedAt >= at) return undefined;
-
   const data = lastHandoff.data ?? {};
+  // PAN-4399 review fix: for an accepted handoff, `pan start` writes the work
+  // agent's own startedAt BEFORE the spawn route answers, and this entry is
+  // journaled only after that — so comparing a real start against `at` always
+  // reads "started after the hand-off" as false. `requestedAt`, stamped
+  // before the spawn call, is the correct anchor for that comparison; other
+  // handoff types have no such field and fall back to the entry's own `at`.
+  const requestedAt = typeof data['requestedAt'] === 'string' ? Date.parse(data['requestedAt']) : NaN;
+  const startedAfterAt = lastHandoff.type === 'handoff.started' && !Number.isNaN(requestedAt) ? requestedAt : at;
+  if (workAgentStartedAt !== null && workAgentStartedAt >= startedAfterAt) return undefined;
+
   const error = typeof data['error'] === 'string' ? data['error'] : undefined;
   const nextRetryAt = typeof data['nextRetryAt'] === 'string' ? data['nextRetryAt'] : undefined;
+  // PAN-4210: a deferral recorded (or left standing) while the Deacon is
+  // frozen is journaled but never actually retried until it thaws.
+  const held = data['deaconPaused'] === true ? { held: true as const } : {};
 
   if (lastHandoff.type === 'handoff.deferred' || lastHandoff.type === 'handoff.retried') {
-    return { status: 'retrying', at: lastHandoff.at, ...(error ? { error } : {}), ...(nextRetryAt ? { nextRetryAt } : {}) };
+    return { status: 'retrying', at: lastHandoff.at, ...(error ? { error } : {}), ...(nextRetryAt ? { nextRetryAt } : {}), ...held };
   }
   if (lastHandoff.type === 'handoff.abandoned' && data['outcome'] === 'gave-up') {
     return { status: 'not-started', at: lastHandoff.at, ...(error ? { error } : {}) };

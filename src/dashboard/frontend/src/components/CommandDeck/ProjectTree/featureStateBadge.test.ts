@@ -113,6 +113,21 @@ describe('resolveFeatureStateBadge', () => {
     expect(badge?.label).toBe('Working');
   });
 
+  // PAN-4210, review non-blocking #3: a frozen Deacon holds the retry, so the
+  // badge must say so instead of claiming an active retry is in flight.
+  it('shows Work start held for a retrying workStart held by a frozen Deacon', () => {
+    const badge = resolveFeatureStateBadge({
+      restState: 'working',
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z', held: true },
+    });
+    expect(badge).toEqual({
+      key: 'work-start-held',
+      label: 'Work start held',
+      tone: 'machine',
+      title: 'The automatic work-agent start is deferred and held while the Deacon is frozen — unfreeze it, or run pan start.',
+    });
+  });
+
   it('never returns the label Allocated', () => {
     const inputs: FeatureStateBadgeInput[] = [
       ...(Object.keys(EXPECTED_BY_STATE) as IssueState[]).map((restState) => ({ restState })),

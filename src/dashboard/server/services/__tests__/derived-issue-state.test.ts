@@ -248,6 +248,16 @@ describe('deriveIssueState — work-not-started (PAN-4399)', () => {
     expect(state.attention).toBe('api-error');
     expect(state.workStart).toEqual(workStart);
   });
+
+  // review non-blocking #2: a closed issue is never "waiting on you" for a
+  // work agent that never started — the tracker already settled it.
+  it('a closed issue carries no workStart and no work-not-started attention', () => {
+    const branch = { name: 'feature/pan-3917', aheadOfMain: 1, pushed: true };
+    const state = deriveIssueState(facts({ branch, issueOpen: false, workStart }));
+    expect(state.state).toBe('closed');
+    expect(state.workStart).toBeUndefined();
+    expect(state.attention).toBeUndefined();
+  });
 });
 
 describe('deriveIssueState — payload', () => {

@@ -1032,19 +1032,31 @@ the one tunable: a `handoff.deferred`/`.retried` entry always reads as
 reads as `status: 'not-started'`; and an accepted `handoff.started` reads as
 `not-started` only once it is older than the grace window with still no live
 work agent — inside the window it reads as nothing at all, since the spawn
-may simply not have produced a pane yet. `deriveIssueState` (FR-6) promotes a
-`not-started` workStart to `attention: 'work-not-started'` when nothing else
-already claimed the attention slot (`needs-you` and `api-error` still
-outrank it).
+may simply not have produced a pane yet. A real accepted spawn is never
+misread as "never started": `pan start` writes the work agent's own
+`startedAt` before the `/api/agents` route answers, so `handoff.started` is
+journaled after a successful launch already happened. Both writers
+(`completePlanningForIssue` and deacon-lite's `retryDeferredHandoffs`) stamp
+`data.requestedAt` right before the spawn call, and `deriveWorkStart`
+compares the work agent's `startedAt` against that instead of the entry's own
+`at` — the one field that is guaranteed to precede a real start. An open
+issue only: a closed issue never carries a `workStart` or the
+`work-not-started` attention, whatever its journal says. `deriveIssueState`
+(FR-6) promotes a `not-started` workStart to `attention: 'work-not-started'`
+when nothing else already claimed the attention slot (`needs-you` and
+`api-error` still outrank it). While the Deacon is frozen (PAN-4210) the last
+journal entry still carries `data.deaconPaused: true`, which `deriveWorkStart`
+surfaces as `held: true` on a `retrying` read — the badge and subline say
+"held", not "retrying", since nothing is actually being retried.
 
 Command Deck's state badge renders "Work agent not started" (a `not-started`
-workStart) or "Work start retrying" (a `retrying` one) in place of the
-ordinary state badge (`featureStateBadge.ts`), and groups
-`work-not-started` into Needs-you with a subline naming the recorded error.
-The Needs-you strip's "Start work" card (`NeedsYouStrip.tsx`) shows the same
-"Work agent not started" label and error text in place of the generic "Plan
-ready" card, with its existing Start work button (`POST /api/agents`)
-unchanged.
+workStart), "Work start retrying" (a `retrying`, unheld one), or "Work start
+held" (a `retrying`, `held` one) in place of the ordinary state badge
+(`featureStateBadge.ts`), and groups `work-not-started` into Needs-you with a
+subline naming the recorded error. The Needs-you strip's "Start work" card
+(`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
+text in place of the generic "Plan ready" card, with its existing Start work
+button (`POST /api/agents`) unchanged.
 
 ## Deacon-lite: seven routines
 
