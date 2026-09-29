@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:36:24.683Z",
+  "updated": "2026-09-29T01:36:35.061Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "sonnet-55-catalog-entry.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T01:36:24.683Z"
+    },
+    "claude-flag-full-sonnet-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:35.060Z"
     }
   }
 }
