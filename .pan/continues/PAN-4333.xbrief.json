@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:51:13.031Z",
+  "updated": "2026-09-29T15:51:27.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "e2e-rotation.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T15:51:13.030Z"
+    },
+    "e2e-rotation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:51:27.761Z"
     }
   }
 }
