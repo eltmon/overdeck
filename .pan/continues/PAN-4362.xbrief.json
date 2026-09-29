@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:16:26.686Z",
+  "updated": "2026-09-29T11:16:37.536Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,10 @@
     "faithfulness-scorer.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:16:26.685Z"
+    },
+    "faithfulness-scorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:37.536Z"
     }
   }
 }
