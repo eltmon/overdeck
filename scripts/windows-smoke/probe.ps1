@@ -9,9 +9,12 @@ one results JSON file (schema: .pan/drafts/PAN-4331.md "Results JSON schema").
 passphrase.txt, fixture.json). Every step is wrapped so a failure is recorded
 and the next step still runs (NFR-1); each catalogue id appears exactly once.
 
-The subject runs as `npx --yes -p <tgz> pan ...`: `npx <path-to-tgz>` runs the
-path as a command instead of installing it. Every subject command runs with
-stdin closed and a timeout, so a prompt or a hang becomes a recorded failure.
+The subject tarball is installed once with `npm install --prefix`, and every
+subject step runs its `pan` bin shim, which is what a cached `npx
+@overdeck/core` runs. (`npx -p <tgz>` re-extracts the 38 MB tarball on every
+call: 90-120 s per call on windows-2022 in run 36595332191.) Every subject
+command runs with stdin closed and a timeout, so a prompt or a hang becomes a
+recorded failure.
 
 -SkipServe records steps 1c-2b as not-run. It exists only for trying the probe
 on a machine whose port 3011 already serves a real dashboard.
@@ -163,12 +166,15 @@ function Get-ServeSnapshot([int]$RootId, [int]$Port) {
   "--- process tree under $RootId ---`n$tree`n--- listening on $Port ---`n$(if ($listen) { $listen } else { '(nothing)' })"
 }
 
+$SubjectPrefix = Join-Path $ProbeTemp 'subject'
+$PanBin = if ($IsWindows) { Join-Path $SubjectPrefix 'node_modules' '.bin' 'pan.cmd' } else { Join-Path $SubjectPrefix 'node_modules' '.bin' 'pan' }
+
 function Invoke-Pan([string[]]$Arguments, [int]$TimeoutSec = 300, [string]$Cwd = (Get-Location).Path) {
-  Invoke-Timed 'npx' (@('--yes', '-p', $Subject, 'pan') + $Arguments) $Cwd $TimeoutSec
+  Invoke-Timed $PanBin $Arguments $Cwd $TimeoutSec
 }
 
 function Format-Pan([string[]]$Arguments) {
-  "npx --yes -p $Subject pan $($Arguments -join ' ')"
+  "pan $($Arguments -join ' ')"
 }
 
 function Get-GitConfig([string]$Key) {
@@ -202,10 +208,15 @@ $Result = [ordered]@{
   subject = "$(Split-Path -Leaf $Subject) @ $(if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { 'local' })"
 }
 
-# Install the subject into the npx cache once, so later steps measure the command and not the download.
+# Install the subject once; every subject step runs its pan bin.
 $warmClock = [System.Diagnostics.Stopwatch]::StartNew()
-$warm = Invoke-Pan @('--version') 600
-$Result.subjectInstall = [ordered]@{ exitCode = $warm.ExitCode; evidence = (Get-Tail $warm.Output); seconds = [Math]::Round($warmClock.Elapsed.TotalSeconds, 1) }
+$install = Invoke-Timed 'npm' @('install', '--prefix', $SubjectPrefix, '--no-audit', '--no-fund', $Subject) -TimeoutSec 900
+$version = Invoke-Pan @('--version') 120
+$Result.subjectInstall = [ordered]@{
+  command = "npm install --prefix $SubjectPrefix --no-audit --no-fund $Subject; pan --version"
+  exitCode = $install.ExitCode; evidence = (Get-Tail "$($install.Output)`n--- pan --version (exit $($version.ExitCode)) ---`n$($version.Output)")
+  seconds = [Math]::Round($warmClock.Elapsed.TotalSeconds, 1)
+}
 
 # ---- 1a-1b: published latest ---------------------------------------------
 
@@ -229,13 +240,13 @@ if ($SkipServe) {
 } else {
   # serve runs through the same launcher as every other step. Its output is
   # read once the tree is killed after 2b; 1c's evidence gets it then. The
-  # budget is 300 s, not 90 s: on windows-2022 every `npx -p <tgz>` call spends
-  # 90-120 s before pan runs (run 36595332191), and 1c measures the server.
+  # budget is 300 s, not the PRD's 90 s: the dashboard's first boot on
+  # windows-2022 was not measured yet, and a pass returns as soon as GET / is 200.
   $serve = $null
   $ServePoll = ''
-  Invoke-Step '1c' "$(Format-Pan @('serve', '--port', "$Port")) (background); GET http://localhost:$Port/ (300 s budget, npx start-up included)" {
+  Invoke-Step '1c' "$(Format-Pan @('serve', '--port', "$Port")) (background); GET http://localhost:$Port/ (300 s budget)" {
     $env:OVERDECK_INTERNAL_TOKEN = $Token
-    $script:serve = Start-Timed 'npx' @('--yes', '-p', $Subject, 'pan', 'serve', '--port', "$Port")
+    $script:serve = Start-Timed $PanBin @('serve', '--port', "$Port")
     Remove-Item Env:OVERDECK_INTERNAL_TOKEN -ErrorAction SilentlyContinue
     if (-not $script:serve.Process) { return @{ status = 'fail'; evidence = $script:serve.Error; note = 'serve did not start' } }
     $last = $null
@@ -280,8 +291,9 @@ if ($SkipServe) {
     $ServeOutput = Get-TimedOutput $serve
     # The poll result and snapshot go last so the 4000-character tail keeps
     # them; the serve output contributes its head (the banner) and its tail.
-    $out = if ($ServeOutput.Length -gt 2400) { "$($ServeOutput.Substring(0, 1200))`n[...]`n$($ServeOutput.Substring($ServeOutput.Length - 1200))" } else { $ServeOutput }
-    $Steps['1c'].evidence = Get-Tail "--- serve stdout+stderr ---`n$out`n$ServePoll"
+    # ($serveText, not $out: PowerShell names are case-insensitive and $Out is the results path.)
+    $serveText = if ($ServeOutput.Length -gt 2400) { "$($ServeOutput.Substring(0, 1200))`n[...]`n$($ServeOutput.Substring($ServeOutput.Length - 1200))" } else { $ServeOutput }
+    $Steps['1c'].evidence = Get-Tail "--- serve stdout+stderr ---`n$serveText`n$ServePoll"
   }
 
   Invoke-Step '1d' 'read serve output for "Open your browser to:"' {
@@ -477,17 +489,17 @@ Invoke-Step '3f' 'record HOME, USERPROFILE, os.homedir(), OVERDECK_HOME and the 
 }
 
 $launchArgs = @('vault', 'resume', $FixtureInfo.vaultId, '--cwd', $ClonePath, '--on-drift', 'continue')
-Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 300 s including npx start-up, stdin closed)" {
+Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 120 s, stdin closed)" {
   # After 3c adopted the session this machine owns it, so resume prints nothing
   # of its own before spawning claude: any output is claude's or a spawn error.
   if (-not $NewSessionId) { return @{ status = 'not-run'; note = '3c failed: the session was not adopted' } }
-  $r = Invoke-Pan $launchArgs 300 $ClonePath
+  $r = Invoke-Pan $launchArgs 120 $ClonePath
   if ($r.Output -match 'EINVAL|ENOENT|spawn .*claude') {
     return @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'spawn error' }
   }
   $text = ($r.Output -replace '\[probe: killed after \d+ s\]', '').Trim()
   if ($text) { return @{ status = 'pass'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'claude produced output' } }
-  if ($r.TimedOut) { return @{ status = 'partial'; evidence = $r.Output; note = 'no output within 300 s' } }
+  if ($r.TimedOut) { return @{ status = 'partial'; evidence = $r.Output; note = 'no output within 120 s' } }
   @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'exited without output' }
 }
 
