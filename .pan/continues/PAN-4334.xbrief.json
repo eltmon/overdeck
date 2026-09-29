@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:43:41.588Z",
+  "updated": "2026-09-29T01:44:08.511Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,7 +90,7 @@
     "cli-set-pack": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4334",
-      "claimedAt": "2026-09-29T01:43:41.588Z"
+      "claimedAt": "2026-09-29T01:44:08.511Z"
     }
   }
 }
