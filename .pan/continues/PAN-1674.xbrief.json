@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1674",
   "created": "2026-09-29T23:41:57.389Z",
-  "updated": "2026-09-29T23:47:03.104Z",
+  "updated": "2026-09-29T23:47:09.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-1674",
       "claimedAt": "2026-09-29T23:41:57.389Z",
       "doneAt": "2026-09-29T23:47:03.104Z"
+    },
+    "link-shared-venv": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1674",
+      "claimedAt": "2026-09-29T23:47:09.474Z"
     }
   }
 }
