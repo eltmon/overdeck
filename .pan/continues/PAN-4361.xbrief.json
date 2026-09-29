@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T04:57:42.970Z",
+  "updated": "2026-09-29T05:10:15.932Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-29T04:57:33.624Z"
     },
     "openai-responses-path": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4361",
-      "claimedAt": "2026-09-29T04:57:42.969Z"
+      "claimedAt": "2026-09-29T04:57:42.969Z",
+      "doneAt": "2026-09-29T05:10:15.931Z"
     }
   }
 }
