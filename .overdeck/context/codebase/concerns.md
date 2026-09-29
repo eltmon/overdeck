@@ -184,6 +184,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
   header collector (`system-health/darwin.ts`) measured available memory with
   different formulas until PAN-4267 unified them.
+- **Agent-memory RAG (not the RAM governor) needs a credentialed provider**
+  (PAN-4370) — `memory.extraction.provider: anthropic` uses the Anthropic SDK,
+  which needs `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` in the dashboard and hook
+  env; a subscription-only host fails every extraction and query expansion (see
+  `health.json` `last_failure_detail` under `~/.overdeck/memory/<project>/<ws>/`).
+  `searchMemory` ANDs every quoted term (`buildMatchQuery`, `search.ts`), so a
+  raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
+  must search in OR mode. Expansion calls share `recordHealth` with extraction, so
+  `extractions_attempted` also counts expansion calls.
+
 - **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
   — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
   `dashboard/server/deacon-main.ts` starts (a separate Node process). A module

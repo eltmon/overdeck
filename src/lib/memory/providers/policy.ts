@@ -1,15 +1,16 @@
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { queryMemoryExtractionCostUsd } from '../../overdeck/cost-sync.js';
-import { updateMemoryHealth } from '../health.js';
+import { updateMemoryHealth, type MemoryHealthUpdate } from '../health.js';
 import {
   getExtractionProvider,
   resolveExtractionProviderSelection,
 } from './registry.js';
-import type {
-  ExtractionProviderOptions,
-  ExtractionProviderResult,
-  ExtractionProviderSelection,
-  MemoryProviderSettings,
+import {
+  isExtractionProviderAuthError,
+  type ExtractionProviderOptions,
+  type ExtractionProviderResult,
+  type ExtractionProviderSelection,
+  type MemoryProviderSettings,
 } from './types.js';
 
 const DEFAULT_DAILY_CAP_USD = 5;
@@ -28,7 +29,7 @@ export interface MemoryExtractionPolicyOptions extends ExtractionProviderOptions
 export interface MemoryExtractionPolicyDeps {
   selection?: ExtractionProviderSelection;
   getDailySpendUsd?: (identity: MemoryIdentity) => number | Promise<number>;
-  recordHealth?: (identity: MemoryIdentity, input: { status: 'healthy' | 'degraded' | 'failing'; reason?: string; success?: boolean }) => Promise<void>;
+  recordHealth?: (identity: MemoryIdentity, input: MemoryHealthUpdate) => Promise<void>;
 }
 
 export async function extractWithProviderPolicy<T>(
@@ -43,7 +44,12 @@ export async function extractWithProviderPolicy<T>(
   const recordHealth = deps.recordHealth ?? updateMemoryHealth;
 
   if (cap > 0 && spend >= cap) {
-    await recordHealth(options.identity, { status: 'degraded', reason: 'cost-cap', success: false });
+    await recordHealth(options.identity, {
+      status: 'degraded',
+      reason: 'cost-cap',
+      detail: `daily memory extraction cap $${cap} reached (spend $${spend.toFixed(2)})`,
+      success: false,
+    });
     return { status: 'skipped', reason: 'cost-cap' };
   }
 
@@ -64,7 +70,8 @@ export async function extractWithProviderPolicy<T>(
     }
   }
 
-  await recordHealth(options.identity, { status: 'failing', reason: 'extraction-failed', detail: describeExtractionError(lastError, selection), success: false });
+  const reason = isExtractionProviderAuthError(lastError) ? 'provider-auth-failed' : 'extraction-failed';
+  await recordHealth(options.identity, { status: 'failing', reason, detail: describeExtractionError(lastError, selection), success: false });
   return { status: 'dropped', reason: 'extraction-failed', error: lastError };
 }
 
