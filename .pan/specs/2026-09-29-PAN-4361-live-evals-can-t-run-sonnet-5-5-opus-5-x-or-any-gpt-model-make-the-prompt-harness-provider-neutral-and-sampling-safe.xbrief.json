@@ -4,17 +4,17 @@
     "created": "2026-09-29T05:10:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4361: Live evals can't run Sonnet 5.5, Opus 5.x or any GPT model: make the prompt harness provider-neutral and sampling-safe",
-    "updated": "2026-09-29T04:28:33.195Z"
+    "updated": "2026-09-29T04:29:33.815Z"
   },
   "plan": {
     "id": "pan-4361",
     "title": "Live evals can't run Sonnet 5.5, Opus 5.x or any GPT model: make the prompt harness provider-neutral and sampling-safe",
-    "status": "proposed",
+    "status": "running",
     "uid": "de69dfb7-ee3c-4a3a-a096-7bebefefa704",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T05:10:00Z",
-    "updated": "2026-09-29T04:28:33.195Z",
+    "updated": "2026-09-29T04:29:33.815Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4361",
