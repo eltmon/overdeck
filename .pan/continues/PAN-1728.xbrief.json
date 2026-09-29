@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:21:39.607Z",
+  "updated": "2026-09-29T02:21:53.147Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
       "claimedBy": "agent-pan-1728",
       "claimedAt": "2026-09-29T02:12:50.515Z",
       "doneAt": "2026-09-29T02:21:39.607Z"
+    },
+    "runner-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:53.147Z"
     }
   }
 }
