@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:42:46.048Z",
+  "updated": "2026-09-29T15:43:03.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "guarded-open-vault.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T15:42:46.048Z"
+    },
+    "cli-rotate-key": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4333",
+      "claimedAt": "2026-09-29T15:43:03.188Z"
     }
   }
 }
