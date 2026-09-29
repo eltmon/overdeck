@@ -44,7 +44,18 @@ pan vault passphrase set --passphrase-file <path> # read the passphrase from a f
 pan vault passphrase remove                       # turn passphrase unlock off; joining needs the recovery phrase again
 ```
 
-When a passphrase is set, `pan vault join` asks for it first; press Enter to use the recovery phrase instead. A wrong passphrase prints `The passphrase did not unlock this vault.` and writes nothing. `set` stores the vault key wrapped under the passphrase on the backend, so a new machine can join by typing the passphrase instead of the 24 words. The passphrase itself is never stored, and the vault key never changes, so the recovery phrase keeps working.
+When a passphrase is set, `pan vault join` asks for it first; press Enter to use the recovery phrase instead. A wrong passphrase prints `The passphrase did not unlock this vault.` and writes nothing. `set` stores the vault key wrapped under the passphrase on the backend, so a new machine can join by typing the passphrase instead of the 24 words. The passphrase itself is never stored, and setting or removing a passphrase does not change the vault key, so the recovery phrase keeps working.
+
+## Key rotation (lost device)
+
+```bash
+pan vault rotate-key --yes                          # rotate without the confirmation prompt
+pan vault rotate-key --passphrase-file <path>       # re-wrap passphrase unlock under the new key with the passphrase in this file
+pan vault rotate-key --generate-passphrase          # re-wrap passphrase unlock under the new key with a generated 6-word passphrase
+pan vault rotate-key --no-passphrase                # turn passphrase unlock off
+```
+
+A lost or revoked machine still holds the vault key. `rotate-key` replaces the key: it re-encrypts every record, every machine entry and the header under a new key and prints a NEW 24-word recovery phrase once. The lost machine can still read what was saved before the rotation and nothing saved after it. Every other machine then refuses to write with `This machine's vault key was retired by a key rotation.` and must run `pan vault join <git-url>` with the new recovery phrase or passphrase. On a TTY the verb asks for confirmation; off a TTY it needs `--yes`, and a vault that has a passphrase needs one of the three passphrase flags. If a rotation is interrupted, other verbs print `A vault key rotation started on this machine has not finished.`; run `pan vault rotate-key` again to finish it. Upgrade Overdeck on every machine before rotating.
 
 ## Save and sync
 

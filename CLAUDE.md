@@ -69,3 +69,4 @@
 - **RTK:** when `agents.rtk.enabled`, Bash output may be compressed; re-run with `OVERDECK_RTK_ENABLED=0` for raw output.
 - **Issue creation from PRDs:** reference the PRD at the top of the issue body (`**PRD:** [link]`); summarize, don't duplicate — canonical PRD is `.pan/drafts/<issue>.md` in the project repo.
 - **Task enforcement:** work agents need a readable xBRIEF (start returns 422 otherwise); completion is gated on the checklist via `pan task`.
+- **OKF skill is vendored:** `sync-sources/skills/okf/` is a pinned copy of an `eltmon/okf` release tag (`.okf-skill-version`). Edit the skill in `eltmon/okf`, then re-vendor with `scripts/vendor-okf-skill.sh <tag>`; `okf-vendor-pin.yml` fails CI on in-place edits.

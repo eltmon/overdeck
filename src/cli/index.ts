@@ -42,6 +42,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
+import { registerPairCommands } from './commands/pair.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -221,6 +222,7 @@ backup
   .action(lazyAction(() => import('./commands/backup.js'), 'backupCleanCommand'));
 
 registerSkillsCommands(program);
+registerPairCommands(program);
 
 // pan issues — list and triage work
 program

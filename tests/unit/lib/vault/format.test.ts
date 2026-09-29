@@ -9,17 +9,22 @@ import {
   VaultAuthenticationError,
   chunkIdFor,
   decodeChunk,
+  decodeWipParts,
   decryptRef,
   encodeChunk,
+  encodeWipParts,
   encryptRef,
   isTombstone,
   newVaultHeader,
+  parseKeyRing,
   readMachineRecord,
   readSessionRecord,
   readVaultHeader,
   refName,
   splitIntoChunks,
+  type RetiredRefMarker,
   type SessionRecord,
+  type VaultHeader,
 } from '../../../../src/lib/vault/format.js';
 
 const keys = deriveSubkeys(createVaultKey());
@@ -187,5 +192,81 @@ describe('vault format: refs', () => {
     const headerBytes = await encryptRef(HEADER_REF_NAME, header, keys);
     expect(await readVaultHeader(headerBytes, keys)).toEqual(header);
     await expect(readVaultHeader(headerBytes, deriveSubkeys(createVaultKey()))).rejects.toBeInstanceOf(VaultAuthenticationError);
+  });
+});
+
+describe('vault format: key ring (PAN-4333)', () => {
+  const retiredKey = createVaultKey();
+  const retired = deriveSubkeys(retiredKey);
+  const older = deriveSubkeys(createVaultKey());
+  const current = { ...deriveSubkeys(createVaultKey()), previous: [retired, older] };
+
+  it("ring.ac1: a chunk encoded under K decodes with keys(K').previous=[keys(K)]", async () => {
+    const lines = arbitraryLines(12);
+    const chunk = await encodeChunk(lines, retired);
+    const decoded = await decodeChunk(chunk.bytes, chunk.id, { ...deriveSubkeys(createVaultKey()), previous: [retired] });
+    expect(decoded.lines).toEqual(lines);
+    expect(decoded.lineHashes).toEqual(chunk.lineHashes);
+    // Any ring position works, and the current key still decodes its own chunks.
+    const oldest = await encodeChunk(lines, older);
+    expect((await decodeChunk(oldest.bytes, oldest.id, current)).lines).toEqual(lines);
+    const fresh = await encodeChunk(lines, current);
+    expect((await decodeChunk(fresh.bytes, fresh.id, current)).lines).toEqual(lines);
+    // Encoding ignores the ring: the id and seal come from the current key only.
+    expect(fresh.id).toBe(chunkIdFor(Buffer.from(JSON.stringify({ v: 1, codec: 'zstd', lineHashes: fresh.lineHashes, lines })), current.K_id));
+    await expect(decodeChunk(fresh.bytes, fresh.id, retired)).rejects.toBeInstanceOf(VaultAuthenticationError);
+  });
+
+  it('ring.ac2: a WIP part encoded under K decodes through the ring', async () => {
+    const bundle = randomBytes(4096);
+    const parts = await encodeWipParts(bundle, retired);
+    expect((await decodeWipParts(parts, current)).equals(bundle)).toBe(true);
+    // Parts sealed under different keys of the ring decode in one call.
+    const tail = randomBytes(512);
+    const mixed = [...parts, ...(await encodeWipParts(tail, current))];
+    expect((await decodeWipParts(mixed, current)).equals(Buffer.concat([bundle, tail]))).toBe(true);
+    await expect(decodeWipParts(parts, deriveSubkeys(createVaultKey()))).rejects.toBeInstanceOf(VaultAuthenticationError);
+  });
+
+  it('ring.ac3: with no key matching, decodeChunk throws VaultAuthenticationError', async () => {
+    const chunk = await encodeChunk(arbitraryLines(3), deriveSubkeys(createVaultKey()));
+    await expect(decodeChunk(chunk.bytes, chunk.id, current)).rejects.toBeInstanceOf(VaultAuthenticationError);
+    await expect(decodeChunk(chunk.bytes, chunk.id, { ...current, previous: [] })).rejects.toBeInstanceOf(VaultAuthenticationError);
+  });
+
+  it('ring.ac4: parseKeyRing rejects a 31-byte entry', () => {
+    const header = newVaultHeader(new Date(0));
+    const good = retiredKey.toString('base64');
+    expect(parseKeyRing({ ...header, keyRing: [good] })).toEqual([retiredKey]);
+    const malformed = 'Vault header key ring is malformed';
+    expect(() => parseKeyRing({ ...header, keyRing: [good, randomBytes(31).toString('base64')] })).toThrow(malformed);
+    expect(() => parseKeyRing({ ...header, keyRing: [randomBytes(33).toString('base64')] })).toThrow(malformed);
+    // 32 bytes, but not the canonical base64 spelling.
+    expect(() => parseKeyRing({ ...header, keyRing: [good.replace(/=+$/, '')] })).toThrow(malformed);
+    expect(() => parseKeyRing({ ...header, keyRing: [` ${good}`] })).toThrow(malformed);
+    expect(() => parseKeyRing({ ...header, keyRing: [7] } as unknown as VaultHeader)).toThrow(malformed);
+    expect(() => parseKeyRing({ ...header, keyRing: good } as unknown as VaultHeader)).toThrow(malformed);
+  });
+
+  it('ring.ac5: a header without keyRing parses to an empty ring', async () => {
+    const header = newVaultHeader(new Date(0));
+    expect(parseKeyRing(header)).toEqual([]);
+    const rotated: VaultHeader = { ...header, rotatedAt: '2026-09-29T00:00:00.000Z', keyRing: [retiredKey.toString('base64')] };
+    const read = await readVaultHeader(await encryptRef(HEADER_REF_NAME, rotated, current), current);
+    expect(read).toEqual(rotated);
+    expect(parseKeyRing(read!)).toEqual([retiredKey]);
+    // The header is sealed under the current key only; a ring key does not open it.
+    await expect(readVaultHeader(await encryptRef(HEADER_REF_NAME, rotated, current), { ...retired, previous: [current] }))
+      .rejects.toBeInstanceOf(VaultAuthenticationError);
+  });
+
+  it('a retired-ref marker seals under the retired key and reads as no session or machine', async () => {
+    const marker: RetiredRefMarker = { v: 1, type: 'retired', at: '2026-09-29T00:00:00.000Z' };
+    const name = refName('record', 'v-1', retired.K_ref);
+    const bytes = await encryptRef(name, marker, retired);
+    expect(await decryptRef(name, bytes, retired)).toEqual(marker);
+    expect(await readSessionRecord(name, bytes, retired)).toBeNull();
+    expect(await readMachineRecord(name, bytes, retired)).toBeNull();
+    await expect(decryptRef(name, bytes, current)).rejects.toBeInstanceOf(VaultAuthenticationError);
   });
 });

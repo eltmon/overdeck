@@ -8,7 +8,7 @@ import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agen
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
+import { Deferred, Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
 import { existsSync, watch as fsWatch } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -47,6 +47,7 @@ import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
 import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { authorizeDashboardUpgrade } from './ws-auth.js';
+import { registerDeviceConnection } from './device-connections.js';
 import type { HeaderMap } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
@@ -1199,9 +1200,20 @@ export const websocketRpcRouteLayer = Layer.unwrap(
 
     return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const rejected = rejectUnauthorizedRpcUpgrade(request);
-      if (rejected) return rejected;
-      return yield* rpcWebSocketHttp;
+      const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+      if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
+      if (auth.credential.kind !== 'device') return yield* rpcWebSocketHttp;
+      // PAN-3762: revoking the device interrupts this socket's handler, which
+      // closes the socket (Effect's release closes it without a code, so this
+      // one cannot send 4401). The client's reconnect then gets 401.
+      const revoked = Deferred.makeUnsafe<void>();
+      const unregister = registerDeviceConnection(auth.credential.deviceId, () => {
+        Deferred.doneUnsafe(revoked, Effect.void);
+      });
+      return yield* Effect.raceFirst(
+        rpcWebSocketHttp,
+        Deferred.await(revoked).pipe(Effect.as(HttpServerResponse.empty())),
+      ).pipe(Effect.ensuring(Effect.sync(unregister)));
     }));
   }),
 );

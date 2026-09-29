@@ -11,6 +11,7 @@ import {
   writeManifest,
 } from './manifest.js';
 import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
+import { convergesVendoredSkillFile } from './vendored-skills.js';
 
 /** Plan the shared Agent Skills half of the harness fan-out. */
 export function planAgentSkills(
@@ -26,7 +27,7 @@ export function planAgentSkills(
       : status.action === 'update'
         ? 'symlink'
         : status.action === 'modified'
-          ? 'conflict'
+          ? (convergesVendoredSkillFile(dirname(targetSkillsDir), `skills/${file.relativePath}`) ? 'symlink' : 'conflict')
           : 'exists';
     return { name: file.relativePath, sourcePath: file.absolutePath, targetPath, status: syncStatus };
   });
@@ -39,7 +40,8 @@ export function executeAgentSkills(
   sourceSkillsDir: string = SKILLS_DIR,
 ): SyncResult {
   const result: SyncResult = {
-    created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [],
+    created: [], updated: [], adopted: [], skipped: [], conflicts: [], replacedVendored: [],
+    pruned: [], keptModified: [], diffs: [],
   };
   const manifestPath = join(dirname(targetSkillsDir), '.overdeck-manifest.json');
   const manifest = readManifest(manifestPath);
@@ -49,6 +51,7 @@ export function executeAgentSkills(
     const targetFile = join(targetSkillsDir, file.relativePath);
     const manifestKey = `skills/${file.relativePath}`;
     const status = compareFileToManifest(targetFile, manifestKey, manifest);
+    const converge = convergesVendoredSkillFile(dirname(targetSkillsDir), manifestKey);
 
     if (status.action === 'new' || status.action === 'update') {
       mkdirSync(dirname(targetFile), { recursive: true });
@@ -63,13 +66,17 @@ export function executeAgentSkills(
           targetContent: readFileSync(targetFile, 'utf-8'),
         });
       }
-      if (options.force) {
+      if (options.force || converge) {
         copyFileSync(file.absolutePath, targetFile);
         setManifestEntry(manifest, manifestKey, hashFile(targetFile), 'overdeck');
-        result.updated.push(file.relativePath);
+        (options.force ? result.updated : result.replacedVendored).push(file.relativePath);
       } else {
         result.conflicts.push(file.relativePath);
       }
+    } else if (converge && hashFile(targetFile) !== hashFile(file.absolutePath)) {
+      copyFileSync(file.absolutePath, targetFile);
+      setManifestEntry(manifest, manifestKey, hashFile(targetFile), 'overdeck');
+      result.replacedVendored.push(file.relativePath);
     } else {
       result.skipped.push(file.relativePath);
     }

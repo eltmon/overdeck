@@ -1,0 +1,1200 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T14:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3762: Overdeck Anywhere: adopt t3code-style multi-machine environment federation",
+    "updated": "2026-09-29T14:15:14.100Z"
+  },
+  "plan": {
+    "id": "pan-3762",
+    "title": "Overdeck Anywhere: adopt t3code-style multi-machine environment federation",
+    "status": "running",
+    "uid": "8577c8cc-2e6b-495f-8980-1fbca78a7c07",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T14:30:00Z",
+    "updated": "2026-09-29T14:15:14.100Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3762",
+        "label": "PAN-3762",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3762/.pan/drafts/pan-3762.md",
+        "label": "PRD draft (.pan/drafts/pan-3762.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4317",
+        "label": "PAN-1166 WS auth PR #4317 (prerequisite for live-revocation)",
+        "type": "pr"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4402",
+        "label": "PAN-4402 desktop catalog/switcher (sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4403",
+        "label": "PAN-4403 endpoint advertisement (sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4404",
+        "label": "PAN-4404 desktop SSH launch (sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4405",
+        "label": "PAN-4405 aggregated views (sibling)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "security",
+      "auth",
+      "pairing",
+      "environment",
+      "dashboard-server",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has one machine-wide root token and one root-derived session cookie. There is no per-device credential, no revocation, and no public environment identity, and many dashboard routes check only Origin while the server binds 0.0.0.0. So another device can only reach a machine by holding its root secret, and LAN peers can already call origin-only routes without any credential.",
+      "Proposal": "Make each Overdeck server a self-describing environment (GET /api/environment built on the existing environment-identity.ts), add a global remote request gate that requires a credential for every non-local /api and /events request, and add one-time pairing: `pan pair` issues a 10-minute single-use odp_ credential delivered in a #pair= URL fragment, which the target server exchanges for a revocable odk_ device session stored in the PAN-2351-form credential registry (~/.overdeck/access-tokens.json). Devices never receive the root session. `pan devices` and DELETE /api/devices/:id revoke a device and close its WebSocket and SSE connections. The desktop catalog/switcher, endpoint discovery, SSH launch and aggregated views are split into PAN-4402, PAN-4403, PAN-4404 and PAN-4405.",
+      "NonGoals": "- No desktop connection catalog, environment switcher, Electron safeStorage or Settings Connections/Devices UI (PAN-4402).\n- No in-renderer multi-environment transport refactor, query-key rekeying or store partitioning (PAN-4402).\n- No endpoint discovery, Tailscale Serve setup or automatic trusted-origin advertisement (PAN-4403).\n- No SSH launch, port forwarding or remote install (PAN-4404).\n- No aggregated cross-environment views (PAN-4405).\n- No token scopes enforcement, `pan token` verb, scoped-token Settings UI or WS/SSE heartbeats (PAN-2351).\n- No re-implementation of WebSocket upgrade auth; reuse PR #4317's ws-auth.ts.\n- No edits to src/lib/config-yaml/schema.ts and no file-size allowlist raises.\n- No change to local-only behavior for loopback callers when require_token_mint is off.\n- No migration or re-minting of environment-id.json; the identity file format is unchanged.\n- No live ownership transfer, transcript replication or cross-machine state merge.\n- No relay, account-service or multi-user shared-session work.\n- The root internal token and overdeck_session cookie are never sent to or issued for a paired device."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the whole PRD into PAN-3762 plus sibling issues PAN-4402 (desktop catalog, switcher, version gating), PAN-4403 (endpoint advertisement), PAN-4404 (desktop SSH launch) and PAN-4405 (aggregated views); the machine-readable ownership fixture stays with PAN-3863 W1.",
+        "rationale": "The renderer federation refactor alone touches 171 files (399 relative fetch calls, 356 query keys, one global store); desktop, SSH and endpoint work are independently shippable, and the swarm contract prefers sibling issues over a mega-plan."
+      },
+      {
+        "summary": "PAN-3762 keeps environment descriptor, pairing, device sessions, revocation and a new remote request gate, with a sizeJustification.",
+        "rationale": "The operator's 2026-09-28 decision, PAN-3863's ownership table and PAN-2609's PRD name PAN-3762 as owner of identity, pairing and device sessions; pairing without the gate or revocation would ship an unsafe credential."
+      },
+      {
+        "summary": "Create src/lib/access-tokens.ts in PAN-2351 W1's exact form (plus optional kind) if PAN-2351 has not landed, instead of blocking on PAN-2351.",
+        "rationale": "Mirrors the operator-approved 'whichever lands first' rule for the shared identity contract and avoids two credential stores (FR-17)."
+      },
+      {
+        "summary": "Paired browsers get a new overdeck_device cookie; the session mint never issues the root-derived overdeck_session to a device credential.",
+        "rationale": "overdeck_session is an HMAC of the internal token, identical for every browser and not revocable; reusing it would make pairing grant permanent root access (FR-16)."
+      },
+      {
+        "summary": "Close validate-origin-only routes with one global HttpRouter middleware and an explicit unauthenticated allowlist, not per-route edits.",
+        "rationale": "Many routes only call validateOrigin and the server binds 0.0.0.0; one middleware covers every current and future route (FR-15)."
+      },
+      {
+        "summary": "Read dashboard.require_token_mint from raw config.yaml in src/lib/remote-access/config.ts rather than the config schema.",
+        "rationale": "src/lib/config-yaml/schema.ts is at its file-size cap and raising caps is an operator decision; readTraefikConfigFromYaml() is the existing precedent."
+      },
+      {
+        "summary": "Pairing credentials live only in dashboard memory: single use, 10-minute TTL, 10 failures per 60 s rate limit.",
+        "rationale": "Short-lived secrets need no durable store; a restart invalidating them is safe and documented."
+      },
+      {
+        "summary": "WebSocket revocation (live-revocation) waits for PR #4317 (PAN-1166) instead of re-implementing WebSocket auth.",
+        "rationale": "#4317 is complete and open; /ws/* upgrades bypass HttpRouter middleware, and duplicating its ws-auth.ts would create a second auth chokepoint."
+      },
+      {
+        "summary": "Endpoint discovery and advertised trusted origins move to PAN-4403; until then operators set OVERDECK_TRUSTED_ORIGINS and pan pair takes --url.",
+        "rationale": "Keeps this slice focused on the security boundary; the docs state the manual step."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Pairing, device-credential verification, the remote request gate and revocation that closes every live surface form one security boundary: shipping any subset leaves either an unrevocable credential, a device that can escalate to the root session, or network-reachable routes that trust no credential at all. Everything separable (desktop client, endpoints, SSH, aggregation) is already split into PAN-4402..4405. The 42-file count is mostly one new test file per item plus five doc files.",
+      "traceNote": "FR-3, FR-5, FR-6, FR-10, FR-12, FR-13, NFR-8 and NFR-9 are owned by sibling issues PAN-4402, PAN-4404 and PAN-4405 per the PRD 'Decomposition (2026-09-29)' table.",
+      "canonicalFilename": "2026-09-29-PAN-3762-overdeck-anywhere-adopt-t3code-style-multi-machine-environment-federation.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "env-contract",
+        "title": "Add the EnvironmentDescriptor and scoped-ref contracts to @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3762",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/environment.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/environment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/environment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "environment.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "env-descriptor-route"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W1.1 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". Create packages/contracts/src/environment.ts with ENVIRONMENT_PROTOCOL_VERSION = 1, branded EnvironmentId, EnvironmentCapabilities {pairing, deviceSessions, terminalAuth}, EnvironmentDescriptor {descriptorVersion: 1, environmentId, label, platform {os, arch}, serverVersion, protocolVersion, capabilities}, ScopedProjectRef/ScopedIssueRef/ScopedAgentRef/ScopedConversationRef/ScopedTerminalRef as {environmentId, localId}, and isProtocolCompatible(descriptor, clientProtocolVersion) (true only on equal protocolVersion). Field names are normative; match the Schema API spelling used by neighbouring files such as packages/contracts/src/flywheel-derived.ts. Export everything from packages/contracts/src/index.ts."
+        },
+        "items": [
+          {
+            "id": "env-contract.ac1",
+            "title": "Given a valid descriptor object, when it is decoded and re-encoded with the EnvironmentDescriptor schema, then the test asserts the round-trip returns an identical object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-contract.ac2",
+            "title": "Given a descriptor missing the capabilities field, when it is decoded, then decoding rejects it with a schema error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-contract.ac3",
+            "title": "Given two ScopedAgentRef values with the same localId and different environmentId, when compared, then the test asserts they are not equal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-contract.ac4",
+            "title": "Given descriptors with protocolVersion 1 and 2, when isProtocolCompatible is called with client version 1, then it returns true for 1 and false for 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "env-descriptor-route",
+        "title": "Serve GET /api/environment from the stable environment identity",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/environment.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/environment-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/environment-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "environment-route.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W1.2 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". New route file exports environmentRouteLayer: GET /api/environment returns an EnvironmentDescriptor built from ensureEnvironmentIdentity() (src/lib/environment-identity.ts, adopt unchanged), os.platform()/os.arch(), getOverdeckVersion() (src/dashboard/server/routes/misc/shared.ts:39), ENVIRONMENT_PROTOCOL_VERSION, and capabilities {pairing: true, deviceSessions: true, terminalAuth} where terminalAuth is a compile-time decision: if src/dashboard/server/ws-auth.ts (PR #4317) is present when you implement this, import an exported constant from it that is true; otherwise use the literal false with a comment naming #4317. Never stat a file at request time. A corrupt environment-id.json returns 503 naming the file and never re-mints. Leave /api/health unchanged. Add the layer to makeRoutesLayer in server.ts before staticRouteLayer, and add the NO_LOSS_MATRIX row {surface: 'GET /api/environment', kind: 'http', disposition: 'READ', door: 'environment-identity.ensureEnvironmentIdentity (descriptor)'}."
+        },
+        "items": [
+          {
+            "id": "env-descriptor-route.ac1",
+            "title": "Given two temp OVERDECK_HOME directories, when GET /api/environment is called twice against each, then each returns the same environmentId on both calls and the two homes return different ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-descriptor-route.ac2",
+            "title": "Given a normal server, when GET /api/environment responds, then the JSON body contains no serverPath, no OVERDECK_HOME path and no internal token string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-descriptor-route.ac3",
+            "title": "Given a corrupt environment-id.json, when GET /api/environment is called, then it returns 503 with an error naming the file and the file is not rewritten",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-descriptor-route.ac4",
+            "title": "Given the updated NO_LOSS_MATRIX, when no-loss-matrix.test.ts runs, then it passes with the GET /api/environment row present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "access-token-registry",
+        "title": "Create the file-backed credential registry in PAN-2351 W1 form with a device kind",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/access-tokens.ts",
+            "tests/unit/lib/access-tokens.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/access-tokens.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "access-tokens.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-17",
+            "NFR-2",
+            "NFR-5",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "device-auth",
+            "pairing-exchange",
+            "device-routes",
+            "cli-devices"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W2.1 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\", following D-3762-2 and D-3762-3. If src/lib/access-tokens.ts already exists on origin/main (PAN-2351 landed), keep its API and add only the optional kind field and the cache functions. Otherwise create it exactly per PAN-2351 W1 (.pan/drafts/pan-2351.md): file ${OVERDECK_HOME}/access-tokens.json, mode 0600, atomic temp-file-then-rename writes, token odk_${randomBytes(32).toString('hex')}, SHA-256 hex at rest, timingSafeEqual compare, record {id, name, scopes, tokenHash, createdAt, lastUsedAt, revokedAt?, kind?: 'device'|'token'}. API: createAccessToken({name, scopes, kind}) -> {token, record}; listAccessTokens() (no tokenHash); revokeAccessToken(id); verifyAccessToken(presented) synchronous against an in-memory snapshot; refreshAccessTokens() async; startAccessTokenRefresh()/stopAccessTokenRefresh() (unref'd 5 s async stat interval). lastUsedAt writes are async and throttled to once per record per minute. Corrupt/unreadable file = zero valid tokens and refreshAccessTokens rejects naming the path (fail closed). Import only Node built-ins and ./paths.js. Tests use vi.useFakeTimers() for cache refresh and throttling; never real waits."
+        },
+        "items": [
+          {
+            "id": "access-token-registry.ac1",
+            "title": "Given a created token, when verifyAccessToken is called with it, then it returns ok with the record, and after revokeAccessToken it returns not ok in the same process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-registry.ac2",
+            "title": "Given a revocation written by a second module instance, when fake timers advance 5000 ms, then verifyAccessToken in the first instance rejects the token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-registry.ac3",
+            "title": "Given the registry file on disk, when the test inspects it, then its mode is 0600 and it contains the SHA-256 hash but never the plaintext token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-registry.ac4",
+            "title": "Given a registry file containing invalid JSON, when refreshAccessTokens runs, then it rejects with a message naming the file path and verifyAccessToken returns not ok for every token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-auth",
+        "title": "Accept device credentials in dashboard auth and never mint a root session for a device",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/__tests__/dashboard-device-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/dashboard-device-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dashboard-device-auth.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-16",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "pairing-exchange",
+            "remote-request-gate",
+            "device-routes",
+            "live-revocation"
+          ],
+          "parallelSafeReason": "Runs in its own slot after access-token-registry and env-descriptor-route; blocks edges serialize every item that shares dashboard-auth.ts or server.ts."
+        },
+        "narrative": {
+          "Action": "Implement W2.2 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-4). In dashboard-auth.ts add DASHBOARD_DEVICE_COOKIE = 'overdeck_device', dashboardDeviceCookieHeader(token, {secure}) with the same attributes as dashboardSessionCookieHeader, the DashboardCredential union ('internal-token' | 'root-session' | 'device' with deviceId), and resolveDashboardCredential(headers) checking internal token, then root session cookie, then verifyAccessToken on the overdeck_device cookie or an Authorization: Bearer odk_ token. hasDashboardAuthHeaders delegates to it (keep its signature; ws-auth.ts from PR #4317 calls it). Export isLoopbackPeer and add hasProxyForwardingHeader(headers) (x-forwarded-for, x-forwarded-host, forwarded). In server.ts dashboardSessionRouteLayer (:204-235), a device-authenticated mint returns csrfToken and a refreshed overdeck_device cookie and never sets overdeck_session; other callers keep current behavior. In src/dashboard/server/main.ts next to ensureInternalToken() (:130) add await refreshAccessTokens() and startAccessTokenRefresh(). This is a boot-path change: before any live restart, boot a throwaway Node 22 dist/dashboard/server.js with a temp OVERDECK_HOME and confirm /api/health answers."
+        },
+        "items": [
+          {
+            "id": "device-auth.ac1",
+            "title": "Given a valid overdeck_device cookie, when rejectUnauthorizedDashboardRequest runs, then it returns null, and given the same cookie after revocation it returns a 401 response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-auth.ac2",
+            "title": "Given Authorization: Bearer with a valid odk_ token, when resolveDashboardCredential runs, then it returns kind device with the record id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-auth.ac3",
+            "title": "Given a device-authenticated POST /api/dashboard/session, when the response is inspected, then it contains csrfToken and a Set-Cookie for overdeck_device and no Set-Cookie for overdeck_session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-auth.ac4",
+            "title": "Given an internal-token POST /api/dashboard/session, when the response is inspected, then it still sets overdeck_session exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pairing-exchange",
+        "title": "Issue one-time pairing credentials and exchange them for device sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/pairing-credentials.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/pairing.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pairing.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Runs after device-auth and env-descriptor-route; the only other writers of server.ts, no-loss-matrix.ts and routes/pairing.ts are ordered by blocks edges."
+        },
+        "narrative": {
+          "Action": "Implement W2.3 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-5, D-3762-6, D-3762-7). pairing-credentials.ts: issuePairingCredential({label?}) -> {credential: 'odp_'+64 hex, expiresAt} stored only as SHA-256 in memory, 10-minute TTL, single use; consumePairingCredential -> 'ok'|'expired'|'unknown'; process-wide limiter: after 10 failed exchanges in 60 s return 429 for 60 s. routes/pairing.ts exports pairingRouteLayer with POST /api/pairing/credentials (internal token or root session + CSRF only; a device credential gets 403) returning {credential, expiresAt, pairingPath: '/#pair=<credential>'}, and POST /api/pairing/exchange (validateOrigin first; body {credential, label, delivery: 'cookie'|'bearer'}; on ok createAccessToken({name: label, scopes: ['admin'], kind: 'device'}) and respond {deviceId, environmentId, csrfToken}, setting overdeck_device for cookie delivery or adding token to the body for bearer; expired 410, unknown 401, limited 429). Always Cache-Control: no-store. Emit emitActivityEntry with deviceId/environmentId in details and never the credential. Register the layer in server.ts before staticRouteLayer and add NO_LOSS_MATRIX rows for both routes (disposition WRITE). Tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "pairing-exchange.ac1",
+            "title": "Given an issued credential, when it is exchanged twice, then the first exchange returns 200 with deviceId and environmentId and the second returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-exchange.ac2",
+            "title": "Given an issued credential, when fake timers advance 10 minutes plus 1 ms and it is exchanged, then the route returns 410",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-exchange.ac3",
+            "title": "Given 10 failed exchanges within 60 s, when an 11th exchange arrives, then it returns 429, and after fake timers advance 60 s a valid exchange succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-exchange.ac4",
+            "title": "Given a device-authenticated caller, when it calls POST /api/pairing/credentials, then the route rejects it with 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-exchange.ac5",
+            "title": "Given any pairing response, when its body and headers are inspected, then neither contains the internal token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-routes",
+        "title": "List and revoke paired devices through GET and DELETE /api/devices",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/pairing.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/devices-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/devices-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "devices-routes.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W2.4 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". In routes/pairing.ts add GET /api/devices (rejectUnauthorizedDashboardRequest) returning kind==='device' records as {id, name, createdAt, lastUsedAt, revokedAt} without tokenHash, and DELETE /api/devices/:id (rejectUnsafeDashboardMutationRequest) that calls revokeAccessToken(id) then emits an activity entry. Unknown id returns 404. A device credential may revoke only itself (403 for another id); the internal token and root session may revoke any. Add NO_LOSS_MATRIX rows for both routes. The live-socket closure call is added later by live-revocation."
+        },
+        "items": [
+          {
+            "id": "device-routes.ac1",
+            "title": "Given two paired devices, when GET /api/devices is called, then it returns both records and no record contains tokenHash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-routes.ac2",
+            "title": "Given device A revoked through DELETE /api/devices/:id, when A's cookie is used on the next request, then the server returns 401 while device B's next request returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-routes.ac3",
+            "title": "Given device A's credential, when it calls DELETE /api/devices/<B's id>, then the route rejects it with 403 and B stays valid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-routes.ac4",
+            "title": "Given an unknown id, when DELETE /api/devices/:id is called with the internal token, then it returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-revocation",
+        "title": "Close a revoked device's WebSocket and SSE connections immediately",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/device-connections.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/ws-auth.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/ws-voice.ts",
+            "src/dashboard/server/ws-autopreso.ts",
+            "src/dashboard/server/routes/events.ts",
+            "src/dashboard/server/__tests__/device-revocation-connections.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/device-revocation-connections.test.ts src/dashboard/server/__tests__/ws-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "device-revocation-connections.test.ts and ws-auth.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Runs after device-routes and pairing-exchange; it is the only item touching the ws-*.ts files and routes/events.ts."
+        },
+        "narrative": {
+          "Action": "Implement W2.5 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-10). PRECONDITION: PR #4317 (PAN-1166) must be on origin/main and src/dashboard/server/ws-auth.ts must exist; check with `git log origin/main --oneline --grep PAN-1166`. If absent, run `pan sync-main` once; if still absent, do not start this item and run `pan tell flywheel-orchestrator \"PAN-3762 live-revocation blocked: PAN-1166 (#4317) not on main\"`. Then: device-connections.ts exports registerDeviceConnection(deviceId, close) returning an unregister function, and closeDeviceConnections(deviceId) returning the count closed. authorizeDashboardUpgrade returns {ok: true, credential} using resolveDashboardCredential. Each of ws-terminal/ws-rpc/ws-voice/ws-autopreso registers () => ws.close(4401, 'device revoked') for device credentials on connection and unregisters on close. /events/stream registers a Deferred-completing callback for device credentials and ends the stream with Stream.interruptWhen. The DELETE /api/devices/:id handler in routes/pairing.ts calls closeDeviceConnections(id) right after revokeAccessToken(id)."
+        },
+        "items": [
+          {
+            "id": "live-revocation.ac1",
+            "title": "Given fake WebSocket connections registered for device A and device B, when A is revoked through DELETE /api/devices/:id, then A's socket is closed with code 4401 and B's socket stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-revocation.ac2",
+            "title": "Given an SSE stream opened by device A, when A is revoked, then the stream ends and device B's stream keeps emitting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-revocation.ac3",
+            "title": "Given a registered connection that closes normally, when the registry is inspected afterwards, then it holds no entry for that connection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-revocation.ac4",
+            "title": "Given a root-session WebSocket, when any device is revoked, then the root-session socket stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pair",
+        "title": "Add pan pair to print a one-time #pair= URL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pair.ts",
+            "src/cli/index.ts",
+            "docs/SKILLS-CONVENTION.md",
+            "tests/unit/cli/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/pair.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pair.test.ts passes",
+            "typecheck and lint (including lint-skills and file-size) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9",
+            "NFR-2",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W2.6 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-11). src/cli/commands/pair.ts exports registerPairCommands(program) adding `pan pair [--label <name>] [--url <base>] [--json]`: POST ${getDashboardApiUrl()}/api/pairing/credentials with [INTERNAL_TOKEN_HEADER]: ensureInternalToken() (pattern: src/cli/commands/plan.ts:37-40); print <base>/#pair=<credential> (base = --url, else getDashboardApiUrl()), the expiry, and the raw credential; --json prints {url, credential, expiresAt}. If the base host is localhost/127.0.0.1/::1 print: 'This URL only works on this machine. Pass --url with an address another device can reach, and add that origin to OVERDECK_TRUSTED_ORIGINS.' Unreachable dashboard exits 1 with 'Overdeck dashboard is not running; start it with `pan up`.'; a 401 explains pan pair needs a server started by pan up, not pan serve. Help text names configuration/remote-access.mdx. Register with a single registerPairCommands(program) call in src/cli/index.ts, which must stay within its 1379-line cap (never raise the allowlist). Add one row to the docs/SKILLS-CONVENTION.md exclusion table for `pan pair`, `pan devices` so scripts/lint-skills.sh passes."
+        },
+        "items": [
+          {
+            "id": "cli-pair.ac1",
+            "title": "Given a mocked dashboard returning a credential, when pan pair runs, then the printed URL contains #pair=<credential> and never ?pair= or any query-string credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair.ac2",
+            "title": "Given a loopback base URL, when pan pair runs, then it prints the 'only works on this machine' warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair.ac3",
+            "title": "Given --json, when pan pair runs, then stdout parses as JSON with url, credential and expiresAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair.ac4",
+            "title": "Given an unreachable dashboard, when pan pair runs, then it exits with code 1 and prints the pan up hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-devices",
+        "title": "Add pan devices list and revoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pair.ts",
+            "tests/unit/cli/devices.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/devices.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "devices.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W2.7 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". In src/cli/commands/pair.ts, registerPairCommands also adds `pan devices list [--json]` (GET /api/devices; table of id, name, created, last used, revoked) and `pan devices revoke <id>` (DELETE /api/devices/:id with the internal token). When the dashboard is unreachable, revoke calls revokeAccessToken(id) from src/lib/access-tokens.ts directly and prints 'Dashboard not running; revoked in the registry. No live connections were open.' Unknown id exits 1."
+        },
+        "items": [
+          {
+            "id": "cli-devices.ac1",
+            "title": "Given a mocked dashboard, when pan devices revoke <id> runs, then it sends DELETE /api/devices/<id> with the internal token header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-devices.ac2",
+            "title": "Given an unreachable dashboard, when pan devices revoke <id> runs, then it calls revokeAccessToken(id) and prints the registry fallback message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-devices.ac3",
+            "title": "Given the dashboard returns 404, when pan devices revoke runs, then it exits with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-devices.ac4",
+            "title": "Given --json, when pan devices list runs, then stdout parses as a JSON array of device records without tokenHash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-pairing-landing",
+        "title": "Pair a browser from a #pair= URL before the session mint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/wsTransport.ts",
+            "src/dashboard/frontend/src/lib/__tests__/wsTransport-pairing.test.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/wsTransport-pairing.test.ts src/lib/__tests__/wsTransport.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "wsTransport-pairing.test.ts and wsTransport.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W2.8 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-12). In wsTransport.ts add consumePairingCredential() beside consumeDashboardBootstrapToken() (:57-69): read `pair` from window.location.hash and strip it with history.replaceState. In ensureDashboardSession (:71-91), when a pairing credential is present, first POST /api/pairing/exchange with {credential, label: `Browser on ${navigator.platform || 'unknown'}`, delivery: 'cookie'} and credentials: 'include'; a non-2xx response throws an Error carrying the server's error text (410 must surface 'expired'); never send x-overdeck-internal-token for a #pair= URL. Then mint as today. Without #pair=, behavior is unchanged. Add the new test file to test:frontend-subset in the root package.json."
+        },
+        "items": [
+          {
+            "id": "browser-pairing-landing.ac1",
+            "title": "Given a location hash #pair=odp_x, when ensureDashboardSession runs, then the hash is stripped before any fetch and the exchange request precedes the session mint request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-pairing-landing.ac2",
+            "title": "Given only #pair= in the hash, when requests are inspected, then no request carries the x-overdeck-internal-token header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-pairing-landing.ac3",
+            "title": "Given the exchange returns 410, when ensureDashboardSession runs, then it rejects with an error whose message contains 'expired'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-pairing-landing.ac4",
+            "title": "Given no #pair= in the hash, when ensureDashboardSession runs, then it makes no exchange request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-request-gate",
+        "title": "Require a credential for every non-local /api and /events request",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/config.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "tests/unit/lib/remote-access/config.test.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote-access/config.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts src/dashboard/server/__tests__/dashboard-device-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "config.test.ts, remote-request-gate.test.ts and dashboard-device-auth.test.ts pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-1",
+            "NFR-6",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Runs after device-auth, pairing-exchange and env-descriptor-route; blocks edges order every other writer of server.ts and dashboard-auth.ts."
+        },
+        "narrative": {
+          "Action": "Implement W10.1 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\" (D-3762-8, D-3762-9). src/lib/remote-access/config.ts: readRemoteAccessConfig() -> {requireTokenMint} from raw ${OVERDECK_HOME}/config.yaml key dashboard.require_token_mint (default false, invalid -> false, cached), modeled on readTraefikConfigFromYaml() in origin-validation.ts:28-44; do NOT edit src/lib/config-yaml/schema.ts (at its size cap). rejectUnauthorizedDashboardSessionMintRequest ignores isLoopbackPeer when requireTokenMint is true. remote-request-gate.ts exports REMOTE_GATE_ALLOWLIST (GET /api/health, GET /api/environment, OPTIONS and POST /api/dashboard/session, POST /api/pairing/exchange, POST /api/webhooks/github) and remoteRequestGateLayer = HttpRouter.middleware(..., {global: true}).layer implementing: non-/api and non-/events paths pass; allowlisted pass; resolveDashboardCredential non-null passes; trusted local caller (isLoopbackPeer and not (requireTokenMint and hasProxyForwardingHeader)) passes; otherwise 401 {error: 'unauthorized'}. Provide it in makeServerLayer in server.ts. Tests must not read source files; use NO_LOSS_MATRIX kind 'http' rows as the route inventory. IMPLEMENTATION CHECKPOINT: if the global middleware layer provided in makeServerLayer does not run for routes added by makeRoutesLayer, provide it directly to makeRoutesLayer before HttpRouter.serve. The test asserting that an uncredentialed non-loopback GET /api/conversations gets 401 is the proof either way."
+        },
+        "items": [
+          {
+            "id": "remote-request-gate.ac1",
+            "title": "Given a non-loopback peer with no credential, when it requests GET /api/conversations, GET /api/lanes or GET /events/stream, then the gate returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-request-gate.ac2",
+            "title": "Given every http surface in NO_LOSS_MATRIX that is not on REMOTE_GATE_ALLOWLIST, when an uncredentialed non-loopback request is sent, then each returns 401, and each allowlisted surface is not rejected by the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-request-gate.ac3",
+            "title": "Given a loopback peer with no credential and requireTokenMint false, when it requests GET /api/conversations, then the gate passes it (local behavior unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-request-gate.ac4",
+            "title": "Given requireTokenMint true, when a loopback peer with x-forwarded-for requests an /api route or the session mint without a credential, then both are rejected with 401, while a loopback peer without forwarding headers still passes the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-request-gate.ac5",
+            "title": "Given a non-loopback peer with a valid overdeck_device cookie, when it requests GET /api/conversations, then the gate passes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-access",
+        "title": "Document pairing, device sessions, the remote request gate and machine ownership",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "docs.json",
+            "docs/DASHBOARD-AUTH.md",
+            "docs/VISION.md",
+            ".pan/drafts/pan-2351.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "python3 -c \"import json;d=json.load(open('docs.json'));assert 'configuration/remote-access' in json.dumps(d)\""
+          ],
+          "expected_outputs": [
+            "lint completes without errors",
+            "the docs.json check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-14",
+            "FR-15",
+            "FR-16",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W9.1 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". Create configuration/remote-access.mdx and add 'configuration/remote-access' to the Configuration group in docs.json. It must state: each machine runs its own Overdeck and owns its projects, agents, conversations, terminals and credentials; how to pair (pan pair --url, open the URL on the other device, 10-minute single use, a dashboard restart invalidates unused credentials); listing and revoking with pan devices; adding a non-default origin to OVERDECK_TRUSTED_ORIGINS; dashboard.require_token_mint and when to enable it (any local reverse proxy such as Tailscale Serve or cloudflared; needs a dashboard restart); that LAN peers now need a credential; that the relay (PAN-2356) is optional reachability, not a shared state plane; that moving a conversation is Session Vault (PAN-2609); and which issues add the desktop catalog (PAN-4402), endpoints (PAN-4403) and SSH launch (PAN-4404). docs/DASHBOARD-AUTH.md (from PR #4317; create it if absent) gains 'Device sessions', 'Pairing' and 'Remote request gate' sections covering credential kinds, the overdeck_device cookie, the rule that devices never get overdeck_session, the allowlist, revocation timing and require_token_mint. docs/VISION.md Current State gains one paragraph on per-machine environments and per-machine pairing. .pan/drafts/pan-2351.md gains a dated Decisions note that the registry and the raw-YAML require_token_mint reader may already exist from PAN-3762 and what PAN-2351 still adds (scopes, pan token, schema entry, Settings UI). The page must also state that an operator must not expose the server on a network until GET /api/environment reports capabilities.terminalAuth: true (PAN-1166 WebSocket auth present)."
+        },
+        "items": [
+          {
+            "id": "docs-remote-access.ac1",
+            "title": "Given docs.json, when the Configuration group is read, then it lists configuration/remote-access",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac2",
+            "title": "Given configuration/remote-access.mdx, when a reader follows it, then it shows the pan pair --url command, the pan devices revoke command, the OVERDECK_TRUSTED_ORIGINS setting, the dashboard.require_token_mint key, and the rule not to expose the server until capabilities.terminalAuth is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac3",
+            "title": "Given docs/DASHBOARD-AUTH.md, when read, then it contains sections titled Device sessions, Pairing and Remote request gate, and states that a device credential never receives overdeck_session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac4",
+            "title": "Given .pan/drafts/pan-2351.md, when read, then it contains a 2026-09-29 note naming src/lib/access-tokens.ts and src/lib/remote-access/config.ts as possibly pre-created by PAN-3762",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-pairing-journey",
+        "title": "Verify the browser pairing and revocation journey with Playwright on an isolated dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-3762-pairing.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-3762-pairing.spec.ts"
+          ],
+          "expected_outputs": [
+            "pan-3762-pairing.spec.ts passes and writes two screenshots that were inspected"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-16",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement W9.2 of the PRD .pan/drafts/pan-3762.md, section \"This issue's implementation (2026-09-29)\". Playwright spec against an isolated dashboard: its own OVERDECK_HOME, its own port, its own browser profile/context; never reuse another agent's browser session. Follow src/dashboard/frontend/tests/pan-1166-ws-auth.spec.ts from PR #4317 for isolated-server setup if present. Journey: issue a credential via POST /api/pairing/credentials with the internal token; open /#pair=<credential> in a fresh context; assert the dashboard loads, the overdeck_device cookie exists, no overdeck_session cookie exists and the URL has no #pair=; revoke through DELETE /api/devices/:id; assert the next /api/* call returns 401 and the RPC socket closes. Save and inspect screenshots of the loaded dashboard and of the post-revocation state."
+        },
+        "items": [
+          {
+            "id": "e2e-pairing-journey.ac1",
+            "title": "Given a fresh isolated browser context, when it opens /#pair=<credential>, then the dashboard renders, the overdeck_device cookie is set, no overdeck_session cookie exists and the URL no longer contains #pair=",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pairing-journey.ac2",
+            "title": "Given the paired context, when its device is revoked through DELETE /api/devices/:id, then its next /api/* request returns 401 and its /ws/rpc socket closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pairing-journey.ac3",
+            "title": "Given the run, when it finishes, then it produces two screenshot files of the loaded and revoked states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "env-contract",
+        "to": "env-descriptor-route",
+        "type": "blocks"
+      },
+      {
+        "from": "access-token-registry",
+        "to": "device-auth",
+        "type": "blocks"
+      },
+      {
+        "from": "env-descriptor-route",
+        "to": "device-auth",
+        "type": "blocks"
+      },
+      {
+        "from": "device-auth",
+        "to": "pairing-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-exchange",
+        "to": "device-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "device-routes",
+        "to": "live-revocation",
+        "type": "blocks"
+      },
+      {
+        "from": "device-auth",
+        "to": "remote-request-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-exchange",
+        "to": "remote-request-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-exchange",
+        "to": "cli-pair",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-pair",
+        "to": "cli-devices",
+        "type": "blocks"
+      },
+      {
+        "from": "device-routes",
+        "to": "cli-devices",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-exchange",
+        "to": "browser-pairing-landing",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-pairing-landing",
+        "to": "e2e-pairing-journey",
+        "type": "blocks"
+      },
+      {
+        "from": "live-revocation",
+        "to": "e2e-pairing-journey",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-request-gate",
+        "to": "e2e-pairing-journey",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-request-gate",
+        "to": "docs-remote-access",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-devices",
+        "to": "docs-remote-access",
+        "type": "blocks"
+      },
+      {
+        "from": "live-revocation",
+        "to": "docs-remote-access",
+        "type": "blocks"
+      },
+      {
+        "from": "env-descriptor-route",
+        "to": "pairing-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "env-descriptor-route",
+        "to": "device-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "env-descriptor-route",
+        "to": "remote-request-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-exchange",
+        "to": "live-revocation",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

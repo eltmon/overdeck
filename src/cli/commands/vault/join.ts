@@ -8,6 +8,15 @@
  * alone, so nothing else is read from the backend. Either way the header ref
  * must decrypt before the key and backend are written, and a failed join
  * writes nothing.
+ *
+ * Re-join after a key rotation (PAN-4333, D-10): on a machine already
+ * configured for the same backend, join refreshes the existing clone, checks
+ * the new key against the header, drops objects this machine wrote but never
+ * published (they are sealed under the retired key), and replaces the key in
+ * place. The local index and list cache are kept: vault ids survive a
+ * rotation, so the next save continues each owned record under its new name.
+ * A `key.next` left by a rotation this machine started and never committed is
+ * removed: it belongs to the key that was just replaced.
  */
 import { rm } from 'node:fs/promises';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
@@ -21,13 +30,17 @@ import {
   parseKeywrap,
   unwrapVaultKey,
 } from '../../../lib/vault/keywrap.js';
+import { clearNextKey } from '../../../lib/vault/rotate.js';
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
 import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
 import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../../lib/vault/store/types.js';
 import { syncOnce } from '../../../lib/vault/sync.js';
 import { DIR_BACKEND_PREFIX, defaultIo, readPassphrase, readPhrase, type CliIo } from './shared.js';
 
-export const PHRASE_MISMATCH_MESSAGE = 'The recovery phrase does not match this vault.';
+export const PHRASE_MISMATCH_MESSAGE =
+  'The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.';
+export const PASSPHRASE_KEY_RETIRED_MESSAGE =
+  'The passphrase unlocked a key this vault no longer uses. The vault key was rotated; use the new recovery phrase, or finish the rotation with pan vault rotate-key on the machine that started it.';
 
 export interface JoinOptions {
   phraseFile?: string;
@@ -104,16 +117,18 @@ export async function joinCommand(url: string, options: JoinOptions = {}, io: Cl
     return io.exit(1);
   };
 
+  if (!createdClone && !url.startsWith(DIR_BACKEND_PREFIX)) {
+    // An existing clone may predate the keywrap or a key rotation; offline, use the local view.
+    await store.refresh().catch((error: unknown) => {
+      if (!(error instanceof VaultOfflineError)) throw error;
+    });
+  }
+  let fromPassphrase = false;
   if (!key) {
-    if (!createdClone && !url.startsWith(DIR_BACKEND_PREFIX)) {
-      // An existing clone may predate the keywrap; offline, use the local view.
-      await store.refresh().catch((error: unknown) => {
-        if (!(error instanceof VaultOfflineError)) throw error;
-      });
-    }
     const outcome = await unlockWithPassphrase(url, store, io, options.passphraseFile);
     if ('error' in outcome) return fail(outcome.error);
     key = outcome.key;
+    fromPassphrase = key !== null;
   }
   if (!key) {
     try {
@@ -133,9 +148,16 @@ export async function joinCommand(url: string, options: JoinOptions = {}, io: Cl
       if (!(error instanceof VaultAuthenticationError)) throw error;
     }
   }
-  if (!matches) return fail(header ? PHRASE_MISMATCH_MESSAGE : `${url} is not a Session Vault yet. Run: pan vault setup ${url}`);
+  if (!matches) {
+    if (!header) return fail(`${url} is not a Session Vault yet. Run: pan vault setup ${url}`);
+    return fail(fromPassphrase ? PASSPHRASE_KEY_RETIRED_MESSAGE : PHRASE_MISMATCH_MESSAGE);
+  }
 
+  // Objects this machine wrote under a retired key and never published must not reach the backend.
+  await store.discardUnpublished();
   await saveVaultKey(key);
+  // A pending rotation here started from the key this join replaces; it must not resume.
+  await clearNextKey();
   await writeVaultConfig({ backend: url });
   const me = await ensureEnvironmentIdentity();
   const report = await syncOnce({ store, keys });

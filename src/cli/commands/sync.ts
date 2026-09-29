@@ -373,6 +373,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}${staleSummaryText}`);
   }
 
+  const replacedVendoredPaths = [
+    ...result.replacedVendored.map((name) => `~/.claude/${name}`),
+    ...agentSkillsResult.replacedVendored.map((name) => `~/.agents/skills/${name}`),
+  ];
+  if (replacedVendoredPaths.length > 0) {
+    console.log('');
+    console.log(chalk.yellow('Replaced locally edited file(s) in vendored skills (edit the OKF skill in eltmon/okf, not in place):'));
+    for (const name of replacedVendoredPaths) console.log(chalk.dim(`  - ${name}`));
+  }
+
   const keptModifiedPaths = [
     ...result.keptModified,
     ...agentSkillsResult.keptModified.map((name) => `~/.agents/${name}`),

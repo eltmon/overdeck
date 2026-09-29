@@ -1,0 +1,305 @@
+{
+  "version": "1",
+  "issueId": "PAN-4408",
+  "created": "2026-09-29T14:47:27.786Z",
+  "updated": "2026-09-29T16:09:19.061Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "okf-license-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:47:27.786Z",
+      "doneAt": "2026-09-29T14:48:48.048Z"
+    },
+    "okf-ci-selftest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:49:07.170Z",
+      "doneAt": "2026-09-29T14:50:08.415Z"
+    },
+    "okf-readme-install": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:50:12.882Z",
+      "doneAt": "2026-09-29T14:51:14.427Z"
+    },
+    "okf-tag-v010": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:51:32.073Z",
+      "doneAt": "2026-09-29T14:53:12.650Z"
+    },
+    "vendor-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:55:50.640Z",
+      "doneAt": "2026-09-29T15:10:43.277Z"
+    },
+    "vendor-apply-v010": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:10:52.450Z",
+      "doneAt": "2026-09-29T15:11:41.235Z"
+    },
+    "pin-workflow": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:11:49.398Z",
+      "doneAt": "2026-09-29T15:14:42.962Z"
+    },
+    "vendored-skills-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:14:49.279Z",
+      "doneAt": "2026-09-29T15:16:04.555Z"
+    },
+    "sync-converge-claude": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:16:12.503Z",
+      "doneAt": "2026-09-29T15:16:55.941Z"
+    },
+    "sync-converge-agent-skills": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:17:02.219Z",
+      "doneAt": "2026-09-29T15:17:41.407Z"
+    },
+    "doctor-okf-skew": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:17:48.298Z",
+      "doneAt": "2026-09-29T15:18:21.480Z"
+    },
+    "sync-cli-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:18:27.225Z",
+      "doneAt": "2026-09-29T15:18:58.026Z"
+    },
+    "sync-okf-convergence-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:19:04.755Z",
+      "doneAt": "2026-09-29T15:19:33.294Z"
+    },
+    "docs-knowledge-mdx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:19:40.003Z",
+      "doneAt": "2026-09-29T15:20:06.335Z"
+    },
+    "docs-claude-md": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:20:10.427Z",
+      "doneAt": "2026-09-29T15:20:34.268Z"
+    },
+    "husky-comment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:20:39.489Z",
+      "doneAt": "2026-09-29T15:44:54.242Z"
+    },
+    "okf-license-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:55:39.853Z"
+    },
+    "okf-license-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:56:58.678Z"
+    },
+    "okf-license-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:13.896Z"
+    },
+    "okf-ci-selftest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:27.926Z"
+    },
+    "okf-ci-selftest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:41.344Z"
+    },
+    "okf-readme-install.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:56.453Z"
+    },
+    "okf-readme-install.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:58:15.470Z"
+    },
+    "okf-readme-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:58:32.352Z"
+    },
+    "okf-tag-v010.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:58:48.219Z"
+    },
+    "okf-tag-v010.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:59:03.564Z"
+    },
+    "okf-tag-v010.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:59:17.902Z"
+    },
+    "okf-tag-v010.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:59:32.328Z"
+    },
+    "vendor-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:59:48.186Z"
+    },
+    "vendor-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:00:05.012Z"
+    },
+    "vendor-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:00:21.968Z"
+    },
+    "vendor-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:00:38.801Z"
+    },
+    "vendor-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:00:55.063Z"
+    },
+    "vendor-apply-v010.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:12.212Z"
+    },
+    "vendor-apply-v010.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:27.587Z"
+    },
+    "vendor-apply-v010.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:44.560Z"
+    },
+    "vendor-apply-v010.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:59.453Z"
+    },
+    "pin-workflow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:02:14.776Z"
+    },
+    "pin-workflow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:02:28.566Z"
+    },
+    "pin-workflow.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:02:42.471Z"
+    },
+    "vendored-skills-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:02:58.822Z"
+    },
+    "vendored-skills-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:03:13.041Z"
+    },
+    "vendored-skills-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:03:29.079Z"
+    },
+    "sync-converge-claude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:03:45.706Z"
+    },
+    "sync-converge-claude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:04:01.176Z"
+    },
+    "sync-converge-claude.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:04:18.339Z"
+    },
+    "sync-converge-claude.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:04:38.475Z"
+    },
+    "sync-converge-agent-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:04:56.924Z"
+    },
+    "sync-converge-agent-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:05:17.679Z"
+    },
+    "sync-converge-agent-skills.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:05:37.437Z"
+    },
+    "sync-converge-agent-skills.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:05:53.472Z"
+    },
+    "sync-cli-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:06:09.790Z"
+    },
+    "sync-cli-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:06:25.650Z"
+    },
+    "sync-okf-convergence-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:06:40.008Z"
+    },
+    "sync-okf-convergence-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:06:55.493Z"
+    },
+    "doctor-okf-skew.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:10.610Z"
+    },
+    "doctor-okf-skew.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:24.716Z"
+    },
+    "doctor-okf-skew.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:38.806Z"
+    },
+    "doctor-okf-skew.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:52.343Z"
+    },
+    "docs-knowledge-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:07.016Z"
+    },
+    "docs-knowledge-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:20.993Z"
+    },
+    "docs-claude-md.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:35.077Z"
+    },
+    "docs-claude-md.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:49.167Z"
+    },
+    "husky-comment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:09:04.543Z"
+    },
+    "husky-comment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:09:19.061Z"
+    }
+  }
+}
