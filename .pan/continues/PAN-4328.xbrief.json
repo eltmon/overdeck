@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:14:03.619Z",
+  "updated": "2026-09-29T10:14:16.199Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "keywrap.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T10:14:03.619Z"
+    },
+    "passphrase-cmd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:16.199Z"
     }
   }
 }
