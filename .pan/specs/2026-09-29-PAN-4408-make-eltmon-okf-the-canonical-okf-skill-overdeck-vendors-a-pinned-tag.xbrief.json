@@ -4,17 +4,17 @@
     "created": "2026-09-29T14:40:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4408: Make eltmon/okf the canonical OKF skill; Overdeck vendors a pinned tag",
-    "updated": "2026-09-29T14:46:09.288Z"
+    "updated": "2026-09-29T14:47:14.926Z"
   },
   "plan": {
     "id": "pan-4408",
     "title": "Make eltmon/okf the canonical OKF skill; Overdeck vendors a pinned tag",
-    "status": "proposed",
+    "status": "running",
     "uid": "a73a0989-faea-4123-a77d-e2e3ec228789",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T14:40:03Z",
-    "updated": "2026-09-29T14:46:09.288Z",
+    "updated": "2026-09-29T14:47:14.926Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4408",
@@ -1162,5 +1162,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
