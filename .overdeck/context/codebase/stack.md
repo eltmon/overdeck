@@ -29,7 +29,9 @@
 - **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI.
   Live-model evals call `runPromptScenario` in `evals/lib/prompt-harness.ts` and
   need `OVERDECK_EVAL_MODEL` (no fallback); `typecheck:evals` covers `evals/**`.
-  Unit tests for eval helpers live in `tests/unit/evals/`.
+  Unit tests for eval helpers live in `tests/unit/evals/`. The model-placement
+  suites append per-case records to gitignored `evals/results/`, and
+  `npx tsx evals/report.ts` prints the cross-run placement table.
 - **Lint:** `npm run lint` is ESLint plus ~20 chained shell guards in `scripts/`
   (skill/CLI drift, state doors, prompt trailers, file size, circular deps,
   ratchet audit, …). `npm run typecheck` chains root + hooks + evals + the two

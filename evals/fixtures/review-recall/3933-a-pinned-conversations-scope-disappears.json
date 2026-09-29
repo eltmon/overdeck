@@ -1,0 +1,37 @@
+{
+  "id": "3933-a-pinned-conversations-scope-disappears",
+  "lane": "correctness",
+  "provenance": {
+    "pr": 3933,
+    "reviewedSha": "b14299f8e5012b458f6f1f76b9b7271ab4a1f43a",
+    "mergeBase": "d06f6bbc642090668a3ccac2dc1e681135a84b45",
+    "commentUrl": "https://github.com/eltmon/overdeck/pull/3933#issuecomment-5746776709"
+  },
+  "issue": {
+    "id": "PAN-3705",
+    "title": "Ctrl-K search: add Conversations to the type list",
+    "acceptanceCriteria": [
+      "The Ctrl-K type list includes Conversations alongside Actions, Workspaces, and Issues.",
+      "Selecting Conversations limits results to conversation entries.",
+      "The Conversations entry supports the same keyboard navigation, selection, active-state, and clear/reset behavior as existing types.",
+      "Empty, loading, and error states are correct when the Conversations type is selected.",
+      "Tests cover selecting Conversations, filtering results, clearing the type, and keyboard navigation.",
+      "Conversation ordering composes correctly with #3703 and the toggle requested in #3704."
+    ]
+  },
+  "diff": "diff --git a/src/dashboard/frontend/src/components/CommandPalette.tsx b/src/dashboard/frontend/src/components/CommandPalette.tsx\nindex c311a4f6753..b63ec113810 100644\n--- a/src/dashboard/frontend/src/components/CommandPalette.tsx\n+++ b/src/dashboard/frontend/src/components/CommandPalette.tsx\n@@ -230,6 +230,12 @@ const SCOPE_LABEL: Record<PaletteScope, string> = {\n   memory: 'Memory',\n };\n \n+/** Scopes whose chip is always offered, even with zero results of that type.\n+ *  Conversation hits only exist after a typed server search, so without this\n+ *  the chip would be invisible on open (and Ctrl-J's initialScope='conversations'\n+ *  would have nothing to pin to). */\n+const PINNED_SCOPES: Exclude<PaletteScope, 'all'>[] = ['conversations'];\n+\n /** Map a result group heading to the scope chip it belongs under. */\n function groupScope(group: string): Exclude<PaletteScope, 'all'> {\n   if (group === 'Conversations') return 'conversations';\n@@ -884,6 +890,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation\n     // An action may answer to a chip its group does not imply, so the chip has\n     // to be offered even when nothing else of that type is listed.\n     for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);\n+    for (const s of PINNED_SCOPES) present.add(s);\n     const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));\n     return ordered.length > 1 ? ['all', ...ordered] : [];\n   }, [groupOrder, filtered]);\n@@ -950,6 +957,10 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation\n                   key={s}\n                   type=\"button\"\n                   onClick={() => setScope(s)}\n+                  // cmdk's Command root swallows Enter (to select the highlighted\n+                  // result row) before the browser's default button-activation\n+                  // fires, so a focused chip needs its own stop to be keyboard-activatable.\n+                  onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}\n                   className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${\n                     scope === s\n                       ? 'bg-primary/15 border-primary/40 text-primary font-medium'\n@@ -967,13 +978,15 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation\n             {isSearchLoading && query.trim().length >= 2 && (\n               <div className=\"flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground\">\n                 <Loader2 className=\"w-3.5 h-3.5 animate-spin\" />\n-                Searching conversations & memory…\n+                {scope === 'conversations' ? 'Searching conversations…' : 'Searching conversations & memory…'}\n               </div>\n             )}\n             {visibleGroups.length === 0 ? (\n               isSearchLoading && query.trim().length >= 2 ? null : (\n                 <Command.Empty className=\"py-6 text-center text-sm text-muted-foreground\">\n-                  {query.trim().length === 0 ? 'Start typing…' : `No results for \"${query}\"`}\n+                  {query.trim().length === 0\n+                    ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')\n+                    : `No results for \"${query}\"`}\n                 </Command.Empty>\n               )\n             ) : (\n\ndiff --git a/docs/DESKTOP-APP.md b/docs/DESKTOP-APP.md\nindex 5c78a6b6663..2d8eff2d037 100644\n--- a/docs/DESKTOP-APP.md\n+++ b/docs/DESKTOP-APP.md\n@@ -115,6 +115,10 @@ Press `Cmd+K` (macOS) or `Ctrl+K` (Linux/Windows) to open the command palette fr\n \n Type to filter. Press `Enter` to execute, `Escape` to close.\n \n+### Scope chips\n+\n+Below the search input, a row of chips filters the result list by type: **All**, plus **Actions**, **Commands**, **Workspaces**, **Issues**, **Conversations**, and **Memory** as each type has results on screen. **Conversations** is always offered, even with zero conversation hits, and narrows the list to conversation search results only. Press `Cmd+J` (macOS) or `Ctrl+J` (Linux/Windows) to open the palette already scoped to Conversations.\n+\n Conversation results default to newest-first order. Use the **Newest first** toggle in the palette footer to switch to relevance-rank order; the choice persists per browser.\n \n Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette shows no conversation hits.\n",
+  "blocker": {
+    "title": "A pinned Conversations scope disappears when it is the only present scope",
+    "file": "src/dashboard/frontend/src/components/CommandPalette.tsx",
+    "lines": [
+      894
+    ],
+    "keywords": [
+      "pinned_scopes",
+      "conversations",
+      "ordered",
+      "scope",
+      "present"
+    ]
+  }
+}

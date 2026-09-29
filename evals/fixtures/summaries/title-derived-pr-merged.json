@@ -1,0 +1,350 @@
+{
+  "id": "title-derived-pr-merged",
+  "kind": "title",
+  "source": "real session excerpt, overdeck PAN-4290, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": "PAN-4290: ended agent sessions should show their outcome (Merged, Review approved, Stopped by operator). Start by carrying pr.merged into the derived issue state."
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "`pr.merged` already exists as a fact (used at lines 727, 732, 853, 858). Now I'll append the conditional spread at both sites."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_012A7BWRZP2XNoisZ6s3DLHb",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4290/src/lib/overdeck/derived-issue-state.ts",
+              "old_string": "    ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),\n    ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),",
+              "new_string": "    ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),\n    ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_012A7BWRZP2XNoisZ6s3DLHb",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4290/src/lib/overdeck/derived-issue-state.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_011NC2JRwGDMyUq8VSB68Jhe",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4290/src/lib/overdeck/derived-issue-state.ts",
+              "old_string": "      ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),\n      ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),",
+              "new_string": "      ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),\n      ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_011NC2JRwGDMyUq8VSB68Jhe",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4290/src/lib/overdeck/derived-issue-state.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's add the tests. First the contracts round-trip test."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01SF2RCtrC2oXAq7ivsMHgwd",
+            "name": "Bash",
+            "input": {
+              "command": "grep -n \"DerivedPrState\\|DerivedIssueState\" packages/contracts/src/types.test.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01SF2RCtrC2oXAq7ivsMHgwd",
+            "content": "4:import { DerivedIssueState } from \"./derived-issue-state\"\n7:const decodeDerived = Schema.decodeUnknownSync(DerivedIssueState)\n8:const encodeDerived = Schema.encodeSync(DerivedIssueState)\n34:describe(\"DerivedIssueState\", () => {"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01SyE8bpdG7YBeQoxxMbAQ79",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4290/packages/contracts/src/types.test.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01SyE8bpdG7YBeQoxxMbAQ79",
+            "content": "1\timport { describe, expect, it } from \"vitest\"\n2\timport { Schema } from \"effect\"\n3\timport { getHarness } from \"./types\"\n4\timport { DerivedIssueState } from \"./derived-issue-state\"\n5\timport { BackendPane } from \"./backend-pane\"\n6\t\n7\tconst decodeDerived = Schema.decodeUnknownSync(DerivedIssueState)\n8\tconst encodeDerived = Schema.encodeSync(DerivedIssueState)\n9\tconst decodePane = Schema.decodeUnknownSync(BackendPane)\n10\t\n11\tdescribe(\"getHarness\", () => {\n12\t  it(\"preserves the canonical ACP runtime literal\", () => {\n13\t    expect(getHarness({ runtime: \"acp\" })).toBe(\"acp\")\n14\t  })\n15\t\n16\t  it(\"preserves the canonical kimi-code runtime literal\", () => {\n17\t    expect(getHarness({ runtime: \"kimi-code\" })).toBe(\"kimi-code\")\n18\t  })\n19\t\n20\t  it(\"returns the existing target for every legacy harness string\", () => {\n21\t    expect(getHarness({ runtime: \"claude-code\" })).toBe(\"claude-code\")\n22\t    …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now I'll add a round-trip case with `pr.merged: true`."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01FnNLWMHHkREa9JXZ6VTUTA",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4290/packages/contracts/src/types.test.ts",
+              "old_string": "  it(\"accepts a null mergeable — the forge has not computed it yet\", () => {\n    const input = {\n      issueId: \"PAN-2\",\n      state: \"in-review\",\n      pr: { url: \"u\", number: 2, reviewState: \"none\", checks: \"pending\", mergeable: null },\n    }\n    expect(decodeDerived(input)).toEqual(input)\n  })\n})",
+              "new_string": "  it(\"accepts a null mergeable — the forge has not computed it yet\", () => {\n    const input = {\n      issueId: \"PAN-2\",\n      state: \"in-review\",\n      pr: { url: \"u\", number: 2, reviewState: \"none\", checks: \"pending\", mergeable: null },\n    }\n    expect(decodeDerived(input)).toEqual(input)\n  })\n\n  it(\"round-trips pr.merged true\", () => {\n    const input = {\n      issueId: \"PAN-4290\",\n      state: \"closed\",\n      pr: { url: \"u\", number: 3, reviewState: \"approved\", checks: \"green\", mergeable: true, merged: true },\n    }\n    const decoded = decodeDerived(input)\n    expect(decoded).toEqual(input …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01FnNLWMHHkREa9JXZ6VTUTA",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4290/packages/contracts/src/types.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Y9M7MfC2AUp9ZPuACESJe1",
+            "name": "Bash",
+            "input": {
+              "command": "sed -n '1,30p' packages/contracts/src/derived-issue-state.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Y9M7MfC2AUp9ZPuACESJe1",
+            "content": "// Derived issue state (PAN-3917 FR-6).\n//\n// Overdeck stores no status it can derive. An issue's pipeline state is\n// computed at read time from the tracker, the plan home, the PR, checks, git,\n// and the terminal backend. This module holds the vocabulary the server\n// derives and the dashboard renders; the derivation itself lives in\n// `src/lib/overdeck/derived-issue-state.ts`, shared by the CLI and the server.\n\nimport { Schema } from \"effect\"\n\n/**\n * The nine pipeline states of the FR-6 table. They are mutually exclusive and\n * resolved in this precedence (highest first), because the underlying facts\n * overlap:\n *\n *   closed > merged > ready > changes-requested > in-review > working >\n *   parked > planned > backlog\n */\nexport const IssueState = Schema.Literals([\n  \"backlog\",\n  \"parked\",\n  \"planned\",\n  \"working\",\n  \"in-review\",\n  \"changes-requested\",\n  \"ready\",\n  \"merged\",\n  \"closed …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Good, \"closed\" is valid. Now let's find the derived-issue-state test file for the actual derivation tests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_017EY2tXDeB7QhDpg41J1avV",
+            "name": "Bash",
+            "input": {
+              "command": "ls tests/unit/lib/overdeck/derived-issue-state.test.ts && grep -n \"mergeable\\|prMerged\\|describe(\\|it(\" tests/unit/lib/overdeck/derived-issue-state.test.ts | head -80"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_017EY2tXDeB7QhDpg41J1avV",
+            "content": "tests/unit/lib/overdeck/derived-issue-state.test.ts\n34:    prMerged: false,\n50:describe('the tracker owns closed', () => {\n51:  it('a closed issue is closed even with an open pull request', async () => {\n57:        checks: 'pending' as const, mergeable: null, merged: false,\n63:  it('an unresolved tracker read is unknown, never open', async () => {\n72:  it('carries no unknown flag once a tracker has answered', async () => {\n81:  it('only a tracker answer of \"closed\" closes the issue', () => {\n87:describe('the plan home owns the spec', () => {\n104:  it('finds the promoted, dated spec in the main checkout', () => {\n109:  it('finds the legacy .vbrief spec name too', () => {\n114:  it('finds the spec the planning agent wrote in the issue workspace', () => {\n119:  it('accepts the bare <ISSUE>.xbrief.json name as well', () => {\n124:  it('reports no spec when neither plan home has one', () => {\n1 …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01CxX8LdGibGYCCo5rfAZTae",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4290/tests/unit/lib/overdeck/derived-issue-state.test.ts",
+              "offset": 1,
+              "limit": 90
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01CxX8LdGibGYCCo5rfAZTae",
+            "content": "1\t/**\n2\t * The one FR-6 derivation (PAN-3917), shared by `pan show` and the dashboard.\n3\t *\n4\t * The nine-row table itself is pinned in\n5\t * `src/dashboard/server/services/__tests__/derived-issue-state.test.ts`, which\n6\t * exercises the same exports through the server adapter. What matters here is\n7\t * the loader contract: who owns each fact, and what an unanswered tracker read\n8\t * is allowed to mean.\n9\t */\n10\t\n11\timport { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';\n12\timport { tmpdir } from 'node:os';\n13\timport { join } from 'node:path';\n14\timport { afterEach, beforeEach, describe, expect, it } from 'vitest';\n15\t\n16\timport {\n17\t  deriveIssueState,\n18\t  getDerivedIssueState,\n19\t  loadIssueStateFacts,\n20\t  specExistsFor,\n21\t  type IssueStateFacts,\n22\t} from '../../../../src/lib/overdeck/derived-issue-state.js';\n23\t\n24\tconst NOW = 1_800_000_000_000;\n25\t\n26\tfunction fac …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Adding a separate mergedAt timestamp field was rejected; the existing pr.merged fact is enough."
+          }
+        ]
+      }
+    }
+  ],
+  "plantedFacts": [
+    {
+      "id": "outcome",
+      "anyOf": [
+        [
+          "outcome"
+        ],
+        [
+          "merged"
+        ]
+      ]
+    },
+    {
+      "id": "scope",
+      "anyOf": [
+        [
+          "session"
+        ],
+        [
+          "derived"
+        ],
+        [
+          "issue state"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "merged-at",
+      "anchor": "mergedAt"
+    }
+  ]
+}
