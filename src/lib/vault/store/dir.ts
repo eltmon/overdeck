@@ -14,8 +14,9 @@
  * Imports only Node built-ins and the sibling types module.
  */
 import { createHash } from 'node:crypto';
-import { mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
+import { withFileLock } from '../file-lock.js';
 import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
@@ -26,10 +27,6 @@ import {
   type VaultRef,
   type VaultStore,
 } from './types.js';
-
-const STALE_LOCK_MS = 30_000;
-const LOCK_RETRY_MS = 10;
-const LOCK_MAX_ATTEMPTS = 500;
 
 export function refVersion(bytes: Uint8Array): string {
   return createHash('sha1').update(bytes).digest('hex');
@@ -97,13 +94,10 @@ export class DirVaultStore implements VaultStore {
   async putObjects(objects: ReadonlyArray<{ id: string; bytes: Uint8Array }>): Promise<void> {
     for (const { id, bytes } of objects) {
       const path = this.objectPath(id);
-      const existing = await readOrNull(path);
-      if (existing !== null) {
-        if (!existing.equals(Buffer.from(bytes))) {
-          throw new Error(`Vault object ${id} already exists with different bytes`);
-        }
-        continue;
-      }
+      // Ids bind the plaintext (keyed HMAC) and decodeChunk authenticates on
+      // read, so an existing id is already stored: a re-encode of the same
+      // lines after a failed push carries a fresh nonce and must not fail.
+      if ((await readOrNull(path)) !== null) continue;
       await writeAtomic(path, bytes);
     }
   }
@@ -141,39 +135,16 @@ export class DirVaultStore implements VaultStore {
   }
 
   private async casRefLocked(path: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
-    const lockPath = `${path}.lock`;
     await mkdir(dirname(path), { recursive: true });
-    await this.acquireLock(lockPath);
-    try {
+    return withFileLock(`${path}.lock`, async () => {
       const current = await readOrNull(path);
       const currentVersion = current === null ? null : refVersion(current);
       if (currentVersion !== expectedVersion) return 'conflict';
       await writeAtomic(path, value);
       return 'ok';
-    } finally {
-      await rm(lockPath, { force: true });
-    }
+    });
   }
 
-  private async acquireLock(lockPath: string): Promise<void> {
-    for (let attempt = 0; attempt < LOCK_MAX_ATTEMPTS; attempt++) {
-      try {
-        const handle = await open(lockPath, 'wx');
-        await handle.writeFile(`${process.pid}\n`);
-        await handle.close();
-        return;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        const info = await stat(lockPath).catch(() => null);
-        if (info && Date.now() - info.mtimeMs > STALE_LOCK_MS) {
-          await rm(lockPath, { force: true });
-          continue;
-        }
-        await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
-      }
-    }
-    throw new Error(`Could not acquire vault ref lock ${lockPath}`);
-  }
 
   async refresh(): Promise<void> {
     // The directory is the source of truth; nothing to pull.

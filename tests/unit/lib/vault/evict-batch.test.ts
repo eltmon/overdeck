@@ -121,6 +121,46 @@ describe('vault evict: pending-deletion batch', () => {
     void vaultId;
   });
 
+  it('a LOG that holds more lines than this machine\'s segment accounts for is never eligible', async () => {
+    const vaultId = await saved();
+    ageFile(nativePath, HOUR);
+    expect((await scanEligible({ store, keys, config })).entries).toHaveLength(1);
+    // Simulate a settlement that appended the same lines twice: the record's
+    // LOG count exceeds the segment's native line count.
+    const { encryptRef, readSessionRecord, refName } = await import('../../../../src/lib/vault/format.js');
+    const name = refName('record', vaultId, keys.K_ref);
+    const ref = (await store.readRef(name))!;
+    const record = (await readSessionRecord(name, ref.value, keys)) as import('../../../../src/lib/vault/format.js').SessionRecord;
+    const last = record.settlements[record.settlements.length - 1]!;
+    expect(last.logLines).toBe(2);
+    const corrupted = { ...record, settlements: [...record.settlements.slice(0, -1), { ...last, logLines: last.logLines! + 2 }] };
+    expect(await store.casRef(name, ref.version, await encryptRef(name, corrupted, keys))).toBe('ok');
+    const batch = await scanEligible({ store, keys, config });
+    expect(batch.entries).toEqual([]);
+    expect(existsSync(nativePath)).toBe(true);
+  });
+
+  it('a file the vault would not reproduce byte for byte (no final newline, blank line) is never eligible', async () => {
+    // Written without a final newline: the last line is settled, but the file
+    // is one byte short of what restore would write.
+    const original = readFileSync(nativePath, 'utf8');
+    writeFileSync(nativePath, original.trimEnd());
+    expect((await settle({ nativePath, harness: 'claude-code', store, keys, config })).verdict).toBe('append');
+    ageFile(nativePath, HOUR);
+    expect((await scanEligible({ store, keys, config })).entries).toEqual([]);
+    // The newline lands later: an unchanged transcript is noop, not diverged, and now eligible.
+    writeFileSync(nativePath, original);
+    ageFile(nativePath, HOUR);
+    expect((await settle({ nativePath, harness: 'claude-code', store, keys, config })).verdict).toBe('noop');
+    expect((await scanEligible({ store, keys, config })).entries).toHaveLength(1);
+    // An extra blank line at the end: still noop for settlement, but never eligible.
+    writeFileSync(nativePath, `${original}\n`);
+    ageFile(nativePath, HOUR);
+    expect((await settle({ nativePath, harness: 'claude-code', store, keys, config })).verdict).toBe('noop');
+    expect((await scanEligible({ store, keys, config })).entries).toEqual([]);
+    expect(existsSync(nativePath)).toBe(true);
+  });
+
   it('ac3: a declined entry is not re-added until reofferEntry runs', async () => {
     const vaultId = await saved();
     ageFile(nativePath, HOUR);

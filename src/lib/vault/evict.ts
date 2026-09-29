@@ -17,8 +17,11 @@ import { ensureEnvironmentIdentity } from '../environment-identity.js';
 import { readVaultConfig, vaultDir, type VaultConfig } from './config.js';
 import { lineHash, splitSettleableLines } from './continuity.js';
 import { decodeChunk, isTombstone, readSessionRecord, refName, type SessionRecord } from './format.js';
+import { withFileLock } from './file-lock.js';
 import type { VaultSubkeys } from './identity.js';
 import { listOwned, type OwnedEntry } from './local-index.js';
+import { nativeFileContent } from './materialize.js';
+import { logLineCount } from './settle.js';
 import type { VaultStore } from './store/types.js';
 import { removeTranscriptFile } from '../cloister/transcript-deletion-door.js';
 
@@ -82,6 +85,17 @@ export async function readEvictionBatch(): Promise<EvictionBatch> {
     entries: Array.isArray(record.entries) ? [...record.entries] : [],
     declined: Array.isArray(record.declined) ? [...record.declined] : [],
   };
+}
+
+/** Read-modify-write of the batch under its lock, so concurrent scans and confirms never drop entries. */
+async function updateEvictionBatch<T>(fn: (batch: EvictionBatch) => Promise<T>): Promise<T> {
+  await mkdir(vaultDir(), { recursive: true });
+  return withFileLock(`${evictionBatchPath()}.lock`, async () => {
+    const batch = await readEvictionBatch();
+    const result = await fn(batch);
+    await writeEvictionBatch(batch);
+    return result;
+  });
 }
 
 export async function writeEvictionBatch(batch: EvictionBatch): Promise<void> {
@@ -154,8 +168,25 @@ export async function checkEligibility(
   if (lines.length !== segment.tail.lineCount || owned.tail.lineCount !== lines.length) {
     return { ok: false, reason: `file has ${lines.length} lines but ${segment.tail.lineCount} are settled`, sizeBytes: info.size, settlementChunk: null };
   }
+  // restoreNative reproduces exactly nativeFileContent(lines): a file with
+  // blank lines or no final newline would not come back byte for byte.
+  if (Buffer.byteLength(nativeFileContent(lines), 'utf8') !== bytes.length) {
+    return { ok: false, reason: 'file has bytes the vault would not reproduce (blank lines or a missing final newline)', sizeBytes: info.size, settlementChunk: null };
+  }
   const last = record.settlements[record.settlements.length - 1];
   if (!last) return { ok: false, reason: 'record has no settlement', sizeBytes: info.size, settlementChunk: null };
+  // The LOG must hold exactly this segment's lines after its start: a LOG that
+  // was appended twice (a settlement retried after a phantom conflict) has more.
+  let logLines: number;
+  try {
+    logLines = await logLineCount(record, store, keys);
+  } catch (error) {
+    return { ok: false, reason: `LOG could not be counted: ${(error as Error).message}`, sizeBytes: info.size, settlementChunk: last.chunk };
+  }
+  const expectedLogLines = segment.logStart + (segment.tail.lineCount - (segment.prefix?.lineCount ?? 0));
+  if (logLines !== expectedLogLines) {
+    return { ok: false, reason: `LOG has ${logLines} lines but this machine's segment accounts for ${expectedLogLines}`, sizeBytes: info.size, settlementChunk: last.chunk };
+  }
   const chunkBytes = await store.getObject(last.chunk);
   if (!chunkBytes) return { ok: false, reason: `covering chunk ${last.chunk} is missing from the backend`, sizeBytes: info.size, settlementChunk: last.chunk };
   let decoded;
@@ -192,8 +223,8 @@ export async function scanEligible(options: ScanOptions): Promise<EvictionBatch>
   const now = options.now ?? (() => new Date());
   const config = options.config ?? (await readVaultConfig());
   const me = await ensureEnvironmentIdentity();
-  const batch = await readEvictionBatch();
   const owned = await listOwned();
+  return updateEvictionBatch(async (batch) => {
   for (const [nativePath, entry] of Object.entries(owned)) {
     if (batch.declined.some((declined) => declined.vaultId === entry.vaultId && declined.nativePath === nativePath)) continue;
     const record = await readOwnedRecord(store, keys, entry.vaultId);
@@ -218,13 +249,13 @@ export async function scanEligible(options: ScanOptions): Promise<EvictionBatch>
     if (existing >= 0) batch.entries[existing] = next;
     else batch.entries.push(next);
   }
-  await writeEvictionBatch(batch);
   return batch;
+  });
 }
 
 /** Remove an entry from the batch and remember the decision so scans do not re-add it. */
 export async function declineEntry(vaultId: string, now: () => Date = () => new Date()): Promise<EvictionBatch> {
-  const batch = await readEvictionBatch();
+  return updateEvictionBatch(async (batch) => {
   const declinedAt = now().toISOString();
   const removed = batch.entries.filter((entry) => entry.vaultId === vaultId);
   batch.entries = batch.entries.filter((entry) => entry.vaultId !== vaultId);
@@ -233,24 +264,24 @@ export async function declineEntry(vaultId: string, now: () => Date = () => new 
       batch.declined.push({ vaultId, nativePath: entry.nativePath, declinedAt });
     }
   }
-  await writeEvictionBatch(batch);
   return batch;
+  });
 }
 
 /** Empty the batch. Records no declines and deletes nothing. */
 export async function clearBatch(): Promise<EvictionBatch> {
-  const batch = await readEvictionBatch();
-  batch.entries = [];
-  await writeEvictionBatch(batch);
-  return batch;
+  return updateEvictionBatch(async (batch) => {
+    batch.entries = [];
+    return batch;
+  });
 }
 
 /** Forget a decline so the next scan may offer the transcript again. */
 export async function reofferEntry(vaultId: string): Promise<EvictionBatch> {
-  const batch = await readEvictionBatch();
-  batch.declined = batch.declined.filter((declined) => declined.vaultId !== vaultId);
-  await writeEvictionBatch(batch);
-  return batch;
+  return updateEvictionBatch(async (batch) => {
+    batch.declined = batch.declined.filter((declined) => declined.vaultId !== vaultId);
+    return batch;
+  });
 }
 
 export interface ConfirmOptions {
@@ -284,11 +315,12 @@ export async function confirmEviction(fingerprint: string, options: ConfirmOptio
   const { store, keys } = options;
   const now = options.now ?? (() => new Date());
   const config = options.config ?? (await readVaultConfig());
+  const me = await ensureEnvironmentIdentity();
+  await mkdir(vaultDir(), { recursive: true });
+  return withFileLock(`${evictionBatchPath()}.lock`, async () => {
   const batch = await readEvictionBatch();
   const current = batchFingerprint(batch);
-  if (current !== fingerprint) return { refused: true, fingerprint: current };
-
-  const me = await ensureEnvironmentIdentity();
+  if (current !== fingerprint) return { refused: true as const, fingerprint: current };
   const owned = await listOwned();
   const deleted: string[] = [];
   const skipped: Array<{ nativePath: string; reason: string }> = [];
@@ -315,5 +347,6 @@ export async function confirmEviction(fingerprint: string, options: ConfirmOptio
   }
   batch.entries = remaining;
   await writeEvictionBatch(batch);
-  return { refused: false, deleted, skipped, bytesFreed, fingerprint: batchFingerprint(batch) };
+  return { refused: false as const, deleted, skipped, bytesFreed, fingerprint: batchFingerprint(batch) };
+  });
 }

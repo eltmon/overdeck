@@ -137,6 +137,58 @@ describe('GitVaultStore', () => {
     expect(existsSync(clone)).toBe(false);
   });
 
+  it('two processes on ONE clone: concurrent casRefs all land, none is a phantom conflict', async () => {
+    const remote = bareRepo();
+    const cloneDir = join(tmp('pan-vault-clone-'), 'git');
+    const a = await initGitVault(remote, cloneDir);
+    const b = new GitVaultStore(cloneDir); // a second process sharing the clone
+    const refA = 'r/' + 'a'.repeat(40);
+    const refB = 'r/' + 'b'.repeat(40);
+    let versionA: string | null = null;
+    let versionB: string | null = null;
+    for (let round = 0; round < 8; round++) {
+      const [ra, rb] = await Promise.all([
+        a.casRef(refA, versionA, Buffer.from(`a-${round}`)),
+        b.casRef(refB, versionB, Buffer.from(`b-${round}`)),
+      ]);
+      expect([ra, rb]).toEqual(['ok', 'ok']);
+      await a.refresh();
+      versionA = (await a.readRef(refA))!.version;
+      versionB = (await a.readRef(refB))!.version;
+      expect(git(remote, 'cat-file', '-p', `main:refs/r/${'a'.repeat(40)}`)).toBe(`a-${round}`);
+      expect(git(remote, 'cat-file', '-p', `main:refs/r/${'b'.repeat(40)}`)).toBe(`b-${round}`);
+    }
+    expect(git(cloneDir, 'status', '--porcelain').trim()).toBe('');
+    expect(existsSync(`${cloneDir}.lock`)).toBe(false);
+  });
+
+  it('a hook-declined push is offline, not a conflict, and the unpushed ref file does not linger', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const hook = join(remote, 'hooks', 'pre-receive');
+    writeFileSync(hook, '#!/bin/sh\necho declined >&2\nexit 1\n', { mode: 0o755 });
+    const name = 'r/' + 'e'.repeat(40);
+    await expect(store.casRef(name, null, Buffer.from('new-record'))).rejects.toBeInstanceOf(VaultOfflineError);
+    expect(existsSync(join(store.cloneDir, 'refs', 'r', 'e'.repeat(40)))).toBe(false);
+    expect(git(store.cloneDir, 'rev-list', '--count', 'origin/main..HEAD').trim()).toBe('0');
+    rmSync(hook);
+    expect(await store.casRef(name, null, Buffer.from('new-record'))).toBe('ok');
+    expect(git(remote, 'cat-file', '-p', `main:refs/r/${'e'.repeat(40)}`)).toBe('new-record');
+  });
+
+  it('retrying after a failed push with a re-encoded chunk (same id, new bytes) succeeds', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const id = 'ab' + 'c'.repeat(38);
+    git(store.cloneDir, 'remote', 'set-url', 'origin', join(tmpdir(), 'pan-vault-does-not-exist', 'nope.git'));
+    await store.putObjects([{ id, bytes: Buffer.from('nonce-1') }]);
+    await expect(store.casRef('r/' + id, null, Buffer.from('ref'))).rejects.toBeInstanceOf(VaultOfflineError);
+    git(store.cloneDir, 'remote', 'set-url', 'origin', remote);
+    await expect(store.putObjects([{ id, bytes: Buffer.from('nonce-2') }])).resolves.toBeUndefined();
+    expect(await store.casRef('r/' + id, null, Buffer.from('ref'))).toBe('ok');
+    expect(git(remote, 'cat-file', '-p', `main:objects/ab/${id}`)).toBe('nonce-1');
+  });
+
   it('blobSha matches git hash-object', () => {
     const bytes = Buffer.from('hello vault\n');
     const dir = tmp('pan-vault-hash-');

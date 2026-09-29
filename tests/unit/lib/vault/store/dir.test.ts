@@ -60,11 +60,12 @@ describe('DirVaultStore layout', () => {
     await expect(store.casRef('r/UPPER', null, Buffer.from('x'))).rejects.toThrow(/Invalid vault ref name/);
   });
 
-  it('refuses to overwrite an object with different bytes', async () => {
+  it('keeps the first bytes when the same id is put again with a different ciphertext', async () => {
+    // Ids bind the plaintext; a re-encode after a failed push carries a fresh nonce.
     const store = await DirVaultStore.open(freshRoot());
     const id = 'd'.repeat(40);
     await store.putObjects([{ id, bytes: Buffer.from('one') }]);
-    await expect(store.putObjects([{ id, bytes: Buffer.from('two') }])).rejects.toThrow(/different bytes/);
+    await expect(store.putObjects([{ id, bytes: Buffer.from('two') }])).resolves.toBeUndefined();
     expect(Buffer.from((await store.getObject(id))!).toString()).toBe('one');
   });
 });

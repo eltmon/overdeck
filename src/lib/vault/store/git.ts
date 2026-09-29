@@ -16,6 +16,12 @@
  * - On a fresh empty remote there is no `origin/main`: fetch/reset are
  *   skipped, every ref has version `null`, and the first push creates `main`.
  *
+ * Every process on the machine shares this one clone (Stop hooks, `save`,
+ * `sync`, the dashboard timer), so the whole fetch/reset/write/commit/push
+ * cycle, and every object write, runs under a cross-process lock file next to
+ * the clone (`<clone>.lock`). Without it one process's `reset --hard` reverts
+ * another's ref write and the CAS reports `conflict` for a value that landed.
+ *
  * Never `git stash`; never touches any repository other than the vault clone.
  * Imports only Node built-ins and sibling vault modules.
  */
@@ -25,6 +31,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'n
 import { dirname, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { vaultDir } from '../config.js';
+import { withFileLock } from '../file-lock.js';
 import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
@@ -47,6 +54,11 @@ export function gitVaultCloneDir(): string {
   return join(vaultDir(), 'git');
 }
 
+/** Lock file guarding the clone; beside it, not inside it, so `git add -A` never sees it. */
+export function gitVaultLockPath(cloneDir: string): string {
+  return `${cloneDir}.lock`;
+}
+
 /** The git blob SHA of `bytes`, which is what `version` means for this backend. */
 export function blobSha(bytes: Uint8Array): string {
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
@@ -58,8 +70,16 @@ class GitCommandError extends Error {
   }
 }
 
+/**
+ * Only a real non-fast-forward rejection is retried. "failed to push some refs"
+ * and "[rejected]" also appear when a hook declines or a quota rejects the
+ * push, and those must surface as VaultOfflineError, not as a CAS conflict.
+ */
 function isNonFastForward(error: GitCommandError): boolean {
-  return /non-fast-forward|fetch first|\[rejected\]|failed to push some refs/i.test(error.stderr);
+  // "cannot lock ref … is at X but expected Y" / "failed to update ref" is the
+  // remote's answer when another push landed between our fetch and our push.
+  return /non-fast-forward|fetch first|remote ref updated since checkout|cannot lock ref '[^']+': is at \w+ but expected|failed to update ref/i
+    .test(error.stderr);
 }
 
 async function git(cwd: string, args: string[]): Promise<string> {
@@ -191,8 +211,16 @@ export class GitVaultStore implements VaultStore {
     }
   }
 
+  private locked<T>(fn: () => Promise<T>): Promise<T> {
+    return withFileLock(gitVaultLockPath(this.cloneDir), fn);
+  }
+
   /** Fetch and hard-reset the vault clone to origin/main. Offline → VaultOfflineError. */
   async refresh(): Promise<void> {
+    return this.locked(() => this.refreshUnlocked());
+  }
+
+  private async refreshUnlocked(): Promise<void> {
     try {
       await git(this.cloneDir, ['fetch', '--quiet', 'origin']);
     } catch (error) {
@@ -209,17 +237,16 @@ export class GitVaultStore implements VaultStore {
   }
 
   async putObjects(objects: ReadonlyArray<{ id: string; bytes: Uint8Array }>): Promise<void> {
-    for (const { id, bytes } of objects) {
-      const path = this.objectPath(id);
-      const existing = await readOrNull(path);
-      if (existing !== null) {
-        if (!existing.equals(Buffer.from(bytes))) {
-          throw new Error(`Vault object ${id} already exists with different bytes`);
-        }
-        continue;
+    await this.locked(async () => {
+      for (const { id, bytes } of objects) {
+        const path = this.objectPath(id);
+        // Ids bind the plaintext (keyed HMAC) and decodeChunk authenticates on
+        // read, so an existing id is already stored: a re-encode of the same
+        // lines after a failed push carries a fresh nonce and must not fail.
+        if ((await readOrNull(path)) !== null) continue;
+        await writeAtomic(path, bytes);
       }
-      await writeAtomic(path, bytes);
-    }
+    });
   }
 
   async getObject(id: string): Promise<Uint8Array | null> {
@@ -242,14 +269,14 @@ export class GitVaultStore implements VaultStore {
 
   async casRef(name: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
     const rel = this.refRelPath(name);
-    const run = this.casQueue.then(() => this.casRefSerialized(rel, expectedVersion, value));
+    const run = this.casQueue.then(() => this.locked(() => this.casRefSerialized(rel, expectedVersion, value)));
     this.casQueue = run.catch(() => undefined);
     return run;
   }
 
   private async casRefSerialized(rel: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
     for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-      await this.refresh();
+      await this.refreshUnlocked();
       const remoteMain = await this.hasRemoteMain();
       const current = remoteMain ? await this.remoteBlobSha(rel) : null;
       if (current !== expectedVersion) return 'conflict';
@@ -265,8 +292,11 @@ export class GitVaultStore implements VaultStore {
         return 'ok';
       } catch (error) {
         const failure = error as GitCommandError;
-        // Drop the local commit either way; objects are untracked again and survive.
+        // Drop the local commit either way; objects are untracked again and
+        // survive for the next attempt. The unpushed ref file must not: a new
+        // record's ref would otherwise ride along with the next push.
         await this.undoLocalCommit();
+        await git(this.cloneDir, ['clean', '-fdq', '--', 'refs']).catch(() => undefined);
         if (failure instanceof GitCommandError && isNonFastForward(failure)) continue;
         await this.resetToRemote();
         throw new VaultOfflineError(`Vault push failed: ${failure.message}`, { cause: failure });

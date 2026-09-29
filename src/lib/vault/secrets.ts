@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { findSecretMatches, type SecretPatternName } from '../secret-redaction.js';
 import { vaultDir } from './config.js';
 import { lineHash } from './continuity.js';
+import { withFileLock } from './file-lock.js';
 
 export const ALLOWED_SECRETS_FILENAME = 'allowed-secrets.json';
 
@@ -72,11 +73,14 @@ async function writeAllowed(allowed: AllowedSecrets): Promise<void> {
 
 /** Persist an allow entry for one line hash of one record. Idempotent. */
 export async function allowSecret(vaultId: string, hash: string): Promise<void> {
-  const allowed = await readAllowed();
-  const hashes = allowed[vaultId] ?? [];
-  if (!hashes.includes(hash)) hashes.push(hash);
-  allowed[vaultId] = hashes;
-  await writeAllowed(allowed);
+  await mkdir(vaultDir(), { recursive: true });
+  await withFileLock(`${allowedSecretsPath()}.lock`, async () => {
+    const allowed = await readAllowed();
+    const hashes = allowed[vaultId] ?? [];
+    if (!hashes.includes(hash)) hashes.push(hash);
+    allowed[vaultId] = hashes;
+    await writeAllowed(allowed);
+  });
 }
 
 /** Line hashes the operator has allowed for `vaultId`. */

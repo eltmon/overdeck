@@ -29,6 +29,7 @@ import { checkContinuity, splitSettleableLines, tailOf, type Tail } from './cont
 import { readCwdState } from './cwd-state.js';
 import { isExcluded } from './exclude.js';
 import {
+  decodeChunk,
   encodeChunk,
   encryptRef,
   isTombstone,
@@ -151,6 +152,19 @@ export function isCompactionBoundary(line: string, harness: string): boolean {
   if (harness === 'claude-code') return entry.type === 'user' && entry.isCompactSummary === true;
   if (harness === 'codex') return entry.type === 'compacted';
   return false;
+}
+
+/** Total LOG lines of `record`: the last settlement's count, or a chunk walk for older records. */
+export async function logLineCount(record: SessionRecord, store: VaultStore, keys: VaultSubkeys): Promise<number> {
+  const last = record.settlements[record.settlements.length - 1];
+  if (last && typeof last.logLines === 'number') return last.logLines;
+  let total = 0;
+  for (const id of record.log) {
+    const bytes = await store.getObject(id);
+    if (!bytes) throw new Error(`Vault chunk ${id} of record ${record.vaultId} is missing from the backend`);
+    total += (await decodeChunk(bytes, id, keys)).lines.length;
+  }
+  return total;
 }
 
 async function readRecord(store: VaultStore, name: string, keys: VaultSubkeys) {
@@ -284,6 +298,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
 
     // Record update.
     const record = target.record;
+    const previousLogLines = await logLineCount(record, store, keys);
     const firstNewChunk = record.log.length;
     record.log = [...record.log, ...encoded.map((chunk) => chunk.id)];
     groups.forEach((group, chunkIndex) => {
@@ -299,6 +314,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
       chunk: encoded[encoded.length - 1]!.id,
       turn: countHumanTurns(lines, harness as TurnHarness),
       lines: lines.length,
+      logLines: previousLogLines + newLines.length,
       cwdState,
     };
     record.settlements = [...record.settlements, settlement];
@@ -316,8 +332,30 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
 
     const result = await store.casRef(target.name, target.expectedVersion, await encryptRef(target.name, record, keys));
     if (result === 'conflict') {
-      // Someone changed the record between our read and write; report it as
-      // divergence of ownership so the next run re-reads and forks if needed.
+      // Re-read: a push that was rejected after the remote had already taken
+      // our value shows up as a conflict. If the backend now carries exactly
+      // this machine's new tail, the settlement landed and the local index
+      // must advance, or the next run would append the same lines again.
+      const landed = await readRecord(store, target.name, keys);
+      const mine = landed.record?.segments.find((segment) => segment.environmentId === me.environmentId);
+      const sameTail = mine
+        && mine.tail.lineCount === newTail.lineCount
+        && mine.tail.byteOffset === newTail.byteOffset
+        && mine.tail.lastHashes.join(',') === newTail.lastHashes.join(',');
+      if (landed.record && sameTail && landed.record.owner.environmentId === me.environmentId) {
+        await setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });
+        const landedVersion = (landed.record.settlementsArchive?.length ?? 0) + landed.record.settlements.length;
+        return {
+          verdict: 'append',
+          vaultId: target.vaultId,
+          chunks: encoded.map((chunk) => chunk.id),
+          lines: newLines.length,
+          version: landedVersion,
+          ...(forkedFrom ? { forkedFrom } : {}),
+        };
+      }
+      // Someone else changed the record between our read and write; report it
+      // as divergence so the next run re-reads and forks if needed.
       return { verdict: 'diverged', vaultId: target.vaultId, reason: 'record changed on the backend during settlement' };
     }
     await setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });

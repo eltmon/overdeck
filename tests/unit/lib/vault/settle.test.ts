@@ -102,6 +102,7 @@ describe('vault settle', () => {
     const after = await readRecord(first.vaultId);
     expect(after.log).toEqual([...first.chunks, ...second.chunks]);
     expect(after.settlements.map((entry) => entry.lines)).toEqual([3, 5]);
+    expect(after.settlements.map((entry) => entry.logLines)).toEqual([3, 5]);
     expect(after.settlements[1]!.turn).toBe(3);
   });
 

@@ -112,8 +112,15 @@ export interface Settlement {
   chunk: string;
   /** Human turns in the whole transcript after this settlement (FR-18). */
   turn: number;
-  /** Cumulative LOG line count after this settlement; versions map onto it (P-7). */
+  /** Settleable lines in the owner's native file after this settlement; versions map onto it (P-7). */
   lines: number;
+  /**
+   * Cumulative LOG line count (every line in every chunk) after this
+   * settlement. Eviction checks it against the owner's segment so a LOG that
+   * was appended twice can never be marked verified. Absent only in records
+   * written before this field existed; readers then count the chunks.
+   */
+  logLines?: number;
   cwdState: CwdState | null;
   /** Reserved (PAN-4329). Absent in every Phase A settlement. */
   wip?: WipSnapshotRef;

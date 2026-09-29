@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { vaultDir } from './config.js';
+import { withFileLock } from './file-lock.js';
 import type { Tail } from './continuity.js';
 
 export const LOCAL_INDEX_FILENAME = 'index.json';
@@ -95,26 +96,37 @@ export async function listOwned(): Promise<Record<string, OwnedEntry>> {
   return (await readLocalIndex()).owned;
 }
 
+/** Read-modify-write under the index lock, so concurrent processes never drop each other's entries. */
+async function updateLocalIndex(mutate: (index: LocalIndex) => boolean | void): Promise<void> {
+  await mkdir(vaultDir(), { recursive: true });
+  await withFileLock(`${localIndexPath()}.lock`, async () => {
+    const index = await readLocalIndex();
+    if (mutate(index) === false) return;
+    await writeLocalIndex(index);
+  });
+}
+
 /** Record (or update) the tail of an owned native path after a settlement. */
 export async function setOwnedTail(nativePath: string, entry: OwnedEntry): Promise<void> {
-  const index = await readLocalIndex();
-  index.owned[nativePath] = entry;
-  await writeLocalIndex(index);
+  await updateLocalIndex((index) => {
+    index.owned[nativePath] = entry;
+  });
 }
 
 /** Forget an owned native path (after exclusion or a transfer of ownership). */
 export async function removeOwned(nativePath: string): Promise<void> {
-  const index = await readLocalIndex();
-  if (!(nativePath in index.owned)) return;
-  delete index.owned[nativePath];
-  await writeLocalIndex(index);
+  await updateLocalIndex((index) => {
+    if (!(nativePath in index.owned)) return false;
+    delete index.owned[nativePath];
+    return true;
+  });
 }
 
 /** Replace the cached list rows with the rows from the latest pull, in order. */
 export async function replaceListCache(rows: readonly ListCacheRow[]): Promise<void> {
-  const index = await readLocalIndex();
-  index.listCache = [...rows];
-  await writeLocalIndex(index);
+  await updateLocalIndex((index) => {
+    index.listCache = [...rows];
+  });
 }
 
 /** The cached list rows in the order they were stored. */

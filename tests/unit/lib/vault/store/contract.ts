@@ -28,6 +28,9 @@ export function runVaultStoreContract(makeStore: () => Promise<VaultStore>): voi
       await store.putObjects([{ id: ID_A, bytes }]);
       await expect(store.putObjects([{ id: ID_A, bytes }])).resolves.toBeUndefined();
       expect(Buffer.from((await store.getObject(ID_A))!).equals(bytes)).toBe(true);
+      // Same id, different ciphertext (fresh nonce after a failed push): stored once, first bytes win.
+      await expect(store.putObjects([{ id: ID_A, bytes: randomBytes(64) }])).resolves.toBeUndefined();
+      expect(Buffer.from((await store.getObject(ID_A))!).equals(bytes)).toBe(true);
     });
 
     it('hasObjects returns exactly the present subset', async () => {
