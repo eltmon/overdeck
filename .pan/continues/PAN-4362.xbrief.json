@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:20:18.040Z",
+  "updated": "2026-09-29T11:20:29.865Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -424,6 +424,10 @@
     "docs.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T11:20:18.039Z"
+    },
+    "run-and-post.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:29.865Z"
     }
   }
 }
