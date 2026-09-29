@@ -25,6 +25,7 @@ import { readJsonBody } from './shared.js';
 const STATUS_BY_CODE: Record<SkillOverrideErrorCode, number> = {
   'core-skill': 409,
   'unknown-skill': 404,
+  'unknown-pack': 404,
   'unknown-project': 404,
   'unknown-issue': 404,
   'bad-request': 400,

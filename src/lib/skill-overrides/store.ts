@@ -31,10 +31,11 @@ import {
 } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
 import { notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
-import { packUpdateAvailable } from '../skill-packs/sources.js';
+import { listPacks, packUpdateAvailable } from '../skill-packs/sources.js';
 import { listPackCatalog, listSkillCatalog, readInstalledClaudePluginNames, type PackCatalogEntry } from './catalog.js';
 import {
   isCoreSkill,
+  isPackSkillId,
   resolvePackSkill,
   resolvePackToggle,
   resolveSkillStates,
@@ -45,7 +46,8 @@ import {
   type SkillState,
 } from './resolve.js';
 
-export type SkillOverrideErrorCode = 'core-skill' | 'unknown-skill' | 'unknown-project' | 'unknown-issue' | 'bad-request';
+export type SkillOverrideErrorCode =
+  | 'core-skill' | 'unknown-skill' | 'unknown-pack' | 'unknown-project' | 'unknown-issue' | 'bad-request';
 
 export class SkillOverrideError extends Error {
   constructor(readonly code: SkillOverrideErrorCode, message: string) {
@@ -58,6 +60,15 @@ export interface SkillOverrideUpdate {
   level: SkillOverrideLevel;
   skill: string;
   /** true = on, false = off, null = inherit (remove the key). */
+  enabled: boolean | null;
+  projectKey?: string;
+  issueId?: string;
+}
+
+/** A pack toggle write (PAN-4334). Global is two-state: `false` and `null` both clear the key. */
+export interface PackOverrideUpdate {
+  level: SkillOverrideLevel;
+  pack: string;
   enabled: boolean | null;
   projectKey?: string;
   issueId?: string;
@@ -391,16 +402,18 @@ export async function listLowerLevelPackOverrides(): Promise<Record<string, Lowe
 
 // ── writes ───────────────────────────────────────────────────────────────
 
-export function parseSkillOverrideUpdate(body: unknown): SkillOverrideUpdate {
+export function parseSkillOverrideUpdate(body: unknown): SkillOverrideUpdate | PackOverrideUpdate {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new SkillOverrideError('bad-request', 'request body must be an object');
   }
-  const { level, skill, enabled, projectKey, issueId } = body as Record<string, unknown>;
+  const { level, skill, pack, enabled, projectKey, issueId } = body as Record<string, unknown>;
   if (level !== 'global' && level !== 'project' && level !== 'issue') {
     throw new SkillOverrideError('bad-request', 'level must be global, project, or issue');
   }
-  if (typeof skill !== 'string' || skill.trim() === '') {
-    throw new SkillOverrideError('bad-request', 'skill must be a non-empty string');
+  const hasSkill = typeof skill === 'string' && skill.trim() !== '';
+  const hasPack = typeof pack === 'string' && pack.trim() !== '';
+  if (hasSkill === hasPack || (skill !== undefined && !hasSkill) || (pack !== undefined && !hasPack)) {
+    throw new SkillOverrideError('bad-request', 'provide exactly one of skill or pack');
   }
   if (enabled !== true && enabled !== false && enabled !== null) {
     throw new SkillOverrideError('bad-request', 'enabled must be true, false, or null');
@@ -413,14 +426,33 @@ export function parseSkillOverrideUpdate(body: unknown): SkillOverrideUpdate {
   }
   return {
     level,
-    skill: skill.trim(),
+    ...(hasPack ? { pack: (pack as string).trim() } : { skill: (skill as string).trim() }),
     enabled,
     ...(level === 'project' ? { projectKey: projectKey as string } : {}),
     ...(level === 'issue' ? { issueId: (issueId as string).toUpperCase() } : {}),
   };
 }
 
+/** PD-7: a `pack/skill` id must name a skill in a registered, cached pack's manifest. */
+async function packSkillEntry(id: string): Promise<{ optIn: boolean }> {
+  const slash = id.indexOf('/');
+  const packId = id.slice(0, slash);
+  const name = id.slice(slash + 1);
+  const pack = (await listPackCatalog()).find(entry => entry.id === packId);
+  if (!pack) throw new SkillOverrideError('unknown-skill', `unknown skill: ${id}`);
+  if (!pack.manifest) {
+    throw new SkillOverrideError('bad-request', `pack ${packId} is not cached; run pan skills pack sync ${packId}`);
+  }
+  const skill = pack.manifest.skills.find(entry => entry.name === name);
+  if (!skill) throw new SkillOverrideError('unknown-skill', `unknown skill: ${id}`);
+  return { optIn: skill.optIn };
+}
+
 async function assertInCatalog(skill: string, projectRoot?: string): Promise<void> {
+  if (isPackSkillId(skill)) {
+    await packSkillEntry(skill);
+    return;
+  }
   const catalog = await listSkillCatalog(projectRoot ? { projectRoot } : {});
   if (!catalog.some(entry => entry.name === skill)) {
     throw new SkillOverrideError('unknown-skill', `unknown skill: ${skill}`);
@@ -437,20 +469,27 @@ function deletePruning(doc: Document, path: string[]): void {
 }
 
 async function setGlobal(skill: string, enabled: boolean | null): Promise<SkillOverrideWriteResult> {
-  // Global is two-state: "on" is the default, so it is stored as no key.
-  const value = enabled === false ? false : null;
+  const packSkill = isPackSkillId(skill) && enabled !== null ? await packSkillEntry(skill) : null;
   return runSettingsWriteSerialized(async () => {
     const path = getGlobalConfigPath();
     const doc = parseDocument(await readTextOrEmpty(path));
     if (doc.errors.length > 0) {
       throw new SkillOverrideError('bad-request', `cannot parse ${path}: ${doc.errors[0]?.message ?? 'invalid YAML'}`);
     }
+    // Native skills: global is two-state; "on" is the default, so it is stored as no key.
+    // Pack skills (PD-6): store only the deviation from the resting state, which is
+    // off for opt-in skills and the global pack toggle otherwise.
+    let value: boolean | null = enabled === false ? false : null;
+    if (packSkill) {
+      const resting = packSkill.optIn ? false : doc.getIn(['skills', 'pack_overrides', skill.slice(0, skill.indexOf('/'))]) === true;
+      value = enabled === resting ? null : enabled;
+    }
     const keyPath = ['skills', 'overrides', skill];
     if (value === null) {
       if (!doc.hasIn(keyPath)) return {};
       deletePruning(doc, keyPath);
     } else {
-      await assertInCatalog(skill);
+      if (!packSkill) await assertInCatalog(skill);
       doc.setIn(keyPath, value);
     }
     await mkdir(dirname(path), { recursive: true });
@@ -493,36 +532,33 @@ async function isTracked(cwd: string, path: string): Promise<boolean> {
   }
 }
 
-function renderIssueFile(issueId: string, skills: Record<string, boolean>): string {
-  const sorted = Object.fromEntries(Object.entries(skills).sort(([a], [b]) => a.localeCompare(b)));
-  return ISSUE_FILE_HEADER + stringifyYaml({ issue: issueId, skills: sorted }, { indent: 2 });
+function sortedEntries(map: Record<string, boolean>): Record<string, boolean> {
+  return Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-async function setIssue(issueId: string, skill: string, enabled: boolean | null): Promise<SkillOverrideWriteResult> {
-  const issue = issueId.toUpperCase();
-  const owner = await projectForIssue(issue);
-  if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
-  const planHome = planHomeFor(owner.project);
-  const path = issueSkillOverridesPath(planHome, issue);
-  const { skills } = await readIssueFile(path);
-  const had = Object.prototype.hasOwnProperty.call(skills, skill);
+function renderIssueFile(issueId: string, skills: Record<string, boolean>, packs: Record<string, boolean>): string {
+  const body = {
+    issue: issueId,
+    ...(Object.keys(skills).length > 0 ? { skills: sortedEntries(skills) } : {}),
+    ...(Object.keys(packs).length > 0 ? { packs: sortedEntries(packs) } : {}),
+  };
+  return ISSUE_FILE_HEADER + stringifyYaml(body, { indent: 2 });
+}
 
-  if (enabled === null) {
-    if (!had) return {};
-    delete skills[skill];
-  } else {
-    await assertInCatalog(skill, owner.project.path);
-    if (had && skills[skill] === enabled) return {};
-    skills[skill] = enabled;
-  }
-
-  if (Object.keys(skills).length === 0) {
+/** Write (or delete, when both maps are empty) the issue file and commit it through the plan-artifact door. */
+async function persistIssueFile(
+  planHome: string,
+  path: string,
+  issue: string,
+  overrides: IssueOverrides,
+): Promise<SkillOverrideWriteResult> {
+  if (Object.keys(overrides.skills).length === 0 && Object.keys(overrides.packs).length === 0) {
     await rm(path, { force: true });
     // A file that was never committed leaves nothing to record.
     if (!(await isTracked(planHome, path))) return { committed: false, reason: 'nothing to commit' };
   } else {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, renderIssueFile(issue, skills), 'utf8');
+    await writeFile(path, renderIssueFile(issue, overrides.skills, overrides.packs), 'utf8');
   }
 
   const commit = await commitPlanArtifacts({
@@ -541,7 +577,98 @@ async function setIssue(issueId: string, skill: string, enabled: boolean | null)
     : { committed: true, sha: commit.sha, pushed: false, reason: push.reason };
 }
 
-export async function setSkillOverride(update: SkillOverrideUpdate): Promise<SkillOverrideWriteResult> {
+async function setIssue(issueId: string, skill: string, enabled: boolean | null): Promise<SkillOverrideWriteResult> {
+  const issue = issueId.toUpperCase();
+  const owner = await projectForIssue(issue);
+  if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
+  const planHome = planHomeFor(owner.project);
+  const path = issueSkillOverridesPath(planHome, issue);
+  const overrides = await readIssueFile(path);
+  const { skills } = overrides;
+  const had = Object.prototype.hasOwnProperty.call(skills, skill);
+
+  if (enabled === null) {
+    if (!had) return {};
+    delete skills[skill];
+  } else {
+    await assertInCatalog(skill, owner.project.path);
+    if (had && skills[skill] === enabled) return {};
+    skills[skill] = enabled;
+  }
+  return persistIssueFile(planHome, path, issue, overrides);
+}
+
+async function setPackOverride(update: PackOverrideUpdate): Promise<SkillOverrideWriteResult> {
+  const { pack, enabled } = update;
+  if (!(await listPacks()).some(entry => entry.id === pack)) {
+    throw new SkillOverrideError('unknown-pack', `unknown pack: ${pack}`);
+  }
+  switch (update.level) {
+    case 'global':
+      // Global is two-state: packs are off by default, so "off" is stored as no key.
+      return runSettingsWriteSerialized(async () => {
+        const path = getGlobalConfigPath();
+        const doc = parseDocument(await readTextOrEmpty(path));
+        if (doc.errors.length > 0) {
+          throw new SkillOverrideError('bad-request', `cannot parse ${path}: ${doc.errors[0]?.message ?? 'invalid YAML'}`);
+        }
+        const keyPath = ['skills', 'pack_overrides', pack];
+        if (enabled === true) {
+          if (doc.getIn(keyPath) === true) return {};
+          doc.setIn(keyPath, true);
+        } else {
+          if (!doc.hasIn(keyPath)) return {};
+          deletePruning(doc, keyPath);
+        }
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, doc.toString(), 'utf8');
+        return {};
+      });
+    case 'project': {
+      const projectKey = update.projectKey;
+      if (!projectKey) throw new SkillOverrideError('bad-request', 'projectKey is required for level project');
+      if (!(await findProject(projectKey))) throw new SkillOverrideError('unknown-project', `unknown project: ${projectKey}`);
+      await updateProjectsConfigAsync(config => {
+        const current = config.projects[projectKey] as ProjectWithSkillOverrides | undefined;
+        if (!current) throw new SkillOverrideError('unknown-project', `unknown project: ${projectKey}`);
+        const toggles = { ...(current.skill_pack_overrides ?? {}) };
+        const had = Object.prototype.hasOwnProperty.call(toggles, pack);
+        if (enabled === null) {
+          if (!had) return { config, result: undefined, changed: false };
+          delete toggles[pack];
+        } else {
+          if (had && toggles[pack] === enabled) return { config, result: undefined, changed: false };
+          toggles[pack] = enabled;
+        }
+        if (Object.keys(toggles).length === 0) delete current.skill_pack_overrides;
+        else current.skill_pack_overrides = toggles;
+        return { config, result: undefined, changed: true };
+      });
+      return {};
+    }
+    case 'issue': {
+      if (!update.issueId) throw new SkillOverrideError('bad-request', 'issueId is required for level issue');
+      const issue = update.issueId.toUpperCase();
+      const owner = await projectForIssue(issue);
+      if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
+      const planHome = planHomeFor(owner.project);
+      const path = issueSkillOverridesPath(planHome, issue);
+      const overrides = await readIssueFile(path);
+      const had = Object.prototype.hasOwnProperty.call(overrides.packs, pack);
+      if (enabled === null) {
+        if (!had) return {};
+        delete overrides.packs[pack];
+      } else {
+        if (had && overrides.packs[pack] === enabled) return {};
+        overrides.packs[pack] = enabled;
+      }
+      return persistIssueFile(planHome, path, issue, overrides);
+    }
+  }
+}
+
+export async function setSkillOverride(update: SkillOverrideUpdate | PackOverrideUpdate): Promise<SkillOverrideWriteResult> {
+  if ('pack' in update) return setPackOverride(update);
   if (isCoreSkill(update.skill)) {
     throw new SkillOverrideError('core-skill', `core skill cannot be overridden: ${update.skill}`);
   }

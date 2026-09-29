@@ -65,7 +65,9 @@ import {
   listSkillStates,
   loadSkillOverrideLayers,
   parseSkillOverrideUpdate,
+  readGlobalPackOverrides,
   readGlobalSkillOverrides,
+  readProjectPackOverrides,
   readProjectSkillOverrides,
   setSkillOverride,
   SkillOverrideError,
@@ -309,5 +311,95 @@ describe('pack states (PAN-4334)', () => {
     const list = await listSkillStates({ projectKey: 'tst' });
     expect(list.packs[0]).toMatchObject({ project: false, enabled: false, source: 'project' });
     expect(await listLowerLevelPackOverrides()).toEqual({ mattpocock: { projects: ['tst'], issues: [] } });
+  });
+});
+
+describe('pack writes (PAN-4334)', () => {
+  const registry = `skills:\n  packs:\n    mattpocock:\n      url: https://github.com/mattpocock/skills\n      ref: v1.2.3\n      commit: ${'c'.repeat(40)}\n`;
+  const issuePath = () => issueSkillOverridesPath(repo, 'TST-1');
+
+  beforeEach(() => {
+    writeFileSync(configPath, `# keep me\n${registry}`);
+  });
+
+  it('round-trips the global pack toggle as two-state', async () => {
+    await setSkillOverride({ level: 'global', pack: 'mattpocock', enabled: true });
+    expect(await readGlobalPackOverrides()).toEqual({ mattpocock: true });
+    expect(readFileSync(configPath, 'utf8')).toContain('# keep me');
+
+    await setSkillOverride({ level: 'global', pack: 'mattpocock', enabled: false });
+    expect(await readGlobalPackOverrides()).toEqual({});
+    expect(readFileSync(configPath, 'utf8')).not.toContain('pack_overrides');
+    expect(readFileSync(configPath, 'utf8')).toContain('mattpocock:');
+  });
+
+  it('round-trips the project pack toggle', async () => {
+    await setSkillOverride({ level: 'project', projectKey: 'tst', pack: 'mattpocock', enabled: false });
+    expect(await readProjectPackOverrides('tst')).toEqual({ mattpocock: false });
+
+    await setSkillOverride({ level: 'project', projectKey: 'tst', pack: 'mattpocock', enabled: null });
+    expect(await readProjectPackOverrides('tst')).toEqual({});
+    expect(readFileSync(projectsPath, 'utf8')).not.toContain('skill_pack_overrides');
+  });
+
+  it('writes the issue packs map beside an existing skills map and commits it', async () => {
+    await setSkillOverride({ level: 'issue', issueId: 'TST-1', skill: 'grilling', enabled: false });
+    const result = await setSkillOverride({ level: 'issue', issueId: 'tst-1', pack: 'mattpocock', enabled: true });
+
+    expect(result).toMatchObject({ committed: true });
+    expect(readFileSync(issuePath(), 'utf8')).toContain('packs:\n  mattpocock: true');
+    expect(readFileSync(issuePath(), 'utf8')).toContain('skills:\n  grilling: false');
+    expect(git('show', '--name-only', '--format=', 'HEAD')).toContain('.pan/skill-overrides/TST-1.yaml');
+
+    await setSkillOverride({ level: 'issue', issueId: 'TST-1', skill: 'grilling', enabled: null });
+    expect(existsSync(issuePath())).toBe(true);
+    expect(readFileSync(issuePath(), 'utf8')).not.toContain('skills:');
+
+    await setSkillOverride({ level: 'issue', issueId: 'TST-1', pack: 'mattpocock', enabled: null });
+    expect(existsSync(issuePath())).toBe(false);
+  });
+
+  it('rejects an unregistered pack', async () => {
+    await expectCode(setSkillOverride({ level: 'global', pack: 'nope', enabled: true }), 'unknown-pack');
+  });
+
+  it('stores a global pack skill value only when it deviates from the pack toggle', async () => {
+    await setSkillOverride({ level: 'global', skill: 'mattpocock/tdd', enabled: true });
+    expect(await readGlobalSkillOverrides()).toEqual({ 'mattpocock/tdd': true });
+
+    await setSkillOverride({ level: 'global', pack: 'mattpocock', enabled: true });
+    await setSkillOverride({ level: 'global', skill: 'mattpocock/tdd', enabled: true });
+    expect(await readGlobalSkillOverrides()).toEqual({});
+
+    await setSkillOverride({ level: 'global', skill: 'mattpocock/tdd', enabled: false });
+    expect(await readGlobalSkillOverrides()).toEqual({ 'mattpocock/tdd': false });
+  });
+
+  it('keeps an opt-in skill resting off even when the pack is on', async () => {
+    await setSkillOverride({ level: 'global', pack: 'mattpocock', enabled: true });
+    await setSkillOverride({ level: 'global', skill: 'mattpocock/setup-matt-pocock-skills', enabled: true });
+    expect(await readGlobalSkillOverrides()).toEqual({ 'mattpocock/setup-matt-pocock-skills': true });
+    await setSkillOverride({ level: 'global', skill: 'mattpocock/setup-matt-pocock-skills', enabled: false });
+    expect(await readGlobalSkillOverrides()).toEqual({});
+  });
+
+  it('validates pack skill ids against the pack manifest', async () => {
+    await expectCode(setSkillOverride({ level: 'global', skill: 'mattpocock/nope', enabled: true }), 'unknown-skill');
+    await expectCode(setSkillOverride({ level: 'project', projectKey: 'tst', skill: 'other/tdd', enabled: true }), 'unknown-skill');
+    await setSkillOverride({ level: 'project', projectKey: 'tst', skill: 'mattpocock/tdd', enabled: false });
+    expect(await readProjectSkillOverrides('tst')).toEqual({ 'mattpocock/tdd': false });
+  });
+
+  it('parses exactly one of skill or pack', () => {
+    expect(parseSkillOverrideUpdate({ level: 'global', pack: 'mattpocock', enabled: true })).toEqual({
+      level: 'global', pack: 'mattpocock', enabled: true,
+    });
+    for (const body of [
+      { level: 'global', enabled: true },
+      { level: 'global', skill: 'grilling', pack: 'mattpocock', enabled: true },
+      { level: 'global', skill: '', pack: 'mattpocock', enabled: true },
+    ]) {
+      expect(() => parseSkillOverrideUpdate(body)).toThrow('provide exactly one of skill or pack');
+    }
   });
 });
