@@ -300,7 +300,7 @@ Pack mattpocock
 Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
 ```
 
-Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (`claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
 ### Pinning and updates
 
@@ -363,7 +363,118 @@ In the dashboard, packs appear above the skill list on the Skills page, in proje
 
 ### SageOx and Deft are not plain packs
 
-SageOx installs hooks, git hooks, and a daemon that record sessions, so hiding its skills would not turn it off. It needs an integration, tracked in [#2444](https://github.com/eltmon/overdeck/issues/2444); `pan skills pack add sageox` refuses with that pointer. Deft's skills depend on its engine and project files, so it needs its own adapter, tracked in [#3943](https://github.com/eltmon/overdeck/issues/3943).
+SageOx installs hooks, git hooks, and a daemon that record sessions, so hiding its skills would not turn it off. It needs an integration, tracked in [#2444](https://github.com/eltmon/overdeck/issues/2444); `pan skills pack add sageox` refuses with that pointer. Deft's skills depend on its engine and project files, so Overdeck mounts only a read-only subset through the `deft-readonly` adapter; see [Deft Directive](#deft-directive).
+
+## Deft Directive
+
+[Deft Directive](https://github.com/eltmon/directive) is a process engine. `directive init` installs it by writing tracked files into a repository: an `AGENTS.md` managed section, agent hooks that call `deft-hook`, `.githooks/` with `core.hooksPath`, a `package.json` pin of `@deftai/directive`, `deft-directive-*` pointer skills, and an `xbrief/` tree. A repository with that deposit is a **Directive project**.
+
+Overdeck never runs a Deft CLI, never installs the engine, and never writes a tracked file in any project. It offers three levels:
+
+| Level | What you get |
+|-------|--------------|
+| Off | No Deft skills. In a Directive project, an explicit off also turns the deposit's enforcement off for Overdeck launches (the kill switch below). |
+| Methodology on | The read-only `deft` pack: seven Deft skills that need no engine, mounted per launch with a host notice. In a Directive project you can also turn on managed mode. |
+| Full Deft | Deft owns worktrees, review, and merge. Overdeck does not target this level. |
+
+### Adding the deft pack
+
+```bash
+pan skills pack add deft https://github.com/eltmon/directive --ref <ref>
+pan skills set --pack deft on
+```
+
+`deft` is a known pack, so Overdeck picks the `deft-readonly` adapter. The preview lists `Skills 7` and `Not applied hooks, context injection, git hooks, requires CLI (directive)`. The adapter reads `content/skills/deft-directive-<name>/SKILL.md` at the trusted commit and keeps only the read-only allowlist. Each skill is named by its stripped name, so the agent sees `deft:glossary`, never `deft:deft-directive-glossary`, and Overdeck's id is `deft/glossary`.
+
+### Skill map
+
+Every Deft skill has one class. Only `compatible` and `translated` skills are mounted. A skill that appears at a newer pinned commit and is not in this map is excluded as unreviewed. The map is verified at eltmon/directive 48e8cbf (v0.119.10-16).
+
+| Deft skill | Class | Overdeck equivalent or reason |
+|------------|-------|-------------------------------|
+| glossary | compatible | Conversation-only; does not write `UBIQUITOUS_LANGUAGE.md` unless asked |
+| debug | translated | `task verify:investigation` is unavailable; the ledger goes to chat |
+| design-critique | translated | `task issue:ingest` is unavailable; the next step is `pan issues` or the operator |
+| gh-arch | translated | `task slice:record` is unavailable; file follow-ups in Overdeck's tracker |
+| write-skill | translated | New skills go to `<project>/.pan/skills/<name>/SKILL.md` |
+| probe | translated | Never writes `xbrief/proposed/`; results go to chat |
+| cost | translated | Reads `xbrief/PROJECT-DEFINITION.xbrief.json` only when present |
+| xbrief | conflicting | `write-xbrief` |
+| swarm | conflicting | `pan-swarm` |
+| pre-pr | conflicting | `work-complete` |
+| review-cycle | conflicting | `pan-code-review` |
+| refinement | conflicting | `pan-plan` |
+| decompose | conflicting | `write-xbrief` |
+| gh-slice | conflicting | `pan-plan` |
+| build | conflicting | `pan-start` |
+| setup | conflicting | `pan-new-project` (it runs `directive init`) |
+| sync | conflicting | `pan-sync` (it runs an npm refresh of the deposit) |
+| interview | runtime-dependent | Needs Deft interview state |
+| issue-eval | runtime-dependent | Needs Deft Stage A tooling |
+| portfolio-priority | runtime-dependent | Needs Deft triage and RFC state |
+| product-signal | runtime-dependent | Consent and upload flow owned by Deft |
+| feedback | runtime-dependent | Escalates gaps through Deft tooling |
+| article-review | runtime-dependent | Feeds Deft's improvement backlog |
+| release | excluded | Releases the Deft framework itself |
+| triage | excluded | Withdrawn upstream |
+
+### Host notice and CLI deny
+
+The mount inserts a host notice after the frontmatter of every mounted Deft `SKILL.md`. It tells the agent not to run `directive init`, `directive update`, `directive bootstrap`, or `deft session:start`; not to install packages, change git hooks or `core.hooksPath`, edit `AGENTS.md`, or write under `xbrief/`; that Overdeck owns planning (`.pan/specs`), worktrees, review, and merge; to skip a `task` or `deft` step that is not installed and report in chat; and not to write repository files unless the operator asks. It also lists the Overdeck equivalent of each conflicting Deft skill.
+
+When a Claude Code launch mounts any `deft/*` skill in a project that is **not** a Directive project, the launch settings also deny Deft's mutating CLIs:
+
+```
+Bash(directive:*)  Bash(deft:*)  Bash(deft-hook:*)  Bash(npx @deftai/directive:*)
+Bash(npm install @deftai/directive:*)  Bash(npm i @deftai/directive:*)
+Bash(pnpm add @deftai/directive:*)  Bash(git config core.hooksPath:*)
+```
+
+In a Directive project no deny is added, because Deft is that project's own tool. Codex has no equivalent deny setting, so on Codex the host notice is the only boundary.
+
+### What a launch does in a Directive project
+
+Each Overdeck-managed Claude Code or Codex launch detects a Directive project at the launch directory's repository root. Detection reads files only (`.deft/core/VERSION`, the `AGENTS.md` managed-section marker, or the `@deftai/directive` pin) and is never stored. **Explicit off** means the `deft` pack toggle resolves off at the issue or project level. The default (no value anywhere) is not explicit off, and the global level has no off value, so it never is.
+
+| Directive project | `deft` toggle | Managed mode | Result |
+|-------------------|---------------|--------------|--------|
+| no | any | — | Nothing exported; Claude gets the CLI deny list when deft skills are mounted |
+| yes | explicit off (issue or project) | any | Kill switch: `DEFT_DIRECTIVE_DISABLE=1`, the flag file in issue worktrees, and the deposit's `deft-directive-*` pointer skills hidden |
+| yes | on, or default | managed | `DEFT_ORCHESTRATOR=overdeck` |
+| yes | on, or default | not managed | Nothing exported; Deft runs as the project configured it |
+
+The **kill switch** is Deft's own `.deft-directive-disable` root file, honored by engines from v0.92.0 when the file is untracked. Overdeck writes it only when the launch runs in an issue worktree (`workspaces/feature-<issue>/`). The file starts with `# overdeck:deft-directive-disable`, and Overdeck adds `/.deft-directive-disable` to the repository's `.git/info/exclude` when nothing ignores it yet, so `git status` stays clean. When the toggle goes back to on or inherit, Overdeck deletes the flag only if its first line is that marker; a flag you wrote yourself is never touched, and a tracked flag is never changed. Review agents, test agents, and conversations launched at the project root get the environment variable only.
+
+A launch prints one provenance line to stderr, for example `[launcher] deft: pack master (48e8cbf0e781); project directive engine ^0.119.10; kill switch`. If anything in the Deft step fails, the launch prints `[launcher] WARNING: deft integration not applied: <message>`, removes the Deft env file, and continues with its other skill settings and packs.
+
+### Managed mode
+
+Managed mode is a per-project decision: Deft methodology on, with Overdeck owning worktrees, review, merge, and the pipeline xBRIEF.
+
+```bash
+pan skills deft status [--project <key>] [--json]   # detection, pack, skill map, managed mode, ownership report
+pan skills deft enable --project <key> [--yes]      # print the ownership plan, then store the decision
+pan skills deft disable --project <key>             # remove the decision; project files untouched
+```
+
+`enable` refuses a project that is not a Directive project (Overdeck never runs `directive init`). It prints the ownership report, one owner per concern (xbrief, context, agent hooks, git hooks, worktrees, gates, task state, review, release, skills, workspace settings), and asks `Enable managed mode with this ownership plan? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. It stores only `projects.<key>.deft_integration: { mode: managed, plan_digest, enabled_at }` in `~/.overdeck/projects.yaml`, where `plan_digest` is the sha256 of the report text you saw. Launches in a managed project that is not off export `DEFT_ORCHESTRATOR=overdeck`.
+
+### Environment contract
+
+Overdeck exports at most these two literal lines, from a per-launch env file that the launcher reads with an allowlist and never sources:
+
+| Variable | Value | Meaning to the engine |
+|----------|-------|-----------------------|
+| `DEFT_DIRECTIVE_DISABLE` | `1` | Same as an untracked root `.deft-directive-disable` |
+| `DEFT_ORCHESTRATOR` | `overdeck` | External-orchestrator mode: Deft enforcement defers to the host; Deft contributes methodology only |
+
+Both variables are a no-op until your project pins an engine that reads them ([PAN-4425](https://github.com/eltmon/overdeck/issues/4425)). The flag file works on every engine from v0.92.0.
+
+### Limits
+
+- **Git hooks.** The deposited `.githooks/pre-commit` runs `deft verify:branch` and does not check the kill switch; whether `verify:branch` itself reads it is unverified. Feature-branch commits pass `verify:branch`. Main-branch plan-artifact commits in a Directive plan home may be refused.
+- **Workspace settings.** In a Directive project `.claude/settings.json` is a tracked Deft deposit, and Overdeck's workspace creation merges its own hooks into it, which leaves that file modified in the worktree.
+- **Scope.** Detection runs at the launch directory's repository root only, not in polyrepo sub-repositories. There is no conversation-level toggle; conversations inherit global and project toggles.
 
 ## Subagents
 
