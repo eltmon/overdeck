@@ -62,9 +62,10 @@ record() {
 const { appendFileSync } = require("node:fs");
 const e = process.env;
 const evidence = e.EVIDENCE.length > 4000 ? e.EVIDENCE.slice(-4000) : e.EVIDENCE;
+const seconds = e.STEP_START ? Math.round((Date.now() / 1000 - Number(e.STEP_START)) * 10) / 10 : null;
 appendFileSync(e.STEPS_FILE, JSON.stringify({
   id: e.ID, status: e.STATUS, command: e.COMMAND,
-  exitCode: e.CODE === "" ? null : Number(e.CODE), evidence, note: e.NOTE,
+  exitCode: e.CODE === "" ? null : Number(e.CODE), evidence, note: e.NOTE, seconds,
 }) + "\n");
 '
 }
@@ -75,7 +76,7 @@ step() {
   local id="$1" fn="$2" before after
   before=$(wc -l < "$STEPS_FILE")
   set +e
-  ( set +e; "$fn" )
+  ( set +e; export STEP_START; STEP_START="$(date +%s.%N)"; "$fn" )
   local code=$?
   after=$(wc -l < "$STEPS_FILE")
   if [[ "$after" -eq "$before" ]]; then
@@ -393,7 +394,7 @@ mkdir -p "$(dirname "$OUT")"
 ENV_NAME="$ENV_NAME" STEPS_FILE="$STEPS_FILE" OUT="$OUT" SUBJECT="$SUBJECT" CATALOGUE="${CATALOGUE[*]}" \
 SETUP_LOG="$SETUP_LOG" WARM_CODE="$WARM_CODE" WARM_OUT="$WARM_OUT" CLONE="$CLONE" CLONE_CODE="$CLONE_CODE" \
 CLONE_OUT="$CLONE_OUT" AUTOCRLF="$(git_config core.autocrlf)" SYMLINKS="$(git_config core.symlinks)" \
-FILEMODE="$(git_config core.filemode)" GIT_VERSION="$(git --version)" OS_DESC="$( (. /etc/os-release && echo "$PRETTY_NAME") 2>/dev/null )" \
+FILEMODE="$(git_config core.filemode)" MATERIALIZED="$MATERIALIZED" GIT_VERSION="$(git --version)" OS_DESC="$( (. /etc/os-release && echo "$PRETTY_NAME") 2>/dev/null )" \
 node -e '
 const { readFileSync, writeFileSync } = require("node:fs");
 const { basename } = require("node:path");
@@ -407,6 +408,16 @@ for (const line of readFileSync(e.STEPS_FILE, "utf8").split("\n").filter(Boolean
 const steps = e.CATALOGUE.split(" ").map((id) => recorded.get(id) ?? {
   id, status: "not-run", command: "", exitCode: null, evidence: "", note: "the probe did not reach this step",
 });
+// Steps whose subject never happened keep their evidence; the status says why.
+const byId = new Map(steps.map((s) => [s.id, s]));
+const demote = (id, note) => {
+  const s = byId.get(id);
+  if (s && s.status !== "not-run") Object.assign(s, { status: "not-run", note });
+};
+if (!e.MATERIALIZED) demote("3f", "3c failed: nothing was materialized");
+if (byId.get("4a")?.status !== "pass") {
+  for (const id of ["4b", "4c", "4d", "4e", "4f"]) demote(id, "4a failed: the code snapshot was not applied");
+}
 const result = {
   env: e.ENV_NAME,
   runner: `${process.env.ImageOS || "windows-2022"} WSL (${e.OS_DESC}, kernel ${require("os").release()})`,
