@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4305",
   "created": "2026-09-29T00:33:19.689Z",
-  "updated": "2026-09-29T00:58:33.178Z",
+  "updated": "2026-09-29T00:58:49.046Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,9 @@
     "docs-delivery-landing.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T00:58:33.177Z"
+    },
+    "parser-unwrap-pasted.ac5": {
+      "status": "cancelled"
     }
   }
 }
