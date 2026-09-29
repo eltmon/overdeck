@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:20:50.995Z",
+  "updated": "2026-09-29T11:21:49.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T11:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-09-29T11:21:49.082Z"
+    }
+  ],
   "items": {
     "harness-messages": {
       "status": "completed",
@@ -437,5 +443,14 @@
       "status": "completed",
       "doneAt": "2026-09-29T11:20:50.995Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-29T11:21:49Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4362 (attempt 1/3):\n\nFailed check: test-skip\n\nVerification FAILED at test-skip (25ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4362/.overdeck/verification/2026-09-29T11-21-41-795Z-5ebeef49.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4362/.overdeck/verification/2026-09-29T11-21-41-795Z-5ebeef49.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4362 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4362 -m \"Fixed test-skip\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
 }
