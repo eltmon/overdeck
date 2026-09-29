@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4372",
+  "created": "2026-09-29T09:44:00.403Z",
+  "updated": "2026-09-29T09:44:00.403Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ac-review-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T09:44:00.403Z"
+    }
+  }
+}
