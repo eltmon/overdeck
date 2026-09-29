@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:26:33.259Z",
+  "updated": "2026-09-29T15:26:49.512Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "keyring-guard.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T15:26:33.259Z"
+    },
+    "tolerant-readers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4333",
+      "claimedAt": "2026-09-29T15:26:49.511Z"
     }
   }
 }
