@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T16:01:02.804Z",
+  "updated": "2026-09-29T16:01:18.523Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "docs-work-start.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:01:02.803Z"
+    },
+    "docs-work-start.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:18.522Z"
     }
   }
 }
