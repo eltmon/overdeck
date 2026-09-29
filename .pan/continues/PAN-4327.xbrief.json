@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:42:14.282Z",
+  "updated": "2026-09-29T01:42:23.889Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -252,6 +252,10 @@
     "sonnet-55-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T01:42:14.282Z"
+    },
+    "sonnet-55-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:42:23.888Z"
     }
   }
 }
