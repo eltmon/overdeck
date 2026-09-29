@@ -1,0 +1,810 @@
+[
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac1",
+    "title": "Same-role context menus have consistent padding, radius, type scale, item states, and shadow across issue, conversation, and pane surfaces.",
+    "observable": false,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac2",
+    "title": "Deacon pause and planning states use theme-aware semantic colors with acceptable contrast.",
+    "observable": false,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac3",
+    "title": "The Cloister restart flow uses the common popup vocabulary and remains fully keyboard-operable.",
+    "observable": false,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac4",
+    "title": "Secondary surfaces contain no unexplained palette literals where a semantic token exists.",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac5",
+    "title": "Desktop and narrow screenshots show no clipping, accidental density changes, or hierarchy regressions in either theme.",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac6",
+    "title": "Relevant frontend tests, typecheck, build, and detector checks pass.",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "utf8-frame-decode",
+    "acId": "utf8-frame-decode.ac1",
+    "title": "Given one decode state, when decodeTerminalRecord receives an incremental frame with bytes [E2] and then one with bytes [97 8F], then it returns [] for the first and [{kind:'output', data:'●'}] for the second",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "utf8-frame-decode",
+    "acId": "utf8-frame-decode.ac2",
+    "title": "Given a decode state holding the partial byte E2, when a full frame with bytes 'hello' arrives, then it returns a snapshot whose data is exactly 'hello' (no leading U+FFFD), and a following frame [E2 97 8F] returns output '●'",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "utf8-frame-decode",
+    "acId": "utf8-frame-decode.ac3",
+    "title": "Given two observeTerminal streams from the fake spawn, when stream 0 receives [E2] then [97 8F] and stream 1 receives only [97 8F], then stream 0 emits output '●' and stream 1 emits '\\uFFFD\\uFFFD', proving each stream has its own decoder",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "utf8-frame-decode",
+    "acId": "utf8-frame-decode.ac4",
+    "title": "Given the Herdr backend and an agent pane showing Claude Code's UI, when the Terminal tab is opened in an isolated Playwright browser, then the xterm buffer renders '●', '─' and '⎿' and contains no 'â' or 'Â·' mojibake",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "utf8-frame-decode",
+    "acId": "utf8-frame-decode.ac5",
+    "title": "When npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts, npm run typecheck and npm run lint run, each exits 0 and the pre-existing herdr-stream tests pass with their assertions unchanged",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "docs-utf8-contract",
+    "acId": "docs-utf8-contract.ac1",
+    "title": "When a reader opens the Herdr wire facts section of docs/TERMINAL-BACKENDS.md, it shows that terminal.frame bytes are base64 UTF-8 and that encoding 'ansi' is not a charset",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+    "itemId": "docs-utf8-contract",
+    "acId": "docs-utf8-contract.ac2",
+    "title": "When a reader opens the same section, it shows that herdr-stream.ts decodes with one streaming TextDecoder per stream, that a full frame starts a fresh decoder, and that invalid bytes become U+FFFD, citing PAN-4310",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-liveness",
+    "acId": "row5-liveness.ac1",
+    "title": "Given work and planning agents stored running and isAlive returning no-session, checkPostMergeRow returns status pass and observed contains 'no running work/planning agents' and 'stored running, not live: agent-pan-2715, planning-pan-2715'",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-liveness",
+    "acId": "row5-liveness.ac2",
+    "title": "Given a stored-running work agent and isAlive returning alive:true with backendState idle, checkPostMergeRow returns status miss and observed contains 'running agents: agent-pan-2715'",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-liveness",
+    "acId": "row5-liveness.ac3",
+    "title": "Given isAlive returning runtime-indeterminate or rejecting, checkPostMergeRow returns status miss with observed containing 'liveness indeterminate: agent-pan-2715' and not 'post-merge evidence unavailable'",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-liveness",
+    "acId": "row5-liveness.ac4",
+    "title": "Given an agent with stored status stopped, checkPostMergeRow does not call the isAlive seam (vi.fn spy has zero calls) and returns pass on verifying_on_main",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-liveness",
+    "acId": "row5-liveness.ac5",
+    "title": "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts exits 0, and git grep -n tmuxActive src/lib/lifecycle/dod-gate.ts returns no matches",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-docs",
+    "acId": "row5-docs.ac1",
+    "title": "docs/MERGE-WORKFLOW.md contains the sentence starting \"Close-out's DoD row 5 (post-merge) asks the liveness oracle\" linking ../src/lib/agents/liveness.ts, placed after the 'The durable, verified teardown owner is **close-out**' paragraph",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+    "itemId": "row5-docs",
+    "acId": "row5-docs.ac2",
+    "title": "Given docs/MERGE-WORKFLOW.md after the change, grep for 'A stored `running` agent with no live pane does not block the row' returns one match, and the same paragraph contains 'runtime-indeterminate' and 'it never writes agent status'",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "deterministic-zombie-fixture",
+    "acId": "deterministic-zombie-fixture.ac1",
+    "title": "Given spawnedServerPid('zombie'), when it returns, then the returned pid reports a ps stat starting with Z and the zombie case's `pid <n>) exited before it became healthy` assertion passes",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "deterministic-zombie-fixture",
+    "acId": "deterministic-zombie-fixture.ac2",
+    "title": "The zombie branch contains no setTimeout and no for (;;) loop, and throws an Error containing `zombie fixture: pid` when its 2000ms deadline passes",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "deterministic-zombie-fixture",
+    "acId": "deterministic-zombie-fixture.ac3",
+    "title": "npx vitest run on the test file exits 0 and reports 6 passed tests with the same test names as origin/main",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "deterministic-zombie-fixture",
+    "acId": "deterministic-zombie-fixture.ac4",
+    "title": "Under 8 busy sh loops with OVERDECK_GATE_ADMISSION=0, the 50-run soak loop prints `passed 50/50`",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "deterministic-zombie-fixture",
+    "acId": "deterministic-zombie-fixture.ac5",
+    "title": "git diff $(git merge-base origin/main HEAD) --stat produces no entries for src/cli/commands/reload.ts or src/lib/platform-lifecycle.ts",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "testing-doc-real-process-fixtures",
+    "acId": "testing-doc-real-process-fixtures.ac1",
+    "title": "docs/TESTING.md renders a `### Real-process fixtures` heading between the `### Mocking` subsection and `## Dashboard UI Testing`",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "testing-doc-real-process-fixtures",
+    "acId": "testing-doc-real-process-fixtures.ac2",
+    "title": "The subsection contains the rule that a zombie fixture kills the long-lived child only after its parent has exec'd into a non-reaping process, and cites PAN-4244",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+    "itemId": "testing-doc-real-process-fixtures",
+    "acId": "testing-doc-real-process-fixtures.ac3",
+    "title": "The subsection states that real-process polls use a wall-clock deadline that throws an error naming the pid, phase, and last observed state, and are paced with setImmediate instead of setTimeout",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "pin-conversations-scope-chip",
+    "acId": "pin-conversations-scope-chip.ac1",
+    "title": "Given the palette is open with an empty query and zero conversation results, when the scope-chip row renders, then it renders a Conversations chip button (getByRole('button', { name: 'Conversations' })) alongside the other type chips",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "pin-conversations-scope-chip",
+    "acId": "pin-conversations-scope-chip.ac2",
+    "title": "Given conversation and non-conversation results are present, when the operator activates the Conversations chip by click and (in a second pass) by Enter on the focused chip button, then the result list renders only rows whose data-value carries the conversation (conv-) id prefix",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "pin-conversations-scope-chip",
+    "acId": "pin-conversations-scope-chip.ac3",
+    "title": "Given the Conversations scope is active, when the operator activates the All chip, then the result list renders every result type again with no scope filter applied",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "pin-conversations-scope-chip",
+    "acId": "pin-conversations-scope-chip.ac4",
+    "title": "Given the palette renders with initialScope='conversations' and no conversation results, when the open effects settle, then the Conversations scope survives as the active scope (filtered list stays conversations-scoped) instead of resetting to All",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "pin-conversations-scope-chip",
+    "acId": "pin-conversations-scope-chip.ac5",
+    "title": "Given two conversation hits, when the Conversations scope is active, then the list renders them in whichever order the active ordering mode (newest-first by default, or rank when toggled off, per #3703/#3704) already produces upstream -- scope filtering does not reorder results",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "scope-aware-conversation-empty-loading",
+    "acId": "scope-aware-conversation-empty-loading.ac1",
+    "title": "Given the Conversations scope is active with an empty query, the empty state renders 'Type to search conversations…' instead of 'Start typing…'",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "scope-aware-conversation-empty-loading",
+    "acId": "scope-aware-conversation-empty-loading.ac2",
+    "title": "Given the Conversations scope is active while a search is in flight, the loading row renders 'Searching conversations…' instead of 'Searching conversations & memory…'",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "scope-aware-conversation-empty-loading",
+    "acId": "scope-aware-conversation-empty-loading.ac3",
+    "title": "Given /api/palette/search responds with HTTP 500 while the Conversations scope is active, the palette falls back to the standard 'No results for \"…\"' empty state and preserves the active Conversations chip",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "docs-conversations-type-chip",
+    "acId": "docs-conversations-type-chip.ac1",
+    "title": "grep -n 'Conversations' docs/DESKTOP-APP.md produces a hit inside the 'Cmd+K Command Palette' section that names Conversations as an always-available scope chip limiting results to conversation entries",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+    "itemId": "docs-conversations-type-chip",
+    "acId": "docs-conversations-type-chip.ac2",
+    "title": "grep -n 'Ctrl+J' docs/DESKTOP-APP.md produces a hit in the same section stating the shortcut opens the palette scoped to Conversations",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-check",
+    "acId": "shim-branch-check.ac1",
+    "title": "Given a linked worktree named feature-pan-1 checked out on main, when the agent runs git commit through the shim, then the shim exits 1 and stderr contains feature/pan-1",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-check",
+    "acId": "shim-branch-check.ac2",
+    "title": "Given the workspace on feature/pan-1, when the agent runs git commit or git push origin feature/pan-1, then the shim execs real git and exits 0",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-check",
+    "acId": "shim-branch-check.ac3",
+    "title": "Given a git-init repo named feature-pan-2 on master (its .git is a directory), when git commit runs through a shim guarding it, then the call passes through and exits 0",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-check",
+    "acId": "shim-branch-check.ac4",
+    "title": "Given any refusal, the stderr line names the expected branch and pan tell and does not contain OVERDECK_PAN_GIT_OP or /usr/bin/git",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-check",
+    "acId": "shim-branch-check.ac5",
+    "title": "Given the existing cases in launcher-git-guard-behavior.test.ts and launcher-git-guard-gh-shim.test.ts, when vitest runs both files after the change, then it exits 0 with zero failed cases",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-tests",
+    "acId": "shim-branch-tests.ac1",
+    "title": "Given the workspace on main, the test asserts git commit, push, merge and cherry-pick each exit 1 with stderr containing feature/pan-1, and that commit from <workspace>/src and git -C <workspace> commit from outside also exit 1",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-tests",
+    "acId": "shim-branch-tests.ac2",
+    "title": "Given a detached HEAD in the workspace, the test asserts git commit exits 1 and stderr contains detached",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-tests",
+    "acId": "shim-branch-tests.ac3",
+    "title": "Given the workspace on feature/pan-1, the test asserts git commit exits 0 and git push origin feature/pan-1 exits 0 and creates refs/heads/feature/pan-1 in the bare origin; git -C <fixtureRepo> commit exits 0",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-tests",
+    "acId": "shim-branch-tests.ac4",
+    "title": "Given .swarm/w1, the test asserts git commit exits 0 on feature/pan-1-w1 and exits 1 with stderr containing feature/pan-1-w1 on feature/pan-1, for both the workspace shim and a shim whose guardRoot is the item worktree",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "shim-branch-tests",
+    "acId": "shim-branch-tests.ac5",
+    "title": "Given the git-init wrapper on master, the nested .claude/worktrees/agent-x worktree, and git merge-base run on a drifted workspace, the test asserts each exits 0",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "branch-check-docs",
+    "acId": "branch-check-docs.ac1",
+    "title": "worktree-discipline.md names src/lib/launcher-git-guard.ts as refusing commit, push, merge and cherry-pick in a drifted or detached worktree, and grep for 'no part of the pipeline auto-checks' in it returns 0 matches",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+    "itemId": "branch-check-docs",
+    "acId": "branch-check-docs.ac2",
+    "title": "reference/workers.mdx renders a paragraph after the working-directory table stating that a non-read-only worker's shim refuses git commit, push, merge and cherry-pick unless the worktree is on <feature-branch>-worker-<n>",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "spawn-item-worktree-default",
+    "acId": "spawn-item-worktree-default.ac1",
+    "title": "Given an item with no files_scope and no --shared, when spawnCommand runs, then createWorktree is called with ('/tmp/proj/workspaces/feature-pan-1', 'item-a') and the started pane's spec.cwd equals '/tmp/proj/workspaces/feature-pan-1/.swarm/item-a' (asserted in tests/unit/cli/commands/spawn.test.ts)",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "spawn-item-worktree-default",
+    "acId": "spawn-item-worktree-default.ac2",
+    "title": "Given shared: true and an item that declares files_scope, when spawnCommand runs, then createWorktree is never called and spec.cwd equals '/tmp/proj/workspaces/feature-pan-1'",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "spawn-item-worktree-default",
+    "acId": "spawn-item-worktree-default.ac3",
+    "title": "Given shared: true and OVERDECK_ITEM_ID set in the injected env, when spawnCommand runs, then it exits with code 1, calls no createWorktree, and starts no pane",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "spawn-item-worktree-default",
+    "acId": "spawn-item-worktree-default.ac4",
+    "title": "When `npx vitest run tests/unit/cli/commands/spawn.test.ts`, `npm run typecheck` and `npm run lint` run, each exits 0, and registerSpawnCommand declares a --shared option",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "foreman-skill-handback",
+    "acId": "foreman-skill-handback.ac1",
+    "title": "`grep -c 'pushes the shared feature branch\\|already commits and pushes directly' sync-sources/skills/pan-foreman/SKILL.md` prints 0, and the per-item protocol states the worker does not push and does not run `pan task done`, for both dispatch kinds",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "foreman-skill-handback",
+    "acId": "foreman-skill-handback.ac2",
+    "title": "SKILL.md contains a 'Dispatch prompt for a worker' template that includes the item id, the file-ownership map, the foreman's $OVERDECK_AGENT_ID, and a `pan tell` hand-back step naming the commit sha",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "foreman-skill-handback",
+    "acId": "foreman-skill-handback.ac3",
+    "title": "The Integrate bullet names the `git log <feature-branch>..<feature-branch>-<item-id>` check, cherry-pick/merge, `git push`, and then `pan task done` as foreman steps, in that order",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+    "itemId": "foreman-skill-handback",
+    "acId": "foreman-skill-handback.ac4",
+    "title": "SKILL.md says `pan spawn` creates the pane in `<workspace>/.swarm/<item-id>/` on `<feature-branch>-<item-id>`, and describes --shared as serial-only and refused (exit 1) from a worker pane",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "remove-close-out-row-gc",
+    "acId": "remove-close-out-row-gc.ac1",
+    "title": "Given state.json, sessions.json and activity.jsonl under getOverdeckHome()/agents/agent-pan-100/, when closeOut({ issueId: 'PAN-100' }) succeeds, then all three files still exist and no .retained-transcripts marker exists",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "remove-close-out-row-gc",
+    "acId": "remove-close-out-row-gc.ac2",
+    "title": "After closeOut, state.json.status reads 'stopped' (teardown's persistIssueAgentsStopped still runs) and result.steps contains no step named close-out:prune-agent-rows",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "remove-close-out-row-gc",
+    "acId": "remove-close-out-row-gc.ac3",
+    "title": "grep -n \"pruneStoppedAgentsForIssue\\|cloister/agent-gc\\|prune-agent-rows\" src/lib/lifecycle/workflows.ts prints nothing, and closeOut still emits close-out:mark-pipeline-terminal followed by close-out:ack-parked-residue",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "remove-close-out-row-gc",
+    "acId": "remove-close-out-row-gc.ac4",
+    "title": "The new test fails on unfixed workflows.ts (state.json missing) and passes after the block is deleted — the implementation checkpoint result is stated in the commit body",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-prune-stopped-agents-for-issue",
+    "acId": "delete-prune-stopped-agents-for-issue.ac1",
+    "title": "grep -rn pruneStoppedAgentsForIssue src tests --include=*.ts prints nothing",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-prune-stopped-agents-for-issue",
+    "acId": "delete-prune-stopped-agents-for-issue.ac2",
+    "title": "tests/unit/lib/cloister/agent-gc.test.ts passes and still contains the 'excludes already-retired agents before terminal issue resolution' test and the PAN-3513 terminality tests",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-prune-stopped-agents-for-issue",
+    "acId": "delete-prune-stopped-agents-for-issue.ac3",
+    "title": "pruneTerminalStoppedAgents stays exported: `pan admin db gc-agents --help` prints the command, and `npm run typecheck` exits 0",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-dead-execute-close-out",
+    "acId": "delete-dead-execute-close-out.ac1",
+    "title": "grep -n \"removeAgentStateDir\\|executeCloseOut\" src/lib/close-out.ts prints nothing and src/lib/__tests__/close-out.test.ts no longer exists",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-dead-execute-close-out",
+    "acId": "delete-dead-execute-close-out.ac2",
+    "title": "src/lib/close-out.ts still exports isBranchMerged with unchanged behaviour: npx vitest run src/lib/cloister/__tests__/reap-issue-residue.test.ts passes and pan workspace list --stale --help still prints",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-dead-execute-close-out",
+    "acId": "delete-dead-execute-close-out.ac3",
+    "title": "`npm run typecheck` and `npm run lint` both exit 0, and lint prints no unused-import finding for src/lib/close-out.ts",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "delete-dead-execute-close-out",
+    "acId": "delete-dead-execute-close-out.ac4",
+    "title": "git diff --stat main...HEAD -- src shows more deletions than insertions for the branch",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "docs-close-out-no-row-gc",
+    "acId": "docs-close-out-no-row-gc.ac1",
+    "title": "`grep -n \"close-out:prune-agent-rows\" docs/MERGE-WORKFLOW.md` prints exactly one line, inside the close-out paragraph, stating that the ceremony runs no agent-row garbage collection of its own",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+    "itemId": "docs-close-out-no-row-gc",
+    "acId": "docs-close-out-no-row-gc.ac2",
+    "title": "`grep -n \"pan admin db gc-agents\" docs/MERGE-WORKFLOW.md` prints a line that names deep-wipe, pan admin db gc-agents, and transcript retention as the only paths that delete state.json",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "dead-agent-guard",
+    "acId": "dead-agent-guard.ac1",
+    "title": "Given a running agent absent from the inventory and confirmed dead, when five deacon-lite ticks run under fake timers, then the stopped notifier is called exactly once with that agent id",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "dead-agent-guard",
+    "acId": "dead-agent-guard.ac2",
+    "title": "Given an agent already reported dead, when a tick observes it alive (in the inventory) and a later tick confirms it dead again, then the notifier is called a second time",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "dead-agent-guard",
+    "acId": "dead-agent-guard.ac3",
+    "title": "Given an agent already reported dead, when its lastResumeAt changes or it leaves and re-enters the running list while still dead, then the notifier is called again; when a tick returns runtime-indeterminate between two dead ticks, then no extra call is made",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "dead-agent-guard",
+    "acId": "dead-agent-guard.ac4",
+    "title": "Given the notifier throws on its first call, when the next tick runs, then the notifier is called again (the guard entry is set only after a successful call)",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "status-event-builder",
+    "acId": "status-event-builder.ac1",
+    "title": "Given a state with status running, when buildConfirmedDeadAgentEvents is called, then it returns agent.heartbeat_dead followed by agent.status_changed whose payload has status 'stopped', previousStatus 'running', hasLivePane false and hasLiveTmuxSession false",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "status-event-builder",
+    "acId": "status-event-builder.ac2",
+    "title": "Given state null, when buildConfirmedDeadAgentEvents is called, then it returns exactly one agent.heartbeat_dead event with payload { agentId }",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "status-event-builder",
+    "acId": "status-event-builder.ac3",
+    "title": "Given a state with status starting, when the builder runs, then status_changed.payload.previousStatus equals 'starting' (never undefined) and the input state's status is still 'starting' afterwards",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "deacon-main-uses-builder",
+    "acId": "deacon-main-uses-builder.ac1",
+    "title": "Given the change, when running grep -n 'function buildAgentStatusChangedPayload\\|function toAgentStatusPayload' src/dashboard/server/deacon-main.ts, then it prints nothing and the stopped notifier body calls buildConfirmedDeadAgentEvents",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "deacon-main-uses-builder",
+    "acId": "deacon-main-uses-builder.ac2",
+    "title": "Given the change, when npm run typecheck and npm run lint run, then both exit 0",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "main-uses-builder",
+    "acId": "main-uses-builder.ac1",
+    "title": "Given the change, when running grep -n 'function buildAgentStatusChangedPayload\\|function toAgentStatusPayload' src/dashboard/server/main.ts, then it prints nothing and the stopped notifier body calls buildConfirmedDeadAgentEvents",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "main-uses-builder",
+    "acId": "main-uses-builder.ac2",
+    "title": "Given the change, when npm run typecheck and npm run lint run, then both exit 0 and wc -l src/dashboard/server/main.ts returns fewer lines than origin/main's copy",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "docs-emission-rule",
+    "acId": "docs-emission-rule.ac1",
+    "title": "Given the change, when a reader opens the Deacon child process list in docs/DASHBOARD-ARCHITECTURE.md, then it shows a PAN-4300 bullet stating that the child emits agent.heartbeat_dead then agent.status_changed with status: stopped and previousStatus set to the recorded status, once per death",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+    "itemId": "docs-emission-rule",
+    "acId": "docs-emission-rule.ac2",
+    "title": "Given the change, when a reader opens that bullet, then it states that state.json is not changed and that a deacon child restart emits the pair once more for each still-dead agent",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "head-deletion-probe",
+    "acId": "head-deletion-probe.ac1",
+    "title": "Given a temp repo where a.ts was deleted in a commit dated @1790000000, headDeletionEpoch(dir)('a.ts') returns 1790000000",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "head-deletion-probe",
+    "acId": "head-deletion-probe.ac2",
+    "title": "Given a path renamed away with git mv, the probe returns the rename commit's epoch seconds for the old path",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "head-deletion-probe",
+    "acId": "head-deletion-probe.ac3",
+    "title": "Given a path that exists only in a commit reachable from refs/pan/turn/x/y and never on HEAD, the probe returns null",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "head-deletion-probe",
+    "acId": "head-deletion-probe.ac4",
+    "title": "Given a never-deleted path or a directory that is not a git repo, the probe returns null",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "head-deletion-probe",
+    "acId": "head-deletion-probe.ac5",
+    "title": "`grep -F -- \"'--all'\" src/cli/commands/start-freshness.ts` produces no output, so the probe consults HEAD only",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "temporal-drift-rule",
+    "acId": "temporal-drift-rule.ac1",
+    "title": "isDriftedPath returns false for (null,100), (50,100) and (100,100), and returns true for (150,100) and (150,null)",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "temporal-drift-rule",
+    "acId": "temporal-drift-rule.ac2",
+    "title": "Given a plan created 2026-09-20T00:00:00Z, checkPlanFreshness reports a missing path deleted at a later epoch and does not report one deleted earlier or never deleted",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "temporal-drift-rule",
+    "acId": "temporal-drift-rule.ac3",
+    "title": "Given a plan with no created field, checkPlanFreshness reports a missing path the probe returns a deletion epoch for",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "temporal-drift-rule",
+    "acId": "temporal-drift-rule.ac4",
+    "title": "When called with three arguments, checkPlanFreshness preserves the old default and reports every missing path; the pre-existing freshness tests pass unchanged",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "temporal-drift-rule",
+    "acId": "temporal-drift-rule.ac5",
+    "title": "`grep -n \"everTracked\" src/cli/commands/start.ts` produces no output, start.ts imports headDeletionEpoch from ./start-freshness.js, and npm run lint exits 0 with lint:file-size passing",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "freshness-docs",
+    "acId": "freshness-docs.ac1",
+    "title": "docs/PIPELINE-GATES.md contains a `## Plan-freshness preflight` section stating that pan start refuses a path only when a commit on HEAD deleted it after plan.created",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "freshness-docs",
+    "acId": "freshness-docs.ac2",
+    "title": "The PIPELINE-GATES.md section contains the reason history comes from HEAD only (refs/pan/turn/* checkpoint refs hold every drafted file) and names --skip-freshness",
+    "observable": true,
+    "compound": true
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "freshness-docs",
+    "acId": "freshness-docs.ac3",
+    "title": "reference/troubleshooting.mdx contains a section whose heading includes `references files that no longer exist` and that tells the reader to re-plan with pan plan <ID>",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+    "itemId": "freshness-docs",
+    "acId": "freshness-docs.ac4",
+    "title": "`pan start --help` prints the --skip-freshness description 'spawn even if the plan names files deleted since it was written'",
+    "observable": true,
+    "compound": false
+  },
+  {
+    "specFile": "2026-07-28-PAN-3252-benchmark-quantumllama-pan-1837-kimi-code-e2e-verification.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac1",
+    "title": "Issue's stated fix implemented with tests",
+    "observable": false,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-13-PAN-3684-pan-1641-acceptance-local-ollama-work-agent-spawn.xbrief.json",
+    "itemId": "auto-start",
+    "acId": "auto-start.ac1",
+    "title": "Issue's stated fix implemented with tests",
+    "observable": false,
+    "compound": false
+  },
+  {
+    "specFile": "2026-08-01-PAN-3420-dashboard-pan-show-render-a-completed-closed-out-issue-as-never-started-post-close-out-history-wipe.xbrief.json",
+    "itemId": "be-issue-history-resolver",
+    "acId": "be-issue-history-resolver.ac2",
+    "title": "Phase derivation produces plan/work/review/test/ship/done timestamps exactly per the PRD derivation rules",
+    "observable": false,
+    "compound": false
+  }
+]
