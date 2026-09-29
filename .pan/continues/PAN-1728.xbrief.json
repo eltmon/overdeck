@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:28:10.933Z",
+  "updated": "2026-09-29T02:28:24.145Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "work-role-guidance.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T02:28:10.932Z"
+    },
+    "work-role-guidance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:24.145Z"
     }
   }
 }
