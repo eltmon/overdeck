@@ -228,6 +228,28 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(existsSync(join(link, 'mattpocock', 'skills', 'tdd'))).toBe(false);
   });
 
+  it('mounts a deft-readonly pack with the host notice transform (PAN-3943)', async () => {
+    const dir = 'content/skills/deft-directive-glossary';
+    const root = packExtractDir('deft', COMMIT);
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, 'SKILL.md'), '---\nname: deft-directive-glossary\ndescription: x\n---\n# Glossary\n');
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      {
+        ...base,
+        id: 'deft',
+        url: 'https://github.com/eltmon/directive',
+        adapter: 'deft-readonly',
+        manifest: { ...base.manifest!, skills: [skill('glossary', dir)], pluginName: null },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { deft: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    const text = await readFile(join(link, 'deft', 'skills', 'glossary', 'SKILL.md'), 'utf8');
+    expect(text).toMatch(/^---\nname: glossary\n/);
+    expect(text).toContain('<!-- overdeck:deft-host-notice v1 -->');
+  });
+
   it('removes the link when the issue turns the pack off', async () => {
     loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
     await applyClaudePacks(ctx, link);

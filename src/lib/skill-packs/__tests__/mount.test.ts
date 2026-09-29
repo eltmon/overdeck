@@ -67,6 +67,20 @@ const alpha = (skills = ['one', 'two']): MountPack => ({
   root: rootA,
   skills: skills.map((name) => ({ name, dir: `skills/${name}` })),
 });
+const COMMIT_D = 'd'.repeat(40);
+const rootDeft = join(scratch, 'deft');
+mkdirSync(join(rootDeft, 'content', 'skills', 'deft-directive-glossary'), { recursive: true });
+writeFileSync(
+  join(rootDeft, 'content', 'skills', 'deft-directive-glossary', 'SKILL.md'),
+  '---\nname: deft-directive-glossary\ndescription: >-\n  Build a glossary.\ntriggers:\n  - glossary\n---\n# Deft Glossary\n',
+);
+const deft = (): MountPack => ({
+  id: 'deft',
+  commit: COMMIT_D,
+  root: rootDeft,
+  transform: 'deft-readonly',
+  skills: [{ name: 'glossary', dir: 'content/skills/deft-directive-glossary' }],
+});
 const beta = (): MountPack => ({ id: 'beta', commit: COMMIT_B, root: rootB, skills: [{ name: 'three', dir: 'skills/three' }] });
 
 function walk(dir: string): string[] {
@@ -135,6 +149,31 @@ describe('buildMount', () => {
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.filter((path) => lstatSync(path).isSymbolicLink())).toEqual([]);
     expect(existsSync(join(mount.path, 'plugins', 'alpha', 'skills', 'one', 'leak.txt'))).toBe(false);
+  });
+
+  it('rewrites Deft SKILL.md copies and keeps other packs byte-for-byte', async () => {
+    const mount = await buildMount({ packs: [deft(), alpha()] });
+    if (!mount) throw new Error('expected a mount');
+    const glossary = readFileSync(join(mount.path, 'plugins', 'deft', 'skills', 'glossary', 'SKILL.md'), 'utf8');
+    expect(glossary).toMatch(/^---\nname: glossary\n/);
+    expect(glossary).toContain('<!-- overdeck:deft-host-notice v1 -->');
+    expect(glossary).toContain('# Deft Glossary');
+    expect(readFileSync(join(mount.path, 'plugins', 'alpha', 'skills', 'one', 'SKILL.md'), 'utf8')).toBe(
+      readFileSync(join(rootA, 'skills', 'one', 'SKILL.md'), 'utf8'),
+    );
+    const claude = JSON.parse(readFileSync(join(mount.path, 'plugins', 'deft', '.claude-plugin', 'plugin.json'), 'utf8'));
+    expect(claude.skills).toEqual(['./skills/glossary']);
+  });
+
+  it('covers the transform in the hash', () => {
+    const { transform: _transform, ...plain } = deft();
+    expect(mountHash({ packs: [deft()] })).not.toBe(mountHash({ packs: [plain] }));
+  });
+
+  it('rejects an unknown transform', async () => {
+    await expect(buildMount({ packs: [{ ...deft(), transform: 'other' as 'deft-readonly' }] })).rejects.toThrow(
+      /invalid pack transform/,
+    );
   });
 
   it('rejects skill dirs that escape the pack', async () => {

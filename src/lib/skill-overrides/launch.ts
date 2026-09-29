@@ -78,7 +78,13 @@ export async function resolveLaunchPackSelection(
       .filter(skill => resolvePackSkill(`${pack.id}/${skill.name}`, skill.optIn, layers).enabled)
       .map(skill => ({ name: skill.name, dir: skill.dir }));
     if (skills.length > 0) {
-      selection.packs.push({ id: pack.id, commit: pack.commit, root: packExtractDir(pack.id, pack.commit), skills });
+      selection.packs.push({
+        id: pack.id,
+        commit: pack.commit,
+        root: packExtractDir(pack.id, pack.commit),
+        ...(pack.adapter === 'deft-readonly' ? { transform: 'deft-readonly' as const } : {}),
+        skills,
+      });
     }
   }
   return { selection, warnings };
