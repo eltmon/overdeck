@@ -4,17 +4,17 @@
     "created": "2026-09-29T04:12:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4343: Operator-grant labels (`released`, `auto-merge`, `hold-for-uat`) honored only from a non-agent actor",
-    "updated": "2026-09-29T04:16:43.852Z"
+    "updated": "2026-09-29T04:17:50.081Z"
   },
   "plan": {
     "id": "pan-4343",
     "title": "Operator-grant labels (`released`, `auto-merge`, `hold-for-uat`) honored only from a non-agent actor",
-    "status": "proposed",
+    "status": "running",
     "uid": "12df2838-5c6f-437f-bc81-c576900ae2e1",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T04:12:08Z",
-    "updated": "2026-09-29T04:16:43.852Z",
+    "updated": "2026-09-29T04:17:50.081Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4343",
