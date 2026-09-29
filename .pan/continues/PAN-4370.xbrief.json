@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:10:29.475Z",
+  "updated": "2026-09-29T16:10:43.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "injection-or-keyword-query.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:10:29.475Z"
+    },
+    "injection-or-keyword-query.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:10:43.847Z"
     }
   }
 }
