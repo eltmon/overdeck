@@ -35,8 +35,12 @@ vi.mock('../../../lib/overdeck/plan-artifact-commit.js', () => ({
   commitPlanArtifacts: mocks.commit,
   planArtifactCommitMessage: (id: string) => `chore(workspace): plan artifacts for ${id}`,
 }));
+vi.mock('../../../lib/xbrief/task-state-lock.js', () => ({
+  taskStateLockPath: async () => '/tmp/test/lock',
+  withTaskStateLock: (_lockPath: string, fn: () => Promise<unknown>) => fn(),
+}));
 
-import { registerTaskCommands } from '../task.js';
+import { registerTaskCommands, runTaskClaim, type TaskClaimDeps, type TaskClaimOptions } from '../task.js';
 
 const item = { id: 'PAN-1-a', title: 'A', status: 'pending', subItems: [] };
 
@@ -155,5 +159,92 @@ describe('pan task CLI', () => {
     expect(mocks.claimItem).not.toHaveBeenCalled();
     expect(mocks.markItemDone).not.toHaveBeenCalled();
     expect(mocks.setItemStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('pan task claim refusals (PAN-4339)', () => {
+  const itemA = { id: 'PAN-1-a', title: 'A', status: 'pending', metadata: { files_scope: ['src/a/**'] } };
+  const itemB = { id: 'PAN-1-b', title: 'B', status: 'pending', metadata: { files_scope: ['src/a/x.ts'] } };
+  const itemC = { id: 'PAN-1-c', title: 'C', status: 'pending', metadata: { files_scope: ['src/c/**'] } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    mocks.readPlan.mockReturnValue({ plan: { id: 'PAN-1', items: [itemA, itemB, itemC], edges: [] } });
+    mocks.commit.mockResolvedValue({ committed: true, sha: 'abc' });
+    mocks.claimItem.mockReturnValue({ status: 'in_progress', claimedBy: 'agent-y' });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('OVERDECK_CLAIM_ID', 'agent-y');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** Mirrors taskAction's try/catch so a direct call (needed for probe injection) still exercises the same exit contract. */
+  async function runClaimAction(itemId: string, options: TaskClaimOptions = {}, deps?: TaskClaimDeps): Promise<void> {
+    try {
+      await runTaskClaim('PAN-1', itemId, options, deps);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  }
+
+  it('refuses a claim held by a live agent, naming the holder, and writes nothing', async () => {
+    mocks.readContinueState.mockReturnValue({
+      items: { 'PAN-1-a': { status: 'in_progress', claimedBy: 'agent-x' } },
+    });
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await runClaimAction('PAN-1-a', {}, { probe: async () => 'alive' });
+
+    expect(process.exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('agent-x');
+    expect(mocks.claimItem).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
+  it('claims for the new holder when the recorded holder is dead', async () => {
+    mocks.readContinueState.mockReturnValue({
+      items: { 'PAN-1-a': { status: 'in_progress', claimedBy: 'agent-x' } },
+    });
+
+    await runClaimAction('PAN-1-a', {}, { probe: async () => 'dead' });
+
+    expect(mocks.claimItem).toHaveBeenCalledWith('/tmp/test/workspaces/feature-pan-1', 'PAN-1', 'PAN-1-a', 'agent-y');
+    expect(mocks.commit).toHaveBeenCalled();
+  });
+
+  it('refuses an item whose files_scope overlaps a live claim, naming the held item; a disjoint item succeeds', async () => {
+    mocks.readContinueState.mockReturnValue({
+      items: { 'PAN-1-a': { status: 'in_progress', claimedBy: 'agent-x' } },
+    });
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await runClaimAction('PAN-1-b', {}, { probe: async () => 'alive' });
+    expect(process.exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('PAN-1-a');
+    expect(mocks.claimItem).not.toHaveBeenCalled();
+
+    process.exitCode = undefined;
+    await runClaimAction('PAN-1-c', {}, { probe: async () => 'alive' });
+    expect(mocks.claimItem).toHaveBeenCalledWith('/tmp/test/workspaces/feature-pan-1', 'PAN-1', 'PAN-1-c', 'agent-y');
+  });
+
+  it('--steal overrides a live-held refusal and writes a "--steal overrode" stderr line', async () => {
+    mocks.readContinueState.mockReturnValue({
+      items: { 'PAN-1-a': { status: 'in_progress', claimedBy: 'agent-x' } },
+    });
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await runClaimAction('PAN-1-a', { steal: true }, { probe: async () => 'alive' });
+
+    expect(mocks.claimItem).toHaveBeenCalledWith('/tmp/test/workspaces/feature-pan-1', 'PAN-1', 'PAN-1-a', 'agent-y');
+    expect(errors.join('\n')).toContain('--steal overrode');
   });
 });
