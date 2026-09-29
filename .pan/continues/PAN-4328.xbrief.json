@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:15:09.712Z",
+  "updated": "2026-09-29T10:15:27.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "passphrase-cmd.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T10:15:09.712Z"
+    },
+    "setup-offer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:27.243Z"
     }
   }
 }
