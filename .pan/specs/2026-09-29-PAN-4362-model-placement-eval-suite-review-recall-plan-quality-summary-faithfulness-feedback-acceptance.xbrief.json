@@ -4,17 +4,17 @@
     "created": "2026-09-29T09:43:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4362: Model-placement eval suite: review recall, plan quality, summary faithfulness, feedback acceptance",
-    "updated": "2026-09-29T09:49:17.200Z"
+    "updated": "2026-09-29T09:50:04.554Z"
   },
   "plan": {
     "id": "pan-4362",
     "title": "Model-placement eval suite: review recall, plan quality, summary faithfulness, feedback acceptance",
-    "status": "proposed",
+    "status": "running",
     "uid": "10fc7e49-1064-4bcf-b1c1-89fab8009731",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T09:43:14Z",
-    "updated": "2026-09-29T09:49:17.200Z",
+    "updated": "2026-09-29T09:50:04.554Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4362",
