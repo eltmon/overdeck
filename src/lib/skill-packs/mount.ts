@@ -14,12 +14,14 @@
  * once renamed into place. Nothing here imports `src/lib/skill-overrides/`.
  */
 import { createHash } from 'node:crypto';
-import { cp, lstat, mkdir, mkdtemp, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix } from 'node:path';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
 
 export const MOUNT_FORMAT_VERSION = 1;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
+export const CODEX_PACK_BLOCK_BEGIN = '# overdeck:skill-packs:begin';
+export const CODEX_PACK_BLOCK_END = '# overdeck:skill-packs:end';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
@@ -157,4 +159,88 @@ export async function linkClaudeMount(link: string, mount: Mount | null): Promis
   await rm(tmp, { force: true });
   await symlink(join(mount.path, 'plugins'), tmp);
   await rename(tmp, link);
+}
+
+function escapeTomlBasicString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function stripPackBlock(content: string): string {
+  const begin = content.indexOf(CODEX_PACK_BLOCK_BEGIN);
+  if (begin === -1) return content;
+  const end = content.indexOf(CODEX_PACK_BLOCK_END, begin);
+  const after = end === -1 ? content.length : end + CODEX_PACK_BLOCK_END.length;
+  return stripPackBlock(content.slice(0, begin) + content.slice(after));
+}
+
+async function listDirNames(dir: string): Promise<string[]> {
+  try {
+    return (await readdir(dir, { withFileTypes: true })).map((dirent) => dirent.name);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+/** Copy each mounted plugin into the Codex plugin cache and remove every other `overdeck-packs` entry. */
+async function syncCodexPackCache(codexHome: string, mount: Mount | null): Promise<void> {
+  const cacheRoot = join(codexHome, 'plugins', 'cache', CODEX_PACK_MARKETPLACE);
+  if (mount === null) {
+    await rm(cacheRoot, { recursive: true, force: true });
+    return;
+  }
+  for (const id of mount.packIds) {
+    const target = join(cacheRoot, id, mount.hash);
+    if (await exists(target)) continue;
+    const tmp = `${target}.tmp-${process.pid}`;
+    await rm(tmp, { recursive: true, force: true });
+    await mkdir(dirname(target), { recursive: true });
+    await copyWithoutSymlinks(join(mount.path, 'plugins', id), tmp);
+    try {
+      await rename(tmp, target);
+    } catch (error) {
+      await rm(tmp, { recursive: true, force: true });
+      if (!(await exists(target))) throw error;
+    }
+  }
+  for (const id of await listDirNames(cacheRoot)) {
+    if (!mount.packIds.includes(id)) {
+      await rm(join(cacheRoot, id), { recursive: true, force: true });
+      continue;
+    }
+    for (const version of await listDirNames(join(cacheRoot, id))) {
+      if (version !== mount.hash) await rm(join(cacheRoot, id, version), { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * Replace the managed skill-pack block in `<codexHome>/config.toml` and sync
+ * the Codex plugin cache. Idempotent; a null mount removes both.
+ */
+export async function writeCodexPackBlock(codexHome: string, mount: Mount | null): Promise<void> {
+  const path = join(codexHome, 'config.toml');
+  let existing = '';
+  try {
+    existing = await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const base = stripPackBlock(existing).trimEnd();
+  const block =
+    mount === null
+      ? ''
+      : [
+          CODEX_PACK_BLOCK_BEGIN,
+          `[marketplaces.${CODEX_PACK_MARKETPLACE}]`,
+          'source_type = "local"',
+          `source = "${escapeTomlBasicString(mount.path)}"`,
+          ...mount.packIds.flatMap((id) => ['', `[plugins."${id}@${CODEX_PACK_MARKETPLACE}"]`, 'enabled = true']),
+          CODEX_PACK_BLOCK_END,
+        ].join('\n');
+  const next = [base, block].filter(Boolean).join('\n\n');
+  await mkdir(codexHome, { recursive: true });
+  await writeFile(path, next ? `${next}\n` : '', { mode: 0o600 });
+  await chmod(path, 0o600);
+  await syncCodexPackCache(codexHome, mount);
 }

@@ -1,8 +1,21 @@
 /**
- * PAN-4334 WI-5: content-addressed pack mounts and the Claude plugin link,
- * against real files under a temp OVERDECK_HOME.
+ * PAN-4334 WI-5/6: content-addressed pack mounts, the Claude plugin link, and
+ * the Codex config block and plugin cache, against real files under a temp
+ * OVERDECK_HOME.
  */
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,7 +29,16 @@ const { overdeckHome } = await vi.hoisted(async () => {
   return { overdeckHome: home };
 });
 
-import { buildMount, CODEX_PACK_MARKETPLACE, linkClaudeMount, mountHash, mountsDir, type MountPack } from '../mount.js';
+import {
+  buildMount,
+  CODEX_PACK_BLOCK_BEGIN,
+  CODEX_PACK_MARKETPLACE,
+  linkClaudeMount,
+  mountHash,
+  mountsDir,
+  writeCodexPackBlock,
+  type MountPack,
+} from '../mount.js';
 
 const COMMIT_A = 'a'.repeat(40);
 const COMMIT_B = 'b'.repeat(40);
@@ -134,5 +156,83 @@ describe('linkClaudeMount', () => {
     await linkClaudeMount(link, null);
     expect(() => lstatSync(link)).toThrow();
     await linkClaudeMount(link, null);
+  });
+});
+
+describe('writeCodexPackBlock', () => {
+  const codexHome = join(overdeckHome, 'agents', 'agent-1', 'codex');
+  const configToml = join(codexHome, 'config.toml');
+  const cacheRoot = join(codexHome, 'plugins', 'cache', CODEX_PACK_MARKETPLACE);
+  const skillBlock = [
+    'model = "gpt-5.5"',
+    '',
+    '# overdeck:skill-overrides:begin',
+    '[[skills.config]]',
+    'name = "grilling"',
+    'enabled = false',
+    '# overdeck:skill-overrides:end',
+  ].join('\n');
+
+  beforeEach(() => {
+    rmSync(codexHome, { recursive: true, force: true });
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(configToml, `${skillBlock}\n`);
+  });
+
+  it('appends the pack block after the skill-override block and copies the plugin', async () => {
+    const mount = await buildMount({ packs: [alpha(), beta()] });
+    if (!mount) throw new Error('expected a mount');
+    await writeCodexPackBlock(codexHome, mount);
+    expect(readFileSync(configToml, 'utf8')).toBe(
+      [
+        skillBlock,
+        '',
+        CODEX_PACK_BLOCK_BEGIN,
+        '[marketplaces.overdeck-packs]',
+        'source_type = "local"',
+        `source = "${mount.path}"`,
+        '',
+        '[plugins."alpha@overdeck-packs"]',
+        'enabled = true',
+        '',
+        '[plugins."beta@overdeck-packs"]',
+        'enabled = true',
+        '# overdeck:skill-packs:end',
+        '',
+      ].join('\n'),
+    );
+    expect(statSync(configToml).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(cacheRoot, 'alpha', mount.hash, 'skills', 'one', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(cacheRoot, 'beta', mount.hash, '.codex-plugin', 'plugin.json'))).toBe(true);
+  });
+
+  it('is byte-identical when repeated with the same mount', async () => {
+    const mount = await buildMount({ packs: [alpha()] });
+    await writeCodexPackBlock(codexHome, mount);
+    const once = readFileSync(configToml, 'utf8');
+    await writeCodexPackBlock(codexHome, mount);
+    expect(readFileSync(configToml, 'utf8')).toBe(once);
+  });
+
+  it('replaces the block for a new mount and prunes old cache entries', async () => {
+    const first = await buildMount({ packs: [alpha(), beta()] });
+    const second = await buildMount({ packs: [alpha(['one'])] });
+    if (!first || !second) throw new Error('expected mounts');
+    await writeCodexPackBlock(codexHome, first);
+    await writeCodexPackBlock(codexHome, second);
+    const text = readFileSync(configToml, 'utf8');
+    expect(text.split(CODEX_PACK_BLOCK_BEGIN)).toHaveLength(2);
+    expect(text).toContain(`source = "${second.path}"`);
+    expect(text).not.toContain('beta@overdeck-packs');
+    expect(readdirSync(cacheRoot)).toEqual(['alpha']);
+    expect(readdirSync(join(cacheRoot, 'alpha'))).toEqual([second.hash]);
+  });
+
+  it('removes the block and the cache for a null mount', async () => {
+    await writeCodexPackBlock(codexHome, await buildMount({ packs: [alpha()] }));
+    await writeCodexPackBlock(codexHome, null);
+    expect(readFileSync(configToml, 'utf8')).toBe(`${skillBlock}\n`);
+    expect(existsSync(cacheRoot)).toBe(false);
+    expect(statSync(configToml).mode & 0o777).toBe(0o600);
   });
 });
