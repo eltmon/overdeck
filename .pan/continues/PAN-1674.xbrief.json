@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1674",
   "created": "2026-09-29T23:41:57.389Z",
-  "updated": "2026-09-29T23:52:03.064Z",
+  "updated": "2026-09-29T23:52:09.696Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-1674",
       "claimedAt": "2026-09-29T23:47:09.474Z",
       "doneAt": "2026-09-29T23:52:03.064Z"
+    },
+    "remove-relocate-venv-scripts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1674",
+      "claimedAt": "2026-09-29T23:52:09.696Z"
     }
   }
 }
