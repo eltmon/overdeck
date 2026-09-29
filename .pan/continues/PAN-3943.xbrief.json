@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:41:01.102Z",
+  "updated": "2026-09-29T23:41:14.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "deft-mount-transform.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T23:41:01.102Z"
+    },
+    "directive-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:14.111Z"
     }
   }
 }
