@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:08:59.897Z",
+  "updated": "2026-09-29T11:09:12.352Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "fixture-loader.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:08:59.897Z"
+    },
+    "fixture-loader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:09:12.352Z"
     }
   }
 }
