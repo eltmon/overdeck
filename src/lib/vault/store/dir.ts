@@ -7,6 +7,7 @@
  *     <root>/VAULT-FORMAT            "overdeck-vault 1\n"
  *     <root>/objects/<id[0:2]>/<id>  encrypted chunk bytes (immutable)
  *     <root>/refs/<name>             encrypted ref value
+ *     <root>/objects/keywrap/v1      reserved slot, overwritten by putSlot
  *
  * A ref's version is the SHA-1 of the ref file bytes. `casRef` is serialized
  * within the process by a promise chain and across processes by an O_EXCL
@@ -21,7 +22,9 @@ import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
   VaultOfflineError,
+  assertNotSlotName,
   assertRefName,
+  assertSlotName,
   objectRelativePath,
   type CasResult,
   type VaultRef,
@@ -92,6 +95,7 @@ export class DirVaultStore implements VaultStore {
   }
 
   async putObjects(objects: ReadonlyArray<{ id: string; bytes: Uint8Array }>): Promise<void> {
+    for (const { id } of objects) assertNotSlotName(id);
     for (const { id, bytes } of objects) {
       const path = this.objectPath(id);
       // Ids bind the plaintext (keyed HMAC) and decodeChunk authenticates on
@@ -99,6 +103,20 @@ export class DirVaultStore implements VaultStore {
       // lines after a failed push carries a fresh nonce and must not fail.
       if ((await readOrNull(path)) !== null) continue;
       await writeAtomic(path, bytes);
+    }
+  }
+
+  async putSlot(name: string, bytes: Uint8Array | null): Promise<void> {
+    assertSlotName(name);
+    const path = this.objectPath(name);
+    if (bytes !== null) {
+      await writeAtomic(path, bytes);
+      return;
+    }
+    try {
+      await unlink(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
   }
 

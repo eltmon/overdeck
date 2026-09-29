@@ -39,6 +39,12 @@ export interface VaultStore {
    * backend with no remote view (the directory store) resolves immediately.
    */
   refresh(): Promise<void>;
+  /**
+   * Overwrite (`bytes`) or delete (`null`) a reserved slot (RESERVED_OBJECT_NAMES)
+   * and publish the change before resolving. Last write wins. Throws for any
+   * other name, and VaultOfflineError when the backend cannot be reached.
+   */
+  putSlot(name: string, bytes: Uint8Array | null): Promise<void>;
 }
 
 /** The backend cannot be reached right now; the caller should back off and retry later. */
@@ -56,8 +62,8 @@ export const OBJECT_ID_PATTERN = /^[0-9a-f]{40}$/;
 /**
  * Reserved object name for PAN-4328 (vault passphrase, anywhere-accounts
  * design 6.5): the scrypt-wrapped copy of the vault key. Stored at
- * `objects/keywrap/v1` on every backend. Phase A never writes it; reserving
- * the name now means PAN-4328 lands without a format bump.
+ * `objects/keywrap/v1` on every backend. Only `putSlot` writes it; `putObjects`
+ * rejects it, because content objects are immutable and a slot is not.
  */
 export const KEYWRAP_OBJECT_NAME = 'keywrap/v1';
 
@@ -76,6 +82,16 @@ export const REF_NAME_PATTERN = /^[a-z]\/[0-9a-z]{1,64}$/;
 export function assertObjectId(id: string): void {
   if (RESERVED_OBJECT_NAMES.has(id)) return;
   if (!OBJECT_ID_PATTERN.test(id)) throw new Error(`Invalid vault object id: ${JSON.stringify(id)}`);
+}
+
+/** Throws unless `name` is a reserved slot (the only names `putSlot` accepts). */
+export function assertSlotName(name: string): void {
+  if (!RESERVED_OBJECT_NAMES.has(name)) throw new Error(`Invalid vault slot name: ${JSON.stringify(name)}`);
+}
+
+/** Throws for a reserved slot name: content objects never go through a slot. */
+export function assertNotSlotName(id: string): void {
+  if (RESERVED_OBJECT_NAMES.has(id)) throw new Error(`Reserved vault object ${id} must be written with putSlot`);
 }
 
 export function assertRefName(name: string): void {

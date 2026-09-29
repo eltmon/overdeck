@@ -185,15 +185,28 @@ def validate_command(
                 errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
             return errors
         flags = option_names(sub_help) | global_flags
+        target = f"pan {verb} {first_arg}"
+        # A nested group (`pan vault passphrase set --generate`): check flags against the leaf command.
+        second_arg = tokens[3] if len(tokens) > 3 else None
+        if second_arg and second_arg != "help" and second_arg in command_names(sub_help):
+            flag_tokens = tokens[4:]
+            try:
+                leaf_help = run_pan(verb, first_arg, second_arg, "--help")
+            except subprocess.CalledProcessError:
+                if any(token.startswith("-") for token in flag_tokens):
+                    errors.append(f"{skill}:{line_no}: {command}: could not read help for {target} {second_arg}")
+                return errors
+            flags = option_names(leaf_help) | global_flags
+            target = f"{target} {second_arg}"
     else:
         flags = set(verb_flags) | set(global_flags)
         flag_tokens = tokens[2:]
+        target = f"pan {verb}"
 
     for token in flag_tokens:
         if token.startswith("-"):
             flag = token.split("=", 1)[0]
             if flag not in flags:
-                target = f"pan {verb} {first_arg}" if first_arg in subcommands else f"pan {verb}"
                 errors.append(f"{skill}:{line_no}: {command}: unknown flag {flag!r} for {target}")
 
     if first_arg and subcommands and first_arg not in subcommands and not first_arg.startswith("--"):

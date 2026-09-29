@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GitVaultStore, blobSha, initGitVault } from '../../../../../src/lib/vault/store/git.js';
-import { VAULT_FORMAT_MARKER, VaultOfflineError } from '../../../../../src/lib/vault/store/types.js';
+import { KEYWRAP_OBJECT_NAME, VAULT_FORMAT_MARKER, VaultOfflineError } from '../../../../../src/lib/vault/store/types.js';
 import { runVaultStoreContract } from './contract.js';
 
 const roots: string[] = [];
@@ -187,6 +187,67 @@ describe('GitVaultStore', () => {
     await expect(store.putObjects([{ id, bytes: Buffer.from('nonce-2') }])).resolves.toBeUndefined();
     expect(await store.casRef('r/' + id, null, Buffer.from('ref'))).toBe('ok');
     expect(git(remote, 'cat-file', '-p', `main:objects/ab/${id}`)).toBe('nonce-1');
+  });
+
+  it('store-slot.ac3: putSlot publishes to the remote and a second clone reads the write and the delete', async () => {
+    const remote = bareRepo();
+    const a = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const b = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    await a.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped-1'));
+    expect(git(remote, 'cat-file', '-p', 'main:objects/keywrap/v1')).toBe('wrapped-1');
+    await b.refresh();
+    expect(Buffer.from((await b.getObject(KEYWRAP_OBJECT_NAME))!).toString()).toBe('wrapped-1');
+
+    // A third clone made after the write sees it straight away.
+    const c = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    expect(Buffer.from((await c.getObject(KEYWRAP_OBJECT_NAME))!).toString()).toBe('wrapped-1');
+
+    // Last write wins from either clone.
+    await b.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped-2'));
+    await a.putSlot(KEYWRAP_OBJECT_NAME, null);
+    expect(() => git(remote, 'cat-file', '-e', 'main:objects/keywrap/v1')).toThrow();
+    await b.refresh();
+    expect(await b.getObject(KEYWRAP_OBJECT_NAME)).toBeNull();
+    for (const store of [a, b]) {
+      expect(git(store.cloneDir, 'rev-list', '--count', 'origin/main..HEAD').trim()).toBe('0');
+    }
+  });
+
+  it('store-slot.ac3: the keywrap commit contains only objects/keywrap/v1 while a content object is pending', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const id = 'ab' + 'f'.repeat(38);
+    await store.putObjects([{ id, bytes: Buffer.from('pending-chunk') }]);
+    await store.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped'));
+    expect(git(store.cloneDir, 'show', '--name-only', '--format=', 'HEAD').trim()).toBe('objects/keywrap/v1');
+    expect(git(remote, 'log', '-1', '--format=%s', 'main').trim()).toBe('vault: keywrap');
+    expect(() => git(remote, 'cat-file', '-e', `main:objects/ab/${id}`)).toThrow();
+    // The pending object is still there, untracked, for the next settle.
+    expect(existsSync(join(store.cloneDir, 'objects', 'ab', id))).toBe(true);
+    expect(git(store.cloneDir, 'status', '--porcelain', '--', 'objects/keywrap').trim()).toBe('');
+  });
+
+  it('store-slot.ac4: an unreachable remote makes putSlot throw VaultOfflineError and leaves no slot file', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const before = git(store.cloneDir, 'rev-parse', 'HEAD').trim();
+    git(store.cloneDir, 'remote', 'set-url', 'origin', join(tmpdir(), 'pan-vault-does-not-exist', 'nope.git'));
+    await expect(store.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped'))).rejects.toBeInstanceOf(VaultOfflineError);
+    expect(existsSync(join(store.cloneDir, 'objects', 'keywrap', 'v1'))).toBe(false);
+    expect(git(store.cloneDir, 'rev-parse', 'HEAD').trim()).toBe(before);
+  });
+
+  it('a hook-declined keywrap push is offline and the new slot file does not linger', async () => {
+    const remote = bareRepo();
+    const store = await initGitVault(remote, join(tmp('pan-vault-clone-'), 'git'));
+    const hook = join(remote, 'hooks', 'pre-receive');
+    writeFileSync(hook, '#!/bin/sh\necho declined >&2\nexit 1\n', { mode: 0o755 });
+    await expect(store.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped'))).rejects.toBeInstanceOf(VaultOfflineError);
+    expect(existsSync(join(store.cloneDir, 'objects', 'keywrap', 'v1'))).toBe(false);
+    expect(git(store.cloneDir, 'rev-list', '--count', 'origin/main..HEAD').trim()).toBe('0');
+    rmSync(hook);
+    await store.putSlot(KEYWRAP_OBJECT_NAME, Buffer.from('wrapped'));
+    expect(git(remote, 'cat-file', '-p', 'main:objects/keywrap/v1')).toBe('wrapped');
   });
 
   it('blobSha matches git hash-object', () => {

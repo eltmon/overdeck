@@ -52,6 +52,12 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,
   and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
+- `vault/` (PAN-2609) — Session Vault: encrypted off-machine transcript storage. Standalone
+  (Node built-ins + sibling modules only; `tests/unit/lib/vault/import-graph.test.ts`).
+  `store/types.ts` is the `VaultStore` contract (immutable objects + CAS refs; reserved
+  slot `keywrap/v1` for the PAN-4328 passphrase-wrapped key), with `store/dir.ts` and
+  `store/git.ts` backends and a shared contract suite under `tests/unit/lib/vault/store/`.
+  `identity.ts` owns the key and the 24-word phrase. CLI verbs: `src/cli/commands/vault/`.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
