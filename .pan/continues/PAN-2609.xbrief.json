@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:32:58.491Z",
+  "updated": "2026-09-29T06:33:11.621Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -518,6 +518,10 @@
     "codex-resume-checkpoint.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:32:58.491Z"
+    },
+    "deletion-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:11.621Z"
     }
   }
 }
