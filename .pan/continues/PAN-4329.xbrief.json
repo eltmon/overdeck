@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4329",
+  "created": "2026-09-29T09:48:46.123Z",
+  "updated": "2026-09-29T09:48:46.123Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wip-format": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T09:48:46.123Z"
+    }
+  }
+}
