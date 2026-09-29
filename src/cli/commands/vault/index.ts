@@ -25,6 +25,20 @@ export function registerVaultCommands(program: Command): void {
     .option('--phrase-file <path>', 'Read the 24-word recovery phrase from a file instead of prompting')
     .action(lazyAction(() => import('./join.js'), 'joinCommand'));
 
+  const passphrase = vault
+    .command('passphrase')
+    .description('Turn passphrase unlock for new machines on (set) or off (remove); the vault key never changes');
+  passphrase
+    .command('set')
+    .description('Wrap the vault key under a passphrase so a new machine can join without the recovery phrase')
+    .option('--passphrase-file <path>', 'Read the passphrase from a file instead of prompting')
+    .option('--generate', 'Generate a 6-word passphrase and print it once')
+    .action(lazyAction(() => import('./passphrase.js'), 'passphraseSetCommand'));
+  passphrase
+    .command('remove')
+    .description('Delete the passphrase unlock object; joining then needs the recovery phrase')
+    .action(lazyAction(() => import('./passphrase.js'), 'passphraseRemoveCommand'));
+
   vault
     .command('status')
     .description('Show backend, this machine, owned records, last sync and the machine list')

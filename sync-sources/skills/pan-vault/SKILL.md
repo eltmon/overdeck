@@ -29,6 +29,17 @@ With no backend configured every verb except `setup` and `join` prints `Session 
 
 The recovery phrase is the vault key. Anyone with these words can read the vault; losing every device and these words loses the vault. Store it in a password manager.
 
+## Passphrase unlock
+
+```bash
+pan vault passphrase set                          # prompt for a passphrase (16+ characters); Enter generates one
+pan vault passphrase set --generate               # generate a 6-word passphrase and print it once
+pan vault passphrase set --passphrase-file <path> # read the passphrase from a file
+pan vault passphrase remove                       # turn passphrase unlock off; joining needs the recovery phrase again
+```
+
+`set` stores the vault key wrapped under the passphrase on the backend, so a new machine can join by typing the passphrase instead of the 24 words. The passphrase itself is never stored, and the vault key never changes, so the recovery phrase keeps working.
+
 ## Save and sync
 
 ```bash
