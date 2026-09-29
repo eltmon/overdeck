@@ -1,0 +1,685 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T23:55:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1674: TLDR .venv is duplicated into every workspace",
+    "updated": "2026-09-29T23:41:01.012Z"
+  },
+  "plan": {
+    "id": "pan-1674",
+    "title": "TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC",
+    "status": "proposed",
+    "uid": "71352553-183d-4865-81cb-edaf09ecce6d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T23:55:00Z",
+    "updated": "2026-09-29T23:41:01.012Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1674",
+        "label": "PAN-1674",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1674.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "tldr",
+      "workspace",
+      "disk",
+      "venv"
+    ],
+    "narratives": {
+      "Problem": "Workspace creation copies the project-root TLDR venv (1.5G since PAN-3534; ~7.5G when filed) into every worktree with `cp -a`, or pip-installs a fresh one per workspace when the root has none. 20 live workspaces hold ~30G of identical copies; at 33 worktrees with GPU torch this filled the disk and ENOSPC zero-filled ~/.claude.json.",
+      "Proposal": "Make each workspace .venv a symlink to <projectRoot>/.venv (every consumer reads join(ws,'.venv') and follows links; the daemon keeps state in <ws>/.tldr). Never build venvs during workspace creation; add `pan admin tldr install` to build the root venv once and `pan admin tldr dedupe` to convert legacy copies. Hide the symlink from git via the common-dir info/exclude and Overdeck's .gitignore. Skip Python-project workspaces. Refuse workspace creation below a 10 GiB free-disk floor, exclude .venv from the stash-clean backup, delete the now-unused relocateVenvScripts, and update docs.",
+      "NonGoals": "- A machine-level venv under ~/.overdeck/ shared across projects\n- Building the TLDR venv automatically during workspace creation\n- TLDR support for Python-project workspaces (workspace root with pyproject.toml/requirements.txt/Pipfile/setup.py)\n- Wiring the reclaim route's venv janitor (cachedVenvCandidates) or any HTTP route or UI for dedupe\n- Sharing or deduplicating the per-workspace .tldr/ index\n- Changing the Deacon disk-pressure patrol or its BuildKit prune\n- Running dedupe automatically\n- Editing any other project's tracked .gitignore"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Link target is the project-root venv <projectRoot>/.venv, not a machine-level venv",
+        "rationale": "It already exists and every other consumer (pan up, main daemon, merge-agent) uses it; a ~/.overdeck venv adds a second location and would build in /tmp under a polluted OVERDECK_HOME."
+      },
+      {
+        "summary": "Workspace creation never builds a venv; `pan admin tldr install` builds the root venv once",
+        "rationale": "On-demand building needs a cross-process lock, ready marker and crash recovery because workspaces are created concurrently; an explicit install removes that surface. Projects without a root venv run workspaces without TLDR until the operator installs once."
+      },
+      {
+        "summary": "Workspaces with a Python-project marker skip the shared link",
+        "rationale": "A uv sync/pip install in one workspace would otherwise write into the venv every workspace shares."
+      },
+      {
+        "summary": "Hide the link via common-dir info/exclude (git rev-parse --git-path info/exclude), plus `.venv` in Overdeck's own .gitignore",
+        "rationale": "Planning verified `.venv/` does not ignore a symlink; create-perform.ts precedent forbids editing a project's tracked .gitignore."
+      },
+      {
+        "summary": "Refuse (not warn) workspace creation below 10 GiB free, reusing the disk-pressure patrol's floor value",
+        "rationale": "ENOSPC mid-write zero-fills files (the incident corrupted ~/.claude.json); one floor value is simpler to explain."
+      },
+      {
+        "summary": "Dedupe is a CLI subcommand only",
+        "rationale": "A new HTTP route requires a no-loss-matrix row and UI; the operator runs it once."
+      },
+      {
+        "summary": "Use the installed package's scripts/patches/llm-tldr-tsx-support.py",
+        "rationale": "The current project-path lookup only finds the patch when the project is Overdeck; scripts/ ships in package.json files."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-tldr-setup",
+        "title": "Extract the workspace TLDR setup block into tldr-venv.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-1674",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts",
+            "src/lib/workspace-manager/tldr-venv.ts",
+            "src/lib/workspace-manager/__tests__/tldr-venv.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/tldr-venv.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tldr-venv.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "link-shared-venv",
+            "tldr-install-command",
+            "tldr-dedupe-command"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W1. Create src/lib/workspace-manager/tldr-venv.ts exporting TldrVenvDeps (exec, exists, startDaemon), installTldrVenv(venvPath, deps?) and setupWorkspaceTldr(workspacePath, projectPath, deps?), both returning string[] steps. Move create.ts lines 510-596 (block starting '// Setup TLDR code analysis for workspace') into setupWorkspaceTldr with unchanged behavior; move the fresh-build branch (python3 -m venv, CPU torch pip install, llm-tldr, patch) into installTldrVenv and call it from that branch. Resolve the patch script as join(packageRoot,'scripts','patches','llm-tldr-tsx-support.py') using packageRoot from src/lib/paths.ts. In create.ts replace the block with `result.steps.push(...await setupWorkspaceTldr(workspacePath, projectConfig.path));` and drop unused imports. Tests inject deps; never run python or network."
+        },
+        "items": [
+          {
+            "id": "extract-tldr-setup.ac1",
+            "title": "Given injected deps, when installTldrVenv runs, then exec receives `python3 -m venv`, then `pip install torch --index-url https://download.pytorch.org/whl/cpu`, then `pip install llm-tldr`, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-tldr-setup.ac2",
+            "title": "Given <ws>/.venv/bin/tldr exists, when setupWorkspaceTldr runs, then it returns a step containing 'Python venv already present' and issues no venv or pip command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-tldr-setup.ac3",
+            "title": "create.ts contains no `python3 -m venv` string and calls setupWorkspaceTldr; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-shared-venv",
+        "title": "Link the workspace .venv to the project-root venv instead of copying it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1674",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/tldr-venv.ts",
+            "src/lib/workspace-manager/__tests__/tldr-venv.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/tldr-venv.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tldr-venv.test.ts passes including the link, marker-skip, missing-root and exclude cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "remove-relocate-venv-scripts",
+            "tldr-dedupe-command"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W2. Add deps symlink (default symlinkSync(target, path, 'dir')), exclude-file read/append, and gitPath (default: async `git rev-parse --git-path info/exclude` in the workspace, resolved against it). Export PYTHON_PROJECT_MARKERS = ['pyproject.toml','requirements.txt','Pipfile','setup.py'], linkWorkspaceTldrVenv(workspacePath, projectVenvPath, deps?) and ensureVenvExcluded(workspacePath, deps?). setupWorkspaceTldr order: (1) <ws>/.venv/bin/tldr exists -> 'Python venv already present', continue to daemon; (2) any marker at <ws> -> step 'Skipped TLDR venv link: workspace is a Python project that owns .venv', return; (3) <projectRoot>/.venv/bin/tldr missing -> step naming `pan admin tldr install`, return (never build); (4) link + ensureVenvExcluded -> step 'Linked .venv to shared project venv <path>'; (5) keep .tldr index copy, daemon start, background warm. ensureVenvExcluded appends '/.venv' (leading newline if needed) only when no trimmed line equals '/.venv' or '.venv' ('.venv/' does not count); creates info dir; failures are non-fatal steps. Drop the relocateVenvScripts import from tldr-venv.ts in this item (its last caller goes away here); the definition itself is deleted by remove-relocate-venv-scripts."
+        },
+        "items": [
+          {
+            "id": "link-shared-venv.ac1",
+            "title": "Given <projectRoot>/.venv/bin/tldr exists and no marker, when setupWorkspaceTldr runs, then symlink is called with the absolute <projectRoot>/.venv target and <ws>/.venv path, and exec receives no cp, `python3 -m venv`, or pip command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-shared-venv.ac2",
+            "title": "Given pyproject.toml exists at the workspace root, when setupWorkspaceTldr runs, then no symlink is created and the returned steps contain 'Python project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-shared-venv.ac3",
+            "title": "Given no <projectRoot>/.venv/bin/tldr, when setupWorkspaceTldr runs, then it returns a step naming `pan admin tldr install` and exec receives no venv or pip command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-shared-venv.ac4",
+            "title": "Given an exclude file whose last line lacks a newline, when ensureVenvExcluded runs twice, then the file ends with exactly one '/.venv' line on its own line and the second call returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-relocate-venv-scripts",
+        "title": "Delete relocateVenvScripts and its test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/worktree-ops.ts",
+            "src/lib/workspace-manager.ts",
+            "src/lib/__tests__/relocate-venv-scripts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W3. Delete the relocateVenvScripts docstring and function from src/lib/workspace-manager/worktree-ops.ts (around lines 20-65), remove it from the re-export at src/lib/workspace-manager.ts line 20, delete src/lib/__tests__/relocate-venv-scripts.test.ts, and remove fs imports the deletion makes unused. Delete subject and test in the SAME commit so the test-skip gate's deleted-subject exemption applies."
+        },
+        "items": [
+          {
+            "id": "remove-relocate-venv-scripts.ac1",
+            "title": "`git grep relocateVenvScripts -- src` produces no output after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-relocate-venv-scripts.ac2",
+            "title": "src/lib/__tests__/relocate-venv-scripts.test.ts no longer exists and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitignore-venv-symlink",
+        "title": "Make Overdeck's .gitignore ignore a .venv symlink",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "d=$(mktemp -d) && git -C \"$d\" init -q && cp .gitignore \"$d/\" && ln -s /nonexistent \"$d/.venv\" && git -C \"$d\" check-ignore -q .venv; echo $?"
+          ],
+          "expected_outputs": [
+            "prints 0 (the copied .gitignore ignores a .venv symlink); prints 1 before the change"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W4. Change .gitignore line 33 from `.venv/` to `.venv` (a slash-less pattern matches both a directory and a symlink; planning verified `.venv/` does not match a symlink)."
+        },
+        "items": [
+          {
+            "id": "gitignore-venv-symlink.ac1",
+            "title": "Given a workspace whose .venv is a symlink, when `git check-ignore -q .venv` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitignore-venv-symlink.ac2",
+            "title": "Given a workspace whose .venv is a symlink, when `git status --porcelain` runs, then no `?? .venv` line appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-install-command",
+        "title": "Add `pan admin tldr install` to build the project-root venv once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/tldr-handler.ts",
+            "src/cli/commands/admin/index.ts",
+            "src/cli/commands/__tests__/tldr-install.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/tldr-install.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tldr-install.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W5. Add an `install` case to tldrCommand and showHelp() in tldr-handler.ts; projectRoot = process.cwd(). (0) <root>/.git is a FILE (linked worktree, e.g. a workspace) -> print an error that install must run in the primary checkout (name the path from `git rev-parse --git-common-dir`'s parent), exit 1, never build; (1) <root>/.venv/bin/tldr exists -> print 'TLDR venv already installed at <path>', exit 0; (2) Python-project marker at root -> error, exit 1; (3) <root>/.venv exists without bin/tldr -> error naming the path, exit 1, never overwrite; (4) else await installTldrVenv(join(root,'.venv')), print steps, then print that new workspaces link to it and `pan admin tldr dedupe` converts existing copies. Update the admin/index.ts tldr description to 'TLDR daemon: status, start, stop, warm, install'. Tests vi.mock tldr-venv.js and use a temp dir."
+        },
+        "items": [
+          {
+            "id": "tldr-install-command.ac1",
+            "title": "Given <root>/.venv/bin/tldr exists, when `install` runs, then installTldrVenv is not called and the output contains 'already installed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-install-command.ac2",
+            "title": "Given pyproject.toml at the root, when `install` runs, then it exits 1 and installTldrVenv is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-install-command.ac3",
+            "title": "Given an empty root, when `install` runs, then installTldrVenv is called once with <root>/.venv",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-install-command.ac4",
+            "title": "Given cwd is a linked worktree whose .git is a file, when `install` runs, then it exits 1 and installTldrVenv is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-install-command.ac5",
+            "title": "Given the CLI is built, when `pan admin tldr help` runs, then its output contains `install`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-dedupe-command",
+        "title": "Add `pan admin tldr dedupe [--dry-run]` to convert legacy workspace venv copies into links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/tldr-venv-dedupe.ts",
+            "src/lib/workspace-manager/__tests__/tldr-venv-dedupe.test.ts",
+            "src/cli/commands/admin/tldr-handler.ts",
+            "src/cli/commands/admin/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/tldr-venv-dedupe.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tldr-venv-dedupe.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W6. New src/lib/workspace-manager/tldr-venv-dedupe.ts exporting DedupeEntry {workspacePath, bytes, action: 'converted'|'would-convert'|'skipped', reason?} and dedupeWorkspaceVenvs(projectRoot, {dryRun}, deps?). Throw when <root>/.venv/bin/tldr is missing. For each <root>/workspaces/feature-*: lstat <ws>/.venv; skip silently when missing or a symlink; skip with reason when a real dir lacks bin/tldr or the workspace has a Python-project marker; measure bytes with async `du -sb`. Dry run -> 'would-convert'. Otherwise stop daemon (errors ignored) -> rename to <ws>/.venv.pan-1674-old -> linkWorkspaceTldrVenv -> ensureVenvExcluded -> Node rm of the old dir (recursive, force) -> start daemon (errors ignored) -> 'converted'; on link failure rename back and record 'skipped'. CLI: add `dedupe` case + help line, `--dry-run` option in admin/index.ts, description 'TLDR daemon: status, start, stop, warm, install, dedupe'; print one line per entry and a 'Reclaimed <X> GiB from <N> workspaces' ('Would reclaim' in dry run) total; --json prints entries. Never shell out to rm with a variable."
+        },
+        "items": [
+          {
+            "id": "tldr-dedupe-command.ac1",
+            "title": "Given a workspace with a real .venv containing bin/tldr, when dedupe runs, then <ws>/.venv becomes a symlink to <root>/.venv, <ws>/.venv.pan-1674-old no longer exists, and the entry action is 'converted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-dedupe-command.ac2",
+            "title": "Given the same tree, when dedupe runs with dryRun true, then the workspace .venv stays a real directory and the entry action is 'would-convert'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-dedupe-command.ac3",
+            "title": "Given a workspace whose .venv is already a symlink or whose root has pyproject.toml, when dedupe runs, then that workspace is not modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-dedupe-command.ac4",
+            "title": "Given dedupe converted every workspace, when the root venv is checked, then <root>/.venv/bin/tldr still exists (dedupe preserves the shared target)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-disk-floor",
+        "title": "Refuse workspace creation below the 10 GiB disk safety floor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/disk-floor.ts",
+            "src/lib/__tests__/disk-floor.test.ts",
+            "src/lib/workspace-manager/create.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/disk-floor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "disk-floor.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W7. New leaf src/lib/disk-floor.ts (imports only node:fs/promises): DISK_SAFETY_FLOOR_BYTES = 10 * 1024 ** 3, readAvailableBytes(path) = statfs bavail*bsize, checkDiskFloor(path, read = readAvailableBytes) returning the error text 'Only <X.X> GiB free on the filesystem holding <path>; workspace creation needs at least 10.0 GiB. Free disk space (see /resources) and retry.' or null; a reader failure returns null. In createWorkspace, right after the dryRun early return and before the workspace row is created, call checkDiskFloor(projectConfig.path) and on error set success=false, push the error, return. Do not edit disk-pressure-patrol.ts."
+        },
+        "items": [
+          {
+            "id": "workspace-disk-floor.ac1",
+            "title": "Given a reader returning 5 GiB, when checkDiskFloor runs, then it returns text containing '10.0 GiB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-disk-floor.ac2",
+            "title": "Given a reader returning 10 GiB or more, when checkDiskFloor runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-disk-floor.ac3",
+            "title": "Given a reader that throws, when checkDiskFloor runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-disk-floor.ac4",
+            "title": "Given the test imports both constants, when it compares them, then DISK_SAFETY_FLOOR_BYTES equals DISK_PRUNE_TRIGGER_BYTES from src/lib/cloister/disk-pressure-patrol.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stash-clean-exclude-venv",
+        "title": "Exclude .venv from the corrupted-workspace rsync backup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/stash-clean.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W8. In src/dashboard/server/routes/workspaces/stash-clean.ts line 410, add `--exclude=.venv` to the `rsync -a` flags next to `--exclude=node_modules`."
+        },
+        "items": [
+          {
+            "id": "stash-clean-exclude-venv.ac1",
+            "title": "Given a workspace holding a real .venv directory, when the stash-clean backup rsync runs, then the backup directory contains no .venv because the command carries `--exclude=.venv`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stash-clean-exclude-venv.ac2",
+            "title": "`npm run typecheck` exits 0 after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-docs",
+        "title": "Document the shared venv link, `pan admin tldr install`, and `pan admin tldr dedupe`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1674",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/tldr.mdx",
+            "sync-sources/skills/pan-tldr/SKILL.md",
+            "sync-sources/skills/pan-admin-tldr/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan admin tldr install' features/tldr.mdx sync-sources/skills/pan-admin-tldr/SKILL.md",
+            "! grep -q daemon.json features/tldr.mdx"
+          ],
+          "expected_outputs": [
+            "both files contain a line with 'pan admin tldr install'",
+            "the negated grep exits 0 (no daemon.json reference remains)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-1674.md W9. features/tldr.mdx: Availability (line 36) says the primary checkout holds the one real venv created by `pan admin tldr install`, each workspace .venv is a symlink to it, Python-project workspaces skip it; replace the manual python3 -m venv snippet (lines 40-45) with `pan admin tldr install`; line 49 'enabled by default when .venv/bin/tldr is present'; line 72 'No .venv/bin/tldr in the file's checkout'; troubleshooting line 128 replaces the stale ~/.overdeck/tldr/*/daemon.json row with deleting <checkout>/.tldr/daemon.pid, and adds rows for 'workspace has no TLDR' (run install then dedupe/recreate) and 'old workspaces hold 1.5G copies' (`pan admin tldr dedupe`). sync-sources/skills/pan-tldr/SKILL.md lines 51-53: workspace .venv is normally a symlink to the primary checkout's venv. sync-sources/skills/pan-admin-tldr/SKILL.md: Usage lists install and dedupe [--dry-run], removes the nonexistent restart line."
+        },
+        "items": [
+          {
+            "id": "tldr-docs.ac1",
+            "title": "Given the change, when features/tldr.mdx renders, then it shows `pan admin tldr install`, `pan admin tldr dedupe`, and states a workspace .venv is a symlink to the primary checkout's venv",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-docs.ac2",
+            "title": "Given the change, when `grep daemon.json features/tldr.mdx` runs, then it returns no match, and the troubleshooting table contains `.tldr/daemon.pid`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-docs.ac3",
+            "title": "Given the change, when sync-sources/skills/pan-admin-tldr/SKILL.md renders, then its Usage block shows `install` and `dedupe [--dry-run]` and contains no `restart` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-tldr-setup",
+        "to": "link-shared-venv",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-tldr-setup",
+        "to": "tldr-install-command",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-tldr-setup",
+        "to": "workspace-disk-floor",
+        "type": "blocks"
+      },
+      {
+        "from": "link-shared-venv",
+        "to": "remove-relocate-venv-scripts",
+        "type": "blocks"
+      },
+      {
+        "from": "link-shared-venv",
+        "to": "tldr-dedupe-command",
+        "type": "blocks"
+      },
+      {
+        "from": "tldr-install-command",
+        "to": "tldr-dedupe-command",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-1674-tldr-venv-7-5g-is-duplicated-into-every-workspace-236g-across-33-worktrees-caused-disk-full-enospc.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
