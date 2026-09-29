@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T15:18:21.481Z",
+  "updated": "2026-09-29T15:18:27.225Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4408",
       "claimedAt": "2026-09-29T15:17:48.298Z",
       "doneAt": "2026-09-29T15:18:21.480Z"
+    },
+    "sync-cli-report": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:18:27.225Z"
     }
   }
 }
