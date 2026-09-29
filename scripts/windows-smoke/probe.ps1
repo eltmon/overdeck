@@ -223,15 +223,16 @@ if ($SkipServe) {
 
   Invoke-Step '2a' "GET /api/{health,conversations,projects,settings,issues} with x-overdeck-internal-token" {
     if (-not $ServeUp) { return @{ status = 'not-run'; note = '1c failed: the server is not up' } }
-    $lines = @()
-    $allOk = $true
+    # Failing endpoints first, so the summary cell (first evidence line) names one.
+    $bad = @()
+    $good = @()
     foreach ($path in '/api/health', '/api/conversations', '/api/projects', '/api/settings', '/api/issues') {
       $r = Get-HttpStatus 'GET' "http://localhost:$Port$path" @{ 'x-overdeck-internal-token' = $Token } $null
-      if (-not ($r.Status -ge 200 -and $r.Status -lt 300)) { $allOk = $false }
       $body = [string]$r.Body
-      $lines += "$path -> $($r.Status) $($body.Substring(0, [Math]::Min(300, $body.Length)))"
+      $line = "$path -> $($r.Status) $($body.Substring(0, [Math]::Min(300, $body.Length)))"
+      if ($r.Status -ge 200 -and $r.Status -lt 300) { $good += $line } else { $bad += $line }
     }
-    @{ status = $(if ($allOk) { 'pass' } else { 'fail' }); evidence = ($lines -join "`n") }
+    @{ status = $(if ($bad.Count -eq 0) { 'pass' } else { 'fail' }); evidence = (($bad + $good) -join "`n") }
   }
 
   Invoke-Step '2b' "POST /api/conversations {`"message`":`"hello`"} with Origin and x-overdeck-internal-token" {
