@@ -78,23 +78,37 @@ ln -s lf.txt "$PROJ/link-to-lf"
 git -C "$PROJ" add link-to-lf
 printf 'untracked notes\n' > "$PROJ/notes-untracked.txt"
 
-# 3. A four-line Claude Code transcript whose cwd is the checkout.
+# 3. A four-line Claude Code transcript whose cwd is the checkout. Each line
+# carries the fields of tests/unit/lib/vault/materialize.test.ts `line()` plus
+# the parentUuid chain, timestamp and version Claude Code needs to load it:
+# with only the minimal fields `claude --resume` answers "No conversation found".
 SLUG="${PROJ//[^A-Za-z0-9-]/-}"
 TRANSCRIPT_DIR="$HOME/.claude/projects/$SLUG"
 mkdir -p "$TRANSCRIPT_DIR"
 SESSION_ID="$SESSION_ID" PROJ="$PROJ" TRANSCRIPT="$TRANSCRIPT_DIR/$SESSION_ID.jsonl" node -e '
 const { writeFileSync } = require("node:fs");
 const { SESSION_ID: sessionId, PROJ: cwd, TRANSCRIPT: path } = process.env;
-const line = (type, text, n) => JSON.stringify({
-  type, sessionId, cwd, uuid: `u-${n}-${type}`,
-  message: { role: type, content: type === "user" ? text : [{ type: "text", text }] },
-});
-const lines = [
-  line("user", `windows smoke fixture ${sessionId}: list the files`, 1),
-  line("assistant", "README.md, lf.txt, crlf.txt, run.sh, link-to-lf and notes-untracked.txt.", 2),
-  line("user", "Add a third line to lf.txt.", 3),
-  line("assistant", "Done: lf.txt now reads a, b, c.", 4),
+const turns = [
+  ["user", `windows smoke fixture ${sessionId}: list the files`],
+  ["assistant", "README.md, lf.txt, crlf.txt, run.sh, link-to-lf and notes-untracked.txt."],
+  ["user", "Add a third line to lf.txt."],
+  ["assistant", "Done: lf.txt now reads a, b, c."],
 ];
+let parentUuid = null;
+const lines = turns.map(([type, text], i) => {
+  const uuid = `${String(i + 1).repeat(8)}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
+  const message = type === "user"
+    ? { role: "user", content: text }
+    : { id: `msg_fixture_${i + 1}`, type: "message", role: "assistant", model: "claude-sonnet-4-5",
+        content: [{ type: "text", text }], stop_reason: "end_turn", stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 } };
+  const line = JSON.stringify({
+    parentUuid, isSidechain: false, userType: "external", cwd, sessionId, version: "2.1.0",
+    gitBranch: "main", type, uuid, timestamp: `2026-09-29T12:00:0${i}.000Z`, message,
+  });
+  parentUuid = uuid;
+  return line;
+});
 writeFileSync(path, lines.join("\n") + "\n");
 '
 
