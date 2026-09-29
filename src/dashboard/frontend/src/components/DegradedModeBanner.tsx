@@ -74,7 +74,7 @@ export function DegradedModeBanner({ lifecycle, onRestartBackend, isRestartBacke
     void queryClient.refetchQueries({ queryKey: ['backend-health'] });
   };
   const since = lastLiveAt === null ? '' : formatDataTime(lastLiveAt);
-  const destructive = shown === 'unreachable';
+  const destructive = shown === 'unreachable' || shown === 'unauthorized';
   const buttonClass = `shrink-0 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
     destructive ? 'border-destructive/40 hover:bg-destructive/15' : 'border-warning/40 hover:bg-warning/20'
   }`;
@@ -120,6 +120,12 @@ export function DegradedModeBanner({ lifecycle, onRestartBackend, isRestartBacke
       break;
     case 'delayed':
       message = <>Live updates are delayed — reconnecting{since && ` · showing data from ${since}`}</>;
+      actions = retryButton;
+      break;
+    case 'unauthorized':
+      tone = 'bg-destructive/10 text-destructive';
+      icon = <AlertTriangle className="h-3.5 w-3.5 shrink-0" />;
+      message = 'Dashboard session could not be established (HTTP 401) — see docs/DASHBOARD-AUTH.md';
       actions = retryButton;
       break;
     case 'reconnected':

@@ -12,6 +12,8 @@ import { Duration, Effect, Exit, Layer, ManagedRuntime, Schedule, Scope, Stream 
 import { RpcClient, RpcSerialization } from 'effect/unstable/rpc'
 import * as Socket from 'effect/unstable/socket/Socket'
 import { PanRpcGroup } from '@overdeck/contracts'
+import { useConnectionState } from './connectionState'
+import { DashboardSessionUnauthorizedError } from './dashboardSessionError'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -54,6 +56,11 @@ function dashboardSessionUrls(url?: string): string[] {
 let dashboardSessionPromise: Promise<void> | null = null
 let dashboardCsrfToken: string | null = null
 
+// Re-exported for backward compatibility: existing callers that import this
+// from wsTransport (e.g. wsTransport.test.ts) keep working. XTerminal.tsx
+// imports it from ./dashboardSessionError directly — see that module's header.
+export { DashboardSessionUnauthorizedError }
+
 function consumeDashboardBootstrapToken(): string | null {
   if (typeof window === 'undefined') return null
   const hash = window.location.hash.replace(/^#/, '')
@@ -77,14 +84,18 @@ export function ensureDashboardSession(url?: string): Promise<void> {
       credentials: 'include',
       headers: token ? { 'x-overdeck-internal-token': token } : undefined,
     })
-    if (response.status === 401) return null
+    if (response.status === 401) throw new DashboardSessionUnauthorizedError(sessionUrl)
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
     const data = await response.json().catch(() => null) as { csrfToken?: unknown } | null
     return typeof data?.csrfToken === 'string' ? data.csrfToken : null
   })).then((csrfTokens) => {
     dashboardCsrfToken = csrfTokens.find((csrfToken) => csrfToken !== null) ?? null
+    useConnectionState.getState().setSessionAuthFailed(false)
   }).catch((err) => {
     dashboardSessionPromise = null
+    if (err instanceof DashboardSessionUnauthorizedError) {
+      useConnectionState.getState().setSessionAuthFailed(true)
+    }
     throw err
   })
   return dashboardSessionPromise
