@@ -84,8 +84,8 @@ const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
       review_agent: 'claude-opus-4-6',
-      test_agent: 'claude-sonnet-5',
-      merge_agent: 'claude-sonnet-5',
+      test_agent: 'claude-sonnet-5-5',
+      merge_agent: 'claude-sonnet-5-5',
     },
     status_review: 'claude-opus-4-6',
   },
