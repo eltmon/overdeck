@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:07:10.611Z",
+  "updated": "2026-09-29T16:07:24.717Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "doctor-okf-skew.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:07:10.610Z"
+    },
+    "doctor-okf-skew.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:24.716Z"
     }
   }
 }
