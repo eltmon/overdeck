@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:48:54.615Z",
+  "updated": "2026-09-29T11:49:05.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "needs-you-label.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:48:54.614Z"
+    },
+    "needs-you-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:05.481Z"
     }
   }
 }
