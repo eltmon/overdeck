@@ -56,6 +56,8 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // meets the Management Center web UI's minimum supported version (7.2.147).
 // PAN-4363: verified 2026-09-29 to serve gpt-6-sol and gpt-6-luna under
 // ChatGPT sign-in (no client-version 400).
+// PAN-4422: verified 2026-09-29 to serve gpt-6.1-sol (GET /v1/models lists it;
+// POST /v1/messages returned a completion) under ChatGPT sign-in.
 const CLIPROXY_RELEASE_VERSION = 'v7.3.16';
 
 function getCliproxyDir(): string {

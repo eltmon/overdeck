@@ -20,6 +20,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-opus-4-6': 'frontier',
   'gpt-6-astra': 'frontier',
   'gpt-6-sol': 'frontier',
+  'gpt-6.1-sol': 'frontier',
   'gpt-5.6-sol': 'frontier',
   'gpt-5.6-sol[372k]': 'frontier',
   'gemini-3.1-pro-preview': 'frontier',

@@ -1,0 +1,739 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T20:40:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4422: Add GPT-6.1 Sol (gpt-6.1-sol): catalog, cost, Codex floor 0.159.0; release to npm",
+    "updated": "2026-09-29T20:41:20.468Z"
+  },
+  "plan": {
+    "id": "pan-4422",
+    "title": "Add GPT-6.1 Sol (gpt-6.1-sol): catalog, cost, Codex floor 0.159.0; release to npm",
+    "status": "running",
+    "uid": "3a319dbf-dd23-42b3-bac7-e5883479f553",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T20:40:44Z",
+    "updated": "2026-09-29T20:41:20.468Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4422",
+        "label": "PAN-4422",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4422.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "openai",
+      "codex",
+      "cost",
+      "catalog"
+    ],
+    "metadata": {
+      "sizeJustification": "One new model id propagated across every model surface (capabilities, providers, fallback, cost, Codex floor, Codex and Claude Code context pins, server API map, Settings catalog, two pickers, display name, docs, changelog). This is the same file set as #4234 (GPT-6 Sol/Luna) and #4327 (Sonnet 5.5); each item is a one-to-few-line edit and splitting into sibling issues would ship a model that is selectable but unpriced or unpinned.",
+      "canonicalFilename": "2026-09-29-PAN-4422-add-gpt-6-1-sol-gpt-6-1-sol-catalog-cost-codex-floor-0-159-0-release-to-npm.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "OpenAI released GPT-6.1 Sol (gpt-6.1-sol) on 2026-09-29. Overdeck does not know the id: it cannot be picked, is not priced, gets no 272K context pin on Codex (codex.ts only matches 'gpt-6-' and 'gpt-5.6-' prefixes), and Codex below 0.159.0 under ChatGPT sign-in fails with HTTP 400 instead of a clear refusal.",
+      "Proposal": "Add gpt-6.1-sol as an opt-in OpenAI model everywhere gpt-6-sol appears, with the same frontier class, 272K pin and effort levels, its own $2/$0.10/$10 pricing, a Codex floor of 0.159.0, and CLIProxy (claude-code) route support verified by probe. Update harnesses.mdx, MODEL-CONTEXT-AUDIT.md and the Unreleased changelog block. No defaults change. The npm release runs post-merge from main.",
+      "NonGoals": "- Releasing to npm; after merge the operator or flywheel runs `pan release stable --version 0.64.0` from main.\n- Changing any default, PROVIDERS.openai.tierModels, provider preset (#4400), role model or workhorse slot.\n- Changing, deprecating or remapping any gpt-6-sol row, even though CLIProxy no longer serves gpt-6-sol.\n- Bumping CLIPROXY_RELEASE_VERSION.\n- Rebuilding sync-sources/hooks/record-cost-event.js (it has no GPT-6 rows today; pre-existing gap).\n- Editing evals/ or tests/unit/evals/.\n- Adding a [372k] or 872K variant for gpt-6.1-sol.\n- Surfacing the Codex 'ultra' effort level.\n- Editing scripts/file-size-allowlist.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Class gpt-6.1-sol as 'frontier', like gpt-6-sol.",
+        "rationale": "#4364 (Sol reclassification) is still OPEN, so the issue's 'unless #4364 reclassified Sol' branch does not apply; the issue asks to keep the two consistent."
+      },
+      {
+        "summary": "Effort levels low, medium, high, xhigh, max; Overdeck default stays high.",
+        "rationale": "Codex 0.159.0 catalog lists the same efforts as gpt-6-sol plus 'ultra', which Overdeck already omits for GPT-6 Sol; the effort-high-default rule forbids xhigh/max defaults."
+      },
+      {
+        "summary": "Apply the 272K billing-tier pin and label '(272K context)'.",
+        "rationale": "Codex 0.159.0 `codex debug models` reports context_window 272000 / max 872000 for gpt-6.1-sol, identical to gpt-6-sol; the issue asks the label to match how Overdeck caps GPT-6 Sol."
+      },
+      {
+        "summary": "CLIProxy implementation checkpoint resolved: the claude-code route is supported.",
+        "rationale": "Planning probe against the pinned CLIProxyAPI 7.3.16: /v1/models lists gpt-6.1-sol and /v1/messages returned a real completion. So gpt-6.1-sol joins GPT_56_MODELS and the cliproxy.ts note records the verification."
+      },
+      {
+        "summary": "Fix codex.ts:295 so 'gpt-6.1-sol' gets model_context_window = 272000 by adding a startsWith('gpt-6.') branch.",
+        "rationale": "'gpt-6.1-sol' does not start with 'gpt-6-'; without the fix Codex sessions would run unpinned past the 272K billing tier. Bare 'gpt-6' is avoided so unrelated future ids are not caught."
+      },
+      {
+        "summary": "Order gpt-6.1-sol right after gpt-6-astra and before gpt-6-sol in ordered pickers; append after gpt-6-luna in plain membership lists.",
+        "rationale": "Newest-first within the Sol tier in UI; appending in unordered arrays mirrors #4234 and keeps diffs minimal."
+      },
+      {
+        "summary": "Changelog goes in the top Unreleased block, creating a v0.64.0 Unreleased block if none exists.",
+        "rationale": "v0.63.0 is tagged and package.json is 0.63.0; docs/RELEASING.md defines the Unreleased block format and finalizes it on release day."
+      },
+      {
+        "summary": "The npm release is a post-merge step, not a work item.",
+        "rationale": "Releases run only from main via `pan release stable`; the same split was used for PAN-4327 (Sonnet 5.5)."
+      },
+      {
+        "summary": "Add gpt-6.1-sol to routes/settings.ts MODEL_API_IDS on the existing line 109.",
+        "rationale": "The file is at its 1104-line allowlist cap and agents may not raise allowlist rows."
+      }
+    ],
+    "items": [
+      {
+        "id": "catalog-entry",
+        "title": "Register gpt-6.1-sol as an OpenAI ModelId with capability, class, provider and fallback entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts tests/lib/model-fallback.test.ts tests/lib/settings.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 1 (catalog-entry). Add 'gpt-6.1-sol' to the OpenAIModel union and the settings.ts:211 openai list (after 'gpt-6-luna'); add a MODEL_CAPABILITIES entry in model-capability-additions.ts after 'gpt-6-sol' (displayName 'GPT-6.1 Sol', costPer1MTokens 6, contextWindow CLIPROXY_GPT56_CONTEXT_WINDOW, maxOutputTokens 128_000, minTier 'plus', effortLevels low..max, skills copied from gpt-6-sol, notes per PRD); class 'frontier' in model-capability-class.ts; MODEL_PROVIDERS 'openai', FALLBACK_MAP 'claude-sonnet-5-5', MODEL_TIER_RANK 2 in model-fallback.ts; append to providers.ts:135 openai models and the providers.ts:462 getProviderForModel list. Do NOT touch tierModels or any default. Tests: model-capabilities.test.ts no-[372k] it.each (:125) gains 'gpt-6.1-sol'; model-fallback.test.ts toContain at :141 and :398 and toHaveLength(19)->20; settings.test.ts:275 exact list appends 'gpt-6.1-sol'."
+        },
+        "items": [
+          {
+            "id": "catalog-entry.ac1",
+            "title": "Given the capability table, when MODEL_CAPABILITIES['gpt-6.1-sol'] is read, then it returns displayName 'GPT-6.1 Sol', contextWindow 272000, maxOutputTokens 128000 and effortLevels ['low','medium','high','xhigh','max']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac2",
+            "title": "Given the provider registry, when getProviderForModel('gpt-6.1-sol') is called, then it returns the openai provider and PROVIDERS.openai.models contains 'gpt-6.1-sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac3",
+            "title": "Given the diff, PROVIDERS.openai.tierModels still equals { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.6-terra', haiku: 'gpt-5.6-luna' } and no default or role model references gpt-6.1-sol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entry.ac4",
+            "title": "Given an OpenAI API key in settings, when getAvailableModels(settings).openai is read, then it returns the previous list with 'gpt-6.1-sol' appended after 'gpt-6-luna' (tests/lib/settings.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-row",
+        "title": "Add the gpt-6.1-sol pricing row to DEFAULT_PRICING",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "model-capabilities.test.ts and cost.test.ts pass, including 'prices gpt-6.1-sol distinctly from gpt-6-sol'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 2 (cost-row). Insert { provider: 'openai', model: 'gpt-6.1-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' } with a source comment above the gpt-6-sol row in src/lib/cost.ts. Add ['gpt-6.1-sol','GPT-6.1 Sol',0.002,0.0001,0.01] to the registration it.each at model-capabilities.test.ts:102. Add test 'prices gpt-6.1-sol distinctly from gpt-6-sol' in tests/lib/cost.test.ts."
+        },
+        "items": [
+          {
+            "id": "cost-row.ac1",
+            "title": "Given DEFAULT_PRICING, when getPricing('openai','gpt-6.1-sol') is called, then it returns inputPer1k 0.002, cacheReadPer1k 0.0001, outputPer1k 0.010 and model 'gpt-6.1-sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-row.ac2",
+            "title": "Given DEFAULT_PRICING, when getPricing('openai','gpt-6-sol') is called, then it still returns cacheReadPer1k 0.0002 and model 'gpt-6-sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-floor",
+        "title": "Add the Codex 0.159.0 client-version floor for gpt-6.1-sol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/model-floors.ts",
+            "src/lib/__tests__/harness-policy.test.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts src/lib/codex/__tests__/app-server-manager.test.ts tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 3 (codex-floor). Add 'gpt-6.1-sol': '0.159.0' to CODEX_MODEL_MINIMUM_VERSIONS with the PAN-4422 verification note (0.158.0 + ChatGPT login answers 400; 0.159.0 succeeds; measured 2026-09-29). No gate code change. Tests: harness-policy api-key it.each gains 'gpt-6.1-sol'; new blocked-at-0.158.0 and allowed-at-0.159.0 cases; app-server-manager floor assertion; doctor-codex-models every toHaveLength(2)->3, below-floor case asserts 'gpt-6.1-sol' and '0.159.0', the at-or-above case uses readVersion '0.159.0'."
+        },
+        "items": [
+          {
+            "id": "codex-floor.ac1",
+            "title": "Given subscription auth and codexCliVersion '0.158.0', when canUseHarness('codex','gpt-6.1-sol','subscription',ctx) runs, then it returns allowed false with a reason containing '0.159.0' and 'npm install -g @openai/codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-floor.ac2",
+            "title": "Given codexCliVersion '0.159.0', when canUseHarness('codex','gpt-6.1-sol','subscription',ctx) runs, then it returns { allowed: true }; with 'api-key' auth it returns { allowed: true } at any version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-floor.ac3",
+            "title": "Given an installed Codex 0.153.4 under subscription auth, when checkCodexModelFloors runs, then it returns 3 warn rows whose messages include 'gpt-6.1-sol' and '0.159.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-context-pin",
+        "title": "Pin the 272K model_context_window for gpt-6.1-sol in the managed Codex config",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "codex.test.ts passes including the 'pins gpt-6.1-sol context and effort' case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 4 (codex-context-pin). In src/lib/runtimes/codex.ts:295 the condition startsWith('gpt-6-') misses 'gpt-6.1-sol'. Add '|| opts.model?.startsWith(\\'gpt-6.\\')' to the condition; do not widen to bare 'gpt-6'. Add ['gpt-6.1-sol', undefined, 272000, 'high'] to the initCodexHome it.each at codex.test.ts:128."
+        },
+        "items": [
+          {
+            "id": "codex-context-pin.ac1",
+            "title": "Given initCodexHome(dir, { model: 'gpt-6.1-sol' }), when config.toml is read, then it contains 'model_context_window = 272000' and 'model_reasoning_effort = \"high\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-context-pin.ac2",
+            "title": "Given the existing it.each rows (gpt-6-astra, gpt-6-sol, gpt-5.6-terra[372k] and others), when codex.test.ts runs, then they still produce their previous windows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-code-route",
+        "title": "Give gpt-6.1-sol the 272K Claude Code context pin on the CLIProxy route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/provider-env.ts",
+            "src/lib/cliproxy.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "model-capabilities.test.ts and model-catalog-audit.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 5 (claude-code-route). CLIProxy v7.3.16 serves gpt-6.1-sol (probe 2026-09-29: /v1/models lists it, /v1/messages returned a completion). Add 'gpt-6.1-sol' to GPT_56_MODELS in provider-env.ts:141 and update its comment; add the PAN-4422 verification lines under the PAN-4363 note at cliproxy.ts:57. No CLIProxy version change. Tests: model-capabilities.test.ts:52 window-parity it.each gains 'gpt-6.1-sol'; model-catalog-audit.test.ts:33 gains ['gpt-6.1-sol','openai',272000]."
+        },
+        "items": [
+          {
+            "id": "claude-code-route.ac1",
+            "title": "Given the provider env, when getClaudeCodeContextPolicyForModel('gpt-6.1-sol') is called, then it returns { autoCompactWindow: 272000, maxContextTokens: 272000 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-route.ac2",
+            "title": "Given the catalog audit, when model-catalog-audit.test.ts runs, then the 'gpt-6.1-sol' row passes with provider openai and context 272000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-code-route.ac3",
+            "title": "Given src/lib/cliproxy.ts, the comment above CLIPROXY_RELEASE_VERSION names gpt-6.1-sol with the 2026-09-29 verification and CLIPROXY_RELEASE_VERSION still equals 'v7.3.16'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-id",
+        "title": "Map gpt-6.1-sol in the dashboard server MODEL_API_IDS table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/server/routes/settings.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint-file-size) completes without errors",
+            "wc reports 1104 lines or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 6 (settings-api-id). routes/settings.ts is at its 1104-line allowlist cap: append \"'gpt-6.1-sol': { apiModel: 'gpt-6.1-sol' },\" to the existing line 109 (the gpt-6-sol/gpt-6-luna line). Add no new lines. Never edit scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "settings-api-id.ac1",
+            "title": "Given MODEL_API_IDS, when MODEL_API_IDS['gpt-6.1-sol'] is read, then it returns { apiModel: 'gpt-6.1-sol' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-id.ac2",
+            "title": "Given the diff, src/dashboard/server/routes/settings.ts has the same line count as on origin/main (1104 or fewer) and scripts/file-size-allowlist.txt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-catalog-order",
+        "title": "List gpt-6.1-sol second in the Settings catalog API OpenAI order",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-model-catalog.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-model-catalog.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 7 (settings-catalog-order). openaiOrder becomes 'gpt-6-astra': 0, 'gpt-6.1-sol': 1, 'gpt-6-sol': 2, 'gpt-6-luna': 3, 'gpt-5.6-sol': 4, 'gpt-5.6-terra': 5, 'gpt-5.6-luna': 6 (rest unchanged); update the ordering comment. Test: add the gpt-6.1-sol object (name 'GPT-6.1 Sol (272K context)', contextWindow 272000, efforts low..max, costPer1MTokens 6) as the FIRST element of gpt6Additions; slice(0,4) expectation becomes ['gpt-6-astra','gpt-6.1-sol','gpt-6-sol','gpt-6-luna']."
+        },
+        "items": [
+          {
+            "id": "settings-catalog-order.ac1",
+            "title": "Given getAvailableModelsApi(), when openai.slice(0,4) ids are read, then it returns ['gpt-6-astra','gpt-6.1-sol','gpt-6-sol','gpt-6-luna']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-catalog-order.ac2",
+            "title": "Given getAvailableModelsApi(), the gpt-6.1-sol entry equals { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol (272K context)', contextWindow: 272000, effortLevels: ['low','medium','high','xhigh','max'], costPer1MTokens: 6 } and the no-loss comparison against the previous catalog still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-pickers",
+        "title": "Show GPT-6.1 Sol in the chat ModelPicker and the Settings model catalog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 8 (frontend-pickers). Insert the gpt-6.1-sol row between the gpt-6-astra and gpt-6-sol rows in ModelPicker.tsx:116 (label 'GPT-6.1 Sol (272K context)', costDisplay '$6/1M', costPer1MTokens 6, effortLevels low..max) and in modelCatalog.ts:70 (name 'GPT-6.1 Sol (272K context)', icon Gem, tier 'premium', costPer1MTokens 6, description stating the 272K cap is the same Overdeck applies to GPT-6 Sol, the $2 / $0.10 cached / $10 price and the Codex 0.159.0 requirement). Frontend ModelId is string, so no type change."
+        },
+        "items": [
+          {
+            "id": "frontend-pickers.ac1",
+            "title": "Given the chat ModelPicker OpenAI group, when the model list renders, then a 'GPT-6.1 Sol (272K context)' row with costDisplay '$6/1M' appears directly after GPT-6 Astra and before GPT-6 Sol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers.ac2",
+            "title": "Given the Settings modelCatalog OpenAI models, the gpt-6.1-sol entry has name 'GPT-6.1 Sol (272K context)', costPer1MTokens 6 and a description containing '$0.10 cached' and '0.159.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "friendly-name",
+        "title": "Render GPT-6.1 Sol as a distinct friendly model name",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dashboard-utils.test.ts passes including 'keeps GPT-6.1 Sol and GPT-6 Sol distinct (PAN-4422)'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 9 (friendly-name). Insert \"if (backingModel.includes('gpt-6.1-sol')) return 'GPT-6.1 Sol';\" directly above the gpt-6-sol check in getFriendlyModelName. Add test 'keeps GPT-6.1 Sol and GPT-6 Sol distinct (PAN-4422)'."
+        },
+        "items": [
+          {
+            "id": "friendly-name.ac1",
+            "title": "Given getFriendlyModelName('gpt-6.1-sol'), then it returns 'GPT-6.1 Sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "friendly-name.ac2",
+            "title": "Given getFriendlyModelName('gpt-6-sol'), then it still returns 'GPT-6 Sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document GPT-6.1 Sol, its 272K pin, price and Codex 0.159.0 floor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'gpt-6.1-sol' configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "grep prints matches in both files, including '0.159.0' in harnesses.mdx and '$0.10/M cached input' in MODEL-CONTEXT-AUDIT.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 10 (docs). harnesses.mdx:90 add `gpt-6.1-sol` to the no-[372k] GPT-6 list; harnesses.mdx:196-209 Codex section add GPT-6.1 Sol to the family list and a sentence that it is opt-in, $2/$10 with $0.10 cached, and needs Codex CLI `0.159.0`+ under ChatGPT sign-in. MODEL-CONTEXT-AUDIT.md:7 table row names GPT-6.1 Sol (Codex 0.159.0 catalog 272,000 default / 872,000 max); add the GPT-6.1 Sol Sources line after :46."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/harnesses.mdx, the Codex section states that gpt-6.1-sol needs Codex CLI 0.159.0 or newer under ChatGPT sign-in and is opt-in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/harnesses.mdx, the no-[372k] sentence lists gpt-6.1-sol with the other GPT-6 models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/MODEL-CONTEXT-AUDIT.md, the context table row names GPT-6.1 Sol at 272,000 and the Sources list has a gpt-6.1-sol line with 1.05M context, $2/M input, $0.10/M cached input and $10/M output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog",
+        "title": "Add the GPT-6.1 Sol entry to the Unreleased changelog block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T20:40:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4422",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'description=\"Unreleased\"' changelog.mdx",
+            "grep -n 'GPT-6.1 Sol' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "the Unreleased count is 1",
+            "grep prints the GPT-6.1 Sol entry inside the top block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4422.md work item 11 (changelog) and decision D11. If the rebased changelog.mdx already has a top Unreleased block, add the entry under its '#### New'; otherwise create <Update label=\"v0.64.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}> with '## Upcoming release' and the 'Drafted from the changes merged to `main` since v0.63.0...' line directly below the RELEASE STEP comment. Entry text is in the PRD; link the PR once pan done opens it, else issue #4422. Never create a second Unreleased block; never run pan release."
+        },
+        "items": [
+          {
+            "id": "changelog.ac1",
+            "title": "Given changelog.mdx, exactly one <Update ... description=\"Unreleased\"> block exists and it is the first Update block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog.ac2",
+            "title": "Given that block, it contains a '**GPT-6.1 Sol:**' entry naming gpt-6.1-sol, '$0.10/M cached', 'opt-in' and 'Codex CLI 0.159.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "catalog-entry",
+        "to": "cost-row",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-row",
+        "to": "claude-code-route",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-entry",
+        "to": "claude-code-route",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-entry",
+        "to": "settings-catalog-order",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-entry",
+        "to": "codex-floor",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
