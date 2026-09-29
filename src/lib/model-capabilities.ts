@@ -238,7 +238,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
-    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; pricing is $2/M input and $10/M output; the planned September increase was cancelled. Scores are provisional until benchmarks are verified.',
+    notes: 'Previous Sonnet generation (June 2026); superseded by Sonnet 5.5. Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; pricing is $2/M input and $10/M output; the planned September increase was cancelled. Scores are provisional until benchmarks are verified.',
   },
 
   'claude-sonnet-4-6': {
