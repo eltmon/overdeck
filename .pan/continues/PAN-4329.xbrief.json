@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:28:41.365Z",
+  "updated": "2026-09-29T10:28:55.511Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "wip-scan.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T10:28:41.364Z"
+    },
+    "wip-scan.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:28:55.510Z"
     }
   }
 }
