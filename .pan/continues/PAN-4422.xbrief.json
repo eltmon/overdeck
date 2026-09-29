@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:14:58.640Z",
+  "updated": "2026-09-29T21:15:06.473Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4422",
       "claimedAt": "2026-09-29T21:07:50.108Z",
       "doneAt": "2026-09-29T21:14:58.640Z"
+    },
+    "claude-code-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4422",
+      "claimedAt": "2026-09-29T21:15:06.473Z"
     }
   }
 }
