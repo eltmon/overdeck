@@ -307,6 +307,15 @@ export type ChannelPermissionRequestSnapshot = typeof ChannelPermissionRequestSn
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
+/** PAN-4371 — advisory Jev reading of why an idle agent ended its turn. kind is a string (append-only store). */
+export const TurnEndAssessment = Schema.Struct({
+  kind: Schema.String,
+  confidence: Schema.Number,
+  needsAnswer: Schema.Boolean,
+  model: Schema.String,
+})
+export type TurnEndAssessment = typeof TurnEndAssessment.Type
+
 export const AgentSnapshot = Schema.Struct({
   id: AgentId,
   issueId: IssueId,
@@ -377,6 +386,7 @@ export const AgentSnapshot = Schema.Struct({
   })),
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
+  turnEndAssessment: Schema.optional(TurnEndAssessment),
   // PAN-800 — bumped on every runtime event so subscribers can cheaply detect
   // a change without diffing the full AgentRuntimeSnapshot.
   runtimeSnapshotSequence: Schema.optional(SequenceNumber),

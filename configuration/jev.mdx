@@ -76,17 +76,46 @@ does without Jev: no request, no startup check, and no warning.
 
 ## What is sent to TypeSafe
 
-This release sends nothing: the client exists, but no feature calls it yet.
+`jevTurnEndAssessment` and `jevAcceptanceCriteriaReview` are both live. `jevTurnEndAssessment`
+sends the agent's role and the tail (trimmed to 6,000 characters) of its last assistant message
+to TypeSafe, and nothing else from the transcript. It runs only for idle interactive agents —
+plan agents and conversations — whose transcript is a claude-code JSONL or a codex rollout; every
+other harness kind is `unsupported-harness` and never reaches Jev. `jevMemoryRelevance` is not
+yet called by anything; turning it on today sends no request.
 
-When each feature ships, turning its toggle on sends the following data:
+Turning a toggle on sends the following data:
 
-| Toggle | What it sends (when that feature ships) |
+| Toggle | What it sends |
 | --- | --- |
-| `jevTurnEndAssessment` | Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
-| `jevAcceptanceCriteriaReview` | Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings. |
+| `jevTurnEndAssessment` | Sends an agent's last message (trimmed to 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
+| `jevAcceptanceCriteriaReview` | Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings. |
 | `jevMemoryRelevance` | Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection. |
 
 The same text appears under each toggle in Settings.
+
+Acceptance-criteria text can quote issue text that anyone wrote in a public tracker, so Overdeck
+treats the Jev result as advice only: it prints warnings and never blocks plan finalize.
+
+## Turn-end classification
+
+`jevTurnEndAssessment` (PAN-4371) reads why an idle interactive agent (a plan agent, or a
+conversation) stopped talking without opening a modal or asking through a tool call. Jev classifies
+the message into one of five kinds — `asks_operator`, `reports_complete`, `reports_blocked`,
+`progress_update`, `other` — and separately answers whether the message needs an operator answer.
+Three of the five kinds replace the generic "Answer the agent" label with a specific one on the
+Needs-you row and on a parked `idle-running` row: **Asked you a question** (`asks_operator`),
+**Reported done** (`reports_complete`), and **Blocked** (`reports_blocked`); `progress_update` and
+`other` keep the generic label.
+
+A classification is shown only when Jev's confidence in the chosen kind is at least `0.7`
+(`TURN_END_MIN_CONFIDENCE`) — below that, nothing is attached and the row reads exactly as it did
+before this feature existed. Nothing is persisted: the result lives only in an in-process, mtime-keyed
+store that a restart clears, and it is read back on the next poll tick or parked-population read.
+
+**Readiness:** advisory; accuracy under measurement. The 2026-09-29 measurement against a 40-row
+labeled fixture (`evals/jev-turn-end.eval.ts`, model `jev-1.13-free`) put `asks_operator` precision
+at 0.7778, recall 0.875 — below the 0.9 bar this feature would need to be called ready. See
+`evals/README.md` for the full per-class table.
 
 ## Privacy
 

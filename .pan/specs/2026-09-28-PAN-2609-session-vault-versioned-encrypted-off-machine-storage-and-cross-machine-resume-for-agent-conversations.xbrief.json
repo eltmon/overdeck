@@ -1,0 +1,2587 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T13:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2609: Session Vault: versioned, encrypted, off-machine storage and cross-machine resume for agent conversations",
+    "updated": "2026-09-28T13:05:17.708Z"
+  },
+  "plan": {
+    "id": "pan-2609",
+    "title": "Session Vault: versioned, encrypted, off-machine storage and cross-machine resume for agent conversations",
+    "status": "running",
+    "uid": "b503abba-dea6-4d64-a05b-15fccc442de7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-28T13:30:00Z",
+    "updated": "2026-09-28T13:05:17.708Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2609",
+        "label": "PAN-2609",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2609/.pan/drafts/pan-2609.md",
+        "label": "PRD draft (.pan/drafts/pan-2609.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4307",
+        "label": "PAN-4307 dashboard consumer (sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4308",
+        "label": "PAN-4308 Fly settlement (sibling)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "anywhere",
+      "cli",
+      "encryption",
+      "transcripts"
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-2609 creates one new module directory (src/lib/vault/, about 17 small single-purpose files, each with its own test) plus its standalone CLI group (src/cli/commands/vault/) and five doc files. The projected-surface lint counts each test and doc path separately, and each docs/ or configuration/ file as its own subsystem, so the new-module surface alone exceeds 25 files and 6 subsystems. The separable consumers were already split out as siblings PAN-4307 (dashboard) and PAN-4308 (Fly); what remains is inseparable because the CLI verbs are the only way to exercise and accept the engine, and the issue-level acceptance criteria are defined through them.",
+      "canonicalFilename": "2026-09-28-PAN-2609-session-vault-versioned-encrypted-off-machine-storage-and-cross-machine-resume-for-agent-conversations.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Agent transcripts, conversation rows and live panes live only on the machine that created them. Work started on one machine is invisible on another, nothing can move transcripts off the machine (about 30 GB on the operator machine), only Claude Code can resume natively, and there is no way to version, back up and resume agent sessions without adopting the whole orchestrator.",
+      "Proposal": "Build the Session Vault engine in src/lib/vault/: an always-encrypted (AES-256-GCM, client-held key with a 24-word recovery phrase), content-addressed chunk + LOG + VIEW record format with a continuity check, secret scan and cwd-state summary on every settlement; a VaultStore interface with git (v1) and dir (tests) backends using compare-and-swap refs; single-owner records with CAS adoption; operator-confirmed eviction batches through one leaf deletion door. Expose it as a standalone pan vault CLI (setup, join, status, save, sync, list, show, resume, evict, restore, exclude, include, allow-secret, setup --hooks) that works with no dashboard and no pan install and sends no telemetry. Reuse PAN-3762 environmentId as the machine identity, creating environment-identity.ts in the shared-contract form. Dashboard surfaces go to PAN-4307 and Fly settlement to PAN-4308.",
+      "NonGoals": "- No dashboard UI, dashboard routes, vault-service.ts, browse rows in overdeck.db, or dashboard sync timer (PAN-4307)\n- No Fly remote reap integration (PAN-4308)\n- No hosted overdeck.ai backend or overdeck:// URL scheme (PAN-4297)\n- No automatic deletion of any native transcript: no timer, sync cycle, retention policy, config value or hook deletes one; only confirmEviction does\n- No change to the CLAUDE.md \"JSONL session files are sacred\" line\n- No separate machineId and no machine-id.json file\n- No writes to ~/.overdeck/config.yaml, src/lib/config-yaml/**, or the dashboard settings schema for vault keys\n- No writes to any Codex state_*.sqlite file\n- No git stash, and no git operation on any repository other than the vault clone\n- No telemetry, analytics or heartbeat from pan vault verbs\n- No new npm dependency and no native addon\n- No purge or garbage collection of tombstoned or unreferenced chunks from backend history\n- No real-time co-editing (CRDT) of one live session and no sharing with other people\n- No model call anywhere in the vault, including the seeded fallback"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the dashboard consumer into PAN-4307 and Fly settlement into PAN-4308; PAN-2609 keeps the engine, standalone CLI and docs",
+        "rationale": "Every issue-level acceptance criterion is satisfiable through the pan vault CLI, the PRD calls the dashboard one consumer, and the swarm contract prefers sibling issues over one mega-plan; Fly settlement also depends on still-open PAN-4295"
+      },
+      {
+        "summary": "AC-4 'within one sync interval' means after pan vault sync on A then on B",
+        "rationale": "Standalone mode has no daemon; the periodic timer belongs to the dashboard sibling"
+      },
+      {
+        "summary": "Vault config lives in ${OVERDECK_HOME}/vault/config.json via src/lib/vault/config.ts, not config.yaml (P-1)",
+        "rationale": "The config-yaml loader pulls in the whole settings schema, which conflicts with the NFR-7 standalone footprint"
+      },
+      {
+        "summary": "The recovery phrase is the BIP-39 entropy encoding of the key with a vendored wordlist; no scrypt, no new dependency (P-2)",
+        "rationale": "A 256-bit random key needs no stretching, and NFR-9 bans new dependencies for crypto"
+      },
+      {
+        "summary": "Git backend never keeps a local commit after a failed push; casRef resets to origin/main (P-4)",
+        "rationale": "Removes divergent local history and rebase conflicts while keeping CAS semantics; the vault clone is not a project repo"
+      },
+      {
+        "summary": "Adoption adds an owner segment to the same record; an owner that lost the record while offline saves its new lines as a fork (P-5, P-6)",
+        "rationale": "Keeps settlement continuity checkable on the adopter file and never discards data (FR-8)"
+      },
+      {
+        "summary": "Secret scan blocks only on API key, token, AWS, JWT, database URL, basic-auth URL and private key; env assignments and labelled secrets stay redaction-only (P-8)",
+        "rationale": "FOO=bar and token: x appear in almost every coding transcript; blocking them would refuse most sessions"
+      },
+      {
+        "summary": "Extract the deletion door into the leaf transcript-deletion-door.ts shared with transcript-retention.ts (P-9)",
+        "rationale": "transcript-retention.ts imports SQLite and terminal-backend modules at top, which breaks the standalone CLI; one door stays one door"
+      },
+      {
+        "summary": "Standalone liveness = transcript mtime older than liveQuietMinutes (default 30) (P-10)",
+        "rationale": "No backend inventory exists without the dashboard; PAN-4307 adds the liveness.ts check"
+      },
+      {
+        "summary": "pan vault bypasses CLI telemetry and heartbeat (P-12)",
+        "rationale": "NFR-8 and the issue promise no telemetry, while the CLI sends anonymous PostHog events by default"
+      },
+      {
+        "summary": "Codex resume: test native rollout placement; else deterministic seeded fallback; never write Codex SQLite (P-16)",
+        "rationale": "The threads table schema has grown about 25 columns across versions (checked on codex-cli 0.158.0), so row insertion is fragile"
+      },
+      {
+        "summary": "The seeded fallback is a deterministic digest with no model call",
+        "rationale": "Standalone mode has no configured summarizer, NFR-8 forbids non-backend network calls, and repo rules forbid a hardcoded model fallback"
+      }
+    ],
+    "items": [
+      {
+        "id": "env-identity",
+        "title": "Create the shared machine identity module environment-identity.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/environment-identity.ts",
+            "tests/unit/lib/environment-identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/environment-identity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/environment-identity.ts exactly per the PRD section \"Shared machine identity contract\": readEnvironmentIdentity() and ensureEnvironmentIdentity() over ${OVERDECK_HOME}/environment-id.json (mode 0600, temp file + rename, created only when absent, shape { v: 1, environmentId: lowercase UUID v4, label: os.hostname(), createdAt: ISO UTC }). Import only Node built-ins and src/lib/paths.ts. A corrupt or unparseable file makes both functions throw an Error whose message names the file path; never re-mint. Never write machine-id.json. PAN-3762 W1 adopts this module unchanged, so do not add fields."
+        },
+        "items": [
+          {
+            "id": "env-identity.ac1",
+            "title": "Given an empty OVERDECK_HOME, when ensureEnvironmentIdentity() runs twice, then it creates environment-id.json once with mode 0600 and returns the same environmentId both times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-identity.ac2",
+            "title": "Given two different OVERDECK_HOME temp dirs, when ensureEnvironmentIdentity() runs in each, then it returns two different UUID v4 values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-identity.ac3",
+            "title": "Given environment-id.json contains invalid JSON, when readEnvironmentIdentity() runs, then it throws an error that names the file path and the file is left unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-identity.ac4",
+            "title": "Given any run of the test suite, then no file named machine-id.json exists under OVERDECK_HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-config",
+        "title": "Add the vault config file module config.ts with isVaultEnabled",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/config.ts",
+            "tests/unit/lib/vault/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/config.ts per PRD decision P-1: vaultDir() = ${OVERDECK_HOME}/vault, readVaultConfig()/writeVaultConfig() over vault/config.json (mode 0600, atomic temp+rename), defaults backend absent, exclude {paths:[],origins:[],sessions:[]}, syncIntervalSec 300, debounceSec 30, evict false, liveQuietMinutes 30, maxChunkBytes 67108864, and isVaultEnabled() false when backend is absent. Export the constant VAULT_OFF_MESSAGE = \"Session Vault is off. Run: pan vault setup <git-url>\". Do not touch ~/.overdeck/config.yaml or src/lib/config-yaml/**."
+        },
+        "items": [
+          {
+            "id": "vault-config.ac1",
+            "title": "Given no vault/config.json, when readVaultConfig() runs, then it returns every P-1 default and isVaultEnabled() returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-config.ac2",
+            "title": "Given writeVaultConfig({ backend: \"file:///x\" }), when the file is read back, then it persists with mode 0600 and isVaultEnabled() returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-config.ac3",
+            "title": "Given a config file missing some keys, when readVaultConfig() runs, then it falls back to the P-1 default for each missing key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-key-phrase",
+        "title": "Generate the vault key and encode it as a 24-word recovery phrase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/identity.ts",
+            "src/lib/vault/bip39-english.ts",
+            "tests/unit/lib/vault/identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/identity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement src/lib/vault/identity.ts per PRD \"Encryption (D-3)\" and decision P-2: createVaultKey() (32 random bytes via node:crypto), saveVaultKey/loadVaultKey at vaultDir()/key (mode 0600, raw bytes), keyToPhrase/phraseToKey as the BIP-39 entropy encoding (256 bits + 8-bit SHA-256 checksum, 24 words), and deriveSubkeys(K) returning K_enc, K_id, K_ref via HKDF-SHA256 with info strings \"overdeck-vault enc\", \"overdeck-vault id\", \"overdeck-vault ref\". Vendor the English wordlist in bip39-english.ts as one space-separated string with the source URL comment. No new dependency; node:crypto only."
+        },
+        "items": [
+          {
+            "id": "vault-key-phrase.ac1",
+            "title": "Given 32 zero bytes, when keyToPhrase runs, then it returns \"abandon\" 23 times followed by \"art\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-key-phrase.ac2",
+            "title": "Given 32 bytes of 0x7f, when keyToPhrase runs, then it returns \"legal winner thank year wave sausage worth useful\" three times with the last word replaced by \"title\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-key-phrase.ac3",
+            "title": "Given a random key, when phraseToKey(keyToPhrase(key)) runs, then it returns the identical 32 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-key-phrase.ac4",
+            "title": "Given a phrase with one word changed or an unknown word, when phraseToKey runs, then it rejects with a message naming the word position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-key-phrase.ac5",
+            "title": "Given saveVaultKey runs, then the key file persists with mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-continuity",
+        "title": "Implement line hashing and the noop/append/diverged continuity check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/continuity.ts",
+            "tests/unit/lib/vault/continuity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/continuity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/continuity.ts: lineHash(line) = first 16 hex chars of SHA-256 of the raw line bytes; splitSettleableLines(buffer) that splits on \\n and drops a trailing line that is not complete JSON; and checkContinuity(tail, liveLines) where tail = { lineCount, byteOffset, lastHashes (up to 16) } returns \"noop\" when the live file has no lines past lineCount, \"append\" when the live hashes at positions lineCount-16..lineCount-1 equal lastHashes, else \"diverged\". Export the Tail type; vault-format and vault-settle import it."
+        },
+        "items": [
+          {
+            "id": "vault-continuity.ac1",
+            "title": "Given a live file that equals the saved lines, when checkContinuity runs, then it returns \"noop\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continuity.ac2",
+            "title": "Given a live file that only grew, when checkContinuity runs, then it returns \"append\" with the new lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continuity.ac3",
+            "title": "Given a live file with one middle line changed inside the last 16 saved lines, when checkContinuity runs, then it returns \"diverged\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continuity.ac4",
+            "title": "Given a file whose last line is incomplete JSON, when splitSettleableLines runs, then it drops that line and a later call that sees the completed line returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-format",
+        "title": "Define the encrypted chunk and record wire format format.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/format.ts",
+            "tests/unit/lib/vault/format.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/format.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-9",
+            "NFR-1",
+            "NFR-6",
+            "NFR-9"
+          ],
+          "foundationFor": [
+            "vault-settle",
+            "vault-sync",
+            "vault-materialize",
+            "vault-adopt",
+            "store-git"
+          ],
+          "parallelSafeReason": "Owns only its new file format.ts and its test; its inputs (continuity.ts lineHash, identity.ts subkeys) arrive through blocks edges."
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/format.ts per PRD \"Record format\", \"Encryption (D-3)\", decisions P-3, P-5, P-7, P-19: encodeChunk(lines, keys) builds the plaintext { v:1, codec:\"zstd\", lineHashes, lines } (lines are raw bytes as strings, never re-serialized), chunkId = hex(HMAC-SHA256(K_id, plaintext))[:40], compresses with promisified zlib.zstdCompress, encrypts AES-256-GCM with a random 96-bit nonce and the chunk id as associated data, stored as nonce||ciphertext||tag; decodeChunk reverses it and rejects any auth failure. splitIntoChunks(lines, maxChunkBytes) implements NFR-6. encryptRef/decryptRef do the same for record, machine and header ref values. Define the SessionRecord type (fields from \"Record format\" plus type: \"session\", segments per P-5, parent {vaultId, version} per P-7) and refName(kind, id, K_ref) producing r/, m/, h/header names. Readers return null for a decrypted value whose type is not \"session\" (FR-9 reservation)."
+        },
+        "items": [
+          {
+            "id": "vault-format.ac1",
+            "title": "Given lines with arbitrary bytes, when encodeChunk then decodeChunk run, then the decoded lines are byte-identical to the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-format.ac2",
+            "title": "Given an encoded chunk with one flipped byte, when decodeChunk runs, then it rejects with an authentication error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-format.ac3",
+            "title": "Given two chunks, when chunk A bytes are decoded under chunk B id, then decodeChunk rejects (associated data binds the id)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-format.ac4",
+            "title": "Given lines totalling more than maxChunkBytes, when splitIntoChunks runs, then it produces several chunks each under the limit and their concatenation equals the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-format.ac5",
+            "title": "Given an encrypted ref value with type \"task\", when the record reader runs, then it returns null without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-turns",
+        "title": "Count human turns with the known injected-prefix filter turns.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/turns.ts",
+            "tests/unit/lib/vault/turns.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/turns.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/turns.ts: isHumanTurn(line, harness) and countHumanTurns(lines, harness) per FR-18. A Claude Code user line is not a human turn when its text starts with <task-notification>, <command-name>, <local-command-stdout>, <local-command-caveat>, or [Request interrupted by user], or when isCompactSummary is true or it carries tool_result content. A Codex user line is not a human turn when it starts with <environment_context>, <codex_internal_context>, or # Files mentioned by the user:. Match by these exact prefixes, never by \"starts with <\"."
+        },
+        "items": [
+          {
+            "id": "vault-turns.ac1",
+            "title": "Given a Claude fixture with 3 typed prompts and 4 injected lines of the listed kinds, when countHumanTurns runs, then it returns 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-turns.ac2",
+            "title": "Given a Codex fixture with 2 typed prompts and an <environment_context> line, when countHumanTurns runs, then it returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-turns.ac3",
+            "title": "Given a typed prompt that starts with \"<div>\", when isHumanTurn runs, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "secret-matcher",
+        "title": "Export findSecretMatches from secret-redaction.ts with the blocking pattern set",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/secret-redaction.ts",
+            "tests/unit/lib/secret-redaction.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/secret-redaction.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD decision P-8: first add tests/unit/lib/secret-redaction.test.ts pinning redactSensitiveText output for one sample of every existing pattern. Then add export type SecretPatternName = \"api-key\" | \"token\" | \"aws-access-key\" | \"jwt\" | \"database-url\" | \"basic-auth-url\" | \"private-key\" and export function findSecretMatches(text) returning { pattern, start, end } for matches of API_KEY_PATTERN, TOKEN_PATTERN, AWS_ACCESS_KEY_PATTERN, JWT_PATTERN, DATABASE_URL_PATTERN, BASIC_AUTH_URL_PATTERN and the private-key scan, reusing the existing constants and collectors. ENV_ASSIGNMENT_PATTERN and LABELLED_SECRET_PATTERN are not part of findSecretMatches."
+        },
+        "items": [
+          {
+            "id": "secret-matcher.ac1",
+            "title": "Given the pinned samples, when redactSensitiveText runs after the change, then it returns the same strings as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "secret-matcher.ac2",
+            "title": "Given text containing a GitHub token and an AWS key, when findSecretMatches runs, then it returns two matches named \"token\" and \"aws-access-key\" with their offsets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "secret-matcher.ac3",
+            "title": "Given the line \"export FOO=bar token: abc\", when findSecretMatches runs, then it returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-secrets",
+        "title": "Block settlement on secret hits with per-line allow list secrets.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/secrets.ts",
+            "tests/unit/lib/vault/secrets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/secrets.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/secrets.ts per FR-13 and P-8: scanNewLines(vaultId, lines, firstLineNumber) calls findSecretMatches per line, skips lines whose lineHash is allowed for that vaultId in vaultDir()/allowed-secrets.json (0600), and returns hits as { line, pattern } without the matched value. allowSecret(vaultId, lineHash) persists an allow entry."
+        },
+        "items": [
+          {
+            "id": "vault-secrets.ac1",
+            "title": "Given a line containing an API key, when scanNewLines runs, then it returns a hit naming the line number and \"api-key\" and the returned object contains no substring of the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-secrets.ac2",
+            "title": "Given allowSecret was called for that line hash and vaultId, when scanNewLines runs again, then it returns no hit for that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-secrets.ac3",
+            "title": "Given the allow entry is for a different vaultId, when scanNewLines runs, then it still blocks the line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-cwd-state",
+        "title": "Record a bounded git summary of the cwd and compare drift cwd-state.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/cwd-state.ts",
+            "tests/unit/lib/vault/cwd-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/cwd-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/cwd-state.ts per FR-12: readCwdState(cwd) uses promisified execFile git calls (remote get-url origin, rev-parse HEAD, branch --show-current, status --porcelain=v1) and returns { gitOrigin, head, branch, dirty, staged, unstaged, untracked, conflicted } counts, or null when cwd is not a git repo. compareCwdState(saved, current) returns the list of differing fields. No paths, diffs or file contents appear in the result. No execSync."
+        },
+        "items": [
+          {
+            "id": "vault-cwd-state.ac1",
+            "title": "Given a temp git repo with one staged and one untracked file, when readCwdState runs, then it returns staged 1, untracked 1, dirty true, and no field contains a file path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-cwd-state.ac2",
+            "title": "Given a non-git temp dir, when readCwdState runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-cwd-state.ac3",
+            "title": "Given saved and current states with different HEAD, when compareCwdState runs, then it returns [\"head\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-contract",
+        "title": "Define the VaultStore interface, the dir backend and the shared contract suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/store/types.ts",
+            "src/lib/vault/store/dir.ts",
+            "tests/unit/lib/vault/store/contract.ts",
+            "tests/unit/lib/vault/store/dir.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/store/dir.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "store-git",
+            "vault-settle",
+            "vault-sync",
+            "vault-adopt",
+            "cli-group-setup"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/store/types.ts with the VaultStore interface from PRD \"Backend interface\" plus VaultOfflineError. Implement src/lib/vault/store/dir.ts over a local directory using the P-3 layout (VAULT-FORMAT marker, objects/<id[0:2]>/<id>, refs/<name>), with version = SHA-1 of the ref file bytes and casRef serialized by an O_EXCL lock file. Write the reusable suite tests/unit/lib/vault/store/contract.ts exporting runVaultStoreContract(makeStore) covering idempotent putObjects, getObject of a missing id, hasObjects, readRef/casRef/listRefs(prefix), and a CAS race where two concurrent casRef calls with the same expectedVersion yield exactly one \"ok\"."
+        },
+        "items": [
+          {
+            "id": "store-contract.ac1",
+            "title": "Given the dir backend, when runVaultStoreContract runs, then every case passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-contract.ac2",
+            "title": "Given two concurrent casRef calls with the same expectedVersion, when both settle, then exactly one returns \"ok\" and the other returns \"conflict\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-contract.ac3",
+            "title": "Given putObjects is called twice with the same id and bytes, then the second call succeeds and the object bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-git",
+        "title": "Implement the git backend that passes the shared contract suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/store/git.ts",
+            "tests/unit/lib/vault/store/git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/store/git.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Owns only store/git.ts and its test; it shares no file with any other item and runs the contract suite created by store-contract."
+        },
+        "narrative": {
+          "Action": "Implement src/lib/vault/store/git.ts per PRD decision P-4: local clone at vaultDir()/git, branch main, promisified execFile with GIT_TERMINAL_PROMPT=0, putObjects writes files uncommitted, casRef = fetch, reset --hard origin/main, compare blob SHA, write, one commit, push; a non-fast-forward rejection repeats up to 3 times then returns \"conflict\"; a network failure resets to origin/main and throws VaultOfflineError. Also export initGitVault(url) (clone; refuse a non-empty remote without VAULT-FORMAT; write VAULT-FORMAT on an empty remote). On an empty remote there is no origin/main: skip fetch/reset, treat every ref as version null, and create main with git push -u origin main on the first casRef. Never git stash; never touch any repo other than the vault clone. Tests use a local bare repo fixture and two clones under separate temp OVERDECK_HOMEs."
+        },
+        "items": [
+          {
+            "id": "store-git.ac1",
+            "title": "Given a bare repo fixture, when runVaultStoreContract runs against the git backend, then every case passes including the CAS race across two clones",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-git.ac2",
+            "title": "Given the remote is unreachable, when casRef runs, then it throws VaultOfflineError and the clone has no commit that origin/main lacks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-git.ac3",
+            "title": "Given a non-empty remote without VAULT-FORMAT, when initGitVault runs, then it refuses and makes no commit or push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-local-index",
+        "title": "Keep the machine-local index of owned tails and list cache local-index.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/local-index.ts",
+            "tests/unit/lib/vault/local-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/local-index.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/local-index.ts per PRD decision P-18: vaultDir()/index.json (0600, atomic), owned: map nativePath -> { vaultId, harness, tail }, and listCache: array of { vaultId, title, harness, ownerLabel, ownerIsHere, updatedAt, tombstone }. Provide getOwned, setOwnedTail, replaceListCache, readListCache. Nothing in this file is ever uploaded."
+        },
+        "items": [
+          {
+            "id": "vault-local-index.ac1",
+            "title": "Given setOwnedTail runs for a path, when getOwned runs in a new process, then it returns the persisted tail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-local-index.ac2",
+            "title": "Given replaceListCache runs, when readListCache runs, then it returns the same rows in the same order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-local-index.ac3",
+            "title": "Given index.json is written, then its mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-exclude",
+        "title": "Match exclusions by path, origin and session exclude.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/exclude.ts",
+            "tests/unit/lib/vault/exclude.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/exclude.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/exclude.ts per PRD decision P-11: isExcluded({ cwd, gitOrigin, nativeSessionId, vaultId }, config.exclude) returns true when cwd is under an exclude.paths entry (path-segment aware, so /a/b does not match /a/bc), gitOrigin equals an exclude.origins entry, or the session id or vaultId is in exclude.sessions. addExclusion/removeExclusion update config.json through config.ts."
+        },
+        "items": [
+          {
+            "id": "vault-exclude.ac1",
+            "title": "Given exclude.paths [\"/a/b\"], when isExcluded runs for cwd \"/a/b/c\", then it returns true, and for cwd \"/a/bc\" it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-exclude.ac2",
+            "title": "Given exclude.origins contains the repo origin, when isExcluded runs for a cwd in that repo, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-exclude.ac3",
+            "title": "Given removeExclusion runs for an entry, when isExcluded runs again, then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-settle",
+        "title": "Run one settlement: continuity, secret scan, chunks and record CAS settle.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/settle.ts",
+            "tests/unit/lib/vault/settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-15",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "vault-sync",
+            "vault-adopt",
+            "vault-evict-batch",
+            "cli-save-sync"
+          ],
+          "parallelSafeReason": "Owns only settle.ts and its test; every module it composes is delivered by its blocks predecessors."
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/settle.ts per PRD \"Settlement\" and decisions P-5, P-6: settle({ nativePath, harness, store, keys }) returns { verdict: \"noop\"|\"append\"|\"diverged\"|\"blocked\"|\"excluded\"|\"offline\", vaultId, chunks }. It skips excluded sessions (vault-exclude), reads from tail.byteOffset, runs checkContinuity, scans new lines (vault-secrets; any hit returns \"blocked\" with the hits and writes nothing), splits into chunks, putObjects, appends a settlement entry with countHumanTurns and readCwdState, recomputes the VIEW on a compaction boundary (Claude line with \"isCompactSummary\":true; Codex {\"type\":\"compacted\"}; other harnesses VIEW = whole log), then casRef. First settlement mints vaultId and a segment owned by ensureEnvironmentIdentity(). If the record owner is not this machine, save the new lines as a fork record per P-6. On VaultOfflineError return \"offline\" and do not advance the local index. On \"diverged\" write nothing and return the verdict."
+        },
+        "items": [
+          {
+            "id": "vault-settle.ac1",
+            "title": "Given a new transcript, when settle runs twice with 2 new lines appended between runs, then the second run uploads only chunks for the 2 new lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle.ac2",
+            "title": "Given a transcript whose saved middle line changed, when settle runs, then it returns \"diverged\" and makes no putObjects or casRef call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle.ac3",
+            "title": "Given a new line containing an API key, when settle runs, then it returns \"blocked\" with the line number and pattern and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle.ac4",
+            "title": "Given the record owner changed to another environmentId, when settle runs with new lines, then it creates a fork record owned here whose parent is the last settled version and leaves the original record unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle.ac5",
+            "title": "Given the store throws VaultOfflineError, when settle runs, then it returns \"offline\" and the local index tail is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-sync",
+        "title": "Run the push/pull sync cycle with backoff and list refresh sync.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/sync.ts",
+            "tests/unit/lib/vault/sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/sync.ts: syncOnce() settles every owned native transcript in the local index whose size grew, upserts this machine ref m/<hmac(environmentId)> with { environmentId, label, lastSyncAt }, pulls all r/ refs, decrypts them, skips values whose type is not \"session\" (FR-9), and replaces the list cache. On VaultOfflineError it returns { offline: true } without throwing or logging per record. createSyncLoop({ intervalSec }) retries offline cycles with exponential backoff capped at intervalSec (used by PAN-4307; tested here with vi.useFakeTimers())."
+        },
+        "items": [
+          {
+            "id": "vault-sync.ac1",
+            "title": "Given machine A settled a transcript, when syncOnce runs on machine B, then B list cache contains the record with ownerLabel of A and ownerIsHere false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-sync.ac2",
+            "title": "Given a ref whose decrypted type is \"task\", when syncOnce runs, then it skips that ref and completes without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-sync.ac3",
+            "title": "Given the store is offline, when createSyncLoop runs under fake timers, then retries occur at increasing delays capped at intervalSec and no error is thrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-telemetry-bypass",
+        "title": "Skip CLI telemetry and heartbeat for pan vault invocations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/telemetry.ts",
+            "tests/unit/cli/telemetry-vault-bypass.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/telemetry-vault-bypass.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD decision P-12: in src/cli/telemetry.ts, when the first positional argv (after node and script) is \"vault\", runCliWithTelemetry runs the command without constructing the analytics lifecycle and without maybeSendInstanceHeartbeat, so no PostHog client is created. Other verbs keep the current behavior."
+        },
+        "items": [
+          {
+            "id": "cli-telemetry-bypass.ac1",
+            "title": "Given argv [\"vault\",\"status\"], when runCliWithTelemetry runs, then getAnalyticsService and maybeSendInstanceHeartbeat are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-telemetry-bypass.ac2",
+            "title": "Given argv [\"status\"], when runCliWithTelemetry runs, then telemetry behaves exactly as before (lifecycle finish is called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-group-setup",
+        "title": "Register the pan vault group with setup, join and status verbs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/setup.ts",
+            "src/cli/commands/vault/join.ts",
+            "src/cli/commands/vault/status.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/setup.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "setup.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors including lint-skills"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-14",
+            "NFR-1",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "The only CLI item with no CLI predecessor; later CLI items that share index.ts and SKILL.md are serialized after it by blocks edges."
+        },
+        "narrative": {
+          "Action": "Per decisions P-1..P-4 and P-13: add registerVaultCommands(program) in src/cli/commands/vault/index.ts and a vault group in src/cli/command-groups.ts (names [\"vault\"]), each verb a lazyAction import. setup <git-url>: refuse if already enabled with a different backend, create the key, initGitVault, write h/header, ensureEnvironmentIdentity, write config backend, and print the 24-word phrase once with the warning \"Anyone with these words can read your vault. Losing every device and these words loses the vault.\" join <git-url>: prompt for the phrase (or --phrase-file), verify via h/header, save key and config. status: print backend, machine label and environmentId, owned record count, last sync, and the machine list. With the vault off, status prints VAULT_OFF_MESSAGE and exits 0. Create sync-sources/skills/pan-vault/SKILL.md matching --help so scripts/lint-skills.sh passes. Check scripts/file-size-allowlist.txt if src/cli/index.ts grows."
+        },
+        "items": [
+          {
+            "id": "cli-group-setup.ac1",
+            "title": "Given an empty OVERDECK_HOME and a bare repo, when pan vault setup <url> runs, then it prints 24 words and the key-loss warning once and a second status run prints the backend and no phrase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-group-setup.ac2",
+            "title": "Given a second OVERDECK_HOME, when pan vault join <url> runs with the correct phrase, then it saves the key and status lists both machines after sync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-group-setup.ac3",
+            "title": "Given a wrong phrase, when pan vault join runs, then it prints \"The recovery phrase does not match this vault.\" and writes no key file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-group-setup.ac4",
+            "title": "Given no backend is configured, when pan vault status runs, then it prints the vault-off message and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-group-setup.ac5",
+            "title": "Given npm run lint runs, then scripts/lint-skills.sh reports no drift for pan-vault",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-save-sync",
+        "title": "Add pan vault save and pan vault sync verbs including the Stop-hook mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/save.ts",
+            "src/cli/commands/vault/sync.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/save-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/save-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-15",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Add save [session-id|path] with --all, --since <date>, --harness <h>, and --hook (P-15: read {session_id, transcript_path} JSON from stdin, never write stdout, always exit 0), resolving sessions through src/lib/conversations/harness-discovery.ts discovery roots. Print per session the verdict (appended N lines, noop, blocked at line N: pattern, diverged, excluded, offline). Add sync calling syncOnce and printing counts. With the vault off every verb prints VAULT_OFF_MESSAGE and exits 0 (save --hook prints nothing). Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-save-sync.ac1",
+            "title": "Given three discovered Claude sessions with mtimes on different days, when pan vault save --all --since <date> runs, then it saves exactly the sessions modified on or after that date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-save-sync.ac2",
+            "title": "Given the vault is off, when pan vault save --hook runs with hook JSON on stdin, then it writes nothing to stdout and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-save-sync.ac3",
+            "title": "Given a session with a secret, when pan vault save <id> runs, then it prints \"blocked at line N: <pattern>\" and exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-list-show",
+        "title": "Add pan vault list and pan vault show verbs with the owner badge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/list.ts",
+            "src/cli/commands/vault/show.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/list-show.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/list-show.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add list (reads the list cache only, never the backend; columns vaultId prefix, title, harness, owner label marked \"(this machine)\" when ownerIsHere, updatedAt; --json) and show <id> (fetches and decrypts the record and its chunks and prints the human turns and assistant text read-only, plus settlements with version numbers for @version). Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-list-show.ac1",
+            "title": "Given the list cache holds a record owned by machine A, when pan vault list runs on machine B, then it prints the title with owner label A and without \"(this machine)\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-show.ac2",
+            "title": "Given a record with 3 settlements, when pan vault show <id> runs, then it prints the conversation text and lists versions 1..3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-show.ac3",
+            "title": "Given the backend is unreachable, when pan vault list runs, then it prints the cached rows and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-materialize",
+        "title": "Materialize a Claude Code session from the VIEW and restore native files materialize.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/materialize.ts",
+            "tests/unit/lib/vault/materialize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/materialize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-16",
+            "FR-17"
+          ],
+          "parallelSafeReason": "Owns only materialize.ts and its test until codex-resume-checkpoint, which is serialized after it."
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/materialize.ts per PRD \"Materialization\" and P-5: materializeClaude({ record, store, keys, targetCwd, newSessionId }) fetches and decrypts the VIEW chunks and writes ~/.claude/projects/<slug(targetCwd)>/<newSessionId>.jsonl, rewriting only each line's \"sessionId\":\"<old>\" and (if the cwd changed) \"cwd\":\"<old>\" substrings by exact string replacement so all other bytes are unchanged; it refuses to overwrite an existing file. Compute the directory with claudeProjectDir(targetCwd) (encodeClaudeProjectDir, src/lib/runtimes/storage/claude-code.ts line 37); never import a slug helper from src/lib/overdeck/*, which the import guard bans. restoreNative({ record, nativePath }) rebuilds a native file of this machine's current segment byte-for-byte (the adopter prefix is re-materialized deterministically from segment.prefix, then the segment's own LOG lines follow)."
+        },
+        "items": [
+          {
+            "id": "vault-materialize.ac1",
+            "title": "Given a record with a compaction boundary, when materializeClaude runs, then the written file starts at the boundary line and every line differs from the saved line only in the sessionId value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-materialize.ac2",
+            "title": "Given a saved original-owner transcript, when restoreNative runs after the file is removed, then the rebuilt file is byte-identical to the original",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-materialize.ac3",
+            "title": "Given an adopted segment, when restoreNative runs, then the rebuilt file is byte-identical to the adopter file as settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-materialize.ac4",
+            "title": "Given the target file already exists, when materializeClaude runs, then it refuses and leaves the file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-adopt",
+        "title": "Transfer ownership by CAS and fork at a version adopt.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/adopt.ts",
+            "tests/unit/lib/vault/adopt.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/adopt.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "FR-17",
+            "D-6"
+          ],
+          "parallelSafeReason": "Owns only adopt.ts and its test."
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/adopt.ts per decisions P-5 and P-7: adoptRecord({ vaultId, targetCwd }) reads the record, refuses when the owner is this machine, appends a lineage entry and a new segment (prefix describing the VIEW range, sessionIdFrom/To, cwdFrom/To), casRefs it, and only on \"ok\" calls materializeClaude; on \"conflict\" it re-reads and returns { alreadyContinuedOn: <label> } without writing any native file. forkRecordAtVersion({ vaultId, version }) creates a new record (new vaultId, owned here) whose log is the parent chunk ids through settlement n and whose parent is { vaultId, version: n }; the original ref is never written. The origin machine native file is never touched."
+        },
+        "items": [
+          {
+            "id": "vault-adopt.ac1",
+            "title": "Given two machines call adoptRecord on the same record concurrently, when both settle, then exactly one becomes owner and the other returns alreadyContinuedOn with the winner label and writes no native file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-adopt.ac2",
+            "title": "Given adoptRecord succeeds on machine B, when machine A runs syncOnce, then A list cache shows the record owned by B and A native file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-adopt.ac3",
+            "title": "Given a record with 3 settlements, when forkRecordAtVersion runs with version 2, then a new record exists with parent {vaultId, version: 2} and the original ref version is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-resume",
+        "title": "Add pan vault resume with drift choice, version fork and native Claude launch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/resume.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/resume.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/resume.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-12",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Add resume <id>[@<version>] with --cwd <dir>, --no-launch, --on-drift continue|note|cancel per P-17. Target cwd: --cwd, else the saved cwd if it exists, else exit 1 naming both options. @version calls forkRecordAtVersion first. Compare readCwdState(target) with the last settlement cwdState; on difference ask on a TTY, use --on-drift otherwise, and cancel when neither. Then adoptRecord (or materialize directly for an owned fork) and spawn claude --resume <newSessionId> [note] with stdio inherit in the target cwd; --no-launch prints that command instead. Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-resume.ac1",
+            "title": "Given a record owned by machine A, when pan vault resume <id> --no-launch runs on machine B, then it prints a claude --resume command whose session file exists under ~/.claude/projects and B becomes owner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-resume.ac2",
+            "title": "Given HEAD differs from the saved cwd state and stdin is not a TTY, when pan vault resume runs without --on-drift, then it cancels, prints the differing fields and writes no native file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-resume.ac3",
+            "title": "Given --on-drift note, when pan vault resume --no-launch runs, then the printed command includes a note naming the differing fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-resume.ac4",
+            "title": "Given <id>@2, when pan vault resume runs, then it creates a fork record and the original record is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-resume-checkpoint",
+        "title": "Resolve the Codex native-resume checkpoint and add the seeded fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "spike",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/materialize.ts",
+            "src/lib/vault/seed.ts",
+            "src/cli/commands/vault/resume.ts",
+            "tests/unit/lib/vault/seed.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/seed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "parallelSafeReason": "Runs after cli-resume and vault-materialize, the only other items that touch its files."
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint per PRD WI-6 and decision P-16. Step 1: in a throwaway CODEX_HOME temp dir, place a materialized rollout under sessions/YYYY/MM/DD/ and run codex resume <id>; record the outcome as opened, refused (Codex found no thread without a state_<N>.sqlite threads row), or could-not-test (auth or network failure before Codex looked for the rollout). Step 2: if it opens, add materializeCodex (rollout written under <CODEX_HOME>/sessions, never touching SQLite) and launch codex resume <id>; for refused or could-not-test, Codex uses the fallback. Never write any Codex SQLite file in either case. Step 3: create src/lib/vault/seed.ts buildSeedDigest(record) (human turns per FR-18 plus the final assistant text of each turn, capped at 32 KB, headed [Session Vault] Seeded continuation of \"<title>\" (not a native resume)); no model call. For non-Claude, non-Codex harnesses resume writes <targetCwd>/.overdeck-vault-seed-<vaultId>.md, prints its path and launches nothing. Record the step-1 outcome in the PR description."
+        },
+        "items": [
+          {
+            "id": "codex-resume-checkpoint.ac1",
+            "title": "Given a record with 40 KB of turns, when buildSeedDigest runs, then it returns at most 32 KB starting with the [Session Vault] header and makes no network call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-resume-checkpoint.ac2",
+            "title": "Given a pi harness record, when pan vault resume runs, then it writes .overdeck-vault-seed-<vaultId>.md in the target cwd, prints the path and spawns no process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-resume-checkpoint.ac3",
+            "title": "Given a Codex record, when pan vault resume --no-launch runs, then it prints either a codex resume command (native path) or a codex command with the seed digest (fallback), and no file under CODEX_HOME matching state_*.sqlite is modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deletion-door",
+        "title": "Extract the transcript deletion door into a leaf module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/transcript-deletion-door.ts",
+            "src/lib/cloister/transcript-retention.ts",
+            "tests/unit/lib/cloister/transcript-deletion-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/transcript-deletion-door.test.ts tests/unit/lib/cloister/transcript-retention.test.ts src/lib/cloister/__tests__/transcript-retention.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-10",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD decision P-9: create src/lib/cloister/transcript-deletion-door.ts exporting removeTranscriptFile(path) (rm with force) and removeTranscriptTree(path) (rm recursive, force), importing only node:fs/promises. Change transcript-retention.ts defaultDeps.removeFile and removeTree to call them. No behavior change to the retention sweep."
+        },
+        "items": [
+          {
+            "id": "deletion-door.ac1",
+            "title": "Given the existing tests tests/unit/lib/cloister/transcript-retention.test.ts and src/lib/cloister/__tests__/transcript-retention.test.ts, when they run, then they pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deletion-door.ac2",
+            "title": "Given transcript-deletion-door.ts, when its imports are inspected by the new test, then it imports only node:fs/promises",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deletion-door.ac3",
+            "title": "Given removeTranscriptFile runs on a temp file, then the file no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-evict-batch",
+        "title": "Maintain the pending-deletion batch with fingerprint, decline, clear and re-offer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/evict.ts",
+            "src/lib/vault/sync.ts",
+            "tests/unit/lib/vault/evict-batch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/evict-batch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-20",
+            "FR-23",
+            "NFR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vault/evict.ts per FR-16, FR-20, FR-23 and P-10: batch file vaultDir()/eviction-batch.json (atomic, 0600, never uploaded) with entries { vaultId, harness, nativePath, title, sizeBytes, settlementChunk, verification: \"verified\"|\"failed\", reason?, checkedAt, addedAt } and a declined list. scanEligible() adds a transcript only when its record LOG covers every settleable line, the covering chunk read back from the store decrypts and its lineHashes match the native lines, and its mtime is older than liveQuietMinutes. batchFingerprint() = SHA-256 over sorted (vaultId, nativePath, sizeBytes, settlementChunk). declineEntry, clearBatch, reofferEntry per FR-23. When config.evict is true, syncOnce calls scanEligible after settling. This item deletes nothing and does not import transcript-deletion-door."
+        },
+        "items": [
+          {
+            "id": "vault-evict-batch.ac1",
+            "title": "Given evict true and a verified, quiet transcript, when syncOnce runs, then the batch contains its entry with status verified and the file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-evict-batch.ac2",
+            "title": "Given a transcript modified 5 minutes ago, when scanEligible runs, then it is not added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-evict-batch.ac3",
+            "title": "Given a declined entry, when scanEligible runs again, then it is not re-added until reofferEntry runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-evict-batch.ac4",
+            "title": "Given clearBatch runs, then the batch is empty, no declines are recorded and every native file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-evict-confirm",
+        "title": "Confirm eviction by fingerprint with re-check through the deletion door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/evict.ts",
+            "tests/unit/lib/vault/evict-confirm.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/evict-confirm.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-21",
+            "NFR-10"
+          ],
+          "parallelSafeReason": "Shares evict.ts only with vault-evict-batch, which blocks it."
+        },
+        "narrative": {
+          "Action": "Add confirmEviction(fingerprint) to src/lib/vault/evict.ts per FR-21: refuse and return the current fingerprint when it differs; otherwise for each entry re-run the FR-16 checks (read-back hash verification, not live, size unchanged since the covering settlement) immediately before calling removeTranscriptFile from transcript-deletion-door.ts; skip failing entries, keep them in the batch with the new status and reason, remove deleted entries, and return { deleted, skipped, bytesFreed }. This is the only call site of the deletion door in src/lib/vault."
+        },
+        "items": [
+          {
+            "id": "vault-evict-confirm.ac1",
+            "title": "Given a batch reviewed with fingerprint F and then changed, when confirmEviction(F) runs, then it deletes nothing and returns the new fingerprint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-evict-confirm.ac2",
+            "title": "Given a batch with one verified entry and one entry whose file grew, when confirmEviction runs with the current fingerprint, then it deletes only the verified file and keeps the grown entry with a reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-evict-confirm.ac3",
+            "title": "Given a spy on removeTranscriptFile across the settle, sync, evict-batch and sync-loop tests under fake timers, then it is called only from confirmEviction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-evict-restore",
+        "title": "Add pan vault evict review/confirm/decline/clear and pan vault restore",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/evict.ts",
+            "src/cli/commands/vault/restore.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/evict-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/evict-restore.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-21",
+            "FR-23"
+          ]
+        },
+        "narrative": {
+          "Action": "Add evict with --review (default), --confirm <fingerprint>, --decline <vaultId>, --reoffer <vaultId>, --clear per FR-21/FR-23: review prints each entry (native path, harness, title, size, verification status), the total size and the fingerprint and deletes nothing; confirm prints what was deleted and bytes freed, or the refusal with the new fingerprint. Add restore <id> calling restoreNative to rebuild the file at its original path (refuse if a file exists there). Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-evict-restore.ac1",
+            "title": "Given a pending batch, when pan vault evict runs with no flags, then it prints each path, size, status, the total and a fingerprint and every file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-evict-restore.ac2",
+            "title": "Given the printed fingerprint, when pan vault evict --confirm <fingerprint> runs, then exactly the listed verified files are deleted and the bytes freed are printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-evict-restore.ac3",
+            "title": "Given an evicted transcript, when pan vault restore <id> runs, then the file at its original path is byte-identical to the file before eviction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-evict-restore.ac4",
+            "title": "Given pan vault evict --clear runs, then no file is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-exclude-secrets",
+        "title": "Add pan vault exclude, include and allow-secret verbs with tombstoning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/exclude.ts",
+            "src/cli/commands/vault/allow-secret.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/exclude.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/exclude.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Add exclude [path] with --origin <url> and --session <id>, include with the same flags (both in exclude.ts), and allow-secret <vaultId> <line> per P-8 and P-11. Excluding a session that already has a record casRefs the tombstone value { v: 1, type: \"session\", vaultId, tombstone: true }; list hides tombstoned rows. Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-exclude-secrets.ac1",
+            "title": "Given pan vault exclude /work/secret-proj, when pan vault save --all runs, then no record is created for sessions whose cwd is under that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-exclude-secrets.ac2",
+            "title": "Given a saved session, when pan vault exclude --session <id> runs, then its record ref value is a tombstone and pan vault list no longer shows it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-exclude-secrets.ac3",
+            "title": "Given a blocked line, when pan vault allow-secret <vaultId> <line> runs, then the next pan vault save for that session appends the line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-hooks",
+        "title": "Add pan vault setup --hooks with one idempotent Claude Code Stop hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-hooks-registration.ts",
+            "src/cli/commands/vault/setup.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/setup-hooks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/setup-hooks.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD decision P-15: add addHookCommandIfMissing(settings, hookType, command, matcher = \".*\") to src/lib/claude-hooks-registration.ts. setup --hooks reads ~/.claude/settings.json, refuses without writing if it is invalid JSON, adds one Stop entry whose command is \"<process.execPath>\" \"<realpath of process.argv[1]>\" vault save --hook, writes atomically, and prints the file path and the entry. Without --hooks, setup never writes harness settings. Update SKILL.md."
+        },
+        "items": [
+          {
+            "id": "cli-hooks.ac1",
+            "title": "Given a settings.json with other hooks, when pan vault setup --hooks runs twice, then exactly one Stop entry with the vault save --hook command exists and the other hooks are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-hooks.ac2",
+            "title": "Given settings.json contains invalid JSON, when pan vault setup --hooks runs, then it refuses and the file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-hooks.ac3",
+            "title": "Given pan vault setup runs without --hooks, then ~/.claude/settings.json is not created or modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "standalone-import-guard",
+        "title": "Add the import-graph test that keeps pan vault standalone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/vault/import-graph.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the named vitest files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-7",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD decision P-14: add a test that parses static import and dynamic import() specifiers starting from every file in src/cli/commands/vault/ and src/lib/vault/ (recursively following relative imports) and fails when any resolves into src/dashboard/, src/lib/terminal-backends/, src/lib/overdeck/, the effect package, or a node-pty package, printing the import chain."
+        },
+        "items": [
+          {
+            "id": "standalone-import-guard.ac1",
+            "title": "Given the finished vault modules, when the test runs, then it passes and reports the number of modules walked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standalone-import-guard.ac2",
+            "title": "Given a temporary fixture import of src/lib/overdeck/conversations.ts added in the test, when the walker runs on that fixture, then it fails naming the chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-two-machine",
+        "title": "Add the two-machine end-to-end test with plaintext byte scan and evict round trip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/vault/two-machine.e2e.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/two-machine.e2e.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "two-machine.e2e.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-16",
+            "NFR-1",
+            "NFR-8",
+            "D-6"
+          ],
+          "parallelSafeReason": "Owns a single new test file and runs after all CLI items."
+        },
+        "narrative": {
+          "Action": "Add tests/unit/lib/vault/two-machine.e2e.test.ts running the built command functions with two temp HOME/OVERDECK_HOME pairs, no dashboard and no pan install, against a local bare git repo: setup on A, join on B, save a fixture Claude transcript on A containing a distinctive title, cwd, project name and line text, sync on A then B, list on B shows it owned by A, resume --no-launch on B materializes it, concurrent adoption yields one owner, then scan every byte of the bare repo (git cat-file of all objects) for the distinctive strings, and run evict review, confirm, restore on A with byte comparison. Spy on fetch, net.connect and child_process to assert only git subprocesses and no other network calls."
+        },
+        "items": [
+          {
+            "id": "e2e-two-machine.ac1",
+            "title": "Given the full flow, when the test runs, then B lists A conversation with owner A after both syncs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-two-machine.ac2",
+            "title": "Given every object in the bare repo, when scanned, then none contains the fixture transcript line, title, cwd or project name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-two-machine.ac3",
+            "title": "Given evict confirm then restore on A, then the restored file is byte-identical to the original",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-two-machine.ac4",
+            "title": "Given fetch and net.connect spies, then no call is made and every child process spawned is git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Session Vault for users and developers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2609",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx",
+            "docs.json",
+            "docs/TRANSCRIPT-PRESERVATION.md",
+            "configuration/telemetry.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-14",
+            "FR-16",
+            "NFR-1",
+            "NFR-8",
+            "NFR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11 (rev 4): write docs/SESSION-VAULT.md (model: vault, backend, record, chunk, LOG, VIEW, owner, adoption; encryption and the key-loss warning; setup, join, save, sync, list, show, resume with @version and drift choices, exclude/include/allow-secret, evict review/confirm/decline/clear and restore; troubleshooting for offline, diverged and blocked). Write the user page configuration/session-vault.mdx with the same setup and eviction steps and add \"configuration/session-vault\" to the Configuration group in docs.json. In docs/TRANSCRIPT-PRESERVATION.md add that off-machine copies are the Session Vault. In configuration/telemetry.mdx add that pan vault sends no telemetry. Leave the CLAUDE.md \"JSONL session files are sacred\" line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/session-vault.mdx, then it contains the sentence that losing every device and the recovery phrase loses the vault, and docs.json lists configuration/session-vault in the Configuration group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/SESSION-VAULT.md, then it shows the pan vault evict --review and --confirm <fingerprint> steps and states that nothing is deleted without confirmation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given configuration/telemetry.mdx, then it states that pan vault commands send no telemetry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given CLAUDE.md, then the \"JSONL session files are sacred\" line is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vault-config",
+        "to": "vault-key-phrase",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-key-phrase",
+        "to": "vault-format",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-continuity",
+        "to": "vault-format",
+        "type": "blocks"
+      },
+      {
+        "from": "secret-matcher",
+        "to": "vault-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-config",
+        "to": "vault-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "store-contract",
+        "to": "store-git",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-format",
+        "to": "store-git",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-config",
+        "to": "vault-local-index",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-config",
+        "to": "vault-exclude",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-format",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-continuity",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-turns",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-secrets",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-cwd-state",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "store-contract",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-local-index",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-exclude",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "env-identity",
+        "to": "vault-settle",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-settle",
+        "to": "vault-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-key-phrase",
+        "to": "cli-group-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "store-git",
+        "to": "cli-group-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "env-identity",
+        "to": "cli-group-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-config",
+        "to": "cli-group-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-save-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-sync",
+        "to": "cli-save-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-save-sync",
+        "to": "cli-list-show",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-format",
+        "to": "vault-materialize",
+        "type": "blocks"
+      },
+      {
+        "from": "store-contract",
+        "to": "vault-materialize",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-materialize",
+        "to": "vault-adopt",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-settle",
+        "to": "vault-adopt",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-adopt",
+        "to": "cli-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-show",
+        "to": "cli-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-resume",
+        "to": "codex-resume-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-materialize",
+        "to": "codex-resume-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-turns",
+        "to": "codex-resume-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-sync",
+        "to": "vault-evict-batch",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-evict-batch",
+        "to": "vault-evict-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "deletion-door",
+        "to": "vault-evict-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-evict-confirm",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-materialize",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-resume-checkpoint",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-evict-restore",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-exclude",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-secrets",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-exclude-secrets",
+        "to": "cli-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-hooks",
+        "to": "standalone-import-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-telemetry-bypass",
+        "to": "e2e-two-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-hooks",
+        "to": "e2e-two-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-hooks",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-list-show",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-group-setup",
+        "to": "cli-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-save-sync",
+        "to": "cli-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-save-sync",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-save-sync",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-save-sync",
+        "to": "cli-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-show",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-show",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-show",
+        "to": "cli-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-resume",
+        "to": "cli-evict-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-resume",
+        "to": "cli-exclude-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-resume",
+        "to": "cli-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-evict-restore",
+        "to": "cli-hooks",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

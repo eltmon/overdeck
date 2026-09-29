@@ -33,14 +33,30 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   paneQuestion: 'Question in terminal — answer the agent',
 };
 
+/** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */
+export const TURN_END_KIND_LABEL: Record<string, string> = {
+  asks_operator: 'Asked you a question',
+  reports_complete: 'Reported done',
+  reports_blocked: 'Blocked',
+};
+
 /**
  * Human tooltip for a set of pending kinds. Falls back to a generic phrase when
  * the kinds array is empty (e.g. an agent flagged via the legacy
  * `hasPendingQuestion` boolean with no kinds populated yet).
+ *
+ * PAN-4371 — for the `agentTurnEnded` kind, a confident Jev turn-end reading
+ * (`turnEnd`) replaces the generic "Answer the agent" label with why the agent
+ * actually stopped.
  */
-export function describePendingInput(kinds: ReadonlyArray<string> | undefined): string {
+export function describePendingInput(
+  kinds: ReadonlyArray<string> | undefined,
+  turnEnd?: { kind: string } | null,
+): string {
   if (!kinds || kinds.length === 0) return 'Waiting on your input';
-  return kinds.map((k) => PENDING_INPUT_KIND_LABEL[k] ?? k).join(', ');
+  return kinds
+    .map((k) => (k === 'agentTurnEnded' && turnEnd && TURN_END_KIND_LABEL[turnEnd.kind]) || PENDING_INPUT_KIND_LABEL[k] || k)
+    .join(', ');
 }
 
 /**

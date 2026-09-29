@@ -102,6 +102,12 @@ Raw counts and durations are replaced by coarse buckets. The complete,
 mechanically checked event and property list is in
 [Anonymous telemetry schema](https://github.com/eltmon/overdeck/blob/main/docs/TELEMETRY.md).
 
+## Commands that send nothing
+
+`pan vault` commands send no telemetry at all: no event is captured, no PostHog client is
+created and the daily instance heartbeat is skipped for them. The vault talks only to the
+backend you configured with `pan vault setup`.
+
 ## What is never sent
 
 - Source code or file contents

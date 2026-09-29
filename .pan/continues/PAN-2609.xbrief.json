@@ -1,0 +1,643 @@
+{
+  "version": "1",
+  "issueId": "PAN-2609",
+  "created": "2026-09-28T13:05:52.429Z",
+  "updated": "2026-09-29T06:39:25.619Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "env-identity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:05:52.429Z",
+      "doneAt": "2026-09-28T13:11:42.532Z"
+    },
+    "vault-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:13:08.801Z",
+      "doneAt": "2026-09-28T13:19:57.514Z"
+    },
+    "vault-key-phrase": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:20:10.669Z",
+      "doneAt": "2026-09-28T13:24:15.127Z"
+    },
+    "vault-continuity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:24:16.455Z",
+      "doneAt": "2026-09-28T13:26:24.031Z"
+    },
+    "vault-turns": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:26:25.322Z",
+      "doneAt": "2026-09-28T13:27:03.301Z"
+    },
+    "secret-matcher": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:27:04.589Z",
+      "doneAt": "2026-09-29T06:03:39.836Z"
+    },
+    "vault-secrets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:29:07.659Z",
+      "doneAt": "2026-09-29T06:04:17.608Z"
+    },
+    "vault-cwd-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:35:24.598Z",
+      "doneAt": "2026-09-29T06:04:38.990Z"
+    },
+    "deletion-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:38:44.663Z",
+      "doneAt": "2026-09-29T06:04:57.954Z"
+    },
+    "cli-telemetry-bypass": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:39:14.757Z",
+      "doneAt": "2026-09-29T06:05:18.955Z"
+    },
+    "vault-local-index": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:40:33.699Z",
+      "doneAt": "2026-09-29T06:05:41.038Z"
+    },
+    "vault-exclude": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:42:09.372Z",
+      "doneAt": "2026-09-29T06:06:05.825Z"
+    },
+    "store-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:44:14.674Z",
+      "doneAt": "2026-09-29T06:06:30.297Z"
+    },
+    "vault-format": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:50:51.092Z",
+      "doneAt": "2026-09-29T06:06:54.820Z"
+    },
+    "store-git": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:55:41.011Z",
+      "doneAt": "2026-09-29T06:07:16.794Z"
+    },
+    "vault-settle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:57:40.647Z",
+      "doneAt": "2026-09-29T06:07:40.448Z"
+    },
+    "vault-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:01:23.296Z",
+      "doneAt": "2026-09-29T06:08:01.333Z"
+    },
+    "standalone-import-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:03:13.196Z",
+      "doneAt": "2026-09-29T06:08:20.549Z"
+    },
+    "vault-materialize": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:03:55.214Z",
+      "doneAt": "2026-09-29T06:08:37.100Z"
+    },
+    "vault-adopt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:09:58.048Z",
+      "doneAt": "2026-09-29T06:08:54.393Z"
+    },
+    "vault-evict-batch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:12:38.022Z",
+      "doneAt": "2026-09-29T06:09:13.392Z"
+    },
+    "cli-group-setup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:21:10.396Z",
+      "doneAt": "2026-09-29T06:09:48.521Z"
+    },
+    "cli-save-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:45:13.467Z",
+      "doneAt": "2026-09-29T06:10:05.009Z"
+    },
+    "cli-list-show": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:45:16.111Z",
+      "doneAt": "2026-09-29T06:10:24.634Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:46:57.593Z",
+      "doneAt": "2026-09-29T06:11:02.133Z"
+    },
+    "codex-resume-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:47:50.731Z",
+      "doneAt": "2026-09-29T06:10:45.525Z"
+    },
+    "cli-evict-restore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:48:40.316Z",
+      "doneAt": "2026-09-29T06:11:19.169Z"
+    },
+    "cli-hooks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:48:42.453Z",
+      "doneAt": "2026-09-29T06:11:35.726Z"
+    },
+    "cli-resume": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:54:40.691Z",
+      "doneAt": "2026-09-29T06:11:53.516Z"
+    },
+    "cli-exclude-secrets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:57:44.726Z",
+      "doneAt": "2026-09-29T06:12:11.784Z"
+    },
+    "e2e-two-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:57:47.382Z",
+      "doneAt": "2026-09-29T06:12:27.598Z"
+    },
+    "vault-evict-confirm": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:09:32.409Z"
+    },
+    "env-identity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:15:25.744Z"
+    },
+    "env-identity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:15:54.906Z"
+    },
+    "env-identity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:16:08.353Z"
+    },
+    "env-identity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:16:21.027Z"
+    },
+    "vault-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:16:34.242Z"
+    },
+    "vault-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:16:48.446Z"
+    },
+    "vault-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:17:01.312Z"
+    },
+    "vault-key-phrase.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:17:14.317Z"
+    },
+    "vault-key-phrase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:17:27.038Z"
+    },
+    "vault-key-phrase.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:17:39.585Z"
+    },
+    "vault-key-phrase.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:17:51.728Z"
+    },
+    "vault-key-phrase.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:18:04.556Z"
+    },
+    "vault-continuity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:18:16.216Z"
+    },
+    "vault-continuity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:18:28.556Z"
+    },
+    "vault-continuity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:18:40.456Z"
+    },
+    "vault-continuity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:18:52.809Z"
+    },
+    "vault-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:05.113Z"
+    },
+    "vault-format.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:17.590Z"
+    },
+    "vault-format.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:30.413Z"
+    },
+    "vault-format.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:44.351Z"
+    },
+    "vault-format.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:57.762Z"
+    },
+    "vault-turns.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:20:13.295Z"
+    },
+    "vault-turns.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:20:26.533Z"
+    },
+    "vault-turns.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:20:39.697Z"
+    },
+    "secret-matcher.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:20:51.958Z"
+    },
+    "secret-matcher.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:21:05.418Z"
+    },
+    "secret-matcher.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:21:18.585Z"
+    },
+    "vault-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:21:31.051Z"
+    },
+    "vault-secrets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:21:44.399Z"
+    },
+    "vault-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:21:58.808Z"
+    },
+    "vault-cwd-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:22:13.058Z"
+    },
+    "vault-cwd-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:22:26.871Z"
+    },
+    "vault-cwd-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:22:40.064Z"
+    },
+    "store-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:22:54.498Z"
+    },
+    "store-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:23:09.040Z"
+    },
+    "store-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:23:23.710Z"
+    },
+    "store-git.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:23:36.683Z"
+    },
+    "store-git.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:23:50.326Z"
+    },
+    "store-git.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:24:04.628Z"
+    },
+    "vault-local-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:24:16.949Z"
+    },
+    "vault-local-index.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:24:30.195Z"
+    },
+    "vault-local-index.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:24:43.406Z"
+    },
+    "vault-exclude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:24:55.515Z"
+    },
+    "vault-exclude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:25:09.095Z"
+    },
+    "vault-exclude.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:25:22.204Z"
+    },
+    "vault-settle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:25:35.079Z"
+    },
+    "vault-settle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:25:47.628Z"
+    },
+    "vault-settle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:00.133Z"
+    },
+    "vault-settle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:12.559Z"
+    },
+    "vault-settle.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:25.681Z"
+    },
+    "vault-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:40.088Z"
+    },
+    "vault-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:53.319Z"
+    },
+    "vault-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:27:06.200Z"
+    },
+    "cli-telemetry-bypass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:27:20.578Z"
+    },
+    "cli-telemetry-bypass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:27:34.092Z"
+    },
+    "cli-group-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:27:47.472Z"
+    },
+    "cli-group-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:28:01.485Z"
+    },
+    "cli-group-setup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:28:15.642Z"
+    },
+    "cli-group-setup.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:28:29.129Z"
+    },
+    "cli-group-setup.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:28:41.951Z"
+    },
+    "cli-save-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:28:54.902Z"
+    },
+    "cli-save-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:08.257Z"
+    },
+    "cli-save-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:20.723Z"
+    },
+    "cli-list-show.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:33.248Z"
+    },
+    "cli-list-show.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:45.240Z"
+    },
+    "cli-list-show.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:57.581Z"
+    },
+    "vault-materialize.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:30:10.997Z"
+    },
+    "vault-materialize.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:30:23.728Z"
+    },
+    "vault-materialize.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:30:35.551Z"
+    },
+    "vault-materialize.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:30:50.448Z"
+    },
+    "vault-adopt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:02.984Z"
+    },
+    "vault-adopt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:15.565Z"
+    },
+    "vault-adopt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:27.876Z"
+    },
+    "cli-resume.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:40.130Z"
+    },
+    "cli-resume.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:52.584Z"
+    },
+    "cli-resume.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:32:05.364Z"
+    },
+    "cli-resume.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:32:17.941Z"
+    },
+    "codex-resume-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:32:30.985Z"
+    },
+    "codex-resume-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:32:45.443Z"
+    },
+    "codex-resume-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:32:58.491Z"
+    },
+    "deletion-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:11.621Z"
+    },
+    "deletion-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:24.368Z"
+    },
+    "deletion-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:38.063Z"
+    },
+    "vault-evict-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:51.638Z"
+    },
+    "vault-evict-batch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:04.934Z"
+    },
+    "vault-evict-batch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:18.527Z"
+    },
+    "vault-evict-batch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:31.966Z"
+    },
+    "vault-evict-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:43.963Z"
+    },
+    "vault-evict-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:56.310Z"
+    },
+    "vault-evict-confirm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:09.009Z"
+    },
+    "cli-evict-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:21.410Z"
+    },
+    "cli-evict-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:33.581Z"
+    },
+    "cli-evict-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:46.224Z"
+    },
+    "cli-evict-restore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:59.047Z"
+    },
+    "cli-exclude-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:12.060Z"
+    },
+    "cli-exclude-secrets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:24.696Z"
+    },
+    "cli-exclude-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:37.498Z"
+    },
+    "cli-hooks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:50.754Z"
+    },
+    "cli-hooks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:04.721Z"
+    },
+    "cli-hooks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:17.186Z"
+    },
+    "standalone-import-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:30.047Z"
+    },
+    "standalone-import-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:42.737Z"
+    },
+    "e2e-two-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:57.642Z"
+    },
+    "e2e-two-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:11.029Z"
+    },
+    "e2e-two-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:23.085Z"
+    },
+    "e2e-two-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:35.033Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:47.129Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:59.846Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:39:12.884Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:39:25.619Z"
+    }
+  }
+}

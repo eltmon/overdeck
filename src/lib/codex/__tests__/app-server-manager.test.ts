@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerManager } from '../app-server-manager.js';
+import { CodexAppServerManager, codexModelMinimumVersion, parseCodexCliVersion } from '../app-server-manager.js';
 import { createFakeAppServer, createFakeNativeTransport, type FakeNativeTransport } from './fake-app-server.js';
 
 afterEach(() => vi.useRealTimers());
@@ -621,5 +621,27 @@ describe('CodexAppServerManager', () => {
       expect(manager.getState().threadId).toBeUndefined();
       manager.stop();
     });
+  });
+});
+
+describe('codexModelMinimumVersion (PAN-4363)', () => {
+  it('returns the floor for gpt-6-sol and gpt-6-luna', () => {
+    expect(codexModelMinimumVersion('gpt-6-luna')).toBe('0.156.1');
+    expect(codexModelMinimumVersion('gpt-6-sol')).toBe('0.156.1');
+  });
+
+  it('returns undefined for models without a floor and for inherited prototype keys', () => {
+    expect(codexModelMinimumVersion('gpt-6-astra')).toBeUndefined();
+    expect(codexModelMinimumVersion('toString')).toBeUndefined();
+  });
+});
+
+describe('parseCodexCliVersion (PAN-4363)', () => {
+  it('extracts the version from CLI output', () => {
+    expect(parseCodexCliVersion('codex-cli 0.158.0\n')).toBe('0.158.0');
+  });
+
+  it('returns undefined when no version is present', () => {
+    expect(parseCodexCliVersion('garbage')).toBeUndefined();
   });
 });

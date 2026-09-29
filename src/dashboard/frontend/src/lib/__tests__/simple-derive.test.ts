@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { AgentSnapshot } from '@overdeck/contracts';
-import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue } from '../simple/derive';
+import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue, isBareTurnEnd, isPlanReadyToStart } from '../simple/derive';
 import { simpleStepIndex } from '../simple/phases';
 import type { BackendPane, DerivedIssueState, DerivedIssueStateName, Issue } from '../../types';
 
@@ -47,6 +47,33 @@ const pane = (role: BackendPane['role'], state: BackendPane['state'] = 'working'
 const WORK = [pane('work')];
 const PLAN = [pane('plan')];
 const PLAN_STOPPED = [pane('plan', 'exited')];
+
+describe('isBareTurnEnd — turn-end assessment override (PAN-4371)', () => {
+  it('a confident asks_operator reading is not a bare turn end', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'], turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' } });
+    expect(isBareTurnEnd(a)).toBe(false);
+  });
+
+  it('a confident reports_complete reading is still a bare turn end', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'], turnEndAssessment: { kind: 'reports_complete', confidence: 0.9, needsAnswer: false, model: 'm' } });
+    expect(isBareTurnEnd(a)).toBe(true);
+  });
+
+  it('no assessment keeps today\'s answer', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'] });
+    expect(isBareTurnEnd(a)).toBe(true);
+  });
+
+  it('isPlanReadyToStart is false for a plan agent with a confident asks_operator reading', () => {
+    const issue = makeIssue({ hasPlan: true });
+    const planAgent = agent({
+      role: 'plan',
+      pendingInputKinds: ['agentTurnEnded'],
+      turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' },
+    });
+    expect(isPlanReadyToStart(issue, planAgent)).toBe(false);
+  });
+});
 
 describe('deriveSimpleIssue', () => {
   it('working issue with a running work agent → working / Writing code', () => {

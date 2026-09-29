@@ -2,10 +2,12 @@
 
 Live landmines a change in this repo can step on. Verified 2026-09-26.
 
-- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
-  Pi + Anthropic + subscription auth. Every harness resolution path must end by
-  passing its winner through this gate; blocked ⇒ collapse to `claude-code`.
-  Never bypass, never reorder around it.
+- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
+  ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
+  rules listed in its header). Every harness resolution path must end by passing its
+  winner through this gate. In `resolveHarness` a denial throws `HarnessResolutionError`
+  for an explicit pick or a non-claude-code provider default (PAN-1871); only an
+  Anthropic-native model collapses to `claude-code`. Never bypass, never reorder around it.
 - **Harness resolution is unified in `resolveHarness()`** (PAN-1787, landed
   3da6c9bc1) — `src/lib/harness-resolve.ts`. Precedence: explicit → roles[role].harness
   → providerHarnesses[provider] → built-in provider default → claude-code. Any value
@@ -289,5 +291,17 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`xbrief/plan-finalized.ts`) or every open branch fails verification. For a
   polyrepo `pan_records.repo` project, finalize makes that commit in the nested
   plan-home repo, not the wrapper.
+- **The stall sweeper is not scheduled** — PAN-3917 W4 (`94255f055fe`) cut the
+  only call site of `runStallSweeperPatrol` (`cloister/stall-sweeper.ts`); it
+  runs only in tests. Live parked-row readers are `pan parked` and
+  `/api/velocity` (both via `parked/resolver.ts`) and `/api/parked`
+  (`routes/parked.ts`, its own derivation). Anything added to sweeper output
+  has no live emitter until the sweeper is rescheduled (operator decision).
+
+- **Session Vault WIP capture runs in the Stop hook** (PAN-4329) — `pan vault save --hook`
+  now builds a temp-index commit, bundles and uploads per turn. Never touch the user's
+  index/worktree/stash (temp `GIT_INDEX_FILE` seeded from a *copy* of the real index —
+  an empty one drops force-added ignored files), async `execFile` only, and skip when the
+  (base, tree) pair is unchanged.
 
 <!-- last-verified: 2026-09-29 -->

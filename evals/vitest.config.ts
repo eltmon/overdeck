@@ -16,6 +16,7 @@ export default defineConfig({
     setupFiles: [],
     // Live evals call a real model at effort 'high' (adaptive thinking / reasoning.effort);
     // Evalite's default 30s testTimeout is too short for that and times out mid-run.
-    testTimeout: 180_000,
+    // E3 asks for a full xBRIEF at effort high; 10 minutes covers a 48K-token response.
+    testTimeout: 600_000,
   },
 });

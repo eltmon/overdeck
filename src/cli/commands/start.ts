@@ -165,7 +165,9 @@ async function resolveExplicitHarnessFlag(
   if (model) {
     const { canUseHarness } = await import('../../lib/harness-policy.js');
     const { getProviderAuthMode } = await import('../../lib/agents.js');
-    const decision = canUseHarness(harness, model, await getProviderAuthMode(model));
+    const { resolveCodexPolicyContext } = await import('../../lib/codex/policy-context.js');
+    const authMode = await getProviderAuthMode(model);
+    const decision = canUseHarness(harness, model, authMode, await resolveCodexPolicyContext(harness, model, authMode));
     if (!decision.allowed) {
       process.stderr.write(`${decision.reason}\n`);
       return exitCli(1);

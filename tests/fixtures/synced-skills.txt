@@ -92,6 +92,7 @@ pan-tts
 pan-unpause
 pan-untroubled
 pan-up
+pan-vault
 pan-wipe
 pan-worker
 pan-workspace

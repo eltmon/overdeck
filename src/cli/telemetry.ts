@@ -109,8 +109,32 @@ export class CliProcessLifecycle {
   }
 }
 
-const cliTelemetry = new CliTelemetryLifecycle();
-registerCliExitFinalizer((code) => cliTelemetry.finish(code === 0));
+/**
+ * PAN-2609 P-12: `pan vault` sends no telemetry. When the first positional
+ * argv (after node and the script) is `vault`, the CLI runs without an
+ * analytics lifecycle and without the instance heartbeat, so no PostHog client
+ * is created and no event is captured. Every other verb is unaffected.
+ */
+export function isVaultInvocation(argv: readonly string[] = process.argv): boolean {
+  return argv[2] === 'vault';
+}
+
+/** Exit path for a telemetry-free invocation: land queued ledger lines, nothing else. */
+async function finishWithoutTelemetry(): Promise<void> {
+  await flushLedgerWrites();
+}
+
+let cliTelemetry: CliTelemetryLifecycle | undefined;
+
+/** The process-wide telemetry lifecycle, created on first use (never for `pan vault`). */
+function getCliTelemetry(): CliTelemetryLifecycle {
+  cliTelemetry ??= new CliTelemetryLifecycle();
+  return cliTelemetry;
+}
+
+registerCliExitFinalizer((code) => (
+  isVaultInvocation() ? finishWithoutTelemetry() : getCliTelemetry().finish(code === 0)
+));
 
 export async function exitAfterTelemetry(
   code: number,
@@ -124,8 +148,12 @@ export async function exitAfterTelemetry(
 export async function runCliWithTelemetry(
   run: () => Promise<unknown>,
   drain: () => Promise<void>,
+  argv: readonly string[] = process.argv,
 ): Promise<void> {
-  const lifecycle = new CliProcessLifecycle(cliTelemetry, drain);
+  const telemetry: Pick<CliTelemetryLifecycle, 'finish'> = isVaultInvocation(argv)
+    ? { finish: finishWithoutTelemetry }
+    : getCliTelemetry();
+  const lifecycle = new CliProcessLifecycle(telemetry, drain);
   registerCliExitFinalizer((code) => lifecycle.finish(code === 0));
   try {
     await run();

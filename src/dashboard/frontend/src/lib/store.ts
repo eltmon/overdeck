@@ -484,6 +484,8 @@ export interface PendingInputSubject {
   pendingQuestionPrompt?: string
   /** The pending input reason from the agent enrichment (for classification). */
   pendingQuestionReason?: string
+  /** PAN-4371 — advisory Jev reading of why a bare agentTurnEnded kind happened. */
+  turnEndAssessment?: AgentSnapshot['turnEndAssessment']
 }
 
 function deriveMemo<S, A, B, R>(
@@ -582,6 +584,7 @@ export const selectPendingInputSubjects = deriveMemo<
         since,
         pendingQuestionPrompt: a.pendingQuestionPrompt,
         pendingQuestionReason: a.pendingQuestionReason,
+        turnEndAssessment: a.turnEndAssessment,
       })
     }
     subjects.sort((x, y) =>

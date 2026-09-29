@@ -19,9 +19,17 @@ export function loadPromptFile(relPath: string): string {
   }
 }
 
+export interface ScenarioMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface RunPromptScenarioOptions {
   system: string;
-  user: string;
+  /** Single user turn. Exactly one of `user` / `messages` is required. */
+  user?: string;
+  /** Multi-turn conversation; must end with a user turn. */
+  messages?: ScenarioMessage[];
   /** Caps the resolved model's maxOutputTokens (or EVAL_DEFAULT_MAX_OUTPUT_TOKENS when unset). */
   maxTokens?: number;
 }
@@ -46,20 +54,34 @@ export interface PromptScenarioResult {
   run: PromptScenarioRun;
 }
 
+export function scenarioMessages(opts: Pick<RunPromptScenarioOptions, 'user' | 'messages'>): ScenarioMessage[] {
+  if ((opts.user === undefined) === (opts.messages === undefined)) {
+    throw new Error('runPromptScenario needs exactly one of `user` or `messages`.');
+  }
+  const messages = opts.messages ?? [{ role: 'user', content: opts.user! }];
+  if (messages.length === 0 || messages[messages.length - 1]!.role !== 'user') {
+    throw new Error('runPromptScenario `messages` must be non-empty and end with a user turn.');
+  }
+  return messages;
+}
+
 interface ProviderCallResult {
   text: string;
   usage: EvalUsage;
   stopReason: string | null;
 }
 
-async function callAnthropic(config: EvalModelConfig, opts: RunPromptScenarioOptions): Promise<ProviderCallResult> {
+async function callAnthropic(
+  config: EvalModelConfig,
+  prompt: { system: string; messages: ScenarioMessage[] },
+): Promise<ProviderCallResult> {
   const client = new Anthropic();
   const message = await client.messages
     .stream({
       model: config.apiModel,
       max_tokens: config.maxTokens,
-      system: opts.system,
-      messages: [{ role: 'user', content: opts.user }],
+      system: prompt.system,
+      messages: prompt.messages,
       ...(config.temperature !== null ? { temperature: config.temperature } : {}),
       ...(config.thinking !== null ? { thinking: { type: config.thinking } } : {}),
       ...(config.effort !== null ? { output_config: { effort: config.effort } } : {}),
@@ -76,9 +98,11 @@ async function callAnthropic(config: EvalModelConfig, opts: RunPromptScenarioOpt
 }
 
 export async function runPromptScenario(opts: RunPromptScenarioOptions): Promise<PromptScenarioResult> {
+  const prompt = { system: opts.system, messages: scenarioMessages(opts) };
   const config = resolveEvalModelConfig(process.env, { maxTokens: opts.maxTokens });
   const startedAt = Date.now();
-  const result = config.provider === 'openai' ? await callOpenAIResponses(config, opts, process.env) : await callAnthropic(config, opts);
+  const result =
+    config.provider === 'openai' ? await callOpenAIResponses(config, prompt, process.env) : await callAnthropic(config, prompt);
   return {
     text: result.text,
     run: {
