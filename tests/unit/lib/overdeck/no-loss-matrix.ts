@@ -403,6 +403,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/deacon/pause',                     kind: 'http', disposition: 'READ',        door: 'SettingsResolver.isDeaconPaused' },
   { surface: 'POST /api/deacon/pause',                    kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused' },
   { surface: 'GET /api/version',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build version probe; outside 8 remodel domains' },
+  { surface: 'GET /api/environment',                      kind: 'http', disposition: 'READ',        door: 'environment-identity.ensureEnvironmentIdentity (descriptor)' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
   { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },

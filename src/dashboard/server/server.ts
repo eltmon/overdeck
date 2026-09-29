@@ -53,6 +53,7 @@ import { cloisterRouteLayer } from './routes/cloister.js'
 import { resourcesRouteLayer } from './routes/resources.js'
 import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
+import { environmentRouteLayer } from './routes/environment.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
@@ -401,6 +402,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   internalEventsRouteLayer,
   restartGateRouteLayer,
   knowledgeViewerRouteLayer,
+  environmentRouteLayer,
   staticRouteLayer,
 );
 
