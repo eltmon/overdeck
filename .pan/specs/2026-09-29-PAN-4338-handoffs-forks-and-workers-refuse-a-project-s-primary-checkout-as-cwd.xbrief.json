@@ -1,0 +1,554 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T01:57:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4338: Handoffs, forks and workers refuse a project's primary checkout as cwd",
+    "updated": "2026-09-29T01:59:19.781Z"
+  },
+  "plan": {
+    "id": "pan-4338",
+    "title": "Handoffs, forks and workers refuse a project's primary checkout as cwd",
+    "status": "proposed",
+    "uid": "b34334d3-9433-4e60-aefa-f474ef6f6c8c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T01:57:13Z",
+    "updated": "2026-09-29T01:59:19.781Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4338",
+        "label": "PAN-4338",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4338.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Parent PRD (Issue 4)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "safety",
+      "conversations",
+      "handoff",
+      "fork",
+      "worker",
+      "projects"
+    ],
+    "narratives": {
+      "Problem": "validateCwdContainment (src/lib/overdeck/conversation-forks.ts:172, twin in conversation-runtime.ts:224) accepts any existing directory under $HOME, including a registered project's primary checkout, so `pan handoff --cwd <primary>` / `pan fork --cwd <primary>` start agents that commit straight onto main (the 2026-07-01 incident in sync-sources/rules/handoff-isolate-cwd.md). pan worker run confines --cwd to the issue workspace but follows symlinks, so a symlinked member repo can still resolve to a primary checkout.",
+      "Proposal": "Add a leaf resolver findPrimaryCheckout (src/lib/projects/primary-checkout.ts) that matches a path's canonical form or git top level against every registered project root and polyrepo member root. Collapse the two validateCwdContainment copies into src/lib/overdeck/cwd-containment.ts (semantics unchanged). The fork route refuses an explicit cwd that is a primary checkout with `Invalid cwd: <path> is the primary checkout of <project>; use a worktree` unless allowPrimary is sent by an operator (callerKind 'operator' or absent). The CLI (`pan fork`, `pan handoff`) gains --allow-primary and always sends callerKind from verdictCallerFromEnv, as `pan review restart` does. startWorker refuses a read-write --cwd that resolves to a primary checkout. Rule, skills and reference docs state the refusal. Full detail: .pan/drafts/pan-4338.md.",
+      "NonGoals": "- Refusing the inherited cwd (source conversation cwd, issue workspace, process.cwd()) when the request sends no explicit cwd\n- Refusing resume or model/harness switch of an existing conversation (conversation-runtime.ts:393 and :1131 keep containment-only validation)\n- Adding any primary-checkout logic inside the shared validateCwdContainment helper\n- Checking POST /api/conversations (new conversation creation) or pan lane start\n- Any dashboard frontend change (the Fork modal sends no cwd)\n- A security boundary against a process that sends raw HTTP to the fork route without callerKind (this is accident prevention)\n- An allowPrimary override for workers\n- Git hooks or shims that block commits in the primary checkout (#4337 / deft-adoption issue 3)\n- Editing src/lib/projects.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The refusal applies only to the fork route's explicit `cwd` body field and to a read-write worker's explicit --cwd, never to the inherited cwd.",
+        "rationale": "Operator conversations such as conv-flywheel live in the primary checkout by design and the rule tells agents to run pan handoff from the project dir; refusing the inherited cwd would break every `pan handoff self` from them and the existing 'keeps the parent cwd' test. The issue's AC names the request cwd."
+      },
+      {
+        "summary": "Collapse the two validateCwdContainment copies into one helper, but add the primary check only at the fork route, not inside the helper.",
+        "rationale": "conversation-runtime.ts calls it at :393 (model/harness switch) and :1131 (resume) on an existing conversation's cwd; refusing there would make every primary-checkout conversation impossible to resume. The issue title scopes the refusal to handoffs, forks and workers."
+      },
+      {
+        "summary": "'Primary checkout' = the canonical path OR its git top level equals a registered project root or polyrepo member root; non-git paths fall back to plain equality.",
+        "rationale": "Plain equality leaves `--cwd <root>/src` open, and commits from there land on the primary checkout just the same. Nested worktrees (workspaces/feature-*) have their own git top level and still pass."
+      },
+      {
+        "summary": "The resolver is a new leaf module src/lib/projects/primary-checkout.ts exporting findPrimaryCheckout (returns the match or null), not isPrimaryCheckout in src/lib/projects.ts.",
+        "rationale": "projects.ts is at its file-size allowlist ceiling (1217); path-containment.ts is the existing sibling for path helpers; the error message needs the matched project, so the function returns the match rather than a boolean."
+      },
+      {
+        "summary": "allowPrimary is honored only when callerKind is 'operator' or absent (dashboard UI); the CLI always sends callerKind from verdictCallerFromEnv and sends allowPrimary only with the new --allow-primary flag on pan fork / pan handoff.",
+        "rationale": "Copies the existing `pan review restart` (#3853) pattern the issue points to. It stops agents that go through the CLI; it is documented as accident prevention, not a boundary against raw HTTP."
+      },
+      {
+        "summary": "Workers get no override; read-only workers are not checked.",
+        "rationale": "The issue says 'apply the same check in pan worker run when not --read-only' and names no override; the read-only git guard already blocks commits."
+      },
+      {
+        "summary": "No frontend change.",
+        "rationale": "useConversationMutations.ts summaryForkConversation sends no cwd, so the dashboard can never hit the refusal."
+      }
+    ],
+    "items": [
+      {
+        "id": "primary-checkout-resolver",
+        "title": "Add findPrimaryCheckout resolver in src/lib/projects/primary-checkout.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4338",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fork-route-primary-guard",
+            "worker-primary-guard"
+          ],
+          "files_scope": [
+            "src/lib/projects/primary-checkout.ts",
+            "src/lib/projects/__tests__/primary-checkout.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/projects/__tests__/primary-checkout.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "primary-checkout.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. New file src/lib/projects/primary-checkout.ts exporting `PrimaryCheckoutMatch { projectKey; repoName: string | null; root }`, `PrimaryCheckoutDeps { listProjects?; gitToplevel? }`, `findPrimaryCheckout(path, deps = {})` and `primaryCheckoutLabel(match)` (returns `key` or `key/repoName`). Algorithm: candidates = canonicalPathAsync(path) plus canonicalPathAsync(gitToplevel(canonical)) when non-null (default gitToplevel = promisified execFile `git rev-parse --show-toplevel` with cwd, null on error). For each project from listProjectsAsync with a path: root = canonicalPathAsync(config.path); match root → {key, null, root}; then each workspace.repos[] member: canonicalPathAsync(resolve(root, repo.path)) → {key, repo.name, memberRoot}. Else null. Async only (no *Sync, no execSync). Do not edit src/lib/projects.ts. Tests with real temp dirs and real git, injected listProjects: root, subdirectory, nested `git worktree add` (null), unrelated (null), polyrepo member (label 'poly/api'), symlink, non-git fallback via injected gitToplevel returning null."
+        },
+        "items": [
+          {
+            "id": "primary-checkout-resolver.ac1",
+            "title": "Given a registered root or any subdirectory of it, findPrimaryCheckout returns { projectKey, repoName: null } (subdirectory matched through its git top level)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-checkout-resolver.ac2",
+            "title": "Given a git worktree added under <root>/workspaces/feature-x, or an unrelated directory, findPrimaryCheckout returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-checkout-resolver.ac3",
+            "title": "Given a polyrepo project whose workspace.repos has { name: 'api', path: 'api' }, the member root returns repoName 'api' and primaryCheckoutLabel returns 'poly/api'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-checkout-resolver.ac4",
+            "title": "Given a symlink to a registered root, or a non-git root with gitToplevel injected to return null, findPrimaryCheckout still returns the match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cwd-containment-collapse",
+        "title": "Collapse the two validateCwdContainment copies into src/lib/overdeck/cwd-containment.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cwd-containment.ts",
+            "src/lib/overdeck/__tests__/cwd-containment.test.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/conversation-runtime.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/cwd-containment.test.ts src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "cwd-containment.test.ts and conversation-forks-handoff-placement.test.ts pass",
+            "typecheck completes without errors",
+            "lint:file-size passes with conversation-runtime.ts below 1248 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. Create src/lib/overdeck/cwd-containment.ts exporting `validateCwdContainment(cwd): Promise<boolean>` with the exact body of the current conversation-forks.ts:172 copy (absolute, no '..' segment, realpath exists and is a directory, under homedir()). Delete the local copies at conversation-forks.ts:171-186 (doc comment + function) and conversation-runtime.ts:224-236 and import the shared one in both. Remove realpath/stat/homedir imports from each file only if grep shows no other use in that file. Do NOT add primary-checkout logic here: runtime callers at :393 and :1131 validate existing conversations and must keep accepting the primary checkout. Tests: accepts existing dir under $HOME; rejects relative, '..', missing, a file, and a dir outside $HOME (set process.env.HOME to a temp dir per test)."
+        },
+        "items": [
+          {
+            "id": "cwd-containment-collapse.ac1",
+            "title": "Given the collapse, grep returns no `async function validateCwdContainment` in conversation-forks.ts or conversation-runtime.ts, and both files import it from ./cwd-containment.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cwd-containment-collapse.ac2",
+            "title": "cwd-containment.test.ts shows the helper accepts an existing directory under $HOME and rejects relative, '..', missing, file and outside-$HOME paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cwd-containment-collapse.ac3",
+            "title": "`wc -l src/lib/overdeck/conversation-runtime.ts` reports fewer than 1248 lines and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-route-primary-guard",
+        "title": "Fork route returns 400 when the explicit cwd is a primary checkout (operator allowPrimary override)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4338",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts src/lib/overdeck/__tests__/conversation-fork-project.test.ts src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-forks-handoff-placement.test.ts passes including the new PAN-4338 describe block",
+            "existing fork project/parent-link tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ],
+          "foundationFor": [
+            "cli-allow-primary"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 in handleConversationSummaryFork, directly after the `if (cwd && !(await validateCwdContainment(cwd)))` check (currently :826) and before createConversation: when cwd is set, `const primary = await findPrimaryCheckout(cwd)`; operatorOverride = body.allowPrimary === true && (body.callerKind === undefined || body.callerKind === 'operator'); if primary && !operatorOverride return 400 `{ error: `Invalid cwd: ${cwd} is the primary checkout of ${primaryCheckoutLabel(primary)}; use a worktree` }`. Import from '../projects/primary-checkout.js'. Only the explicit cwd is checked; the inherited effectiveCwd is not. Tests: vi.mock '../../projects/primary-checkout.js' with importOriginal + a vi.hoisted primaryRoot so findPrimaryCheckout returns { projectKey: 'demo', repoName: null, root } when the path equals primaryRoot (a dir under testHome); do not mock listProjectsAsync. Cases: summary fork refused + no new row (listConversations().length unchanged); handoff mode refused; worktree <primaryRoot>/workspaces/feature-pan-1 accepted with conversation.cwd equal to it; allowPrimary + callerKind 'agent' → 400; allowPrimary + callerKind 'operator' → 200; allowPrimary without callerKind → 200. Also add a case where the mock reports parentCwd as a primary checkout and the request sends no cwd: the route returns 200 and the new conversation's cwd equals parentCwd (D1: the inherited cwd is never refused). Existing 'keeps the parent cwd' test stays green."
+        },
+        "items": [
+          {
+            "id": "fork-route-primary-guard.ac1",
+            "title": "Given cwd equal to a registered project root, the fork route returns 400 with error containing 'is the primary checkout of demo; use a worktree' in summary and handoff modes and creates no conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-primary-guard.ac2",
+            "title": "Given cwd equal to a worktree of that project (<root>/workspaces/feature-pan-1), the fork route returns 200 and the new conversation's cwd equals that worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-primary-guard.ac3",
+            "title": "Given allowPrimary: true with callerKind 'agent', the route still returns 400; with callerKind 'operator' or no callerKind it returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-primary-guard.ac4",
+            "title": "Given no explicit cwd and a source conversation whose cwd the resolver reports as a primary checkout, the fork route returns 200 and the new conversation's cwd equals the parent cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-allow-primary",
+        "title": "Add --allow-primary to pan fork and pan handoff; fork-client always sends callerKind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/cli/commands/__tests__/fork-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/fork-client.test.ts src/cli/commands/__tests__/handoff.test.ts",
+            "npm run typecheck",
+            "npm run build:cli",
+            "npm run lint:slash-commands",
+            "node dist/cli/index.js handoff --help",
+            "node dist/cli/index.js fork --help"
+          ],
+          "expected_outputs": [
+            "fork-client.test.ts and handoff.test.ts pass",
+            "typecheck completes without errors",
+            "lint:slash-commands prints the manifest-matches line",
+            "both --help outputs list --allow-primary"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. fork-client.ts: add `allowPrimary?: boolean` and `callerKind?: 'operator' | 'agent'` to ForkViaServerOptions; in forkConversationViaServer set `body['callerKind'] = opts.callerKind ?? verdictCallerFromEnv(process.env, readAncestorAgentIds).kind` and `if (opts.allowPrimary) body['allowPrimary'] = true` (import from '../../lib/cloister/verdict-caller.js'). handoff.ts and fork.ts: add allowPrimary to their options interfaces and pass it to forkConversationViaServer. src/cli/index.ts: add `.option('--allow-primary', 'Operator only: allow --cwd to be a project\\'s primary checkout (refused for agent sessions)')` after the --cwd option of both `fork` (:377) and `handoff` (:387). Then `npm run build:cli && npm run generate:slash-commands` and commit packages/contracts/src/composer-commands.generated.ts. New test fork-client.test.ts stubs globalThis.fetch (first call returns { conversation: { id: 1, name: 'n', tmuxSession: 't', forkStatus: null } }, polls return the same) and passes { pollMs: 0, timeoutMs: 50 } or uses fake timers — never real multi-second waits."
+        },
+        "items": [
+          {
+            "id": "cli-allow-primary.ac1",
+            "title": "Given allowPrimary: true and callerKind 'operator', forkConversationViaServer POSTs a body containing allowPrimary: true and callerKind: 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-allow-primary.ac2",
+            "title": "Given no allowPrimary option, the POST body omits the allowPrimary key and still contains callerKind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-allow-primary.ac3",
+            "title": "`pan handoff --help` and `pan fork --help` (built dist) list --allow-primary, and npm run lint:slash-commands exits 0 with the regenerated manifest committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-primary-guard",
+        "title": "startWorker refuses a read-write --cwd that resolves to a primary checkout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/worker/start.ts",
+            "src/lib/agents/worker/__tests__/start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/worker/__tests__/start.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start.test.ts passes including the two new PAN-4338 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Add `findPrimaryCheckout?: (path: string) => Promise<PrimaryCheckoutMatch | null>` to StartWorkerDeps (type-only import from '../../projects/primary-checkout.js') and a lazy-import default like defaultSpawnRun. In startWorker, inside the `if (options.cwd)` block right after `explicitCwd = realCwd;` and before allocateWorkerId: when options.readOnly !== true, call it with realCwd; on a match throw `new Error(`--cwd ${requested} is the primary checkout of ${label}; use a worktree`)` where label is `key` or `key/repoName`. Update the module header sentence about the primary checkout to mention the PAN-4338 refusal. Tests: add `findPrimaryCheckout: async () => null` to the existing deps() helper; new case injecting a match { projectKey: 'demo', repoName: 'docs' } with a --cwd inside the workspace rejects with /is the primary checkout of demo\\/docs; use a worktree/ and never calls allocateWorkerId or spawnRun; the same with readOnly: true resolves and calls spawnRun once."
+        },
+        "items": [
+          {
+            "id": "worker-primary-guard.ac1",
+            "title": "Given a read-write worker whose --cwd resolves to a primary checkout, startWorker rejects with '--cwd <path> is the primary checkout of demo/docs; use a worktree' and never calls allocateWorkerId or spawnRun",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-primary-guard.ac2",
+            "title": "Given the same --cwd with readOnly: true, startWorker resolves and calls spawnRun once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-handoff-fork",
+        "title": "Document the primary-checkout refusal and --allow-primary in the handoff rule, pan-handoff skill and FORKS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/rules/handoff-isolate-cwd.md",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "docs/FORKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run lint:skills",
+            "grep -n 'primary checkout' sync-sources/rules/handoff-isolate-cwd.md sync-sources/skills/pan-handoff/SKILL.md docs/FORKS.md"
+          ],
+          "expected_outputs": [
+            "lint:skills passes",
+            "grep prints at least one line per file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. handoff-isolate-cwd.md is a scope: universal rule, so add exactly one sentence after the `Invalid cwd` sentence: the server also refuses a project's primary checkout (or any directory inside it) with `Invalid cwd: <path> is the primary checkout of <project>; use a worktree`, and only an operator may override with --allow-primary. pan-handoff/SKILL.md: extend the line-34 --cwd bullet with the same refusal and that --allow-primary is honored only for an operator shell or operator conversation; replace the line-71 example `--cwd /home/you/Projects/project` with a worktree path such as `/home/you/Projects/project/workspaces/feature-pan-123`. docs/FORKS.md line 122 cwd row: add that an explicit primary-checkout cwd is refused unless an operator passes --allow-primary."
+        },
+        "items": [
+          {
+            "id": "docs-handoff-fork.ac1",
+            "title": "Given the docs change, handoff-isolate-cwd.md, pan-handoff/SKILL.md and docs/FORKS.md each contains the phrase 'primary checkout' in the same sentence or table row as '--allow-primary'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-handoff-fork.ac2",
+            "title": "pan-handoff/SKILL.md no longer shows `--cwd /home/you/Projects/project` as a bare primary-checkout example, and npm run lint:skills exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-worker",
+        "title": "Document the read-write worker primary-checkout refusal in pan-worker skill and reference/workers.mdx",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-29T01:57:13Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-worker/SKILL.md",
+            "reference/workers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'primary checkout' sync-sources/skills/pan-worker/SKILL.md reference/workers.mdx",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "grep prints at least one line per file",
+            "lint:skills passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. pan-worker/SKILL.md line 64 ('--cwd (must be inside the issue workspace)') and reference/workers.mdx line 105 (the `--cwd <path>` table row): add that a read-write worker's --cwd that resolves (symlinks followed) to a project's primary checkout is refused with `--cwd <path> is the primary checkout of <project>; use a worktree`, and that --read-only workers are not checked."
+        },
+        "items": [
+          {
+            "id": "docs-worker.ac1",
+            "title": "Given the docs change, pan-worker/SKILL.md and reference/workers.mdx each contains a sentence saying a read-write --cwd that resolves to a primary checkout is refused, quoting 'is the primary checkout of'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-worker.ac2",
+            "title": "Given the docs change, both files state that the refusal skips --read-only workers (the read-only worker path accepts a primary checkout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "primary-checkout-resolver",
+        "to": "fork-route-primary-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "cwd-containment-collapse",
+        "to": "fork-route-primary-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "primary-checkout-resolver",
+        "to": "worker-primary-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-route-primary-guard",
+        "to": "cli-allow-primary",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-allow-primary",
+        "to": "docs-handoff-fork",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One cohesive guard defined item-by-item by the issue: 7 small items touching ~20 files, half of them tests and docs. The subsystem count is inflated by docs surfaces (sync-sources rule + two skills, docs/, reference/) and the generated CLI manifest in packages/contracts; splitting the docs or the CLI flag into sibling issues would ship a server refusal whose documented override does not exist yet.",
+      "canonicalFilename": "2026-09-29-PAN-4338-handoffs-forks-and-workers-refuse-a-project-s-primary-checkout-as-cwd.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
