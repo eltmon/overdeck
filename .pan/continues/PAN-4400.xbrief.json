@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:21:11.216Z",
+  "updated": "2026-09-29T15:24:40.229Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-29T15:21:02.612Z"
     },
     "ui-preset-buttons": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4400",
-      "claimedAt": "2026-09-29T15:21:11.216Z"
+      "claimedAt": "2026-09-29T15:21:11.216Z",
+      "doneAt": "2026-09-29T15:24:40.229Z"
     }
   }
 }
