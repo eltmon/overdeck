@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4343",
   "created": "2026-09-29T04:18:07.024Z",
-  "updated": "2026-09-29T04:33:07.920Z",
+  "updated": "2026-09-29T04:35:53.088Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-29T04:33:06.297Z"
     },
     "launcher-conversation-gh-shim": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4343",
-      "claimedAt": "2026-09-29T04:33:07.920Z"
+      "claimedAt": "2026-09-29T04:33:07.920Z",
+      "doneAt": "2026-09-29T04:35:53.088Z"
     }
   }
 }
