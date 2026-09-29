@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SCRIPT_SOURCE = new URL('../../../scripts/guard-agent-main-push.sh', import.meta.url);
+const HELPER_SOURCE = new URL('../../../scripts/lib/pusher-identity.sh', import.meta.url);
 
 function makeTempRepo(userName = 'panopticon-agent[bot]'): string {
   const root = mkdtempSync(join(tmpdir(), 'guard-agent-main-push-'));
@@ -17,8 +18,11 @@ function makeTempRepo(userName = 'panopticon-agent[bot]'): string {
 function installScript(root: string): string {
   const scriptDest = join(root, 'scripts', 'guard-agent-main-push.sh');
   const src = readFileSync(SCRIPT_SOURCE, 'utf-8');
-  mkdirSync(join(root, 'scripts'), { recursive: true });
+  mkdirSync(join(root, 'scripts', 'lib'), { recursive: true });
   writeFileSync(scriptDest, src, { mode: 0o755 });
+  writeFileSync(join(root, 'scripts', 'lib', 'pusher-identity.sh'), readFileSync(HELPER_SOURCE, 'utf-8'), {
+    mode: 0o755,
+  });
   return scriptDest;
 }
 
@@ -187,6 +191,47 @@ describe('guard-agent-main-push.sh', () => {
 
     const result = runGuard(root, ['--range', `${base}..${head}`], {
       OVERDECK_AGENT_ID: undefined,
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses conv-flywheel ranges touching src', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'code.ts'), 'export const code = true;\n');
+    const head = commitAll(root, 'code change');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'conv-flywheel',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('agents land code via PR');
+  });
+
+  it('refuses a tmux flywheel conversation identified only by OVERDECK_CONVERSATION', () => {
+    const { root, base } = setupRepo('Human Operator');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'code.ts'), 'export const code = true;\n');
+    const head = commitAll(root, 'code change');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: undefined,
+      OVERDECK_CONVERSATION: 'conv-flywheel',
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('allows conv-flywheel ranges touching only .pan/flywheel state', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, '.pan', 'flywheel'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'flywheel', 'state.md'), 'tick\n');
+    const head = commitAll(root, 'flywheel state');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'conv-flywheel',
     });
 
     expect(result.ok).toBe(true);
