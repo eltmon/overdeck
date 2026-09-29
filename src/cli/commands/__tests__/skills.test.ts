@@ -439,6 +439,7 @@ describe('pan skills pack', () => {
 
   it('rejects an unknown adapter before any work', async () => {
     await expect(run(...addArgs, '--adapter', 'npm')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('--adapter must be plain, claude-plugin, or deft-readonly');
     expect(mocks.addPack).not.toHaveBeenCalled();
   });
 
