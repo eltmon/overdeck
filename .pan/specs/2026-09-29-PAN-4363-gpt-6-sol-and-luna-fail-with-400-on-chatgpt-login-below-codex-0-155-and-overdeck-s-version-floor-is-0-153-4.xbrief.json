@@ -4,17 +4,17 @@
     "created": "2026-09-29T04:22:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4363: GPT-6 Sol and Luna fail with 400 on ChatGPT login below Codex 0.155, and Overdeck's version floor is 0.153.4",
-    "updated": "2026-09-29T04:29:06.485Z"
+    "updated": "2026-09-29T04:30:27.671Z"
   },
   "plan": {
     "id": "pan-4363",
     "title": "GPT-6 Sol and Luna fail with 400 on ChatGPT login below Codex 0.155, and Overdeck's version floor is 0.153.4",
-    "status": "proposed",
+    "status": "running",
     "uid": "84da3a1a-834c-44e3-befa-547d3c004deb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T04:22:49Z",
-    "updated": "2026-09-29T04:29:06.485Z",
+    "updated": "2026-09-29T04:30:27.671Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4363",
