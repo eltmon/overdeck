@@ -13,9 +13,11 @@ Embedding commands also need Ollama or an API key for the selected provider.
 
 ## Install
 
-Overdeck users receive this skill through `pan sync`.
+[eltmon/okf](https://github.com/eltmon/okf) is the canonical home of this skill. Releases are git tags named `vX.Y.Z`.
 
-Standalone Claude Code users install it from the mirror repo, [eltmon/okf](https://github.com/eltmon/okf) — symlink so `git pull` updates it in place:
+**With Overdeck.** Overdeck vendors one release tag (recorded in its `sync-sources/skills/okf/.okf-skill-version`), and `pan sync` installs it into `~/.claude/skills/okf` (Claude Code) and `~/.agents/skills/okf` (Codex, Pi). Do not edit those copies: `pan sync` replaces local edits, and `pan doctor` warns when an installed copy's version differs from the vendored one. Change the skill here, tag a release, and re-vendor it in Overdeck.
+
+**Standalone Claude Code.** Clone the repo and symlink it so `git pull` updates it in place:
 
 ```bash
 git clone https://github.com/eltmon/okf.git ~/Projects/okf
@@ -23,11 +25,14 @@ mkdir -p ~/.claude/skills
 ln -s ~/Projects/okf ~/.claude/skills/okf
 ```
 
-Or copy-install instead of symlinking:
+**Standalone Codex or Pi.** Both read the shared Agent Skills directory:
 
 ```bash
-cp -R ~/Projects/okf ~/.claude/skills/okf
+mkdir -p ~/.agents/skills
+ln -s ~/Projects/okf ~/.agents/skills/okf
 ```
+
+To pin a release, run `git -C ~/Projects/okf checkout vX.Y.Z`. If you also run Overdeck on the same machine, skip the symlinks and let `pan sync` manage the copies.
 
 The skill remains portable. Its core scripts do not import Overdeck and require only git, gh, Python 3, and PyYAML for non-embedding workflows.
 
