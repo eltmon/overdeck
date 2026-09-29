@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-29T23:53:31.600Z",
+  "updated": "2026-09-29T23:59:52.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-09-29T23:53:26.098Z"
     },
     "fork-host-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2444",
-      "claimedAt": "2026-09-29T23:53:31.600Z"
+      "claimedAt": "2026-09-29T23:53:31.600Z",
+      "doneAt": "2026-09-29T23:59:52.787Z"
     }
   }
 }
