@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4358",
   "created": "2026-09-29T03:41:33.107Z",
-  "updated": "2026-09-29T03:45:01.339Z",
+  "updated": "2026-09-29T03:45:06.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4358",
       "claimedAt": "2026-09-29T03:41:33.107Z",
       "doneAt": "2026-09-29T03:45:01.339Z"
+    },
+    "conversation-grouper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:45:06.908Z"
     }
   }
 }
