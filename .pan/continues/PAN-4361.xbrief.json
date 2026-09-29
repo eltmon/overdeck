@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T05:26:15.502Z",
+  "updated": "2026-09-29T05:26:28.623Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "eval-model-config.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T05:26:15.502Z"
+    },
+    "eval-model-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:28.623Z"
     }
   }
 }
