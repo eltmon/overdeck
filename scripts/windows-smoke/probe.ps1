@@ -266,7 +266,8 @@ if ($SkipServe) {
     $script:ServeAnswers = $null -ne $last.Status
     $script:ServePoll = "GET / -> $($last.Status)$(if ($last.Status -ne 200) { "`n$($last.Body)" })`n$(Get-ServeSnapshot $script:serve.Process.Id $Port)"
     $exit = if ($script:serve.Process.HasExited) { $script:serve.Process.ExitCode } else { $null }
-    @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $script:ServePoll }
+    @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $script:ServePoll
+       note = $(if ($script:ServeUp) { '' } elseif ($script:ServeAnswers) { "server up, GET / -> $($last.Status)" } else { 'no HTTP answer' }) }
   }
 
   # /api/projects has no GET route (POST only), so it is not probed.
@@ -527,7 +528,8 @@ Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 120 s, stdin close
   if (-not $NewSessionId) { return @{ status = 'not-run'; note = '3c failed: the session was not adopted' } }
   $r = Invoke-Pan $launchArgs 120 $ClonePath
   if ($r.Output -match 'EINVAL|ENOENT|spawn .*claude') {
-    return @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'spawn error' }
+    $line = ($r.Output -split "`r?`n") | Where-Object { $_ -match 'EINVAL|ENOENT' } | Select-Object -First 1
+    return @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = "spawn error: $(([string]$line).Trim())" }
   }
   $text = ($r.Output -replace '\[probe: killed after \d+ s\]', '').Trim()
   if ($text) { return @{ status = 'pass'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'claude produced output' } }
