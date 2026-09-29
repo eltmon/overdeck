@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T14:35:44.820Z",
+  "updated": "2026-09-29T14:35:59.758Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
     "fixture-script.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T14:35:44.820Z"
+    },
+    "fixture-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:35:59.758Z"
     }
   }
 }
