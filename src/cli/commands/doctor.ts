@@ -37,6 +37,7 @@ import { checkInotify } from './doctor-inotify.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
+import { checkCodexModelFloors } from './doctor-codex-models.js';
 import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
@@ -767,7 +768,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   for (const c of checkOhmypi(options.strict ?? false)) checks.push(c);
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
-  for (const c of checkCodex()) checks.push(c);
+  for (const c of [...checkCodex(), ...await checkCodexModelFloors()]) checks.push(c);
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
