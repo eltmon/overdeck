@@ -1,7 +1,7 @@
 /**
  * pan vault status
  *
- * Backend, this machine's identity, owned record count, last sync and the
+ * Backend, the last key rotation, this machine's identity, owned record count, last sync and the
  * machine list, read from the local clone and index. With the vault off,
  * prints VAULT_OFF_MESSAGE and exits 0 (AC-1).
  */
@@ -33,6 +33,7 @@ export async function statusCommand(options: StatusOptions = {}, io: CliIo = def
   const mine = machines.find((machine) => machine.environmentId === me.environmentId);
   const summary = {
     backend: vault.config.backend,
+    keyRotatedAt: vault.rotatedAt,
     machine: { label: me.label, environmentId: me.environmentId },
     ownedRecords: Object.keys(owned).length,
     listedRecords: cache.filter((row) => !row.tombstone).length,
@@ -45,6 +46,7 @@ export async function statusCommand(options: StatusOptions = {}, io: CliIo = def
     return;
   }
   io.out(`Backend:        ${summary.backend}`);
+  io.out(`Key rotated:    ${summary.keyRotatedAt ?? 'never'}`);
   io.out(`This machine:   ${summary.machine.label} (${summary.machine.environmentId})`);
   io.out(`Owned records:  ${summary.ownedRecords}`);
   io.out(`Listed records: ${summary.listedRecords}`);
