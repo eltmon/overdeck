@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:37:17.186Z",
+  "updated": "2026-09-29T06:37:30.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -598,6 +598,10 @@
     "cli-hooks.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:37:17.186Z"
+    },
+    "standalone-import-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:37:30.047Z"
     }
   }
 }
