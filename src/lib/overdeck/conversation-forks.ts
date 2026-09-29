@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { HttpServerResponse } from 'effect/unstable/http';
@@ -11,6 +10,7 @@ import { loadConfigSync } from '../config-yaml.js';
 import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
+import { validateCwdContainment } from './cwd-containment.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -166,23 +166,6 @@ async function resolveForkSourceSessionFile(conv: Conversation): Promise<string 
 function resolvePlainForkTargetSessionFile(conv: Conversation): string | null {
   if (!conv.claudeSessionId) return null;
   return sessionFilePath(conv.cwd, conv.claudeSessionId);
-}
-
-/** Validate a caller-supplied cwd is an existing directory under the user's home. */
-async function validateCwdContainment(cwd: string): Promise<boolean> {
-  if (!cwd.startsWith('/')) return false;
-  const segments = cwd.split('/').filter(Boolean);
-  if (segments.includes('..')) return false;
-  try {
-    const resolved = await realpath(cwd);
-    const stats = await stat(resolved);
-    if (!stats.isDirectory()) return false;
-    const home = homedir();
-    if (!resolved.startsWith(`${home}/`) && resolved !== home) return false;
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
