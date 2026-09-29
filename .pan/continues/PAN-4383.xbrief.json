@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4383",
   "created": "2026-09-29T06:22:16.508Z",
-  "updated": "2026-09-29T07:45:31.730Z",
+  "updated": "2026-09-29T07:45:43.508Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "answer-route-clears.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T07:45:31.729Z"
+    },
+    "operator-message-closes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:43.508Z"
     }
   }
 }
