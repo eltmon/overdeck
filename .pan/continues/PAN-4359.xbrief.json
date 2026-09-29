@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T04:57:31.395Z",
+  "updated": "2026-09-29T04:57:45.272Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,13 @@
     "claude-code-requirements.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T04:57:31.395Z"
+    },
+    "upgrade-banner.ac5": {
+      "status": "cancelled"
+    },
+    "launch-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:45.271Z"
     }
   }
 }
