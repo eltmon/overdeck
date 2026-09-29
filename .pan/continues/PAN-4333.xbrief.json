@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:24:53.138Z",
+  "updated": "2026-09-29T15:25:11.080Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4333",
       "claimedAt": "2026-09-29T15:09:25.675Z",
       "doneAt": "2026-09-29T15:24:53.137Z"
+    },
+    "keyring-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:25:11.080Z"
     }
   }
 }
