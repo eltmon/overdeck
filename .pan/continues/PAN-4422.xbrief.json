@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:58:19.841Z",
+  "updated": "2026-09-29T21:58:32.217Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "codex-context-pin.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T21:58:19.841Z"
+    },
+    "claude-code-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T21:58:32.217Z"
     }
   }
 }
