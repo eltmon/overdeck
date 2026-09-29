@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4341",
   "created": "2026-09-29T04:22:08.600Z",
-  "updated": "2026-09-29T04:22:08.600Z",
+  "updated": "2026-09-29T04:23:28.370Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "plan-digest": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4341",
-      "claimedAt": "2026-09-29T04:22:08.600Z"
+      "claimedAt": "2026-09-29T04:22:08.600Z",
+      "doneAt": "2026-09-29T04:23:28.369Z"
     }
   }
 }
