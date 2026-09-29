@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4340",
   "created": "2026-09-29T04:09:59.174Z",
-  "updated": "2026-09-29T04:32:53.306Z",
+  "updated": "2026-09-29T04:33:26.170Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
       "claimedBy": "agent-pan-4340",
       "claimedAt": "2026-09-29T04:32:20.632Z",
       "doneAt": "2026-09-29T04:32:53.306Z"
+    },
+    "foreman-doc-handback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:26.170Z"
     }
   }
 }
