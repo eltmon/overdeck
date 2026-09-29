@@ -169,3 +169,23 @@ describe('the backend owns liveness', () => {
     expect(deriveIssueState(facts({ panes: [pane] })).attention).toBe('needs-you');
   });
 });
+
+// PAN-4383: an open `pan ask` decision is the operator's move.
+describe('the pipeline journal owns an open operator decision', () => {
+  const idleWithUnpushedWork = {
+    panes: [{
+      id: 'w1:p1', issue: 'PAN-3917', role: 'work' as const, harness: 'claude-code',
+      model: 'opus', state: 'idle' as const, stateSince: NOW - 17 * 60 * 60_000, terminalId: 'w1:p1',
+    }],
+    branch: { name: 'feature/pan-3917', aheadOfMain: 3, pushed: false },
+  };
+
+  it('needs you when a decision is open, even where the agent would otherwise be stuck', () => {
+    expect(deriveIssueState(facts({ ...idleWithUnpushedWork, operatorDecisionOpen: true })).attention).toBe('needs-you');
+  });
+
+  it('keeps the old result when no decision is open', () => {
+    expect(deriveIssueState(facts({ ...idleWithUnpushedWork, operatorDecisionOpen: false })).attention).toBe('stuck');
+    expect(deriveIssueState(facts({ operatorDecisionOpen: false })).attention).toBeUndefined();
+  });
+});
