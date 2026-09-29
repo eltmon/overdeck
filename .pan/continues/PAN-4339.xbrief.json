@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:01:51.270Z",
+  "updated": "2026-09-29T03:11:07.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4339",
       "claimedAt": "2026-09-29T02:53:28.717Z",
       "doneAt": "2026-09-29T03:01:51.269Z"
+    },
+    "claim-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:07.138Z"
     }
   }
 }
