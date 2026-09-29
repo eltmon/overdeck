@@ -12,6 +12,10 @@ export {
   type MemoryExtractionPolicyOptions,
   type MemoryExtractionPolicyResult,
 } from './policy.js';
+export {
+  ExtractionProviderAuthError,
+  isExtractionProviderAuthError,
+} from './types.js';
 export type {
   ExtractionCost,
   ExtractionProvider,
