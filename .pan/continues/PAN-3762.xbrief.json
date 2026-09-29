@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T15:59:09.790Z",
+  "updated": "2026-09-29T16:18:17.686Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
       "claimedBy": "agent-pan-3762",
       "claimedAt": "2026-09-29T15:53:59.890Z",
       "doneAt": "2026-09-29T15:59:09.789Z"
+    },
+    "env-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:18:17.685Z"
     }
   }
 }
