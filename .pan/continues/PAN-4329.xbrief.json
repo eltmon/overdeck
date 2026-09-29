@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:30:19.784Z",
+  "updated": "2026-09-29T10:30:34.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "settle-wip.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T10:30:19.784Z"
+    },
+    "settle-wip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:30:34.803Z"
     }
   }
 }
