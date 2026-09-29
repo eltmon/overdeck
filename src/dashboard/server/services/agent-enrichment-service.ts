@@ -28,6 +28,7 @@ import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
 import { indexPanesByAgentKey, type AgentEnrichmentChangedEvent, type AgentCreatedEvent, type TerminalBackendName } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
+import { clearTurnEndAssessment, peekTurnEndAssessment, scheduleTurnEndAssessment } from '../../../lib/jev/turn-end-store.js'
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js'
 import { hostTerminalBackendName } from '../../../lib/terminal-backends/select.js'
 
@@ -80,7 +81,9 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.pendingAskUserQuestion?.toolUseId !== next.pendingAskUserQuestion?.toolUseId ||
     prev.pendingProposedPlan?.toolUseId !== next.pendingProposedPlan?.toolUseId ||
     prev.resolution !== next.resolution ||
-    prev.resolutionCount !== next.resolutionCount
+    prev.resolutionCount !== next.resolutionCount ||
+    prev.turnEndAssessment?.kind !== next.turnEndAssessment?.kind ||
+    prev.turnEndAssessment?.confidence !== next.turnEndAssessment?.confidence
   )
 }
 
@@ -163,6 +166,7 @@ export function buildPendingReapEvent(
       pendingProposedPlan: undefined,
       resolution: previous.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
       resolutionCount: previous.resolutionCount,
+      turnEndAssessment: undefined,
     },
   }
 }
@@ -281,7 +285,10 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         // used to return an Effect, and awaiting that non-thenable value yielded
         // the Effect object, so every enrichment field came back undefined
         // (PAN-1395).
-        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan)
+        enrichment = await computeAgentEnrichment(
+          agentId, startedAt, hasActiveSpecialist, cachedScan,
+          peekTurnEndAssessment(agentId, currentMtime),
+        )
       } catch {
         return
       }
@@ -290,6 +297,12 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         state.lastScan.set(agentId, { mtime: currentMtime, scan: enrichment.jsonlScan })
       } else if (currentMtime === null) {
         state.lastScan.delete(agentId)
+      }
+
+      // PAN-4371 — advisory Jev reading of a bare turn end. Fire-and-forget: the
+      // poll never waits on the transcript read or on Jev; the result is peeked next tick.
+      if (enrichment.pendingInputKinds.includes('agentTurnEnded')) {
+        scheduleTurnEndAssessment({ agentId, role: enrichment.role ?? 'conversation', transcriptMtime: currentMtime })
       }
 
       // PAN-1834 — on the rising edge of an agent becoming blocked on input,
@@ -330,6 +343,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           pendingProposedPlan: enrichment.pendingProposedPlan,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
           resolutionCount: enrichment.resolutionCount,
+          ...(enrichment.turnEndAssessment ? { turnEndAssessment: enrichment.turnEndAssessment } : {}),
         },
       }
 
@@ -368,6 +382,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       state.lastEnrichment.delete(id)
       state.lastScan.delete(id)
+      clearTurnEndAssessment(id)
     }
   }
 }
