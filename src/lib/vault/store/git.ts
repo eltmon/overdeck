@@ -13,6 +13,9 @@
  *   three times, then returns `conflict`. A network failure resets the clone
  *   to `origin/main` and throws `VaultOfflineError`, so no local commit ever
  *   outlives a failed push and there is never a divergent history to rebase.
+ * - `putSlot` overwrites or deletes a reserved slot (`objects/keywrap/v1`)
+ *   and commits and pushes only that path, with the same refresh, retry and
+ *   offline-reset rules as `casRef`. Last write wins; there is no CAS.
  * - On a fresh empty remote there is no `origin/main`: fetch/reset are
  *   skipped, every ref has version `null`, and the first push creates `main`.
  *
@@ -36,7 +39,9 @@ import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
   VaultOfflineError,
+  assertNotSlotName,
   assertRefName,
+  assertSlotName,
   objectRelativePath,
   type CasResult,
   type VaultRef,
@@ -237,6 +242,7 @@ export class GitVaultStore implements VaultStore {
   }
 
   async putObjects(objects: ReadonlyArray<{ id: string; bytes: Uint8Array }>): Promise<void> {
+    for (const { id } of objects) assertNotSlotName(id);
     await this.locked(async () => {
       for (const { id, bytes } of objects) {
         const path = this.objectPath(id);
@@ -303,6 +309,51 @@ export class GitVaultStore implements VaultStore {
       }
     }
     return 'conflict';
+  }
+
+  async putSlot(name: string, bytes: Uint8Array | null): Promise<void> {
+    assertSlotName(name);
+    const run = this.casQueue.then(() => this.locked(() => this.putSlotSerialized(name, bytes)));
+    this.casQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async putSlotSerialized(name: string, bytes: Uint8Array | null): Promise<void> {
+    const path = this.objectPath(name);
+    // Scope every git call to the slot directory so pending content objects
+    // (untracked until the next settle) never ride along with a keywrap commit.
+    const scope = `objects/${name.split('/')[0]}`;
+    for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+      await this.refreshUnlocked();
+      if (bytes === null) {
+        const tracked = (await git(this.cloneDir, ['ls-files', '--', `objects/${name}`])).trim().length > 0;
+        await rm(path, { force: true });
+        // A pathspec that matches nothing makes `git add` fail, so deleting a
+        // slot the remote does not have ends here (an untracked leftover is gone).
+        if (!tracked) return;
+      } else {
+        await writeAtomic(path, bytes);
+      }
+      await git(this.cloneDir, ['add', '-A', '--', scope]);
+      // Not `--quiet`: it exits 1 when there are changes and git() throws on that.
+      const staged = await git(this.cloneDir, ['diff', '--cached', '--name-only', '--', scope]);
+      if (staged.trim().length === 0) return;
+      await git(this.cloneDir, [...COMMIT_IDENTITY, 'commit', '--quiet', '-m', 'vault: keywrap']);
+      try {
+        await git(this.cloneDir, ['push', '--quiet', 'origin', `HEAD:${GIT_VAULT_BRANCH}`]);
+        return;
+      } catch (error) {
+        const failure = error as GitCommandError;
+        await this.undoLocalCommit();
+        await this.resetToRemote();
+        // A brand-new slot file is untracked after the reset and would
+        // otherwise be swept into the next settle's `add -A -- .`.
+        await git(this.cloneDir, ['clean', '-fdq', '--', scope]).catch(() => undefined);
+        if (failure instanceof GitCommandError && isNonFastForward(failure)) continue;
+        throw new VaultOfflineError(`Vault keywrap push failed: ${failure.message}`, { cause: failure });
+      }
+    }
+    throw new VaultOfflineError('Vault keywrap push kept conflicting');
   }
 
   /** Blob SHA of `rel` at origin/main, or null when the ref does not exist there. */
