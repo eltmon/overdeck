@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:49:59.387Z",
+  "updated": "2026-09-29T11:50:10.972Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "bare-turn-end.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T11:49:59.387Z"
+    },
+    "eval-fixtures-metrics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:10.971Z"
     }
   }
 }
