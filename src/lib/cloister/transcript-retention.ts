@@ -1,9 +1,10 @@
 import type { Dirent, Stats } from 'node:fs';
-import { readdir, realpath, rm, rmdir, stat } from 'node:fs/promises';
+import { readdir, realpath, rmdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { removeTranscriptFile, removeTranscriptTree } from './transcript-deletion-door.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
@@ -32,9 +33,9 @@ export interface TranscriptRetentionOptions {
 const defaultDeps: TranscriptRetentionDeps = {
   readDir: (path) => readdir(path, { withFileTypes: true }),
   stat,
-  removeFile: async (path) => { await rm(path, { force: true }); },
+  removeFile: removeTranscriptFile,
   removeDir: rmdir,
-  removeTree: async (path) => { await rm(path, { recursive: true, force: true }); },
+  removeTree: removeTranscriptTree,
   realpath,
   pruneAgentDir: pruneAgentStateDir,
   listLiveAgentIds,

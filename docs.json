@@ -105,6 +105,7 @@
             "pages": [
               "configuration/projects",
               "configuration/telemetry",
+              "configuration/session-vault",
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/local-models",
