@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:47:11.314Z",
+  "updated": "2026-09-29T15:47:25.337Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "cli-rotate-key.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T15:47:11.313Z"
+    },
+    "cli-rotate-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:47:25.336Z"
     }
   }
 }
