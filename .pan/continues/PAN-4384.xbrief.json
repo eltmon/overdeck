@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T13:40:11.963Z",
+  "updated": "2026-09-29T13:40:14.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4384",
       "claimedAt": "2026-09-29T13:30:16.231Z",
       "doneAt": "2026-09-29T13:40:11.962Z"
+    },
+    "conflict-repair-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:40:14.139Z"
     }
   }
 }
