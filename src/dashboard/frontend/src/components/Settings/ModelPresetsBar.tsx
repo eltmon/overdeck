@@ -33,6 +33,11 @@ interface PresetStatusList {
   undoAvailable: boolean;
 }
 
+interface PresetUndoResult {
+  restored: string[];
+  leftAsIs: { path: string; reason: string }[];
+}
+
 async function responseError(res: Response, fallback: string): Promise<string> {
   const body = await res.json().catch(() => null) as { error?: unknown } | null;
   return typeof body?.error === 'string' ? body.error : `${fallback} (HTTP ${res.status})`;
@@ -70,6 +75,26 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
     onPresetChanged();
   };
 
+  const undo = async () => {
+    try {
+      const res = await fetch('/api/model-presets/undo', {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+        body: '{}',
+      });
+      if (!res.ok) {
+        toast.error(await responseError(res, 'Failed to undo preset'));
+        return;
+      }
+      const result = await res.json() as PresetUndoResult;
+      refreshAfterWrite();
+      const leftAsIs = result.leftAsIs.length > 0 ? `; ${result.leftAsIs.length} changed since apply were left as is` : '';
+      toast.success(`Restored ${result.restored.length} settings${leftAsIs}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const openPreset = async (id: string) => {
     setLoadingId(id);
     try {
@@ -99,7 +124,10 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
       const label = plan.label;
       setPlan(null);
       refreshAfterWrite();
-      toast.success(`Applied ${label}`);
+      toast(`Applied ${label}`, {
+        duration: 10_000,
+        action: { label: 'Undo', onClick: () => { void undo(); } },
+      });
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -109,9 +137,22 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
 
   const presets = data?.presets ?? [];
   if (presets.length === 0) return null;
+  const updated = presets.filter((preset) => preset.updateAvailable);
 
   return (
     <div className="mb-4 space-y-2">
+      {updated.map((preset) => (
+        <p key={preset.id} className="text-[11px] leading-snug text-warning" role="status">
+          {preset.label} updated (v{preset.version}):{' '}
+          <button
+            type="button"
+            onClick={() => { void openPreset(preset.id); }}
+            className="underline hover:opacity-80"
+          >
+            review changes
+          </button>
+        </p>
+      ))}
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
           <button
@@ -124,6 +165,16 @@ export function ModelPresetsBar({ onPresetChanged }: ModelPresetsBarProps) {
             Apply {preset.label}
           </button>
         ))}
+        {data?.undoAvailable && (
+          <button
+            type="button"
+            onClick={() => { void undo(); }}
+            disabled={busy}
+            className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            Undo last preset
+          </button>
+        )}
       </div>
       <p className="text-[11px] leading-snug text-muted-foreground">
         A preset writes explicit values for the model settings once, after you review the changes. It never applies on its own.

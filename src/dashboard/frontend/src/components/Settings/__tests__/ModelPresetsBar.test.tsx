@@ -43,12 +43,19 @@ const planPayload = {
   digest: 'digest-123',
 };
 
-function installFetchMock(opts: { plan?: Record<string, unknown>; applyStatus?: number } = {}) {
+function installFetchMock(opts: { plan?: Record<string, unknown>; applyStatus?: number; status?: typeof statusPayload } = {}) {
   const plan = opts.plan ?? planPayload;
+  const status = opts.status ?? statusPayload;
   const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
     const url = input.toString();
     if (url === '/api/model-presets') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(statusPayload) } as Response);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(status) } as Response);
+    }
+    if (url === '/api/model-presets/undo' && init?.method === 'POST') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ restored: ['workhorses.mid'], leftAsIs: [{ path: 'roles.work.model', reason: 'changed since apply; left as is' }] }),
+      } as Response);
     }
     if (url.endsWith('/plan')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(plan) } as Response);
@@ -109,7 +116,7 @@ describe('ModelPresetsBar', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Apply Anthropic defaults' }));
     await userEvent.click(await screen.findByRole('button', { name: /Apply 2 changes/ }));
 
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Applied Anthropic defaults'));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('Applied Anthropic defaults', expect.objectContaining({ action: expect.objectContaining({ label: 'Undo' }) })));
     const applyCall = fetchMock.mock.calls.find(([url]) => url.toString() === '/api/model-presets/anthropic/apply');
     expect(applyCall).toBeTruthy();
     expect(JSON.parse(String(applyCall![1]!.body))).toEqual({ expectedDigest: 'digest-123' });
@@ -142,5 +149,52 @@ describe('ModelPresetsBar', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Anthropic has no credentials/)).toBeTruthy();
     expect((within(dialog).getByRole('button', { name: /Apply 0 changes/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('the toast Undo action POSTs /api/model-presets/undo and reports what it restored', async () => {
+    const fetchMock = installFetchMock();
+    const { onPresetChanged } = renderBar();
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply Anthropic defaults' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Apply 2 changes/ }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+
+    const options = vi.mocked(toast).mock.calls[0]![1] as { action: { onClick: () => void } };
+    onPresetChanged.mockClear();
+    options.action.onClick();
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Restored 1 settings; 1 changed since apply were left as is'));
+    const undoCall = fetchMock.mock.calls.find(([url]) => url.toString() === '/api/model-presets/undo');
+    expect(undoCall?.[1]?.method).toBe('POST');
+    expect(onPresetChanged).toHaveBeenCalled();
+  });
+
+  it('shows Undo last preset only when an undo record exists', async () => {
+    installFetchMock({ status: { ...statusPayload, undoAvailable: true } });
+    renderBar();
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo last preset' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Restored 1 settings; 1 changed since apply were left as is'));
+  });
+
+  it('renders no updated notice and no undo button when nothing was applied', async () => {
+    installFetchMock();
+    renderBar();
+    await screen.findByRole('button', { name: 'Apply Anthropic defaults' });
+    expect(screen.queryByText(/updated \(v/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Undo last preset' })).toBeNull();
+  });
+
+  it('the updated notice opens that preset\'s diff dialog', async () => {
+    const status = {
+      ...statusPayload,
+      presets: statusPayload.presets.map((preset) => (preset.id === 'anthropic'
+        ? { ...preset, updateAvailable: true, lastApplied: { presetId: 'anthropic', version: 0, appliedAt: '2026-09-01T00:00:00.000Z' } }
+        : preset)),
+    };
+    installFetchMock({ status });
+    renderBar();
+    const notice = await screen.findByRole('status');
+    expect(notice.textContent).toBe('Anthropic defaults updated (v1): review changes');
+    await userEvent.click(within(notice).getByRole('button', { name: 'review changes' }));
+    expect(within(await screen.findByRole('dialog')).getByText('Anthropic defaults v1')).toBeTruthy();
   });
 });
