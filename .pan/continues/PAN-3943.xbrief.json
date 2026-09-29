@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:41:55.944Z",
+  "updated": "2026-09-29T23:42:09.668Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "directive-detect.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T23:41:55.944Z"
+    },
+    "deft-collision-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:42:09.667Z"
     }
   }
 }
