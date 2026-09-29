@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3943",
+  "created": "2026-09-29T22:32:07.575Z",
+  "updated": "2026-09-29T22:32:07.575Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "deft-skill-map": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:32:07.575Z"
+    }
+  }
+}
