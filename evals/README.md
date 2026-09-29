@@ -99,6 +99,7 @@ Measured values from the first live runs are listed below; replace the estimates
 
 ### Known limits
 
+- In a Bun-installed workspace, Evalite can fail at start with `Could not locate the bindings file` for `better-sqlite3` (Bun skips the native build). Install the prebuilt binding once with `cd node_modules/.bun/better-sqlite3@*/node_modules/better-sqlite3 && npx prebuild-install`, then rerun `npm run eval`.
 - `gpt-6-sol` is not served by the local CLIProxy sidecar (`{"error":{"message":"unknown provider for model gpt-6-sol","code":"model_not_found"}}`); evaluate it with `OPENAI_API_KEY` on the default `api` route instead.
 - `xhigh`/`max` effort on OpenAI models was verified only through CLIProxy, not against `api.openai.com` directly.
 
