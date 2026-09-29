@@ -261,7 +261,7 @@ describe('pack states (PAN-4334)', () => {
     const list = await listSkillStates({});
     expect(list.packs).toHaveLength(1);
     expect(list.packs[0]).toMatchObject({
-      id: 'mattpocock', license: 'MIT', cached: true, notApplied: ['project-mutating skills (1)'],
+      id: 'mattpocock', license: 'MIT', cached: true, notApplied: ['project-mutating skills (1)'], disclosure: null,
       duplicatePluginInstall: false, global: null, enabled: false, source: 'default',
     });
     expect(list.packs[0]?.updateAvailable).toBeUndefined();
