@@ -1,0 +1,778 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T06:19:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4383: Work agents blocked on an operator decision have no channel that reaches Needs-you (PAN-2609 sat 16h)",
+    "updated": "2026-09-29T06:21:21.588Z"
+  },
+  "plan": {
+    "id": "pan-4383",
+    "title": "Work agents blocked on an operator decision have no channel that reaches Needs-you (PAN-2609 sat 16h)",
+    "status": "proposed",
+    "uid": "dd17d8d6-e1a6-45e5-ac94-e5078671c5d7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T06:19:05Z",
+    "updated": "2026-09-29T06:21:21.588Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4383",
+        "label": "PAN-4383",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "needs-you",
+      "pipeline-journal",
+      "operator-decision",
+      "cli",
+      "god-view",
+      "work-role"
+    ],
+    "metadata": {
+      "sizeJustification": "One user-visible channel whose five acceptance criteria each land on a different existing surface (CLI verb, enrichment/Needs-you, answer delivery, derived attention for the Command Deck, God View, parked resolver, role prompt, docs). The projected-surface lint counts every two-segment path (each doc file, roles/work.md, package.json) as its own subsystem; the real code touches four areas (src/lib, src/cli, src/dashboard, packages/contracts generated manifest). Each item is an independent vertical slice over one shared foundation module, and splitting into sibling issues would ship a verb with no surface or a surface with no writer.",
+      "canonicalFilename": "2026-09-29-PAN-4383-work-agents-blocked-on-an-operator-decision-have-no-channel-that-reaches-needs-you-pan-2609-sat-16h.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A work agent that needs an operator decision has no channel that reaches the operator. PAN-2609's agent posted an issue comment and a failed `pan tell flywheel-orchestrator`; nothing reached Needs-you, God View showed '17h idle', and the parked resolver classed it idle-running. The enrichment only flags prose turn-ends for interactive roles, derived attention only reads blocked panes, and the work role prompt routes blocking questions to the flywheel.",
+      "Proposal": "Add `pan ask <ISSUE> \"<question>\" --option ... [--context] [--withdraw]`, which appends operator.decision-* entries to the issue's pipeline journal (the durable fact). Every surface derives the open decision on read: agent enrichment synthesizes an askUserQuestion so the existing Needs-you panel, dialog, TTS and desktop notification work unchanged; the answer route delivers through deliverAgentMessage and appends operator.decision-answered on ok; delivered pan tell and dashboard messages also close it; derived attention returns needs-you (Command Deck); God View draws a needs-you orb on the shelf row; the parked resolver emits an operator-gate row instead of idle-running; roles/work.md points blocking questions at pan ask; PIPELINE-GATES and GOD-VIEW docs describe it. Full detail: .pan/drafts/PAN-4383.md.",
+      "NonGoals": "- No change to roles/plan.md, review.md, test.md or strike.md\n- No change to sync-sources/hooks/ask-user-question-hook or its detector contract\n- No extension of `pan answer`\n- No new HTTP route, no new PendingInputKind, no new read-model or contract field\n- No stored decision status outside the append-only pipeline journal\n- No server push service (ntfy/web-push); push stays the existing browser notification and TTS\n- No issue-comment mirroring of the question\n- The stall sweeper gains no action capability"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Channel = new `pan ask` verb writing operator.decision-* pipeline-journal entries, not a labelled issue comment",
+        "rationale": "The issue names either; the journal is workspace-scoped, append-only, event-firing (pipeline.entry) and needs no forge round-trip or poll."
+      },
+      {
+        "summary": "Reuse the askUserQuestion pending-input kind with toolUseId operator-decision:<questionId> instead of a new kind",
+        "rationale": "Gets the Needs-you row, the dialog (with free-form textarea), rising-edge TTS, activity entry and desktop notification with no frontend or contract changes."
+      },
+      {
+        "summary": "A decision closes on answered, withdrawn, a later verification.started, or a newer request; no transcript user-text clearing",
+        "rationale": "One journal-only rule keeps Needs-you, the Command Deck and God View in agreement and survives agent restarts."
+      },
+      {
+        "summary": "Any delivered operator message (pan tell, dashboard message/tell) to the asking agent closes its decision",
+        "rationale": "The flywheel answers with pan tell; treating an operator message to a blocked agent as the answer avoids a second answer verb. The agent re-asks if it was not an answer."
+      },
+      {
+        "summary": "The journal decision is exempt from PAN-1834 specialist suppression and from the startedAt filter",
+        "rationale": "Suppression exists for stale transcript residue; a timestamped decision request is fresh evidence and a restarted agent still owes the answer."
+      },
+      {
+        "summary": "God View needs-you orbs sit on the shelf row in SWEEP_FLARE_COLOR with label '⚑ <id> · needs you <age>'",
+        "rationale": "The shelf means paused work still in the pipeline, and GOD-VIEW.md already defines the flare as an orb only a human can release."
+      },
+      {
+        "summary": "Only the blocking-question shape in roles/work.md moves to pan ask; other roles and the AUQ deny hook are unchanged",
+        "rationale": "The issue scopes the work role; a Claude agent's AskUserQuestion already reaches Needs-you through the (PAN-1520) deny marker, whose text is a tested contract."
+      },
+      {
+        "summary": "pan ask requires 2-4 options",
+        "rationale": "Matches the AskUserQuestion option contract the reused dialog renders; free-form answers still go through the dialog textarea."
+      }
+    ],
+    "items": [
+      {
+        "id": "decision-core",
+        "title": "Add the operator-decision journal core module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/operator-decision.ts",
+            "src/lib/cloister/__tests__/operator-decision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/operator-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "operator-decision.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "pan-ask-cli",
+            "enrichment-needs-you",
+            "answer-route-clears",
+            "operator-message-closes",
+            "derived-attention",
+            "parked-operator-gate"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-1. Extend PipelineJournalEntryType with operator.decision-requested/-answered/-withdrawn. Create src/lib/cloister/operator-decision.ts exporting OPERATOR_DECISION_TOOL_ID_PREFIX ('operator-decision:'), OperatorDecision, isOperatorDecisionToolId, deriveOpenOperatorDecision (oldest-first walk: requested opens/supersedes; answered or withdrawn with matching data.questionId closes; verification.started closes; malformed data ignored), readOpenOperatorDecision (try/catch -> null), requestOperatorDecision (questionId od-<8 chars of randomUUID>, source 'pan-ask'), answerOperatorDecision (answer truncated to 2000 chars, source = via), withdrawOperatorDecision, operatorDecisionAsPendingQuestion (structural {toolId, timestamp, questions[{question, header:'Decision', multiSelect:false, options[{label, description:''}]}]}), closeOpenDecisionOnOperatorMessage(agentId, message, via) (workspace from getAgentState(agentId)?.workspace; appends only when decision.agentId matches; returns boolean, never throws). Must NOT import src/lib/agent-enrichment.ts."
+        },
+        "items": [
+          {
+            "id": "decision-core.ac1",
+            "title": "Given a journal with one operator.decision-requested entry, when deriveOpenOperatorDecision reads it, then it returns the decision with its questionId, question and options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decision-core.ac2",
+            "title": "Given an open decision, when an operator.decision-answered or operator.decision-withdrawn entry with the same questionId or a later verification.started entry is appended, then readOpenOperatorDecision returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decision-core.ac3",
+            "title": "Given two requested entries, when the journal is derived, then the newer request is returned and the older one is superseded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decision-core.ac4",
+            "title": "Given an open decision for agent-pan-1, when closeOpenDecisionOnOperatorMessage runs for agent-pan-2, then it returns false and appends no entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-ask-cli",
+        "title": "Add the pan ask CLI verb",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/ask.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/cli/commands/__tests__/ask.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/ask.test.ts",
+            "npm run build",
+            "npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ask.test.ts passes",
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-2. Register `ask <id> [question]` next to `answer` in src/cli/index.ts with repeatable --option (collect into string[]), --context, --withdraw, lazyAction to ./commands/ask.js askCommand. askCommand resolves the issue id via resolveBareNumericId + toUpperCase, the workspace via getIssueWorkspacePath (exit 1 'No workspace for <ISSUE>' when missing), the agent id from OVERDECK_AGENT_ID or agent-<issue lowercase>. Ask requires a non-empty question and 2-4 non-empty options; prints 'Superseding <old>' when a decision is open; prints the stop-and-wait confirmation. --withdraw exits 1 'No open decision for <ISSUE>' when none is open. Rebuild, run npm run generate:slash-commands and commit the regenerated manifest. src/cli/index.ts cap is 1379 lines (now 1282)."
+        },
+        "items": [
+          {
+            "id": "pan-ask-cli.ac1",
+            "title": "Given an existing workspace, when `pan ask PAN-X \"q\" --option a --option b` runs, then exactly one operator.decision-requested line with options [a, b] is appended to .overdeck/pipeline.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-ask-cli.ac2",
+            "title": "Given a single --option, when pan ask runs, then it exits 1 and appends no journal entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-ask-cli.ac3",
+            "title": "Given no open decision, when `pan ask PAN-X --withdraw` runs, then it exits 1; given an open decision, it appends operator.decision-withdrawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-ask-cli.ac4",
+            "title": "Given the regenerated manifest, when scripts/lint-slash-commands.sh runs, then it reports the manifest matches the CLI registry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-needs-you",
+        "title": "Surface the open decision as an askUserQuestion in agent enrichment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/compute-agent-enrichment.test.ts tests/lib/agent-enrichment-pending-inputs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both enrichment test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-3. Add openDecisionForAgent(agentId) (workspace from getAgentState, decision only when decision.agentId === agentId), read every poll independent of cachedScan. After the startedAt filter append operatorDecisionAsPendingQuestion to pendingQuestions (replace them with only the decision when a specialist is active). shouldSuppressPendingInput gains `&& !operatorDecision`. Extract toPendingAskUserQuestion and, when isSpecialistSuppressed && operatorDecision, push 'askUserQuestion' and set pendingAskUserQuestion. getAgentPendingQuestions returns transcript questions then the decision, even without a JSONL path."
+        },
+        "items": [
+          {
+            "id": "enrichment-needs-you.ac1",
+            "title": "Given an open decision for a work agent, when computeAgentEnrichment runs, then pendingInputKinds contains askUserQuestion and pendingAskUserQuestion.toolUseId equals operator-decision:<questionId> with the option labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-needs-you.ac2",
+            "title": "Given the decision was answered in the journal, when computeAgentEnrichment runs again, then it returns no askUserQuestion kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-needs-you.ac3",
+            "title": "Given a decision whose agentId names another agent, when computeAgentEnrichment runs, then it does not report the decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-needs-you.ac4",
+            "title": "Given hasActiveSpecialist is true, when computeAgentEnrichment runs with an open decision, then the decision still renders as askUserQuestion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-route-clears",
+        "title": "Answer route delivers the answer and appends operator.decision-answered",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/server/routes/__tests__/agent-answer-operator-decision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agent-answer-operator-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-answer-operator-decision.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-4. Frontend agent-kind answer POST sends {answers, toolUseId}. The route picks the pending set matching body.toolUseId (else the first); returns 409 code decision-closed for an operator-decision toolUseId with no match; for an operator-decision set composes 'Operator answered your decision request (<questionId>):\\n\\nQ: ...\\nA: ...', calls deliverAgentMessage(id, message, 'operator-decision-answer'), returns 502 code delivery-failed without appending when result.ok is false, else appends via answerOperatorDecision(..., 'dashboard-answer'). The transcript AskUserQuestion branch is unchanged."
+        },
+        "items": [
+          {
+            "id": "answer-route-clears.ac1",
+            "title": "Given an open decision and an ok delivery, when POST /api/agents/:id/answer-question runs with its toolUseId, then it returns 200 and appends operator.decision-answered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-route-clears.ac2",
+            "title": "Given deliverAgentMessage returns ok false, when the route runs, then it returns 502 and appends no journal entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-route-clears.ac3",
+            "title": "Given a toolUseId for a decision that is already closed, when the route runs, then it returns 409 with code decision-closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "operator-message-closes",
+        "title": "Delivered pan tell and dashboard messages close the open decision",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tell.ts",
+            "src/dashboard/server/routes/agents/messaging.ts",
+            "src/cli/commands/__tests__/tell.test.ts",
+            "src/dashboard/server/routes/__tests__/agents-messaging.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/tell.test.ts src/dashboard/server/routes/__tests__/agents-messaging.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tell.test.ts and agents-messaging.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-5. In tell.ts after the `if (!outcome.delivered)` exit block call closeOpenDecisionOnOperatorMessage(agentId, message, 'pan-tell') and print a dim 'Closed the open operator decision' line when true; remote branch unchanged. In messaging.ts sendAgentMessage, after the steer-refused check, call closeOpenDecisionOnOperatorMessage(id, message, 'dashboard-message') when outcome.delivered."
+        },
+        "items": [
+          {
+            "id": "operator-message-closes.ac1",
+            "title": "Given messageAgent reports delivered, when pan tell runs, then closeOpenDecisionOnOperatorMessage is called with via 'pan-tell'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-message-closes.ac2",
+            "title": "Given messageAgent reports not delivered, when pan tell runs, then closeOpenDecisionOnOperatorMessage is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-message-closes.ac3",
+            "title": "Given a delivered dashboard message, when POST /api/agents/:id/message runs, then closeOpenDecisionOnOperatorMessage is called with via 'dashboard-message'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derived-attention",
+        "title": "Derived issue attention returns needs-you for an open decision",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state.test.ts src/dashboard/server/services/__tests__/derived-issue-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both derived-issue-state test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-6. Add optional IssueStateFacts.operatorDecisionOpen; deriveAttention returns 'needs-you' first when it is true. Add operatorDecisionOpenFor(issueId, projectPath) reading readOpenOperatorDecision(join(projectPath,'workspaces',`feature-${issueId.toLowerCase()}`)) and set the fact in loadIssueStateFacts (only when the project resolved) and loadIssueStatesForProject. The Command Deck's isNeedsYouFeature already buckets attention needs-you as Needs you."
+        },
+        "items": [
+          {
+            "id": "derived-attention.ac1",
+            "title": "Given facts with operatorDecisionOpen true and an idle pane with unpushed commits, when deriveIssueState runs, then attention is needs-you instead of stuck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-attention.ac2",
+            "title": "Given operatorDecisionOpen false, when deriveIssueState runs, then attention is unchanged from the existing rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-attention.ac3",
+            "title": "Given a workspace journal with an open decision, when loadIssueStateFacts runs with injected deps, then the returned facts carry operatorDecisionOpen true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parked-operator-gate",
+        "title": "Parked resolver emits an operator-decision gate instead of idle-running",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/parked/__tests__/resolver.test.ts src/lib/__tests__/agent-text-cli-verbs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolver.test.ts and agent-text-cli-verbs.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-7. Add ParkedSignals.openOperatorDecision. In classifyParked inside `if (!closed)` after the gateRows loop push an operator-gate row (parkedAt askedAt, reason '<agentId> asked the operator: <question truncated to 160>', unpark 'answer it from the dashboard Needs-you, or run pan tell <agentId> \"<answer>\"', details {gate:'operator-decision', questionId, agentId}); the existing rows.length === 0 guard then skips idle-running. In resolveParkedPopulation classifyOne, read the decision from the first agent of the issue with a workspace."
+        },
+        "items": [
+          {
+            "id": "parked-operator-gate.ac1",
+            "title": "Given an open decision and a live agent idle for 7 hours, when classifyParked runs, then it returns one operator-gate row with details.gate operator-decision and no idle-running row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-operator-gate.ac2",
+            "title": "Given the issue is closed, when classifyParked runs with an open decision, then no operator-decision row is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-operator-gate.ac3",
+            "title": "Given the new unparkCondition text, when agent-text-cli-verbs.test.ts runs, then every named pan verb resolves to a registered command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "godview-needs-you-orb",
+        "title": "God View draws a needs-you orb on the shelf row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/IssueRail.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "model.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-8. OrbState gains 'needs-you'; classifyOrb returns it after the paused/yield shelf check and before failed/stale; positionOrb places needs-you orbs on the shelf row sharing the shelf index. RiverCanvas: shelf count (line ~254) includes needs-you; new draw branch before the shelf branch (~573) with a steady SWEEP_FLARE_COLOR ring and label `⚑ <id> · needs you <fmtAge>`; shelf motion (~659) and the skip at ~699 include needs-you; tide beneficiary (~363) and yield choreography stay shelf-only. IssueRail.stateLabel returns 'needs you ⚑'. Add the model test to root package.json test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "godview-needs-you-orb.ac1",
+            "title": "Given attention needs-you and last activity 17 hours ago, when classifyOrb runs, then it returns needs-you instead of stale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "godview-needs-you-orb.ac2",
+            "title": "Given paused true and attention needs-you, when classifyOrb runs, then it returns shelf",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "godview-needs-you-orb.ac3",
+            "title": "Given a needs-you orb, when positionOrb runs, then the orb's ty equals layout.shelfY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "godview-needs-you-orb.ac4",
+            "title": "Given a needs-you orb, when IssueRail renders its state label, then it reads 'needs you ⚑'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-role-pan-ask",
+        "title": "Work role prompt directs blocking questions to pan ask",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "agent-text-cli-verbs.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-9. Insert the '## Ask the operator with `pan ask`' section before '## Signal the flywheel before you stall' in roles/work.md with the exact text in the PRD (verb usage, stop-and-wait, no issue comment or flywheel tell for the same question, --withdraw, re-ask when a message does not answer it). In the flywheel section replace 'or park on a question for the operator' with '(for a blocking question use `pan ask` above)' and drop the blocking-question clause so the sentence lists three shapes. Do not edit other roles."
+        },
+        "items": [
+          {
+            "id": "work-role-pan-ask.ac1",
+            "title": "Given roles/work.md, when read, then it contains a `pan ask <ISSUE-ID>` usage line with --option and a `pan ask <ISSUE-ID> --withdraw` instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-role-pan-ask.ac2",
+            "title": "Given the flywheel section of roles/work.md, when read, then it lists three push-back shapes and points blocking questions to pan ask",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-role-pan-ask.ac3",
+            "title": "Given the updated prompt, when agent-text-cli-verbs.test.ts runs, then it accepts every pan verb named in roles/work.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-operator-decisions",
+        "title": "Document the operator-decision channel in PIPELINE-GATES and GOD-VIEW",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T06:19:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/GOD-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'operator.decision-' docs/PIPELINE-GATES.md",
+            "grep -n 'needs you' docs/GOD-VIEW.md"
+          ],
+          "expected_outputs": [
+            "PIPELINE-GATES.md reports at least 3 operator.decision- matches",
+            "GOD-VIEW.md shows the flare-ring glyph row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4383.md WI-10. Add three rows to the pipeline-journal entry table in docs/PIPELINE-GATES.md (operator.decision-requested by pan ask; -answered by the dashboard answer route, a delivered dashboard message or pan tell; -withdrawn by pan ask --withdraw) and a '## Operator decisions (PAN-4383)' section before '## Deacon-lite' covering the verb and 2-4 option rule, the open-decision rule, Needs-you within one 10 s poll and the specialist-suppression exemption, answered-only-on-ok delivery, derived needs-you attention, the operator-gate/operator-decision parked row with the 24 h TTL, and that the journal dies with the workspace. Add the glyph row 'Flare ring on the shelf' to docs/GOD-VIEW.md."
+        },
+        "items": [
+          {
+            "id": "docs-operator-decisions.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when read, then its journal table lists operator.decision-requested, operator.decision-answered and operator.decision-withdrawn with their writers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-operator-decisions.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when read, then an 'Operator decisions (PAN-4383)' section explains that the answer is delivered through deliverAgentMessage and the entry is appended only on ok delivery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-operator-decisions.ac3",
+            "title": "Given docs/GOD-VIEW.md, when read, then its glyph table has a 'Flare ring on the shelf' row for issues whose agent ran pan ask",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "decision-core",
+        "to": "pan-ask-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "decision-core",
+        "to": "enrichment-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "decision-core",
+        "to": "answer-route-clears",
+        "type": "blocks"
+      },
+      {
+        "from": "decision-core",
+        "to": "operator-message-closes",
+        "type": "blocks"
+      },
+      {
+        "from": "decision-core",
+        "to": "derived-attention",
+        "type": "blocks"
+      },
+      {
+        "from": "decision-core",
+        "to": "parked-operator-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment-needs-you",
+        "to": "answer-route-clears",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-ask-cli",
+        "to": "work-role-pan-ask",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
