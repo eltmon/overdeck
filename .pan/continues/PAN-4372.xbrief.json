@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4372",
   "created": "2026-09-29T09:44:00.403Z",
-  "updated": "2026-09-29T10:45:15.290Z",
+  "updated": "2026-09-29T10:45:49.049Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,11 @@
     },
     "ac-eval-fixtures.ac1": {
       "status": "cancelled"
+    },
+    "docs-xbrief-advisory": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:45:49.049Z"
     }
   }
 }
