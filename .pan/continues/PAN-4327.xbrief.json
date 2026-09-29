@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:40:14.723Z",
+  "updated": "2026-09-29T01:40:25.396Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "tts-summarizer-omit-sampling.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T01:40:14.723Z"
+    },
+    "tts-summarizer-omit-sampling.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:25.396Z"
     }
   }
 }
