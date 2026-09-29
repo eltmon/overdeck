@@ -12,7 +12,7 @@ projects (NFR-7). `pan vault` sends no telemetry (P-12).
 | Term | Meaning |
 | --- | --- |
 | **Vault** | One user's encrypted store of conversations, keyed by one 32-byte vault key. Lives in a git remote the user owns (`pan vault setup <git-url>`); a `dir:<path>` backend exists for tests and NAS mounts. |
-| **Backend** | An immutable object store plus compare-and-swap refs (`src/lib/vault/store/types.ts`). Layout on both backends: `VAULT-FORMAT` marker, `objects/<id[0:2]>/<id>`, `refs/<name>`. Ref names are keyed HMACs, so the backend cannot link records to conversations. One object name is reserved rather than content-addressed: `objects/keywrap/v1`, the scrypt-wrapped vault key for the optional passphrase (PAN-4328); Phase A never writes it. |
+| **Backend** | An immutable object store plus compare-and-swap refs (`src/lib/vault/store/types.ts`). Layout on both backends: `VAULT-FORMAT` marker, `objects/<id[0:2]>/<id>`, `refs/<name>`. Ref names are keyed HMACs, so the backend cannot link records to conversations. One object name is reserved rather than content-addressed: `objects/keywrap/v1`, the scrypt-wrapped vault key for the optional passphrase, written and deleted only through `putSlot`, which publishes immediately (PAN-4328). `putObjects` rejects it. |
 | **Record** | One saved conversation: an encrypted ref value (`r/<hmac>`) holding owner, harness, title, cwd, the LOG, the VIEW pointer, segments, settlements and lineage (`SessionRecord` in `src/lib/vault/format.ts`). |
 | **Chunk** | The lines one settlement added, stored as `{ v, codec: "zstd", lineHashes, lines }`, compressed and sealed with AES-256-GCM. The chunk id is `HMAC-SHA256(K_id, plaintext)[:40]` and is the associated data, so a chunk cannot be swapped under another id. |
 | **LOG** | The ordered chunk ids of a record: every native line ever saved, byte for byte. |
@@ -36,11 +36,62 @@ projects (NFR-7). `pan vault` sends no telemetry (P-12).
 **Key loss.** Anyone with the 24 words can read the vault. Losing every device and the
 recovery phrase loses the vault: there is no server-side recovery, by design.
 
+## Passphrase unlock
+
+A second machine can join by typing a vault passphrase instead of the 24 words
+([PAN-4328](https://github.com/eltmon/overdeck/issues/4328)). The vault key `K` is wrapped
+under the passphrase and stored on the backend as the reserved slot `objects/keywrap/v1`.
+The passphrase is never stored anywhere, and `K` never changes, so the recovery phrase is
+still the root of recovery: removing the passphrase never locks you out.
+
+`keywrap/v1` is UTF-8 JSON with exactly these eight fields (`src/lib/vault/keywrap.ts`):
+
+| Field | Value |
+| --- | --- |
+| `v` | `1` |
+| `kdf` | `"scrypt"` |
+| `N`, `r`, `p` | scrypt cost; written as `131072`, `8`, `1` |
+| `salt` | base64 of 16 random bytes |
+| `nonce` | base64 of 12 random bytes |
+| `ct` | base64 of AES-256-GCM(`K`) plus its 16-byte tag (48 bytes), associated data `overdeck-vault-keywrap-v1` |
+
+- The key-encryption key is `scrypt(normalize(passphrase), salt, 32, { N, r, p, maxmem: 256 MiB })`.
+  Node's default `maxmem` (32 MiB) rejects `N = 131072, r = 8`, so `maxmem` is mandatory.
+  The derivation is async `crypto.scrypt`, never `scryptSync`.
+- `normalize` is NFKC, trimmed, with every whitespace run collapsed to one space. Wrap,
+  unwrap and the strength check all use the normalized form.
+- The blob is validated before any derivation: `N` a power of two in [2^14, 2^20],
+  `1 <= r <= 16`, `1 <= p <= 4`, `128·N·r·p <= 256 MiB`, exact field sizes, no extra keys.
+  A malicious backend therefore cannot make a client allocate unbounded memory. A malformed
+  blob makes `join` print a warning and fall back to the recovery phrase.
+- A wrong passphrase fails GCM authentication locally, so `join` reads nothing else from the
+  backend and writes nothing.
+
+**Strength.** A typed passphrase must be at least 16 characters (code points, after
+normalization), must not be on a short blocklist of well-known phrases, and must use at least
+6 distinct characters. The default is a generated passphrase of 6 words drawn uniformly from
+the EFF long wordlist (`src/lib/vault/eff-wordlist.ts`), about 77.5 bits.
+
+**Offline guessing.** Anyone who holds the backend bytes can guess the passphrase offline.
+Each guess costs 128 MiB and one scrypt derivation, so a generated passphrase is out of
+reach, but a weak typed one is not. Use a generated passphrase unless you have a reason not to.
+
+**Backend operation.** `VaultStore.putSlot(name, bytes | null)` overwrites or deletes a
+reserved slot and publishes before it resolves; last write wins. The dir backend writes
+atomically or unlinks. The git backend refreshes the clone, stages only `objects/keywrap`
+(pending content objects never ride along), commits `vault: keywrap` and pushes; a
+non-fast-forward push is retried up to three times, and any other push failure resets the
+clone and throws `VaultOfflineError`.
+
 ## Commands
 
 ```bash
-pan vault setup <git-url> [--hooks]        # enable; prints the recovery phrase ONCE
-pan vault join <git-url> [--phrase-file p]  # second machine
+pan vault setup <git-url> [--hooks] [--passphrase-file p | --generate-passphrase | --no-passphrase]
+                                            # enable; prints the recovery phrase ONCE, offers passphrase unlock
+pan vault join <git-url> [--phrase-file p | --passphrase-file p]
+                                            # second machine: passphrase first when one is set
+pan vault passphrase set [--passphrase-file p | --generate]   # turn passphrase unlock on (or change it)
+pan vault passphrase remove                 # turn it off; joining needs the recovery phrase
 pan vault status [--json]
 pan vault save <id|path> | --all [--since <date>] [--harness <h>]
 pan vault save --hook                       # Claude Code Stop hook: stdin JSON, silent, exit 0
@@ -172,6 +223,9 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
   it is real, then `pan vault allow-secret <id|path> N`, or exclude the session.
 - **`Already continued on <label>`** — another machine adopted the record first. Run
   `pan vault sync` and resume again to take it over from there.
+- **`The passphrase did not unlock this vault.`** — the passphrase does not decrypt
+  `keywrap/v1`. Nothing was written. Try again, or press Enter at the prompt to use the
+  recovery phrase.
 - **`The recovery phrase does not match this vault.`** — the words decode but do not
   decrypt the header. Nothing was written; check the phrase and try again.
 
@@ -181,6 +235,8 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
 src/lib/environment-identity.ts   machine identity (shared with PAN-3762)
 src/lib/vault/config.ts           vault/config.json, isVaultEnabled
 src/lib/vault/identity.ts         key, recovery phrase, HKDF sub-keys
+src/lib/vault/keywrap.ts          passphrase unlock: keywrap/v1 wrap/unwrap, strength, generation
+src/lib/vault/eff-wordlist.ts     vendored EFF long wordlist for generated passphrases
 src/lib/vault/format.ts           chunk and record wire format, ref names
 src/lib/vault/continuity.ts       line hashes, noop/append/diverged
 src/lib/vault/turns.ts            human-turn filter (FR-18)
