@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:14:42.291Z",
+  "updated": "2026-09-29T03:14:56.964Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "lock-write-verbs.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T03:14:42.290Z"
+    },
+    "lock-write-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:56.964Z"
     }
   }
 }
