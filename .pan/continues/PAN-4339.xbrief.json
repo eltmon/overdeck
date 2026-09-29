@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:13:23.292Z",
+  "updated": "2026-09-29T03:13:38.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "spawn-claim-identity.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T03:13:23.292Z"
+    },
+    "claim-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:13:38.654Z"
     }
   }
 }
