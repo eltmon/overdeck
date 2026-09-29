@@ -375,6 +375,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--allow-primary', 'Operator only: allow --cwd to be a project\'s primary checkout (refused for agent sessions)')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(lazyAction(() => import('./commands/fork.js'), 'forkCommand'));
@@ -385,6 +386,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--allow-primary', 'Operator only: allow --cwd to be a project\'s primary checkout (refused for agent sessions)')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--issue <id>', 'Issue ID to associate with the new conversation; without --cwd the new conversation starts in the issue workspace when it exists')
   .option('--role <role>', 'Pane role for the new conversation: conversation (default), work, review, test, plan. With --issue, review makes the handoff the issue\'s Review row')
