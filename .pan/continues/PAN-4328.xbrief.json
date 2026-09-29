@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:12:51.228Z",
+  "updated": "2026-09-29T10:13:02.721Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "eff-wordlist.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T10:12:51.227Z"
+    },
+    "eff-wordlist.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:02.721Z"
     }
   }
 }
