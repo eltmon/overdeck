@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T15:58:48.220Z",
+  "updated": "2026-09-29T15:59:03.564Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "okf-tag-v010.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T15:58:48.219Z"
+    },
+    "okf-tag-v010.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:59:03.564Z"
     }
   }
 }
