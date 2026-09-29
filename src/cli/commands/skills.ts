@@ -9,6 +9,7 @@
  *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
+ *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
  * it imports only Commander types and chalk statically. The
@@ -17,6 +18,7 @@
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
+import { registerSkillsDeftCommands } from './skills-deft.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
@@ -435,4 +437,6 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackSyncCommand);
   pack.command('gc').description('Remove unused skill pack mounts and dangling launch links')
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
+
+  registerSkillsDeftCommands(skills);
 }
