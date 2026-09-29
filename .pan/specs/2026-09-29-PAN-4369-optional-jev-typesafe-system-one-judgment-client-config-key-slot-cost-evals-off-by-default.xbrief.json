@@ -1,0 +1,879 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:32:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4369: Optional Jev (TypeSafe System One) judgment client: config, key slot, cost, evals (off by default)",
+    "updated": "2026-09-29T04:36:30.047Z"
+  },
+  "plan": {
+    "id": "pan-4369",
+    "title": "Optional Jev (TypeSafe System One) judgment client: config, key slot, cost, evals (off by default)",
+    "status": "proposed",
+    "uid": "65f2349b-1871-459b-892c-c70e8a2b5aa5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T04:32:15Z",
+    "updated": "2026-09-29T04:36:30.047Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4369",
+        "label": "PAN-4369",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4369.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/jev-integration.md",
+        "label": "Jev research PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "jev",
+      "typesafe",
+      "background-ai",
+      "config",
+      "cost",
+      "settings",
+      "evals"
+    ],
+    "metadata": {
+      "sizeJustification": "This is the single shared foundation for three already-split consumer issues (PAN-4371, PAN-4372, PAN-4373). Its surface spans config-yaml, the jev client, background-ai registry, pricing, Settings UI, evals and docs because each of those is one small, required seam of an off-by-default feature; every seam is its own vertical item here, and none is shippable as a sibling issue without leaving an unreachable or unconfigurable client.",
+      "canonicalFilename": "2026-09-29-PAN-4369-optional-jev-typesafe-system-one-judgment-client-config-key-slot-cost-evals-off-by-default.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Several Overdeck decisions are fuzzy judgments made with keyword lists or not made at all (is an agent's last message a question; is an acceptance criterion observable). TypeSafe's Jev model answers typed questions with calibrated probabilities in under 0.5 s at $0.042/Mtok input, but Overdeck has no client, config, key slot, cost accounting or eval harness for it. Research: .pan/drafts/jev-integration.md.",
+      "Proposal": "Add an optional, off-by-default Jev client in src/lib/jev/ (config resolution with typed unavailable reasons, a content-addressed memo with in-flight dedupe and a concurrency cap of 4, and a never-throwing assess() that records cost through recordBackgroundAiCost). Configure it through a new jev: block and an api_keys.typesafe slot (with TYPESAFE_API_KEY fallback), gate it through three new background-ai features that default off, price jev-1.13 and jev-1.13-free, expose the toggles and a key input in Settings -> Background AI, add a smoke eval that skips when unconfigured, and document it in configuration/jev.mdx. The model comes only from jev.model; nothing in this issue calls assess() outside tests and the eval.",
+      "NonGoals": "- No call sites of assess() outside tests and the eval; turn-end, AC review and memory relevance consumers are PAN-4371, PAN-4372, PAN-4373\n- No hardcoded model id or model fallback anywhere in src/lib/jev (no jev-latest, no TYPESAFE_DEFAULT_MODEL reliance)\n- No new ModelProvider, PROVIDERS entry or model-picker entry for Jev\n- No Settings editor for jev.model, jev.base_url or jev.timeout_ms (config.yaml only); the key input is the only new Settings control besides the toggles\n- No startup check, doctor check, health check or warning when Jev is unconfigured\n- No persistence of Jev verdicts (no DB rows, agent rows, journal or tracker writes); the memo is in-process only\n- No Effect facade around the Promise client\n- No edits to sync-sources/hooks/record-cost-event.js or src/lib/settings.ts\n- No scripts/file-size-allowlist.txt edits\n- No vendoring of the TypeSafe agent skill into sync-sources/skills/"
+    },
+    "autoDecisions": [
+      {
+        "summary": "assess() lives in src/lib/jev/client.ts next to createJevClient(); no index.ts barrel.",
+        "rationale": "The issue lists client/config/questions/memo only; keeping assess in client.ts avoids an extra file and a barrel."
+      },
+      {
+        "summary": "Config types and normalizer go in a new src/lib/config-yaml/jev.ts, and the merge lands in merge.ts (not only schema/defaults/load as the issue says).",
+        "rationale": "merge.ts is where every other block (ollama, registry, api_keys) is folded; ollama.ts is the established pattern for a small typed block."
+      },
+      {
+        "summary": "schema.ts grows by exactly 4 lines using inline import('./jev.js') types and no comments.",
+        "rationale": "schema.ts is 1092 lines against an allowlist cap of 1096, and agents may not raise the cap; inline import types have precedent in verification-runner.ts and kimi-code.ts."
+      },
+      {
+        "summary": "Gate order: disabled -> not-configured -> model-not-configured -> no-api-key; added a 'no-api-key' reason the issue did not name.",
+        "rationale": "The issue says the feature gate runs first; a missing key needs its own reason so the SDK constructor never throws on the normal path."
+      },
+      {
+        "summary": "Memo key adds featureKey and a hash of the questions to the issue's (state hash, question-set version, model) key; only answered results are cached.",
+        "rationale": "Two consumers sending the same state with different question maps would otherwise share an entry, and caching a transient 429 would make it sticky."
+      },
+      {
+        "summary": "SDK retries disabled (maxRetries 0); baseURL passed only when jev.base_url is set; logLevel forced to 'warn'.",
+        "rationale": "Callers schedule assessments off hot paths so fail-fast is correct; forcing warn overrides a TYPESAFE_LOG_LEVEL=debug env that would log bodies."
+      },
+      {
+        "summary": "Toggle descriptions live in frontend Settings/types.ts BACKGROUND_AI_FEATURE_META (and identical strings in registry.ts); settingsPageConstants.ts only gains cost-source entries.",
+        "rationale": "That is where descriptions actually live today; the issue's file name refers to the Settings constants in general."
+      },
+      {
+        "summary": "The TypeSafe key input lives in Settings -> Background AI, not the Providers section.",
+        "rationale": "There is no page named 'API Keys'; TypeSafe is not a model provider, and the key only serves the jev* background features."
+      },
+      {
+        "summary": "Toggle descriptions name the data each future consumer will send, taken from the research PRD's consumer designs.",
+        "rationale": "The issue requires descriptions naming the data sent while this issue itself sends nothing; the docs page states that explicitly."
+      },
+      {
+        "summary": "The smoke eval takes model and key from config via resolveJevConfig, bypasses the feature toggle and cost recording, and uses evalite.skip with a printed reason when unconfigured.",
+        "rationale": "The issue says skip when no key; the no-hardcoded-model rule forbids an eval literal; operators run evals deliberately."
+      },
+      {
+        "summary": "Invalid jev values throw at config load.",
+        "rationale": "Matches the registry.classification and ollama precedent in merge.ts; absence of the block remains silent."
+      }
+    ],
+    "items": [
+      {
+        "id": "sdk-dependency",
+        "title": "Pin @typesafe-ai/sdk at exactly 0.6.0",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -F '\"@typesafe-ai/sdk\": \"0.6.0\"' package.json",
+            "node -e \"import('@typesafe-ai/sdk').then(m => console.log(m.VERSION))\""
+          ],
+          "expected_outputs": [
+            "grep prints the exact-pinned dependency line",
+            "node prints 0.6.0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4369.md WI-1. At the repo root run `bun add @typesafe-ai/sdk@0.6.0 --exact`. The dependency lands in root package.json `dependencies` next to `@anthropic-ai/sdk` with no ^ or ~ prefix, and bun.lock records it. Commit package.json and bun.lock only."
+        },
+        "items": [
+          {
+            "id": "sdk-dependency.ac1",
+            "title": "Given the root package.json, when it is read, then `dependencies` contains `\"@typesafe-ai/sdk\": \"0.6.0\"` with no range prefix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sdk-dependency.ac2",
+            "title": "Given a fresh install, when `node -e \"import('@typesafe-ai/sdk').then(m => console.log(m.VERSION))\"` runs, then it prints `0.6.0`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-jev-block",
+        "title": "Add the jev: config block and the api_keys.typesafe slot to config-yaml",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/jev.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/config-yaml/__tests__/jev-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/jev-config.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "jev-config.test.ts passes",
+            "file-size guard passes with schema.ts at or below 1096 lines",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "jev-config-resolution",
+            "typesafe-key-slot"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (exact code and line anchors there). Create src/lib/config-yaml/jev.ts (YamlJevConfig, NormalizedJevConfig {configured, baseUrl?, model?, apiKeyRef, timeoutMs}, DEFAULT_JEV_API_KEY_REF='TYPESAFE_API_KEY', DEFAULT_JEV_TIMEOUT_MS=2000, DEFAULT_NORMALIZED_JEV, normalizeJevConfig(raw, current)) following src/lib/config-yaml/ollama.ts; it imports nothing from src/lib/jev. null/undefined raw returns current; a mapping sets configured:true; invalid types or timeout_ms outside 1..30000 throw `config.yaml: jev.<key> ...`; blank model becomes undefined. schema.ts: add EXACTLY 4 lines, no comments: `typesafe?: string;` in YamlConfig.api_keys and in NormalizedConfig.apiKeys, `jev?: import('./jev.js').YamlJevConfig;` after `ollama?: YamlOllamaConfig;`, and `jev: import('./jev.js').NormalizedJevConfig;` after `ollama: NormalizedOllamaConfig;`. defaults.ts: `jev: { ...DEFAULT_NORMALIZED_JEV }`. merge.ts: init `jev: { ...DEFAULT_CONFIG.jev }`, fold `result.jev = normalizeJevConfig(config.jev, result.jev);` after the ollama fold, and `if (config.api_keys.typesafe) result.apiKeys.typesafe = resolveEnvVar(config.api_keys.typesafe);` after the voyage branch (no enabledProviders.add). load.ts applyEnvironmentFallbacks: TYPESAFE_API_KEY fallback after VOYAGE_API_KEY. Tests via mergeConfigs as listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "config-jev-block.ac1",
+            "title": "Given `mergeConfigs(null)`, when the config is read, then `config.jev` equals `{ configured: false, apiKeyRef: 'TYPESAFE_API_KEY', timeoutMs: 2000 }` (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-jev-block.ac2",
+            "title": "Given a `jev:` block with model, base_url and timeout_ms 1500, when merged, then `config.jev` returns configured true with those values; given `jev: {}`, then configured is true and model is undefined (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-jev-block.ac3",
+            "title": "Given `jev: { timeout_ms: 0 }`, when merged, then mergeConfigs throws an error matching /jev.timeout_ms/ (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-jev-block.ac4",
+            "title": "Given `api_keys: { typesafe: 'k' }`, when merged, then `config.apiKeys.typesafe` equals 'k' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-jev-block.ac5",
+            "title": "Given the finished change, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and `wc -l < src/lib/config-yaml/schema.ts` prints at most 1096.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "background-ai-jev-features",
+        "title": "Register jevTurnEndAssessment, jevAcceptanceCriteriaReview and jevMemoryRelevance as off-by-default background features",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/background-ai/registry.ts",
+            "src/lib/background-ai/__tests__/features.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/background-ai/__tests__/features.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "features.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Append the three keys to BACKGROUND_AI_FEATURES after 'ttsSummarizer' and three BACKGROUND_AI_FEATURE_META entries with defaultEnabled false, using EXACTLY the labels and descriptions in the PRD WI-3 table (each description starts with 'Sends ' and names TypeSafe). Add one header-comment line: jev* features default OFF (PAN-4369). Extend features.test.ts with the cases listed in PRD WI-3. Do not touch sync-sources/hooks/record-cost-event.js."
+        },
+        "items": [
+          {
+            "id": "background-ai-jev-features.ac1",
+            "title": "Given `defaultBackgroundAiFeatures()`, when read, then jevTurnEndAssessment, jevAcceptanceCriteriaReview and jevMemoryRelevance each default to false (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-ai-jev-features.ac2",
+            "title": "Given cheapMode true and jevTurnEndAssessment toggled on, when `isBackgroundFeatureEnabled('jevTurnEndAssessment', config)` runs, then it returns false; with cheapMode false it returns true (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-ai-jev-features.ac3",
+            "title": "Given BACKGROUND_AI_FEATURE_META, when the three jev entries are read, then each description starts with 'Sends ' and contains 'TypeSafe' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-pricing",
+        "title": "Add jev-1.13 and exact jev-1.13-free rows to DEFAULT_PRICING",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/__tests__/cost-jev-pricing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/cost-jev-pricing.test.ts"
+          ],
+          "expected_outputs": [
+            "cost-jev-pricing.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/cost.ts DEFAULT_PRICING, directly after the muse-spark-1.3 rows, add the comment and two rows `{ provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' }` and `{ provider: 'custom', model: 'jev-1.13-free', inputPer1k: 0, outputPer1k: 0, currency: 'USD' }`. New test file asserts the getPricing results listed in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "jev-pricing.ac1",
+            "title": "Given `getPricing('custom', 'jev-1.13-free')`, when called, then it returns a row with inputPer1k 0 and outputPer1k 0 (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-pricing.ac2",
+            "title": "Given `getPricing('custom', 'jev-1.13.0')`, when called, then it falls back to the jev-1.13 row with inputPer1k 0.000042 (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-pricing.ac3",
+            "title": "Given 1,000,000 input tokens priced with the jev-1.13 row, when calculateCost runs, then it returns 0.042 (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-config-resolution",
+        "title": "Resolve Jev config and key with typed unavailable reasons in src/lib/jev/config.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/config.ts",
+            "src/lib/jev/__tests__/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (config.ts block). Export JevFeature (Extract of the three jev keys), JevConfigInput = Pick<NormalizedConfig,'backgroundAi'|'jev'|'apiKeys'>, JevUnavailableReason = 'disabled'|'not-configured'|'model-not-configured'|'no-api-key', ResolvedJevConfig {apiKey, model, baseUrl?, timeoutMs}, resolveJevConfig(config, env = process.env) for steps 2-4, and resolveJevForFeature(feature, config, env?) that first checks isBackgroundFeatureEnabled(feature, config). Key = apiKeys.typesafe (trimmed, non-empty) else env[jev.apiKeyRef] (trimmed, non-empty) else 'no-api-key'. No model literal anywhere."
+        },
+        "items": [
+          {
+            "id": "jev-config-resolution.ac1",
+            "title": "Given cheapMode true, when resolveJevForFeature runs, then it returns { ok: false, reason: 'disabled' } (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-config-resolution.ac2",
+            "title": "Given cheapMode false, the feature on and jev.configured false, when resolved, then it returns reason 'not-configured'; given configured true with no model, then 'model-not-configured'; given a model but no key anywhere, then 'no-api-key' (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-config-resolution.ac3",
+            "title": "Given both apiKeys.typesafe and env[apiKeyRef] set, when resolved, then the result uses apiKeys.typesafe; given only a custom apiKeyRef 'MY_JEV_KEY' in the injected env, then the key comes from it (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-memo",
+        "title": "Add the Jev memo: content-addressed LRU, in-flight dedupe and a 4-request concurrency cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/memo.ts",
+            "src/lib/jev/__tests__/memo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/memo.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memo.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (memo.ts block) and Decisions 9-10. Model on src/lib/agent-input-detection.ts (paneDetectionCache / paneDetectionInFlight / withPaneDetectionSlot). Export JEV_MEMO_MAX_ENTRIES=256, JEV_MAX_CONCURRENT_REQUESTS=4, jevMemoKey({featureKey, model, questionSetVersion, state, questions}) = `${featureKey}:${model}:${questionSetVersion}:${sha256(JSON.stringify({state, questions}))}`, getMemoized (LRU touch), setMemoized (evict oldest), dedupeInFlight(key, run), withJevSlot(run), resetJevMemo(). Header comment documents that a joined in-flight request inherits the first caller's signal and outcome."
+        },
+        "items": [
+          {
+            "id": "jev-memo.ac1",
+            "title": "Given 257 distinct keys set, when the first key is read, then getMemoized returns undefined, and a key touched by a read before overflow is preserved (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-memo.ac2",
+            "title": "Given two concurrent dedupeInFlight calls with the same key, when both resolve, then `run` was invoked exactly once and both receive the same value (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-memo.ac3",
+            "title": "Given five withJevSlot bodies that block on deferred promises, when they start, then only four run until one resolves (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-memo.ac4",
+            "title": "Given two key inputs that differ only in questions or only in featureKey, when jevMemoKey runs, then it produces different keys (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-client-assess",
+        "title": "Build createJevClient and the never-throwing assess() entry point with cost recording",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/client.ts",
+            "src/lib/jev/questions.ts",
+            "src/lib/jev/__tests__/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/client.test.ts",
+            "bash -c \"! grep -rnE 'jev-(latest|preview|[0-9])' src/lib/jev --include='*.ts' --exclude-dir=__tests__\"",
+            "npm run lint:effect-facades",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "client.test.ts passes",
+            "the grep finds no model id literal and the command exits 0",
+            "effect-facades lint passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "jev-smoke-eval"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (questions.ts and client.ts blocks) and Decisions 1, 5-11. questions.ts: QUESTION_SET_VERSION = 1, JEV_SMOKE_QUESTIONS (one noul), JEV_SMOKE_NOUL_THRESHOLD = 0.5. client.ts: createJevClient(resolved, {fetch?}) builds TypeSafeClient with apiKey, defaultModel = resolved.model, baseURL only when set, logLevel 'warn', timeout = timeoutMs, retry { maxRetries: 0 }, fetch when given. assess(featureKey, state, questions, {signal?, config?, fetch?, env?}): resolve (config defaults to loadConfigSync().config) -> unavailable; memo hit -> return; else dedupeInFlight(key, () => withJevSlot(...)) calling systemOne({state, questions, model}) with {signal}, recording cost via recordBackgroundAiCost({feature, provider:'custom', model: result.model || resolved.model, usage:{inputTokens, outputTokens}}), caching only 'answered'. catch -> { status:'failed', reason: classifyJevError(err), message } using the instanceof order in PRD WI-4; never rethrow, never console-log the error. Tests: fake fetch through the SDK fetch option, inline configs with cheapMode false, vi.mock('../../costs/events.js') as in background-ai cost.test.ts, vi.useFakeTimers for the timeout case, vi.stubEnv for env cases."
+        },
+        "items": [
+          {
+            "id": "jev-client-assess.ac1",
+            "title": "Given cheap mode on, or no jev block, or jev.model unset with a key and TYPESAFE_DEFAULT_MODEL='jev-latest' stubbed, when assess() is called, then it returns unavailable with reason 'disabled', 'not-configured' or 'model-not-configured' respectively and the fake fetch is never invoked (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-client-assess.ac2",
+            "title": "Given jev.model 'test-model-x' and base_url 'https://opencode.ai/zen', when assess() sends a request, then the fetch URL is 'https://opencode.ai/zen/v1/systemone' and the request body model is 'test-model-x' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-client-assess.ac3",
+            "title": "Given the fake fetch returns 401, 429, or never settles until its signal aborts (fake timers advanced by timeoutMs), when assess() runs, then it resolves to failed with reason 'auth-failed', 'rate-limited' or 'timeout' and never rejects (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-client-assess.ac4",
+            "title": "Given the same state and questions sent twice sequentially, or twice concurrently, when assess() runs, then the fake fetch is called exactly once and both calls return answered (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-client-assess.ac5",
+            "title": "Given a successful response reporting model 'jev-1.13-free', when assess() completes, then exactly one cost event is appended with source 'background:jevTurnEndAssessment', provider 'custom' and cost 0, and a following memo hit appends none; given model 'jev-1.13' with 1,000,000 input tokens, the event cost is 0.042 (tests).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-jev-toggles",
+        "title": "Show the three jev* toggles with data-disclosure descriptions in Settings -> Background AI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/jevSettingsMeta.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/__tests__/jevSettingsMeta.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "jevSettingsMeta.test.ts passes",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and Decision 13. In Settings/types.ts add the three keys to the BackgroundAiFeature union and three BACKGROUND_AI_FEATURE_META rows with the EXACT labels/descriptions from the PRD WI-3 table. In settingsPageConstants.ts add the three BG_FEATURE_COST_SOURCE entries 'background:<key>'. No model control for jev rows (backgroundModelControl already returns null by default). New frontend test on the constants."
+        },
+        "items": [
+          {
+            "id": "settings-jev-toggles.ac1",
+            "title": "Given BACKGROUND_AI_FEATURE_META in the frontend, when each jev key is looked up, then a row exists whose description starts with 'Sends ' and contains 'TypeSafe' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-jev-toggles.ac2",
+            "title": "Given BG_FEATURE_COST_SOURCE, when each jev key is read, then it returns 'background:' followed by the key (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-jev-toggles.ac3",
+            "title": "Given the updated union, when `npm run typecheck:frontend` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "typesafe-key-slot",
+        "title": "Add the TypeSafe API key input to Settings and persist api_keys.typesafe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings-api.test.ts passes including the TypeSafe persistence case",
+            "BackgroundAiSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and Decision 12. settings-api.ts: add `typesafe?: string;` to the api_keys type and `typesafe: settings.api_keys.typesafe,` to the hand-written save mapping after dashscope. Frontend Settings/types.ts ApiKeysConfig: add typesafe. BackgroundAiSection.tsx: after the feature map, add one row labeled 'TypeSafe API key (Jev)' with the helper text from PRD WI-7 and an `<input type=\"password\" autoComplete=\"off\" aria-label=\"TypeSafe API key\">` bound to formData.api_keys?.typesafe, calling onSettingsChange({...formData, api_keys: {...formData.api_keys, typesafe: value || undefined}}, {debounce: true}). Add the settings-api persistence test beside the DashScope one and a new BackgroundAiSection test."
+        },
+        "items": [
+          {
+            "id": "typesafe-key-slot.ac1",
+            "title": "Given saveSettingsApi is called with api_keys.typesafe 'typesafe-test-key', when the YAML is written, then it contains 'typesafe: typesafe-test-key' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typesafe-key-slot.ac2",
+            "title": "Given formData.api_keys.typesafe 'abc', when BackgroundAiSection renders, then an input labeled 'TypeSafe API key' of type password shows the value 'abc' (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typesafe-key-slot.ac3",
+            "title": "Given an empty key input, when a change event fires on it with value 'xyz' (fireEvent.change), then onSettingsChange is called with api_keys.typesafe 'xyz' and { debounce: true } (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-smoke-eval",
+        "title": "Add the evals/jev-smoke.eval.ts harness with a labeled fixture that skips when Jev is unconfigured",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "evals/jev-smoke.eval.ts",
+            "evals/fixtures/jev-smoke.json",
+            "evals/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "evals typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and Decision 15. Fixture: 8 cases {name, state, asksQuestion} (4 true, 4 false), synthetic text only. Eval: resolution = resolveJevConfig(loadConfigSync().config); when not ok, console.warn('[jev-smoke] skipped: <reason>') and register via evalite.skip; else evalite. Task calls createJevClient(resolution.config).systemOne({state, questions: JEV_SMOKE_QUESTIONS, model: resolution.config.model}) and returns answers.asks_question.noul; scorer (createScorer) scores 1 when (noul >= JEV_SMOKE_NOUL_THRESHOLD) equals the label. Add the README table row and the one sentence from PRD WI-8."
+        },
+        "items": [
+          {
+            "id": "jev-smoke-eval.ac1",
+            "title": "Given the new eval and fixture, when `npm run typecheck:evals` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-smoke-eval.ac2",
+            "title": "Given no jev.model or no key in config, when the eval module loads, then it registers the suite with evalite.skip and prints '[jev-smoke] skipped: <reason>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-smoke-eval.ac3",
+            "title": "Given evals/README.md, when the live-model eval table is read, then it contains a row linking jev-smoke.eval.ts that states the suite is skipped unless jev.model and a TypeSafe/Zen key are configured.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-docs",
+        "title": "Document Jev in configuration/jev.mdx, the Mintlify nav and the CLAUDE.md topic index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:32:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4369",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/jev.mdx",
+            "docs.json",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## What is sent to TypeSafe' configuration/jev.mdx",
+            "grep -n '\"configuration/jev\"' docs.json",
+            "grep -n 'configuration/jev.mdx' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Create configuration/jev.mdx with frontmatter (title 'Jev (TypeSafe) judgment client') and the six sections in order: What Jev is; Two routes (Zen: base_url https://opencode.ai/zen, jev-1.13-free / jev-1.13, OpenCode Zen key; direct: base_url unset -> https://api.typesafe.ai, e.g. jev-1.13.0, console key); Configuration (YAML example of jev: base_url/model/api_key_ref/timeout_ms and api_keys.typesafe, key order, no default model -> model-not-configured, three toggles default off, low-cost mode disables them); What is sent to TypeSafe (this release sends nothing; table of the three toggle descriptions from PRD WI-3 'when that feature ships'); Privacy; Cost ($0.042/Mtok input, output free, -free records $0, ledger source background:<feature>). Add \"configuration/jev\" after \"configuration/memory-governor\" in docs.json and the CLAUDE.md topic-index row from PRD WI-9."
+        },
+        "items": [
+          {
+            "id": "jev-docs.ac1",
+            "title": "Given configuration/jev.mdx, when read, then it has a '## What is sent to TypeSafe' section stating that this release sends nothing and listing the three toggle descriptions verbatim.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-docs.ac2",
+            "title": "Given configuration/jev.mdx, when the Configuration section is read, then it shows a jev: YAML example with base_url, model, api_key_ref and timeout_ms and states that an unset jev.model makes no request and reports model-not-configured.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-docs.ac3",
+            "title": "Given docs.json and CLAUDE.md, when grepped, then docs.json lists \"configuration/jev\" in the Configuration group and the CLAUDE.md topic index links configuration/jev.mdx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sdk-dependency",
+        "to": "jev-client-assess",
+        "type": "blocks"
+      },
+      {
+        "from": "config-jev-block",
+        "to": "jev-config-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "background-ai-jev-features",
+        "to": "jev-config-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-config-resolution",
+        "to": "jev-client-assess",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-memo",
+        "to": "jev-client-assess",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-pricing",
+        "to": "jev-client-assess",
+        "type": "blocks"
+      },
+      {
+        "from": "config-jev-block",
+        "to": "typesafe-key-slot",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-jev-toggles",
+        "to": "typesafe-key-slot",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-client-assess",
+        "to": "jev-smoke-eval",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
