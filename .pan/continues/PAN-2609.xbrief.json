@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:33:38.063Z",
+  "updated": "2026-09-29T06:33:51.638Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -530,6 +530,10 @@
     "deletion-door.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:33:38.063Z"
+    },
+    "vault-evict-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:51.638Z"
     }
   }
 }
