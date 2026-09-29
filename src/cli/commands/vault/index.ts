@@ -60,7 +60,7 @@ export function registerVaultCommands(program: Command): void {
     .option('--passphrase-file <path>', 'Re-wrap passphrase unlock under the new key with the passphrase in this file')
     .option('--generate-passphrase', 'Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once')
     .option('--no-passphrase', 'Turn passphrase unlock off')
-    .action(lazyAction(() => import('./rotate-key.js'), 'rotateKeyCommand'));
+    .action(vaultAction(() => import('./rotate-key.js'), 'rotateKeyCommand'));
 
   vault
     .command('status')
