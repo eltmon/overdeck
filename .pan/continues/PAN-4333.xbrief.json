@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:50:13.583Z",
+  "updated": "2026-09-29T15:50:44.385Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,9 +190,10 @@
       "doneAt": "2026-09-29T15:49:14.569Z"
     },
     "e2e-rotation": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4333",
-      "claimedAt": "2026-09-29T15:50:13.582Z"
+      "claimedAt": "2026-09-29T15:50:13.582Z",
+      "doneAt": "2026-09-29T15:50:44.384Z"
     }
   }
 }
