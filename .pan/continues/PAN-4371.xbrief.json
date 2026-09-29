@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:51:07.894Z",
+  "updated": "2026-09-29T11:51:18.629Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,10 @@
     "eval-runner.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T11:51:07.894Z"
+    },
+    "docs-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:18.628Z"
     }
   }
 }
