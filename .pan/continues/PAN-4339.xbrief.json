@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:14:26.387Z",
+  "updated": "2026-09-29T03:14:42.291Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "claim-cli.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T03:14:26.387Z"
+    },
+    "lock-write-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:42.290Z"
     }
   }
 }
