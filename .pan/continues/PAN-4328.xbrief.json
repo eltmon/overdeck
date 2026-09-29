@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4328",
+  "created": "2026-09-29T09:43:01.978Z",
+  "updated": "2026-09-29T09:43:01.978Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-slot": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:43:01.978Z"
+    }
+  }
+}
