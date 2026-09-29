@@ -1,0 +1,143 @@
+{
+  "version": "1",
+  "issueId": "PAN-4372",
+  "created": "2026-09-29T09:44:00.403Z",
+  "updated": "2026-09-29T10:52:10.706Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ac-review-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T09:44:00.403Z",
+      "doneAt": "2026-09-29T09:59:06.167Z"
+    },
+    "ac-review-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:00:08.377Z"
+    },
+    "ac-review-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:00:24.213Z"
+    },
+    "ac-review-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:00:40.907Z"
+    },
+    "ac-review-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:00:56.769Z"
+    },
+    "ac-review-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:01:13.575Z"
+    },
+    "ac-eval-log": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:01:33.186Z",
+      "doneAt": "2026-09-29T10:10:55.241Z"
+    },
+    "ac-eval-log.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:11:19.749Z"
+    },
+    "ac-eval-log.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:11:33.502Z"
+    },
+    "ac-eval-log.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:11:47.516Z"
+    },
+    "ac-eval-log.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:01.335Z"
+    },
+    "finalize-jev-warnings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:12:27.904Z",
+      "doneAt": "2026-09-29T10:24:15.711Z"
+    },
+    "finalize-jev-warnings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:24:37.183Z"
+    },
+    "finalize-jev-warnings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:24:49.980Z"
+    },
+    "finalize-jev-warnings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:25:02.282Z"
+    },
+    "finalize-jev-warnings.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:25:15.609Z"
+    },
+    "finalize-jev-warnings.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:25:27.726Z"
+    },
+    "ac-eval-fixtures": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:25:50.443Z"
+    },
+    "ac-eval-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:44:13.216Z"
+    },
+    "ac-eval-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:44:27.319Z"
+    },
+    "ac-eval-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:44:39.978Z"
+    },
+    "ac-eval-fixtures.ac1": {
+      "status": "cancelled"
+    },
+    "docs-xbrief-advisory": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:45:49.049Z",
+      "doneAt": "2026-09-29T10:46:55.529Z"
+    },
+    "docs-xbrief-advisory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:47:19.120Z"
+    },
+    "docs-xbrief-advisory.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:47:32.050Z"
+    },
+    "docs-xbrief-advisory.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:47:44.938Z"
+    },
+    "disclosure-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4372",
+      "claimedAt": "2026-09-29T10:48:01.668Z",
+      "doneAt": "2026-09-29T10:51:21.650Z"
+    },
+    "disclosure-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:51:45.655Z"
+    },
+    "disclosure-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:51:58.104Z"
+    },
+    "disclosure-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:52:10.706Z"
+    }
+  }
+}

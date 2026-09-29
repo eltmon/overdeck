@@ -45,6 +45,10 @@
   and muse, with persistent transports.
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
   xBRIEF v0.8 specs and task state live under `.pan/` in the project repo and are exposed through `pan task`.
+- **Optional judgment model:** TypeSafe Jev via `@typesafe-ai/sdk`, wrapped by
+  `src/lib/jev/` (`assess()` never throws; gated per background-AI toggle, off
+  by default; model only from `jev.model`). Questions and thresholds live in
+  `src/lib/jev/questions.ts`. See `configuration/jev.mdx`.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.

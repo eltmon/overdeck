@@ -28,6 +28,7 @@ Evals that call a model live under `npm run eval`. They read the model from `OVE
 | Flywheel launch-vs-report | [`flywheel-launch.eval.ts`](./flywheel-launch.eval.ts) | Given a fixture board, the flywheel role emits launch actions for eligible issues and respects the author/assignee gate, veto, and `blocks-main` emergency override. |
 | Review synthesis blocker format | [`review-synthesis.eval.ts`](./review-synthesis.eval.ts) | Given fixture convoy reviewer reports, the review role produces the canonical synthesis blocker format and a changes-requested verdict. |
 | Jev smoke | [jev-smoke.eval.ts](./jev-smoke.eval.ts) | Given 8 labeled messages, Jev's question-detection Noul agrees with the label. Skipped unless config.yaml has jev.model and a TypeSafe/Zen key. |
+| Jev acceptance criteria | [jev-acceptance-criteria.eval.ts](./jev-acceptance-criteria.eval.ts) | Given 60+ labeled ACs from .pan/specs, Jev's observable/compound Nouls agree with the labels at the questions.ts thresholds. Skipped unless config.yaml has jev.model and a TypeSafe/Zen key. |
 
 Jev evals take the model from `jev.model` in config.yaml, never from a literal, and are skipped (with the reason printed) when Jev is not configured.
 
