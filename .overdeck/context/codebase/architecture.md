@@ -35,6 +35,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `getProviderForModel()`, per-provider `tierModels` (opus/sonnet/haiku slots).
 - `model-capabilities.ts` — `MODEL_CAPABILITIES` skill/cost matrix; `model-deprecations.ts`
   alias table; `model-capability-class.ts` (PAN-3842) frontier/workhorse/small classes.
+  New models land in `model-capability-additions.ts` (spread first into the matrix);
+  `model-capabilities.ts` is at its file-size cap. Adding a `ModelId` also needs rows in
+  `model-fallback.ts` `MODEL_PROVIDERS`, `providers.ts`, `cost.ts` and the dashboard pickers.
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
