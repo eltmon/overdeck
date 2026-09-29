@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:35:31.884Z",
+  "updated": "2026-09-29T01:35:42.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "sampling-capability-flag.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T01:35:31.884Z"
+    },
+    "sampling-capability-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:35:42.362Z"
     }
   }
 }
