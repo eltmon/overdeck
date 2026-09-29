@@ -1,0 +1,610 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T01:59:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4339: `pan task claim` refuses a live competing claim and overlapping scope",
+    "updated": "2026-09-29T02:03:36.438Z"
+  },
+  "plan": {
+    "id": "pan-4339",
+    "title": "`pan task claim` refuses a live competing claim and overlapping scope",
+    "status": "proposed",
+    "uid": "4db1f813-9431-4dd9-a0d8-af37a56951ce",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T01:59:33Z",
+    "updated": "2026-09-29T02:03:36.438Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4339",
+        "label": "PAN-4339",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4339.md",
+        "label": "PRD draft (.pan/drafts/pan-4339.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Parent PRD: Deft adoption, Issue 5",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "xbrief",
+      "pan-task",
+      "claims",
+      "concurrency",
+      "foreman",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "claimItem (src/lib/xbrief/continue-state.ts:289-310) overwrites claimedBy unconditionally through an unlocked read-modify-write, so docs/XBRIEF.md:9 ('exactly one claim succeeds') is false, nothing stops two workers claiming items with overlapping files_scope, concurrent pan task writes lose updates and race on the git index, and pan spawn workers claim as cli-<pid> (an exited process) so their claims can never be live-checked.",
+      "Proposal": "Add a pure claim check plus async orchestrator (src/lib/xbrief/claim-check.ts) that refuses a claim when a different live-or-indeterminate holder has the item, or when the item's files_scope overlaps (hasFileOverlap, low confidence = overlap) another active claim held by a live-or-indeterminate agent. Liveness comes from isAlive at claim time and is never stored; cli-* holders count as dead. Add a per-worktree task-state lock file in the plan home's git dir (src/lib/xbrief/task-state-lock.ts) held across every pan task write and its commit. pan spawn stamps OVERDECK_CLAIM_ID with the pane's agent name so worker claims are probe-able. --steal is the foreman/operator override. Docs are corrected to match.",
+      "NonGoals": "- No lease, TTL, heartbeat file, or stored liveness; liveness is derived at claim time only.\n- No lock on continue-file writers outside pan task (deacon-swarm.ts, xbrief/io.ts, lifecycle-io.ts, done.ts, migrate-plan-home.ts).\n- No change to pan task next filtering.\n- No change to claimItem's status-preserving behavior on re-claim.\n- No role or permission check on --steal.\n- No item-worktree changes (#4340) and no re-dispatch budget (#4350).\n- No change to what OVERDECK_AGENT_ID is set to anywhere; pan spawn panes get OVERDECK_CLAIM_ID only.\n- The lock file must never be placed where git status can see it (not under <workspace>/.overdeck/)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lock file lives at `git rev-parse --git-path overdeck-task-state.lock` in the plan home, not <workspace>/.overdeck/task-claim.lock.",
+        "rationale": "The issue names the path only 'for example'. The overdeck repo's .gitignore lists individual .overdeck/ files, not the directory, so a lock there shows as untracked while held and permanently after a crash; the per-worktree git dir never shows in git status and is the index the lock protects."
+      },
+      {
+        "summary": "pan spawn sets a dedicated OVERDECK_CLAIM_ID (the pane's agent name); pan task claim reads OVERDECK_CLAIM_ID, then OVERDECK_AGENT_ID, then cli-<pid>.",
+        "rationale": "Without it pan spawn workers claim as cli-<pid> of an exited process and the live-holder check never fires. OVERDECK_AGENT_ID is not reused because hooks, cost recording and the pre-rebase git guard key on it."
+      },
+      {
+        "summary": "The lock covers every pan task writing verb (claim, done, block, unblock, reopen, cancel), not only claim.",
+        "rationale": "markItemDone and setItemStatus are the same read-modify-write plus commit on the same file and index; a claim landing between done's read and write would be erased."
+      },
+      {
+        "summary": "The overlap set includes other items held by the claimant itself; re-claiming an item you already hold is idempotent.",
+        "rationale": "Claude Code in-harness subagents inherit the foreman's OVERDECK_AGENT_ID, so excluding same-holder items would leave parallel subagents unprotected."
+      },
+      {
+        "summary": "Indeterminate liveness counts as live for both checks; cli-* holders are classified dead without probing.",
+        "rationale": "The issue requires indeterminate to refuse; probing a cli-* id could only turn a Herdr outage into a block on every worker."
+      },
+      {
+        "summary": "--steal overrides both the held-item refusal and the overlap refusal, with no role check.",
+        "rationale": "Otherwise a live-but-stuck overlapping holder has no escape except cancel; the parent PRD's threat model is cheap-path prevention, not a security boundary."
+      },
+      {
+        "summary": "Raw hasFileOverlap is used (not swarm-readiness hotspot stripping); missing scope never overlaps; low confidence on either side overlaps.",
+        "rationale": "Matches the issue text and analyzePairOverlap's low-confidence rule."
+      },
+      {
+        "summary": "The check lives in a new src/lib/xbrief/claim-check.ts instead of continue-state.ts.",
+        "rationale": "Keeps continue-state.ts (410 lines) focused on durable I/O; no import cycle arises (claim-check imports continue-state, dag and liveness; none import it back)."
+      },
+      {
+        "summary": "The two-process contention test is a regular *.test.ts with a 30s timeout.",
+        "rationale": "VITEST_INCLUDE_SLOW is set nowhere in .github, so a *.slow.test.ts would never gate the acceptance criterion."
+      }
+    ],
+    "items": [
+      {
+        "id": "claim-check",
+        "title": "Add pure claim check and async claim orchestrator in src/lib/xbrief/claim-check.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4339",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "claim-cli",
+            "claim-contention-test"
+          ],
+          "files_scope": [
+            "src/lib/xbrief/claim-check.ts",
+            "src/lib/xbrief/__tests__/claim-check.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/claim-check.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "claim-check.test.ts passes with all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W1 exactly: new module src/lib/xbrief/claim-check.ts exporting HolderLiveness, ClaimRefusal, ClaimCheckResult, ClaimCheckInput, resolveClaimantId, holdersToProbe, probeHolder, checkClaim, formatClaimRefusal, ClaimRefused and claimItemChecked with the signatures, check order, active-claim definition (claimedBy set and status not completed/cancelled), same-holder rule, low-confidence rule, --steal behavior and message wording given in the PRD. checkClaim is pure; claimItemChecked reads readContinueState, probes holders in parallel via probeHolder (or the injected probe), runs checkClaim, throws ClaimRefused or calls claimItem. Write src/lib/xbrief/__tests__/claim-check.test.ts covering every case listed under W1 Tests. Do not modify continue-state.ts or dag.ts."
+        },
+        "items": [
+          {
+            "id": "claim-check.ac1",
+            "title": "Given item A actively claimed by agent-x with liveness alive or indeterminate, when checkClaim runs for claimant agent-y, then it returns ok:false with refusal kind 'held' naming agent-x; with agent-x dead or equal to the claimant it returns ok:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-check.ac2",
+            "title": "Given item A (files_scope src/a/**) actively claimed by a live holder, when checkClaim runs for item B (files_scope src/a/x.ts), then it returns an 'overlap' refusal naming A and sharedPaths containing src/a/x.ts, and for item C (src/c/**) it returns ok:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-check.ac3",
+            "title": "Given either item has files_scope_confidence 'low' and the other is actively claimed by a live holder, checkClaim returns an 'overlap' refusal with lowConfidence true; with steal:true it returns ok:true and lists the refusal in overridden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-check.ac4",
+            "title": "probeHolder('cli-123', spy) returns 'dead' without calling spy; a verdict {alive:false, reason:'runtime-indeterminate'} maps to 'indeterminate' and {alive:false, reason:'no-session'} maps to 'dead'; resolveClaimantId returns OVERDECK_CLAIM_ID before OVERDECK_AGENT_ID before cli-<pid>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-state-lock",
+        "title": "Add the async task-state lock in src/lib/xbrief/task-state-lock.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4339",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "claim-cli",
+            "lock-write-verbs",
+            "claim-contention-test"
+          ],
+          "files_scope": [
+            "src/lib/xbrief/task-state-lock.ts",
+            "src/lib/xbrief/__tests__/task-state-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/task-state-lock.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "task-state-lock.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W2 exactly: taskStateLockPath(planHome) runs `git rev-parse --git-path overdeck-task-state.lock` via async execFile in planHome and resolves it against planHome (plain-English Error when not a git checkout); withTaskStateLock(lockPath, fn, options) acquires with fs/promises open(path,'wx') writing {pid, acquiredAt}, breaks a stale lock (recorded pid not running via process.kill(pid,0) ESRCH, or unreadable content with mtime older than 5000 ms), polls every 100 ms, throws TaskStateLockTimeout naming the holder pid after 60000 ms, and unlinks the file in finally only when it still names our pid. No *Sync twin, no execSync. Tests use vi.useFakeTimers() for every wait and a git-init temp repo for the path case."
+        },
+        "items": [
+          {
+            "id": "task-state-lock.ac1",
+            "title": "withTaskStateLock runs fn and the lock file no longer exists afterwards, both when fn resolves and when fn rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-state-lock.ac2",
+            "title": "Given a lock file naming a live pid (isPidAlive returns true), when a second acquire runs under fake timers and time advances past timeoutMs, then it rejects with TaskStateLockTimeout whose message contains that pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-state-lock.ac3",
+            "title": "Given a lock file naming a dead pid (isPidAlive returns false), withTaskStateLock breaks it and runs fn without waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-state-lock.ac4",
+            "title": "In a git-init temp repo, taskStateLockPath returns a path under .git/, and after creating that file `git status --porcelain` produces no line for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-claim-identity",
+        "title": "pan spawn stamps OVERDECK_CLAIM_ID with the worker pane's agent name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/spawn.ts",
+            "tests/unit/cli/commands/spawn.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/spawn.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn.test.ts passes including the OVERDECK_CLAIM_ID case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W3: in spawnCommand (src/cli/commands/spawn.ts, around line 122) compute `const agentName = `${issueId.toLowerCase()}-${item.id}``, pass it as `name`, and add `OVERDECK_CLAIM_ID: agentName` to the startAgent env next to OVERDECK_ISSUE_ID and OVERDECK_ITEM_ID. Add one module-header sentence saying the pane's OVERDECK_CLAIM_ID is its agent name so pan task claim records an id liveness can probe. Do not set OVERDECK_AGENT_ID. Add a test case asserting env.OVERDECK_CLAIM_ID equals the spec name ('pan-1-item-a' for the fixture)."
+        },
+        "items": [
+          {
+            "id": "spawn-claim-identity.ac1",
+            "title": "Given pan spawn --issue PAN-1 --item item-a, the StartAgentSpec passed to backend.startAgent has env.OVERDECK_CLAIM_ID equal to 'pan-1-item-a' and equal to spec.name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-claim-identity.ac2",
+            "title": "The StartAgentSpec env still contains OVERDECK_ISSUE_ID and OVERDECK_ITEM_ID and does not contain OVERDECK_AGENT_ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claim-cli",
+        "title": "pan task claim runs the claim check under the lock and accepts --steal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/task.ts",
+            "src/cli/commands/__tests__/task.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/task.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "task.test.ts passes including the live-holder, dead-holder, overlap, disjoint and --steal cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-9",
+            "FR-10",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W4: rewrite runTaskClaim(issue, itemId, options: TaskClaimOptions, deps: TaskClaimDeps = {}) to resolve the claimant with resolveClaimantId(), take taskStateLockPath(planHome), and inside withTaskStateLock call claimItemChecked(planHome, issueId, itemId, claimant, { items: doc.plan.items, probe: deps.probe, steal: options.steal }) then commitContinue; after the lock, print one `--steal overrode: <formatClaimRefusal>` stderr line per overridden refusal and print the claim. Register `--steal` on the claim command with the description in the PRD. ClaimRefused flows through taskAction (exit code 1, message on stderr). Remove the now-unused claimItem import. In task.test.ts mock task-state-lock.js as a passthrough, keep the continue-state.js mock (it feeds the real claim-check), call runTaskClaim directly with an injected probe for liveness cases, and use vi.stubEnv for OVERDECK_CLAIM_ID/OVERDECK_AGENT_ID."
+        },
+        "items": [
+          {
+            "id": "claim-cli.ac1",
+            "title": "Given item A claimed by live agent-x, when agent-y (OVERDECK_CLAIM_ID) runs pan task claim for A, then process.exitCode is 1, stderr contains 'agent-x', and neither claimItem nor commitPlanArtifacts is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-cli.ac2",
+            "title": "Given item A claimed by an agent whose probe returns dead, pan task claim calls claimItem with claimant agent-y and commits the continue file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-cli.ac3",
+            "title": "Given A (src/a/**) claimed by a live holder, claiming B (src/a/x.ts) exits 1 with stderr naming A, and claiming disjoint C (src/c/**) calls claimItem and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-cli.ac4",
+            "title": "Given A claimed by live agent-x, pan task claim --steal calls claimItem for the claimant and writes a stderr line containing '--steal overrode'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lock-write-verbs",
+        "title": "pan task done/block/unblock/reopen/cancel hold the task-state lock across write and commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/task.ts",
+            "src/cli/commands/__tests__/task.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/task.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "task.test.ts passes including the lock-per-verb cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W5: in runTaskDone wrap markItemDone + commitContinue, and in runTaskStatus wrap setItemStatus + commitContinue, in withTaskStateLock(await taskStateLockPath(planHome), ...). Keep the ItemNotVerifiable-to-plain-English translation and its 'Nothing was written' message unchanged; the lock is released in finally when it throws. next and show take no lock. Add task.test.ts cases asserting the mocked withTaskStateLock spy is called once for each of done, block, unblock, reopen, cancel and never for next or show."
+        },
+        "items": [
+          {
+            "id": "lock-write-verbs.ac1",
+            "title": "Each of pan task done, block, unblock, reopen and cancel calls withTaskStateLock exactly once and commits the continue file inside the lock callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-write-verbs.ac2",
+            "title": "Given pan task next or pan task show runs, then it returns item data and withTaskStateLock is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-write-verbs.ac3",
+            "title": "When markItemDone rejects with ItemNotVerifiable, pan task done still exits 1 with the 'is not done yet' message and commitPlanArtifacts is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claim-contention-test",
+        "title": "Two-process contention test proves exactly one concurrent claim wins",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/__tests__/task-claim-contention.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/task-claim-contention.test.ts"
+          ],
+          "expected_outputs": [
+            "task-claim-contention.test.ts passes: child exit codes are [0, 3] and the continue file names the winner"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W6: a regular (not .slow) vitest file with { timeout: 30_000 } that seeds a temp plan home's .pan/continues/PAN-1.xbrief.json with item 'a' claimed by 'agent-dead', then spawns two children with spawn(process.execPath, ['--import', 'tsx/esm', '--input-type=module', '--eval', script], { env: { ...process.env, OVERDECK_HOME: <temp dir> } }) (shape from src/lib/runtimes/__tests__/kimi-code-capture-lock.slow.test.ts). Each child imports withTaskStateLock and claimItemChecked by absolute path, claims 'a' as agent-one/agent-two with a probe that sleeps 300 ms and returns 'dead' for agent-dead and 'alive' otherwise, and exits 0 on success, 3 on ClaimRefused. Clean up temp dirs in afterEach. This is the only test in the plan that uses real time."
+        },
+        "items": [
+          {
+            "id": "claim-contention-test.ac1",
+            "title": "Given two child processes claiming the same item concurrently, the sorted child exit codes equal [0, 3]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-contention-test.ac2",
+            "title": "After both children exit, the continue file records the id of the child that exited 0 in items.a.claimedBy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Correct XBRIEF, FOREMAN, pan-task, pan-foreman, work-agent and work prompt claim docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:59:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "docs/FOREMAN.md",
+            "sync-sources/skills/pan-task/SKILL.md",
+            "sync-sources/skills/pan-foreman/SKILL.md",
+            "sync-sources/agents/pan-work-agent.md",
+            "src/lib/cloister/prompts/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q -- '--steal' docs/XBRIEF.md && grep -q -- '--steal' docs/FOREMAN.md && grep -q -- '--steal' sync-sources/skills/pan-task/SKILL.md && grep -q -- '--steal' sync-sources/skills/pan-foreman/SKILL.md",
+            "! grep -q 'exactly one claim succeeds' docs/XBRIEF.md",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "the --steal grep chain exits 0 (every one of the four files mentions --steal)",
+            "the negated grep exits 0 (the stale sentence is gone)",
+            "no-legacy-task-engine.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W7 exactly: docs/XBRIEF.md line 9 replaces the 'exactly one claim succeeds' sentence with the refusal rules (live holder, overlapping live claim, low confidence counts as overlap, lock serializes concurrent claims, liveness read live with no lease, --steal is the foreman/operator override); the Concurrency Model row for .pan/continues/<issue>.xbrief.json lists all writing verbs and says 'Serialized per issue by the task-state lock (overdeck-task-state.lock in the plan home's git dir)'; docs/FOREMAN.md and sync-sources/skills/pan-foreman/SKILL.md per-item protocol step 1 say the claim refuses a live holder or overlapping live claim, the worker then runs pan task next, only the foreman/operator uses --steal, and pan spawn panes claim under their pane name (OVERDECK_CLAIM_ID); pan-foreman's file-ownership paragraph says pan task claim now enforces no-overlap; sync-sources/skills/pan-task/SKILL.md adds `pan task claim PAN-123 PAN-123-a --steal` and a refusal/--steal paragraph; sync-sources/agents/pan-work-agent.md step 1 and src/lib/cloister/prompts/work.md step 2 append 'If the claim is refused, run `pan task next` and pick another item — never pass `--steal` for a worker.'"
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "grep -c 'exactly one claim succeeds' docs/XBRIEF.md prints 0, and docs/XBRIEF.md line 9 region states that pan task claim refuses an item held by a running agent or overlapping a running claim and names --steal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The docs/XBRIEF.md Concurrency Model row for .pan/continues/<issue>.xbrief.json contains 'task-state lock'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "grep -n -- '--steal' returns at least one line in each of docs/FOREMAN.md, sync-sources/skills/pan-task/SKILL.md and sync-sources/skills/pan-foreman/SKILL.md, and docs/FOREMAN.md mentions OVERDECK_CLAIM_ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "sync-sources/agents/pan-work-agent.md and src/lib/cloister/prompts/work.md each contains 'If the claim is refused, run `pan task next`', and no-legacy-task-engine.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "claim-check",
+        "to": "claim-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "task-state-lock",
+        "to": "claim-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "task-state-lock",
+        "to": "lock-write-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "claim-cli",
+        "to": "lock-write-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "claim-check",
+        "to": "claim-contention-test",
+        "type": "blocks"
+      },
+      {
+        "from": "task-state-lock",
+        "to": "claim-contention-test",
+        "type": "blocks"
+      },
+      {
+        "from": "claim-cli",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "lock-write-verbs",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-claim-identity",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "15 files, well under the file cap. The 7th subsystem comes only from the docs item: six doc/prompt files (docs/, sync-sources/skills, sync-sources/agents, src/lib/cloister/prompts) describe one behavior change to pan task claim and must ship with it; splitting them into a sibling issue would leave the docs describing false behavior between merges.",
+      "canonicalFilename": "2026-09-29-PAN-4339-pan-task-claim-refuses-a-live-competing-claim-and-overlapping-scope.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
