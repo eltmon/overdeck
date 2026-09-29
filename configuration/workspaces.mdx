@@ -350,7 +350,10 @@ evidence — they never probe your shell's own environment, which is why they
 catch a missing key even when your own `pan doctor` run happens to have one
 set locally.
 
-Every failure gets one of these reasons:
+`health.json` and `pan memory doctor` use these reasons for a failed extraction
+or query-expansion call; `timeout` is specific to prompt-time query expansion
+and never appears in `health.json`, since a timed-out expansion still lets
+injection continue with the fallback keyword query rather than failing:
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
@@ -358,7 +361,7 @@ Every failure gets one of these reasons:
 | `extraction-failed` | The provider call failed for a reason other than auth (network error, rate limit, unexpected response shape). | Check `pan memory doctor`'s `cause:` line for the provider's error text; retry once the underlying issue clears. |
 | `malformed-response` | The provider replied, but its output didn't parse as the expected JSON payload. | Usually transient (a truncated or off-schema completion); if it recurs for one model, that model may not follow the extraction schema reliably. |
 | `cost-cap` | Today's memory-extraction spend reached `memory.extraction.per_day_cost_cap_usd`. | Raise the cap, or wait for the next local day. |
-| `timeout` | Prompt-time query expansion didn't return within its 750 ms budget. | Informational — prompt-time injection still runs, falling back to the raw prompt's keyword query (see below). No action needed unless it's constant, which usually means the provider itself is slow. |
+| `timeout` (query expansion only) | Prompt-time query expansion didn't return within its 750 ms budget. | Informational — prompt-time injection still runs, falling back to the raw prompt's keyword query (see below). No action needed unless it's constant, which usually means the provider itself is slow. |
 
 ### Reading RAG decision logs
 
@@ -378,8 +381,9 @@ An annotated `rag-decision` line:
 ```json
 {
   "id": "8f2c1e4a-...",
+  "type": "rag-decision",
   "outcome": "injected",           // injected | skipped | no-hits | expansion-failed | context-too-large | budget-truncated
-  "reason": null,                  // non-null explains a non-injected outcome
+  "reason": "provider-auth-failed", // carries the expansion's reason on a non-truncated outcome, even when something was still injected
   "query": "verification gate block review findings", // the OR-mode keyword query actually searched, not the raw prompt
   "hitCounts": { "status": 1, "observations": 2, "summaries": 0, "sibling": 1, "knowledgeIndex": 0 },
   "expansion": { "status": "fallback", "reason": "provider-auth-failed", "cacheKey": "..." }
@@ -391,4 +395,8 @@ That example is deliberately a **failed** expansion (`expansion.status:
 memory (`outcome: "injected"`, `hitCounts.observations: 2`): prompt-time
 retrieval searches in OR mode over a stopword-filtered keyword query built
 from the prompt, so a failed or fallback expansion still finds observations
-that share content words with the prompt instead of returning nothing.
+that share content words with the prompt instead of returning nothing. The
+top-level `reason` mirrors `expansion.reason` here rather than being `null`,
+because it is only forced to a fixed string (`memory-context-truncated-to-budget`)
+when the outcome is `budget-truncated`; otherwise it passes the expansion's
+own reason through unchanged, injected or not.
