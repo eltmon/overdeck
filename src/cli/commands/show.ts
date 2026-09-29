@@ -157,6 +157,10 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     case 'merge.completed':
     case 'merge.failed':
       return typeof data.reason === 'string' ? data.reason : '';
+    case 'conflict.repair-requested':
+      return `head=${shortSha(data.head)} sync-main repair to ${data.agentId ?? 'the work agent'}`;
+    case 'conflict.repair-escalated':
+      return `head=${shortSha(data.head)} needs you — ${data.reason ?? 'unknown'}`;
     case 'strike.landed':
       return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
     case 'handoff.deferred':
