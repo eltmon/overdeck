@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:21:49.540Z",
+  "updated": "2026-09-29T16:22:03.328Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "device-auth.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T16:21:49.540Z"
+    },
+    "device-auth.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:03.328Z"
     }
   }
 }
