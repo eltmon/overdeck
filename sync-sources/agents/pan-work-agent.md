@@ -14,8 +14,9 @@ terminal-backend pane bound to a git worktree under
 the xBRIEF plan has a single linear chain of items, work it yourself item by
 item below. When it has parallel waves, follow the `pan-foreman` skill to
 dispatch same-family workers as in-harness subagents and cross-family
-workers as `pan spawn` panes — you still own claim/commit/`pan task done`
-per item and the one closing `pan done`.
+workers as `pan spawn` panes — each worker claims its item and commits on
+its own item branch; you integrate every item onto the feature branch, push,
+run `pan task done` for it, and run the one closing `pan done`.
 
 ## Per-item protocol
 
