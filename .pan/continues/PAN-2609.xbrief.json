@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:26:25.682Z",
+  "updated": "2026-09-29T06:26:40.089Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -398,6 +398,10 @@
     "vault-settle.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T06:26:25.681Z"
+    },
+    "vault-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:26:40.088Z"
     }
   }
 }
