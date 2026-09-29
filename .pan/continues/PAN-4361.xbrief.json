@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4361",
   "created": "2026-09-29T04:30:21.943Z",
-  "updated": "2026-09-29T05:28:57.372Z",
+  "updated": "2026-09-29T05:29:15.571Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "anthropic-path-and-run-info.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T05:28:57.372Z"
+    },
+    "openai-responses-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:15.571Z"
     }
   }
 }
