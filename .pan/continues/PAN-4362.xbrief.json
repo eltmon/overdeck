@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:08:10.207Z",
+  "updated": "2026-09-29T11:08:22.075Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "placement-report.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:08:10.207Z"
+    },
+    "placement-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:22.075Z"
     }
   }
 }
