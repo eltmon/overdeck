@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:06:55.494Z",
+  "updated": "2026-09-29T16:07:10.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -260,6 +260,10 @@
     "sync-okf-convergence-test.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:06:55.493Z"
+    },
+    "doctor-okf-skew.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:07:10.610Z"
     }
   }
 }
