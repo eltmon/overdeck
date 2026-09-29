@@ -58,7 +58,10 @@ run_pan() { run "${PAN_TIMEOUT:-300}" npx --yes -p "$SUBJECT" pan "$@"; }
 
 # record <id> <status> <command> <exitCode or ""> <evidence> [note]
 record() {
-  ID="$1" STATUS="$2" COMMAND="$3" CODE="$4" EVIDENCE="$5" NOTE="${6:-}" STEPS_FILE="$STEPS_FILE" node -e '
+  # Trim before the environment carries it: one variable over 128 KiB fails exec.
+  local evidence="$5"
+  if [[ ${#evidence} -gt 4000 ]]; then evidence="${evidence: -4000}"; fi
+  ID="$1" STATUS="$2" COMMAND="$3" CODE="$4" EVIDENCE="$evidence" NOTE="${6:-}" STEPS_FILE="$STEPS_FILE" node -e '
 const { appendFileSync } = require("node:fs");
 const e = process.env;
 const evidence = e.EVIDENCE.length > 4000 ? e.EVIDENCE.slice(-4000) : e.EVIDENCE;
