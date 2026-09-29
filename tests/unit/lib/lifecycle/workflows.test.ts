@@ -1215,8 +1215,10 @@ describe('workflows', () => {
 
       expect(result.success).toBe(true);
       expect(existsSync(wsPath)).toBe(false);
-      expect((await findSpecByIssue(testDir, 'PAN-100'))?.status).toBe('completed');
-      expect((await findSpecByIssue(testDir, 'PAN-100'))?.document.plan.status).toBe('completed');
+      // PAN-4225: close-out no longer writes the spec — its status is derived
+      // from the merged PR, so the pre-existing 'active' status is untouched.
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.status).toBe('active');
+      expect((await findSpecByIssue(testDir, 'PAN-100'))?.document.plan.status).toBe('active');
 
       const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
       expect(commands.some(command => command.includes('gh issue close 100'))).toBe(true);
@@ -1261,16 +1263,20 @@ describe('workflows', () => {
       });
     });
 
-    it('should complete xBRIEF status and prune checkpoint refs during close-out', async () => {
+    it('skips the xBRIEF spec write and prunes checkpoint refs during close-out (PAN-4225)', async () => {
       await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
+      const specBefore = await findSpecByIssue(testDir, 'PAN-100');
+      const specBytesBefore = readFileSync(specBefore!.path, 'utf-8');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
-      const xbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const xbriefStep = result.steps.find(s => s.step === 'close-out:vbrief-completed');
       const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
       const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
-      expect(xbriefIdx).toBeGreaterThanOrEqual(0);
+      const xbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      expect(xbriefStep?.skipped).toBe(true);
+      expect(xbriefStep?.success).toBe(true);
       expect(teardownIdx).toBeGreaterThanOrEqual(0);
       expect(closeIdx).toBeGreaterThanOrEqual(0);
       expect(xbriefIdx).toBeLessThan(teardownIdx);
@@ -1281,8 +1287,9 @@ describe('workflows', () => {
       expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/planning-pan-100/'))).toBe(true);
 
       const spec = await findSpecByIssue(testDir, 'PAN-100');
-      expect(spec?.status).toBe('completed');
-      expect(spec?.document.plan.status).toBe('completed');
+      expect(spec?.status).toBe('active');
+      expect(spec?.document.plan.status).toBe('active');
+      expect(readFileSync(spec!.path, 'utf-8')).toBe(specBytesBefore);
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
     });
 
