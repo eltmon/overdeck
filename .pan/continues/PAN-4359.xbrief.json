@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T05:01:30.069Z",
+  "updated": "2026-09-29T05:01:45.059Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -179,6 +179,10 @@
     "upgrade-banner.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T05:01:30.069Z"
+    },
+    "upgrade-banner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:45.058Z"
     }
   }
 }
