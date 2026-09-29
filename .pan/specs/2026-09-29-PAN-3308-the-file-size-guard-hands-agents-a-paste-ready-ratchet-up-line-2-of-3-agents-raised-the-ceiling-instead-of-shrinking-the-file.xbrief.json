@@ -4,17 +4,17 @@
     "created": "2026-09-29T01:55:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3308: The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file",
-    "updated": "2026-09-29T01:57:02.402Z"
+    "updated": "2026-09-29T01:57:36.916Z"
   },
   "plan": {
     "id": "pan-3308",
     "title": "The file-size guard hands agents a paste-ready ratchet-up line — 2 of 3 agents raised the ceiling instead of shrinking the file",
-    "status": "proposed",
+    "status": "running",
     "uid": "467424d6-a22f-4ef8-808f-74a3c7d0390e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T01:55:16Z",
-    "updated": "2026-09-29T01:57:02.402Z",
+    "updated": "2026-09-29T01:57:36.916Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3308",
