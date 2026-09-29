@@ -184,6 +184,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
   header collector (`system-health/darwin.ts`) measured available memory with
   different formulas until PAN-4267 unified them.
+- **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
+  — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
+  `dashboard/server/deacon-main.ts` starts (a separate Node process). A module
+  cache written by a hygiene routine (e.g. `setCachedMemoryVerdict`) is
+  invisible to `/api/*` routes in the main process and to `pan` CLI processes;
+  `getCachedMemoryVerdict()` is null there. Samplers that feed `/api/resources`
+  must run in main (`main.ts` next to `startResourcesSnapshotService`), and
+  gates must use a stateless read (PAN-4311). Likewise the runtime mirror behind
+  `getAgentRuntimeStateSync`/`isIdle` is populated only in the main process.
 
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and

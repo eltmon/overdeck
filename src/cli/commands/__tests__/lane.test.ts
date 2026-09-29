@@ -89,6 +89,18 @@ describe('pan lane start', () => {
     expect(err).toEqual(['lane hotel/663 builder is live as conversation #7 (x)']);
   });
 
+  it('posts force: true with --force and prints a 429 cpu-saturated refusal (PAN-4311)', async () => {
+    const { deps, fetchMock, err } = harness({ env: { OVERDECK_CONVERSATION: 'conv-abc' } });
+    expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel', force: true, wait: false }, deps)).toBe(0);
+    expect(sentBody(fetchMock)).toMatchObject({ force: true });
+
+    const refused = 'cpu-saturated: psi-some-avg60 55 is at or above 50; the host is CPU-saturated. Pass --force to launch anyway.';
+    (deps.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(json(429, { error: refused }));
+    expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel' }, deps)).toBe(1);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty('force');
+    expect(err).toEqual([refused]);
+  });
+
   it('waits until the lane leaves starting, and exits 1 with the spawn error when it fails to start', async () => {
     const started = harness({ env: { OVERDECK_CONVERSATION: 'conv-abc' } });
     const fetchStarted = started.deps.fetch as unknown as ReturnType<typeof vi.fn>;

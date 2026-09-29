@@ -1,6 +1,8 @@
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
+import { getRunawaySnapshot } from '../../../../lib/cloister/runaway-process-patrol.js';
+import { readCpuPsi } from '../../../../lib/system-health/cpu-psi.js';
 import { getBackendPanes } from '../../services/backend-inventory.js';
 import { jsonResponse, jsonStringResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -8,7 +10,8 @@ import { getAgentStatsSnapshotEffect } from './agents-stats.js';
 import { getCoreServicesSnapshot } from './core-services.js';
 import { buildCapacityForecast } from './forecast.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
-import { buildHostVitalsSnapshot } from './host-vitals.js';
+import { recordResourceHistorySample } from './history.js';
+import { buildHostVitalsSnapshot, type HostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
 import { buildReclaimPayload, listReclaimVenvIssueIds, loadClosedIssueIds } from './reclaim.js';
 import { getCurrentDockerStats } from './shared.js';
@@ -86,7 +89,7 @@ export function buildResourcesPayloadEffect() {
       containers,
       forecast: buildCapacityForecast(stacks, { hostVitals }),
       hostVitals,
-      hostProcesses: getHostProcessesSnapshot(),
+      hostProcesses: getHostProcessesSnapshot(getRunawaySnapshot()),
       stoppedContainers,
       networks: [],
       reclaimCandidates: reclaim.reclaimCandidates,
@@ -108,13 +111,33 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
 export function refreshResourcesSnapshot(): Promise<void> {
   if (resourcesSnapshotRefresh) return resourcesSnapshotRefresh;
   resourcesSnapshotRefresh = Effect.runPromise(buildResourcesPayloadEffect())
-    .then((payload) => {
+    .then(async (payload) => {
       resourcesSnapshotJson = JSON.stringify(payload);
+      await recordHistorySample(payload.hostVitals);
     })
     .finally(() => {
       resourcesSnapshotRefresh = null;
     });
   return resourcesSnapshotRefresh;
+}
+
+/**
+ * PAN-4311 FR-13: one history sample per snapshot refresh, with CPU PSI, so
+ * `/api/resources/history/24h` has data. Skipped while CPU percent is unknown.
+ */
+async function recordHistorySample(hostVitals: HostVitalsSnapshot): Promise<void> {
+  const cpuPercent = hostVitals.cpu.percent;
+  if (cpuPercent == null) return;
+  const { usedBytes, availableBytes } = hostVitals.mem;
+  // used = MemTotal - MemAvailable, so used + available is MemTotal.
+  const totalBytes = (usedBytes ?? 0) + (availableBytes ?? 0);
+  const psi = await readCpuPsi();
+  recordResourceHistorySample({
+    cpuPercent,
+    memoryPercent: usedBytes != null && totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0,
+    psiCpuSomeAvg10: psi.someAvg10,
+    psiCpuSomeAvg60: psi.someAvg60,
+  });
 }
 
 export function getResourcesSnapshotEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {

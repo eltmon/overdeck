@@ -30,6 +30,8 @@ export interface LaneLaunchRequest {
   at?: string;
   reuse?: boolean;
   replace?: boolean;
+  /** PAN-4311: launch even while CPU pressure is saturated. */
+  force?: boolean;
 }
 
 export interface LaneLaunchResult {
@@ -41,7 +43,7 @@ export interface LaneLaunchResult {
 }
 
 export class LaneLaunchError extends Error {
-  constructor(readonly status: 400 | 404 | 409 | 500, message: string) {
+  constructor(readonly status: 400 | 404 | 409 | 429 | 500, message: string) {
     super(message);
     this.name = 'LaneLaunchError';
   }

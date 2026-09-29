@@ -1,6 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { loadConfigSync } from '../config-yaml/load.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
@@ -202,7 +203,15 @@ async function runSupervisedVerificationInternal(
   }
 
   const request = JSON.stringify({ issueId, workspacePath, workspaceInfo, logPrefix, options, runId, resultPath });
-  const launch = buildVerificationWorkerLaunch(issueId, runId, workerPath, request);
+  const launch = buildVerificationWorkerLaunch(
+    issueId,
+    runId,
+    workerPath,
+    request,
+    process.env,
+    process.platform,
+    loadConfigSync().config.resources.verificationCpuWeight,
+  );
   const logFd = openSync(logPath, 'a');
   const child = launchVerificationWorker(
     launch,

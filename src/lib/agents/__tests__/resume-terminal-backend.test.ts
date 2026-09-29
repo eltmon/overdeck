@@ -229,7 +229,7 @@ describe('resumeAgent relaunches on the host backend (PAN-3960)', () => {
     expect(selected.starts[0]!.spec).toMatchObject({
       name: agentId,
       cwd: workspace,
-      argv: ['bash', join(getAgentDir(agentId), 'launcher.sh')],
+      argv: ['nice', '-n', '10', '--', 'bash', join(getAgentDir(agentId), 'launcher.sh')],
       tokens: { issue: 'PAN-3960', role: 'work', harness: 'claude-code', model: 'claude-sonnet-5' },
       env: expect.objectContaining({ OVERDECK_AGENT_ID: agentId, OVERDECK_ISSUE_ID: 'PAN-3960' }),
     });

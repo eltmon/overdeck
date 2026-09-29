@@ -454,6 +454,28 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## CPU weight and the runaway patrol (PAN-4311)
+
+The dashboard runs in its own transient systemd unit started with
+`CPUWeight=<resources.dashboard_cpu_weight>` (default 1000; the supervisor
+unit uses the same value). That weight enables the `cpu` controller in
+`app.slice`, so under contention the dashboard's cgroup gets its weighted
+share instead of competing thread by thread with every agent in the Herdr
+unit. It fixes scheduler starvation of the event loop. It does not fix the
+event-loop p99 the dashboard causes itself with its own blocking work.
+
+The runaway-process patrol (`src/lib/cloister/runaway-process-patrol.ts`)
+runs in the dashboard **main** process, not the deacon child, because
+`/api/resources` is built there and `isIdle` has runtime data only there.
+`main.ts` starts it next to `startResourcesSnapshotService()` and stops it on
+the same shutdown path. Every 30 s it reads `/proc` with async
+`fs/promises` calls only (no child processes, no `*Sync` reads): one `stat`
+per process in the Overdeck cgroups, and `environ`, `cmdline` and `cwd` once
+per process identity. Its latest sample feeds `/api/resources`
+`hostProcesses` and the load-spike sampler. It only reports: it never kills,
+pauses or messages anything (see "Runaway processes" in
+[PIPELINE-GATES.md](PIPELINE-GATES.md)).
+
 ## Terminal permission prompts and held messages (PAN-4278)
 
 Claude Code draws a blocking tool-permission prompt in a conversation's pane (`Bash command`,

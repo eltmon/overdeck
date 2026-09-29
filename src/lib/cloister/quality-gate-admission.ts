@@ -3,6 +3,7 @@ import { cpus, loadavg } from 'node:os'
 import { join } from 'node:path'
 
 import { getOverdeckHome } from '../paths.js'
+import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 
 /**
  * Machine-wide CPU admission for quality gates and direct Vitest runs.
@@ -11,6 +12,12 @@ import { getOverdeckHome } from '../paths.js'
 
 const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
 const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
+/**
+ * PAN-4311 D10: with CPU PSI available, start heavy runs only once `some avg10`
+ * is below the governor's default recovery level. Load per core counts IO
+ * wait, so it is the fallback only when PSI is unavailable.
+ */
+const QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD = 25
 const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
 const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
 const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
@@ -18,6 +25,8 @@ const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
 export interface QualityGatePressureSample {
   cpuUtilization: number
   loadPerCore: number
+  /** CPU PSI `some avg10`, percent; null when unavailable (PAN-4311). */
+  psiSomeAvg10: number | null
   pressured: boolean
 }
 
@@ -98,8 +107,9 @@ function cpuTotals() {
   return { idle, total, cores: Math.max(1, records.length) }
 }
 
-async function sampleQualityGatePressure(
+export async function sampleQualityGatePressure(
   sleep: (ms: number) => Promise<void> = delay,
+  readPsi: () => Promise<CpuPsi> = readCpuPsi,
 ): Promise<QualityGatePressureSample> {
   const before = cpuTotals()
   await sleep(250)
@@ -108,11 +118,15 @@ async function sampleQualityGatePressure(
   const idleDelta = after.idle - before.idle
   const cpuUtilization = totalDelta > 0 ? (totalDelta - idleDelta) / totalDelta : 0
   const loadPerCore = loadavg()[0] / after.cores
+  const psiSomeAvg10 = (await readPsi()).someAvg10
+  const contended = psiSomeAvg10 != null
+    ? psiSomeAvg10 >= QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD
+    : loadPerCore >= QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD
   return {
     cpuUtilization,
     loadPerCore,
-    pressured: cpuUtilization >= QUALITY_GATE_CPU_START_THRESHOLD
-      || loadPerCore >= QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD,
+    psiSomeAvg10,
+    pressured: cpuUtilization >= QUALITY_GATE_CPU_START_THRESHOLD || contended,
   }
 }
 

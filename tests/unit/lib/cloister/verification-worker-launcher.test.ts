@@ -21,11 +21,19 @@ describe('verification worker launcher', () => {
       '--unit', 'overdeck-verification-pan-3814-123-456',
       '--collect',
       '--quiet',
+      '--property=CPUWeight=20',
       '--same-dir',
       process.execPath,
       '/overdeck/dist/verification-worker.js',
       '{"request":true}',
     ]);
+  });
+
+  it('passes a configured CPUWeight to the systemd scope (PAN-4311)', () => {
+    const launch = buildVerificationWorkerLaunch('PAN-1', 'run', '/worker.js', '{}', {}, 'linux', 35);
+
+    expect(launch.args).toContain('--property=CPUWeight=35');
+    expect(launch.args).not.toContain('--property=CPUWeight=20');
   });
 
   it('uses direct detached execution on non-Linux platforms and ordinary unit tests', () => {

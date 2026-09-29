@@ -9,7 +9,9 @@ import { evaluateAgentStartGate, evaluateSpawnGuardrails, hasActiveAgentGateOrRe
 import {
   AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
   parseSpawnGuardrailAcknowledgement,
+  unacknowledgedSpawnGuardrailWarnings,
 } from '../agents/shared.js';
+import type { CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
 import { resolveSpawnGuardrailRefusal } from '../agents/spawn.js';
 import {
   countAdmittedWorkAgentPanes,
@@ -409,6 +411,32 @@ describe('evaluateSpawnGuardrails', () => {
 
 // PAN-3977: the planning auto-handoff starts work agents with nobody watching.
 // Its acknowledgement covers tight RAM and a high agent count, nothing else.
+describe('evaluateSpawnGuardrails CPU pressure (PAN-4311)', () => {
+  const saturated: CpuPressureVerdict = { saturated: true, signal: 'psi-some-avg60', reading: 55, threshold: 50, psiSomeAvg10: 60 };
+
+  it('adds an acknowledgeable cpu_saturated warning when CPU is saturated', () => {
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot(), saturated);
+
+    expect(decision).toMatchObject({ blocked: false, requiresAcknowledgement: true, status: 409 });
+    expect(decision.warnings).toEqual([{
+      severity: 'warning',
+      code: 'cpu_pressure',
+      kind: 'cpu_saturated',
+      message: 'CPU is saturated (psi-some-avg60 55 ≥ 50).',
+    }]);
+    expect(unacknowledgedSpawnGuardrailWarnings(decision, { all: false, kinds: ['cpu_saturated'] })).toEqual([]);
+  });
+
+  it('adds no CPU warning for a calm verdict or a null verdict', () => {
+    expect(evaluateSpawnGuardrails(createHealthSnapshot(), { ...saturated, saturated: false, reading: 20 }).warnings).toEqual([]);
+    expect(evaluateSpawnGuardrails(createHealthSnapshot(), null).warnings).toEqual([]);
+  });
+
+  it('is not an automatic acknowledgement', () => {
+    expect(AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT).not.toContain('cpu_saturated');
+  });
+});
+
 describe('resolveSpawnGuardrailRefusal (POST /api/agents guardrail step)', () => {
   const automaticBody = {
     issueId: 'PAN-3977',
@@ -422,10 +450,10 @@ describe('resolveSpawnGuardrailRefusal (POST /api/agents guardrail step)', () =>
     { name: 'specialist-pan-1', currentIssue: 'PAN-1', reason: 'parent agent missing' },
   ];
 
-  function refuse(body: unknown, health: SystemHealthSnapshot) {
+  function refuse(body: unknown, health: SystemHealthSnapshot, cpu: CpuPressureVerdict | null = null) {
     // Round-trip through JSON: the route sees the body the way fetch sent it.
     const parsed = JSON.parse(JSON.stringify(body)) as unknown;
-    return resolveSpawnGuardrailRefusal('PAN-3977', health, parseSpawnGuardrailAcknowledgement(parsed)).refusal;
+    return resolveSpawnGuardrailRefusal('PAN-3977', health, parseSpawnGuardrailAcknowledgement(parsed), cpu).refusal;
   }
 
   afterEach(async () => {
@@ -495,6 +523,20 @@ describe('resolveSpawnGuardrailRefusal (POST /api/agents guardrail step)', () =>
         body: { blocked: true, error: 'Available RAM is critically low (1.5 GB).' },
       });
     }
+  });
+
+  it('refuses the automatic acknowledgement under CPU saturation, and the operator confirm covers it (PAN-4311)', () => {
+    const cpu: CpuPressureVerdict = { saturated: true, signal: 'psi-some-avg60', reading: 55, threshold: 50, psiSomeAvg10: 60 };
+
+    expect(refuse(automaticBody, createHealthSnapshot(), cpu)).toMatchObject({
+      status: 409,
+      body: {
+        requiresAcknowledgement: true,
+        unacknowledgedWarnings: [expect.objectContaining({ kind: 'cpu_saturated', code: 'cpu_pressure' })],
+      },
+    });
+    expect(refuse(operatorBody, createHealthSnapshot(), cpu)).toBeNull();
+    expect(refuse({ guardrailAcknowledgedWarnings: ['cpu_saturated'] }, createHealthSnapshot(), cpu)).toBeNull();
   });
 
   it('ignores unknown acknowledgement kinds', () => {

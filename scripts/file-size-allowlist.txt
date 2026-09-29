@@ -156,3 +156,6 @@
 1148 src/lib/conversations/smart-compaction.ts # PAN-4327
 997 src/lib/overdeck/planning-promotion.ts # PAN-1728
 961 src/lib/cloister/verification-runner.ts # PAN-1728
+1045 src/lib/config-yaml/merge.ts # PAN-4311
+1114 src/lib/config-yaml/schema.ts # PAN-4311
+1252 src/lib/overdeck/conversation-runtime.ts # PAN-4311
