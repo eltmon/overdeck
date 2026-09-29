@@ -1,11 +1,14 @@
 import { sep } from 'path';
 import { findPlanSync } from '../../lib/xbrief/io.js';
-import { transitionIssueXBrief, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
-import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { resolveIssueWorkspacePlanHome, transitionIssueXBrief, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
 
 export async function transitionStartedXBrief(projectRoot: string, issueId: string) {
+  const planHome = resolveIssueWorkspacePlanHome(projectRoot, issueId);
+  if (!planHome) {
+    throw new Error(`no base workspace for ${issueId.toUpperCase()}; spec transition skipped`);
+  }
   return transitionIssueXBrief(
-    resolvePlanHome(projectRoot),
+    planHome,
     issueId,
     'active',
     'running',
