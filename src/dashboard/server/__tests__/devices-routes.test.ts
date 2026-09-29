@@ -66,15 +66,17 @@ afterEach(async () => {
 });
 
 describe('device list and revoke routes (PAN-3762)', () => {
-  it('lists only devices and never includes tokenHash', async () => {
-    const { record } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+  it('lists every paired device, only devices, and never includes tokenHash', async () => {
+    const phone = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const laptop = await createAccessToken({ name: 'laptop', scopes: ['admin'], kind: 'device' });
     await createAccessToken({ name: 'ci-token', scopes: ['admin'], kind: 'token' });
 
     const res = await call('GET', '/api/devices', asInternal);
     expect(res.status).toBe(200);
     expect(res.text).not.toContain('tokenHash');
     expect(res.json.devices).toEqual([
-      { id: record.id, name: 'phone', createdAt: record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: phone.record.id, name: 'phone', createdAt: phone.record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: laptop.record.id, name: 'laptop', createdAt: laptop.record.createdAt, lastUsedAt: null, revokedAt: null },
     ]);
   });
 
@@ -107,5 +109,7 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect((await call('DELETE', `/api/devices/${a.record.id}`, asDevice(a.token))).status).toBe(200);
     expect(stillAuthenticates(a.token)).toBe(false);
     expect(stillAuthenticates(b.token)).toBe(true);
+    expect((await call('GET', '/api/devices', asDevice(a.token))).status).toBe(401);
+    expect((await call('GET', '/api/devices', asDevice(b.token))).status).toBe(200);
   });
 });

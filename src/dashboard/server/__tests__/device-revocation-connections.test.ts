@@ -90,11 +90,20 @@ describe('revocation closes live device connections (PAN-3762)', () => {
     expect(_deviceConnectionCountForTests()).toBe(0);
   });
 
-  it('does not track sockets opened with a non-revocable credential', () => {
-    const ws = new FakeSocket();
-    trackDeviceSocket({ kind: 'root-session' }, ws);
-    trackDeviceSocket({ kind: 'internal-token' }, ws);
-    expect(_deviceConnectionCountForTests()).toBe(0);
+  it('leaves root-session and internal-token sockets open when a device is revoked', async () => {
+    const device = await createAccessToken({ name: 'd', scopes: ['admin'], kind: 'device' });
+    const rootWs = new FakeSocket();
+    const internalWs = new FakeSocket();
+    const deviceWs = new FakeSocket();
+    trackDeviceSocket({ kind: 'root-session' }, rootWs);
+    trackDeviceSocket({ kind: 'internal-token' }, internalWs);
+    trackDeviceSocket({ kind: 'device', deviceId: device.record.id }, deviceWs);
+    expect(_deviceConnectionCountForTests()).toBe(1);
+
+    expect(await revokeThroughRoute(device.record.id)).toBe(200);
+    expect(deviceWs.closedWith?.code).toBe(4401);
+    expect(rootWs.closedWith).toBeNull();
+    expect(internalWs.closedWith).toBeNull();
   });
 
   it('ends the SSE stream of the revoked device only', async () => {
