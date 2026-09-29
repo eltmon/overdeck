@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:24:14.639Z",
+  "updated": "2026-09-29T16:24:28.301Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "device-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:24:14.639Z"
+    },
+    "live-revocation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:28.301Z"
     }
   }
 }
