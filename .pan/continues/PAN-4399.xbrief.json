@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T15:55:55.509Z",
+  "updated": "2026-09-29T15:56:10.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "planning-defer-stack.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T15:55:55.508Z"
+    },
+    "planning-defer-stack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:56:10.430Z"
     }
   }
 }
