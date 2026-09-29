@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:48:26.780Z",
+  "updated": "2026-09-29T15:48:43.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
       "claimedBy": "agent-pan-4333",
       "claimedAt": "2026-09-29T15:48:09.859Z",
       "doneAt": "2026-09-29T15:48:26.780Z"
+    },
+    "rejoin-after-rotation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:43.631Z"
     }
   }
 }
