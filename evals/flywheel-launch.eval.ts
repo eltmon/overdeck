@@ -1,5 +1,5 @@
 import { createScorer, evalite } from 'evalite';
-import { extractJsonArray, loadPromptFile, runPromptScenario } from './lib/prompt-harness.js';
+import { extractJsonArray, loadPromptFile, runPromptScenario, type PromptScenarioRun } from './lib/prompt-harness.js';
 
 const flywheelRole = loadPromptFile('roles/flywheel.md');
 const flywheelBrief = loadPromptFile('sync-sources/skills/pan-flywheel/SKILL.md');
@@ -187,6 +187,7 @@ function buildUserPrompt(fixture: BoardFixture): string {
 async function runFixture(fixture: BoardFixture): Promise<{
   suggestions: FlywheelSuggestionShape[];
   raw: string;
+  run: PromptScenarioRun;
 }> {
   const system = [
     flywheelRole,
@@ -200,9 +201,9 @@ async function runFixture(fixture: BoardFixture): Promise<{
     'For this evaluation, respond with a JSON array of suggestions only.',
   ].join('\n');
 
-  const raw = await runPromptScenario({ system, user: buildUserPrompt(fixture) });
+  const { text: raw, run } = await runPromptScenario({ system, user: buildUserPrompt(fixture) });
   const parsed = extractJsonArray(raw);
-  return { suggestions: parsed as FlywheelSuggestionShape[], raw };
+  return { suggestions: parsed as FlywheelSuggestionShape[], raw, run };
 }
 
 function launchedIssues(suggestions: FlywheelSuggestionShape[]): Set<string> {
@@ -246,7 +247,7 @@ const orderDrainCases: Array<{ input: OrderDrainFixture; expected: OrderDrainFix
   },
 ];
 
-async function runOrderDrainFixture(fixture: OrderDrainFixture): Promise<{ actions: string[]; raw: string }> {
+async function runOrderDrainFixture(fixture: OrderDrainFixture): Promise<{ actions: string[]; raw: string; run: PromptScenarioRun }> {
   const system = [flywheelRole, '', '---', '', flywheelBrief].join('\n');
   const user = [
     'The current mechanically-derived Flywheel status contains `orders.drained: true`.',
@@ -256,16 +257,16 @@ async function runOrderDrainFixture(fixture: OrderDrainFixture): Promise<{ actio
       : 'You recognized no real doctrine, substrate, or template improvements.',
     'Emit ONLY a JSON array of concise actions you take next, in order. Include literal paths and commands.',
   ].join('\n');
-  const raw = await runPromptScenario({ system, user });
+  const { text: raw, run } = await runPromptScenario({ system, user });
   const parsed = extractJsonArray(raw);
-  return { actions: parsed.filter((value): value is string => typeof value === 'string'), raw };
+  return { actions: parsed.filter((value): value is string => typeof value === 'string'), raw, run };
 }
 
 function normalizedActions(actions: string[]): string {
   return actions.join('\n').toLowerCase();
 }
 
-evalite<BoardFixture, { suggestions: FlywheelSuggestionShape[]; raw: string }, BoardFixture>(
+evalite<BoardFixture, { suggestions: FlywheelSuggestionShape[]; raw: string; run: PromptScenarioRun }, BoardFixture>(
   'flywheel launch-vs-report decision',
   {
     data: cases,
@@ -305,7 +306,7 @@ evalite<BoardFixture, { suggestions: FlywheelSuggestionShape[]; raw: string }, B
   },
 );
 
-evalite<OrderDrainFixture, { actions: string[]; raw: string }, OrderDrainFixture>(
+evalite<OrderDrainFixture, { actions: string[]; raw: string; run: PromptScenarioRun }, OrderDrainFixture>(
   'flywheel order-book drain completion',
   {
     data: orderDrainCases,

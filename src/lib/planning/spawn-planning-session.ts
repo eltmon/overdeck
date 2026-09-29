@@ -519,7 +519,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
     const planningModel = modelOverride || settingsModel;
     const effectiveHarness = await resolvePlanningSessionHarness(planningModel, opts.harness);
-    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
+    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness, { model: planningModel });
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     progress(3, 'Loading specs & PRDs', 'PRD comes from the canonical draft path', 'complete');

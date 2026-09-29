@@ -7,6 +7,7 @@ import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import { computeGovernorReserveDefaultsGb, computeSpawnMemoryThresholdDefaultsGb } from './governor-reserves.js';
 import type { NormalizedConfig } from './schema.js';
 import { DEFAULT_NORMALIZED_OLLAMA } from './ollama.js';
+import { DEFAULT_NORMALIZED_JEV } from './jev.js';
 
 /**
  * PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
@@ -47,6 +48,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // Overdeck asks for when it starts `ollama serve` itself. 64K is the smallest
   // window a work agent's first prompt comfortably fits in.
   ollama: { ...DEFAULT_NORMALIZED_OLLAMA },
+  // PAN-4369: Jev is off until some layer has a `jev:` block; there is no default model.
+  jev: { ...DEFAULT_NORMALIZED_JEV },
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.

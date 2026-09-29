@@ -102,7 +102,10 @@ This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. The gates:
 the pipeline. The one exception to "never block on the operator."
 
 `released` and `vetoed` are operator-only labels: this loop never adds or
-removes either one.
+removes either one. The same holds for `auto-merge` and `hold-for-uat`. The
+Flywheel conversation's `gh` shim refuses these grant-label writes
+(`released`, `auto-merge`, `hold-for-uat`) and exits non-zero; when one seems
+needed, park the item and ask the operator.
 
 ## Phase 2 — Pick the next item
 

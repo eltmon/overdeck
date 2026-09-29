@@ -217,6 +217,32 @@ export function BackgroundAiSection({
             </div>
           );
         })}
+
+        {/* PAN-4369: key for the optional Jev toggles. TypeSafe is not a model provider, so the
+            slot lives here rather than in Providers. Model and endpoint stay config.yaml-only. */}
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-foreground">TypeSafe API key (Jev)</span>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Used by the Jev toggles above. Accepts a TypeSafe console key or an OpenCode Zen key. The
+              model and endpoint are set under <code className="font-mono">jev:</code> in config.yaml — see
+              the Jev configuration docs.
+            </p>
+          </div>
+          <input
+            type="password"
+            autoComplete="off"
+            aria-label="TypeSafe API key"
+            value={formData.api_keys?.typesafe ?? ''}
+            onChange={(e) =>
+              onSettingsChange(
+                { ...formData, api_keys: { ...formData.api_keys, typesafe: e.target.value || undefined } },
+                { debounce: true },
+              )
+            }
+            className="w-48 shrink-0 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary"
+          />
+        </div>
       </div>
       <p className="text-[11px] text-muted-foreground mt-3 px-4">
         You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the

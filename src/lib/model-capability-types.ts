@@ -68,6 +68,12 @@ export interface ModelCapability {
    * provider's model docs (Claude API thinking/sampling table, PAN-4327).
    */
   supportsSamplingParams?: boolean;
+  /**
+   * Oldest Claude Code CLI that recognizes this model (`X.Y.Z`). Launches on
+   * the claude-code harness refuse an older binary (PAN-4359). Unset = no known
+   * minimum. Set it from the model's release notes when adding a model.
+   */
+  minClaudeCodeVersion?: string;
   /** Additional notes about this model's strengths */
   notes?: string;
 }

@@ -531,8 +531,8 @@ describe('spawnAgent PTY supervisor wiring', () => {
       expect(kimiState.costSoFar).toBe(0);
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
-      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('codex');
-      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('ohmypi');
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('codex', { model: 'gpt-5.5' });
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('ohmypi', { model: 'kimi-k2.6' });
     } finally {
       delete process.env.KIMI_API_KEY;
     }

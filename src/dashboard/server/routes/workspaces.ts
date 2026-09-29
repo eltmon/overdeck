@@ -180,9 +180,8 @@ async function readWorkspaceContinueFile(
   issueId: string,
 ): Promise<string | null> {
   try {
-    const { readContinueState } = await import('../../../lib/xbrief/continue-state.js');
-    const { resolvePlanHome } = await import('../../../lib/pan-dir/paths.js');
-    const state = readContinueState(resolvePlanHome(projectPath), issueId);
+    const { readContinueStateForIssue } = await import('../../../lib/xbrief/lifecycle-io.js');
+    const state = readContinueStateForIssue(projectPath, issueId);
     return state ? JSON.stringify(state, null, 2) : null;
   } catch {
     return null;
