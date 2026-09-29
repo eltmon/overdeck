@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:28:19.002Z",
+  "updated": "2026-09-29T16:28:33.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,10 @@
     "browser-pairing-landing.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:28:19.001Z"
+    },
+    "remote-request-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:33.794Z"
     }
   }
 }
