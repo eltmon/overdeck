@@ -49,7 +49,7 @@ describe('model capabilities', () => {
   // PAN-3057: the harness pin and the capability table are one number. If these
   // drift again, the dashboard meter and the Deacon's proactive compaction score
   // GPT-5.6 agents against a window the harness was never given.
-  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
     'feeds the same window to the harness env exports and the capability table for %s',
     async (model) => {
       const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
