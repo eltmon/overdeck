@@ -135,6 +135,12 @@ describe('readApprovalStandsAtHead', () => {
     expect(await readApprovalStandsAtHead('PAN-1', deps)).toBe(false);
   });
 
+  it('reads the facts by branch so neither cache answers with a pre-push head', async () => {
+    const getFacts = vi.fn(async () => conflictingFacts({ mergeable: true }));
+    await readApprovalStandsAtHead('PAN-1', { getFacts });
+    expect(getFacts).toHaveBeenCalledWith('PAN-1', { preferBranch: 'feature/pan-1' });
+  });
+
   it('is undefined when the facts carry an error', async () => {
     const { deps } = gateDeps(emptyPrFacts('PAN-1', 'gh failed'));
     expect(await readApprovalStandsAtHead('PAN-1', deps)).toBeUndefined();

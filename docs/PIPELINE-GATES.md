@@ -576,7 +576,10 @@ head H1, the PR is now at a different head that the forge calls mergeable, no
 `review.requested` entry follows the repair, and the repair is at least 15
 minutes old, the patrol asks the guarded review door once (source
 `conflict-repair`). The door journals `review.requested`, which ends the
-backstop. When the new head is approved, the existing auto-merge scheduler
+backstop. The patrol logs the door's answer, and raises Needs-you once per head
+when the door refuses for a reason the operator must fix (`circuit-breaker`,
+`no-project`, `dirty-workspace`). The guarded request reads the PR by branch
+so no cached pre-push head answers for the new one. When the new head is approved, the existing auto-merge scheduler
 re-arms the issue under the same policy as before the conflict.
 
 ## Review Convergence Gate (PAN-3151)

@@ -21,6 +21,7 @@ import {
   type ConflictRepairDeps,
 } from '../conflict-repair.js';
 import type { ConflictRepairGateResult } from '../merge-gate.js';
+import type { GuardedReviewRequestOutcome } from '../request-review-pipeline.js';
 import { appendPipelineEntry, readPipelineJournal, type PipelineJournalEntry } from '../pipeline-journal.js';
 import { emptyPrFacts } from '../pr-facts.js';
 
@@ -317,7 +318,7 @@ describe('tickConflictRepair — review backstop after a repair', () => {
   async function repairThenMove(overrides: ConflictRepairDeps = {}) {
     approve();
     let current = gate(true, HEAD_A);
-    const requestReview = vi.fn(async () => ({ kind: 'started' }));
+    const requestReview = vi.fn(async (): Promise<GuardedReviewRequestOutcome | null> => ({ kind: 'started', autoRequeueCount: 0 }));
     const { deps } = makeDeps({ evaluateGate: async () => current, requestReview, ...overrides });
     await tickConflictRepair(deps);
     current = gate(false, HEAD_B);
@@ -328,7 +329,7 @@ describe('tickConflictRepair — review backstop after a repair', () => {
     const { deps, requestReview } = await repairThenMove();
 
     vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
-    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: review-requested']);
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: review-requested (started)']);
     vi.advanceTimersByTime(60_000);
     await tickConflictRepair(deps);
 
@@ -345,6 +346,35 @@ describe('tickConflictRepair — review backstop after a repair', () => {
     await tickConflictRepair(deps);
 
     expect(requestReview).toHaveBeenCalledTimes(2);
+  });
+
+  it('raises Needs-you once per head when the door refuses for a reason the operator must fix', async () => {
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+    const { deps, requestReview } = await repairThenMove({ surfaceNeedsYou });
+    requestReview.mockResolvedValue({ kind: 'circuit-breaker', autoRequeueCount: 3 });
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: review-requested (circuit-breaker)']);
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).toHaveBeenCalledTimes(2);
+    expect(surfaceNeedsYou).toHaveBeenCalledOnce();
+    expect(surfaceNeedsYou).toHaveBeenCalledWith(
+      ISSUE,
+      expect.stringContaining('review request was refused (circuit-breaker)'),
+      expect.objectContaining({ head: 'ffff6666', reason: 'circuit-breaker' }),
+    );
+  });
+
+  it('does not raise Needs-you when the door answers already-passed', async () => {
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+    const { deps, requestReview } = await repairThenMove({ surfaceNeedsYou });
+    requestReview.mockResolvedValue({ kind: 'already-passed' });
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: review-requested (already-passed)']);
+    expect(surfaceNeedsYou).not.toHaveBeenCalled();
   });
 
   it('does not request review when a review request followed the repair', async () => {

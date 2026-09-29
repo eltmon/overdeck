@@ -167,12 +167,17 @@ export async function evaluateConflictRepairGate(
  * marker or a GitHub review names the head, `false` when the forge proves it
  * does not (the head moved since the approving review), `undefined` when it
  * cannot tell (lookup failed, GitLab, no PR).
+ *
+ * The facts are read fresh: a branch read is neither served from nor stored
+ * in the PR-facts or PR-tab caches, and a cached pre-push head would answer
+ * for the old head right after the agent pushed a new one.
  */
 export async function readApprovalStandsAtHead(
   issueId: string,
   deps: Pick<MergeGateDeps, 'getFacts' | 'readReviews' | 'overdeckLogins'> = {},
 ): Promise<boolean | undefined> {
-  const facts = deps.getFacts ? await deps.getFacts(issueId) : await getPrFacts(issueId);
+  const fresh: PrFactsOptions = { preferBranch: `feature/${issueId.toLowerCase()}` };
+  const facts = deps.getFacts ? await deps.getFacts(issueId, fresh) : await getPrFacts(issueId, {}, fresh);
   if (facts.error || !facts.open) return undefined;
   if (facts.approvedAtHead === true) return true;
   if (facts.forge !== 'github') return undefined;

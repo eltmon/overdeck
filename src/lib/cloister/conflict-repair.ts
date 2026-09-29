@@ -32,7 +32,7 @@ import {
   readPipelineJournal,
   type PipelineJournalEntry,
 } from './pipeline-journal.js';
-import { getGuardedReviewRequester } from './request-review-pipeline.js';
+import { getGuardedReviewRequester, type GuardedReviewRequestOutcome } from './request-review-pipeline.js';
 
 export const CONFLICT_REPAIR_INTERVAL_MS = 60_000;
 /** How long one repair may take before a head that still conflicts escalates. */
@@ -54,7 +54,7 @@ export interface ConflictRepairDeps {
   /** The conflicting paths, for the prompt text only. */
   probeConflictPaths?: (workspacePath: string) => Promise<string[]>;
   /** The guarded review request, for the post-repair backstop. */
-  requestReview?: (issueId: string) => Promise<unknown>;
+  requestReview?: (issueId: string) => Promise<GuardedReviewRequestOutcome | null>;
   now?: () => number;
   log?: (message: string) => void;
 }
@@ -63,10 +63,15 @@ export interface ConflictRepairDeps {
 const inFlight = new Set<string>();
 /** When the backstop last asked for review, per issue, so a refusing door is not asked every tick. */
 const lastBackstopAt = new Map<string, number>();
+/** `<issue>:<head>` pairs whose backstop refusal already raised Needs-you. */
+const refusalsSurfaced = new Set<string>();
+/** Guarded-door answers that need the operator: the review will not start on its own. */
+const OPERATOR_REFUSALS = new Set<GuardedReviewRequestOutcome['kind']>(['circuit-breaker', 'no-project', 'dirty-workspace']);
 
 export function __resetConflictRepairStateForTests(): void {
   inFlight.clear();
   lastBackstopAt.clear();
+  refusalsSurfaced.clear();
 }
 
 /**
@@ -123,7 +128,7 @@ async function defaultDeliver(agentId: string, prompt: string, dedupKey: string)
   }
 }
 
-async function defaultRequestReview(issueId: string): Promise<unknown> {
+async function defaultRequestReview(issueId: string): Promise<GuardedReviewRequestOutcome | null> {
   const requester = getGuardedReviewRequester();
   if (!requester) {
     console.log(`[conflict-repair] ${issueId}: no guarded review requester in this process; backstop skipped`);
@@ -274,8 +279,23 @@ async function reviewBackstop(
   if (last !== undefined && now - last < CONFLICT_REPAIR_REVIEW_BACKSTOP_MS) return null;
   lastBackstopAt.set(issueId, now);
   d.log(`[conflict-repair] ${issueId}: repaired head ${head} has no review request; requesting review`);
-  await d.requestReview(issueId);
-  return 'review-requested';
+  const outcome = await d.requestReview(issueId);
+  const kind = outcome?.kind ?? 'no-requester';
+  d.log(`[conflict-repair] ${issueId}: backstop review request for ${head} answered ${kind}`);
+  const refusalKey = `${issueId}:${head}`;
+  if (outcome && OPERATOR_REFUSALS.has(outcome.kind) && !refusalsSurfaced.has(refusalKey)) {
+    refusalsSurfaced.add(refusalKey);
+    try {
+      await d.surfaceNeedsYou(
+        issueId,
+        `${facts.number ? `PR #${facts.number}` : 'The PR'} was repaired to ${head} but its review request was refused (${kind})`,
+        { head, prUrl: facts.url, reason: kind },
+      );
+    } catch (err) {
+      d.log(`[conflict-repair] Could not raise Needs-you for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return `review-requested (${kind})`;
 }
 
 async function tickIssue(d: Resolved, issueId: string, workspacePath: string): Promise<string | null> {
