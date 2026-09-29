@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4369",
   "created": "2026-09-29T04:37:53.207Z",
-  "updated": "2026-09-29T05:17:09.738Z",
+  "updated": "2026-09-29T05:18:19.818Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "jev-client-assess.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T05:17:09.738Z"
+    },
+    "jev-smoke-eval": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:18:19.818Z"
     }
   }
 }
