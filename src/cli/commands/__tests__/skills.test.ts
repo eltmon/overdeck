@@ -11,8 +11,24 @@ const mocks = vi.hoisted(() => {
       super(message);
     }
   }
+  class PackSourceError extends Error {
+    constructor(readonly code: string, message: string) {
+      super(message);
+    }
+  }
   return {
     SkillOverrideError,
+    PackSourceError,
+    addPack: vi.fn(),
+    updatePack: vi.fn(),
+    removePack: vi.fn(),
+    syncPack: vi.fn(),
+    listPacks: vi.fn(),
+    packUpdateAvailable: vi.fn(),
+    writePackEntry: vi.fn(),
+    listPackCatalog: vi.fn(),
+    listLowerLevelPackOverrides: vi.fn(),
+    gcMounts: vi.fn(),
     listSkillStates: vi.fn(),
     setSkillOverride: vi.fn(),
     resolveLaunchDisabledSkills: vi.fn(),
@@ -27,7 +43,21 @@ vi.mock('../../../lib/skill-overrides/store.js', () => ({
   SkillOverrideError: mocks.SkillOverrideError,
   listSkillStates: mocks.listSkillStates,
   setSkillOverride: mocks.setSkillOverride,
+  listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides,
 }));
+
+vi.mock('../../../lib/skill-packs/sources.js', () => ({
+  PackSourceError: mocks.PackSourceError,
+  addPack: mocks.addPack,
+  updatePack: mocks.updatePack,
+  removePack: mocks.removePack,
+  syncPack: mocks.syncPack,
+  listPacks: mocks.listPacks,
+  packUpdateAvailable: mocks.packUpdateAvailable,
+  writePackEntry: mocks.writePackEntry,
+}));
+
+vi.mock('../../../lib/skill-overrides/catalog.js', () => ({ listPackCatalog: mocks.listPackCatalog }));
 
 vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../lib/skill-overrides/launch.js')>()),
@@ -37,7 +67,7 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   applyCodexPacks: mocks.applyCodexPacks,
 }));
 
-vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock }));
+vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock, gcMounts: mocks.gcMounts }));
 
 import { registerSkillsCommands } from '../skills.js';
 
@@ -193,5 +223,125 @@ describe('pan skills launch-settings', () => {
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
     expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: boom']);
     expect(mocks.writeCodexPackBlock).toHaveBeenCalledWith('/ch', null);
+  });
+});
+
+describe('pan skills pack', () => {
+  const COMMIT = 'c55ee46073ed'.padEnd(40, '0');
+  const capabilities = {
+    hooks: false, mcpServers: false, commands: false, agents: false, contextInjection: false, gitHooks: false,
+    executables: ['skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh'],
+    projectMutatingSkills: ['setup-matt-pocock-skills'], requiresCli: [],
+  };
+  const preview = {
+    id: 'mattpocock', url: 'https://github.com/mattpocock/skills', ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin',
+    manifest: {
+      skills: [
+        { name: 'grilling', dir: 'skills/productivity/grilling', description: '', optIn: false },
+        { name: 'setup-matt-pocock-skills', dir: 'skills/engineering/setup-matt-pocock-skills', description: '', optIn: true },
+      ],
+      capabilities, license: 'MIT', pluginName: 'mattpocock-skills',
+    },
+  };
+  const addArgs = ['pack', 'add', 'mattpocock', 'https://github.com/mattpocock/skills', '--ref', 'v1.2.3'];
+  let isTTY: boolean | undefined;
+
+  beforeEach(() => {
+    isTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    mocks.addPack.mockImplementation(async (_input: unknown, confirm: (p: typeof preview) => Promise<boolean>) => {
+      const written = await confirm(preview);
+      if (written) mocks.writePackEntry();
+      return { written, preview };
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+  });
+
+  it('prints the preview and writes nothing without --yes on a non-TTY', async () => {
+    await expect(run(...addArgs)).rejects.toThrow('exit 1');
+    const out = logs.join('\n');
+    expect(out).toContain('Pack mattpocock');
+    expect(out).toContain('  Source       https://github.com/mattpocock/skills @ v1.2.3 (c55ee46)');
+    expect(out).toContain('  Skills       2 (1 opt-in: setup-matt-pocock-skills)');
+    expect(out).toContain('  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh');
+    expect(out).toContain('  Not applied  executables (1), project-mutating skills (1)');
+    expect(out).toContain('Not written: re-run with --yes to trust c55ee46.');
+    expect(mocks.writePackEntry).not.toHaveBeenCalled();
+  });
+
+  it('trusts the commit with --yes and prints the enable hint', async () => {
+    await run(...addArgs, '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'mattpocock', url: 'https://github.com/mattpocock/skills', ref: 'v1.2.3', reservedIds: expect.arrayContaining(['pan-done']) }),
+      expect.any(Function),
+    );
+    expect(mocks.writePackEntry).toHaveBeenCalledOnce();
+    expect(logs.join('\n')).toContain('Turn it on with: pan skills set --pack mattpocock on');
+  });
+
+  it('refuses sageox with the integration note', async () => {
+    mocks.addPack.mockRejectedValue(new mocks.PackSourceError('integration', 'SageOx is an integration, not a skill pack; see https://github.com/eltmon/overdeck/issues/2444'));
+    await expect(run('pack', 'add', 'sageox', 'https://github.com/sageox/ox', '--ref', 'main', '--yes')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('issues/2444');
+  });
+
+  it('rejects an unknown adapter before any work', async () => {
+    await expect(run(...addArgs, '--adapter', 'npm')).rejects.toThrow('exit 1');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('lists packs as JSON offline without an update check', async () => {
+    mocks.listPackCatalog.mockResolvedValue([
+      { id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true, manifest: preview.manifest },
+    ]);
+    await run('pack', 'list', '--json', '--offline');
+    expect(JSON.parse(logs.join('\n'))).toEqual([{
+      id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true,
+      license: 'MIT', skills: 2, notApplied: ['executables (1)', 'project-mutating skills (1)'],
+    }]);
+    expect(mocks.packUpdateAvailable).not.toHaveBeenCalled();
+  });
+
+  it('includes updateAvailable when online', async () => {
+    mocks.listPackCatalog.mockResolvedValue([
+      { id: 'mattpocock', url: preview.url, ref: 'main', commit: COMMIT, adapter: 'claude-plugin', cached: false, manifest: null },
+    ]);
+    mocks.packUpdateAvailable.mockResolvedValue('f'.repeat(40));
+    await run('pack', 'list', '--json');
+    expect(JSON.parse(logs.join('\n'))[0]).toMatchObject({ cached: false, skills: 0, updateAvailable: 'f'.repeat(40) });
+  });
+
+  it('reports an up-to-date pack without asking', async () => {
+    mocks.updatePack.mockResolvedValue({ written: false, preview });
+    await run('pack', 'update', 'mattpocock');
+    expect(logs.join('\n')).toContain('mattpocock is up to date at v1.2.3 (c55ee46).');
+  });
+
+  it('removes a pack and reports inert lower-level toggles', async () => {
+    mocks.removePack.mockResolvedValue({ removed: true });
+    mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: ['TST-1'] } });
+    await run('pack', 'remove', 'mattpocock');
+    expect(logs.join('\n')).toContain('2 project or issue toggle(s) for mattpocock remain');
+  });
+
+  it('syncs every registered pack and fails when one fails', async () => {
+    mocks.listPacks.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+    mocks.syncPack.mockImplementation(async (id: string) => {
+      if (id === 'b') throw new mocks.PackSourceError('git', 'pack b: unreachable');
+      return { commit: COMMIT, dir: '/x' };
+    });
+    await expect(run('pack', 'sync')).rejects.toThrow('exit 1');
+    expect(logs).toEqual(['a: cached c55ee46']);
+    expect(errors.join('\n')).toContain('pack b: unreachable');
+  });
+
+  it('collects garbage with the default age', async () => {
+    mocks.gcMounts.mockResolvedValue({ removedMounts: ['/m/1'], removedLinks: [] });
+    await run('pack', 'gc');
+    expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
+    expect(logs.join('\n')).toContain('Removed 1 mount(s) and 0 dangling launch link(s).');
   });
 });
