@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:20:48.432Z",
+  "updated": "2026-09-29T16:21:04.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "access-token-registry.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T16:20:48.432Z"
+    },
+    "access-token-registry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:21:04.130Z"
     }
   }
 }
