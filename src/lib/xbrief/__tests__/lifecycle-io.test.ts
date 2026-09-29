@@ -4,11 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import {
-  appendContinueSessionEntryForIssue,
-  appendFeedbackEntryForIssue,
-  clearFeedbackForIssue,
   findXBriefByIssueSync,
-  readContinueStateForIssue,
   transitionIssueXBrief,
   updatePlanStatus,
 } from '../lifecycle-io.js';
@@ -17,7 +13,6 @@ import {
   generateXBriefFilename,
   resolveXBriefDir,
 } from '../lifecycle.js';
-import { continueStatePath, writeContinueState, type ContinueState } from '../continue-state.js';
 import type { XBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -268,76 +263,6 @@ describe('transitionIssueXBrief', () => {
   });
 });
 
-describe('per-issue continue adapters (PAN-4225)', () => {
-  const issueId = 'PAN-1919';
-  const workspaceDir = () => join(TEST_DIR, 'workspaces', 'feature-pan-1919');
-  const workspaceContinuePath = () => continueStatePath(workspaceDir(), issueId);
-  const primaryContinuePath = () => continueStatePath(TEST_DIR, issueId);
-
-  function seedContinueState(planHome: string, overrides: Partial<ContinueState> = {}): void {
-    const now = new Date().toISOString();
-    writeContinueState(planHome, issueId, {
-      version: '1',
-      issueId,
-      created: now,
-      updated: now,
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      sessionHistory: [],
-      ...overrides,
-    });
-  }
-
-  it('ac1: writes into the workspace plan home and never the primary checkout', () => {
-    mkdirSync(workspaceDir(), { recursive: true });
-
-    const wrote = appendContinueSessionEntryForIssue(TEST_DIR, issueId, {
-      reason: 'manual',
-      note: 'seeded for ac1',
-    });
-
-    expect(wrote).toBe(true);
-    expect(existsSync(workspaceContinuePath())).toBe(true);
-    expect(existsSync(join(TEST_DIR, '.pan'))).toBe(false);
-  });
-
-  it('ac2: returns false and writes nothing when there is no base workspace', () => {
-    const wrote = appendFeedbackEntryForIssue(TEST_DIR, issueId, {
-      seq: 1,
-      specialist: 'review-agent',
-      outcome: 'changes-requested',
-      timestamp: new Date().toISOString(),
-      markdownBody: '# feedback',
-    });
-
-    expect(wrote).toBe(false);
-    expect(existsSync(workspaceDir())).toBe(false);
-    expect(existsSync(join(TEST_DIR, '.pan'))).toBe(false);
-  });
-
-  it('ac3: returns false and creates no continue file when the workspace has none yet', () => {
-    mkdirSync(workspaceDir(), { recursive: true });
-
-    const cleared = clearFeedbackForIssue(TEST_DIR, issueId);
-
-    expect(cleared).toBe(false);
-    expect(existsSync(workspaceContinuePath())).toBe(false);
-  });
-
-  it('ac4: readContinueStateForIssue prefers the workspace copy, falls back to the primary', () => {
-    mkdirSync(workspaceDir(), { recursive: true });
-    seedContinueState(workspaceDir(), { resumePoint: { description: 'workspace copy' } });
-    seedContinueState(TEST_DIR, { resumePoint: { description: 'primary copy' } });
-
-    const preferred = readContinueStateForIssue(TEST_DIR, issueId);
-    expect(preferred?.resumePoint?.description).toBe('workspace copy');
-
-    rmSync(workspaceContinuePath());
-    expect(existsSync(primaryContinuePath())).toBe(true);
-
-    const fallback = readContinueStateForIssue(TEST_DIR, issueId);
-    expect(fallback?.resumePoint?.description).toBe('primary copy');
-  });
-});
+// Per-issue continue adapter coverage (routing, no-workspace skip, read
+// fallback) lives in tests/unit/lib/xbrief/lifecycle-io-continue-adapters.test.ts
+// — the file the PAN-4225 xBRIEF names in files_scope/verify_commands.

@@ -190,19 +190,25 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   questions of `HEAD` (or a named branch) instead — PAN-4212.
 
 - **Per-issue continue/spec writers target the issue's base workspace, never
-  the primary checkout, and the server never commits inside a workspace**
-  (PAN-4225) — `resolveIssueWorkspacePlanHome(projectRoot, issueId)` in
-  `xbrief/lifecycle-io.ts` is the one place that resolves
+  the primary checkout** (PAN-4225) — `resolveIssueWorkspacePlanHome(projectRoot,
+  issueId)` in `xbrief/lifecycle-io.ts` is the one place that resolves
   `<project>/workspaces/feature-<issue>`'s plan home; every per-issue writer
   (feedback, session history, `transitionIssueXBrief`, the swarm slot ledger)
   routes through it and writes nothing once that workspace is gone. Readers
   (`readContinueStateForIssue`) check the workspace copy first, then the
-  primary. A server write leaves `.pan/continues/`/`.pan/specs/` dirty and
-  uncommitted in the workspace until the work agent's own `pan task`/`pan
-  done` commits it — `isOverdeckOwnedOnlyStatus` (`state-plane.ts`) already
-  exempts both paths from the "uncommitted work" gate, so this is expected,
-  not a bug. Don't add a writer that resolves the primary checkout directly;
-  route it through `resolveIssueWorkspacePlanHome` like the rest.
+  primary. Routine server writes leave `.pan/continues/`/`.pan/specs/` dirty
+  and uncommitted in the workspace — `isOverdeckOwnedOnlyStatus`
+  (`state-plane.ts`) already exempts both paths from the "uncommitted work"
+  gate, so a server-dirtied file sitting there is expected, not a bug. The
+  server is NOT lock-free of commits in a workspace, though:
+  `commitPendingIssueArtifacts` (`overdeck/plan-artifact-commit.ts`) commits
+  both paths at the two spots that would otherwise hit `git rebase`'s refusal
+  on a dirty tree — `pan done`'s rebase-and-push step, and the merge
+  pipeline's in-place feature-branch rebase (`cloister/merge-rebase.ts`) —
+  and `autoCommitWorkspaceChangesBeforeSync` (`merge-agent.ts`, pre-dating
+  PAN-4225) already committed `.pan/continues/` before a sync-main rebase for
+  the same reason. Don't add a writer that resolves the primary checkout
+  directly; route it through `resolveIssueWorkspacePlanHome` like the rest.
 - **A `verification.passed` journal tail is ambiguous** (PAN-4221) — quick
   review mode writes no `review.dispatched`, so the tail stays
   `verification.passed` while a healthy quick reviewer runs, AND when a

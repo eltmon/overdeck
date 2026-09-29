@@ -42,7 +42,7 @@ describe('resolveScopeTarget (PAN-4225)', () => {
 });
 
 describe('finishScopeTransition (PAN-4225)', () => {
-  it('ac2: commits only .pan/specs/ and returns a warning instead of throwing when there is no upstream', async () => {
+  it('ac2: commits only the transitioned spec file and returns a warning instead of throwing when there is no upstream', async () => {
     await execFileAsync('git', ['init', '-q', '-b', 'main'], { cwd: TEST_DIR });
     await execFileAsync('git', ['config', 'user.email', 'test@test.local'], { cwd: TEST_DIR });
     await execFileAsync('git', ['config', 'user.name', 'Test'], { cwd: TEST_DIR });
@@ -52,21 +52,34 @@ describe('finishScopeTransition (PAN-4225)', () => {
 
     const specDir = join(TEST_DIR, '.pan', 'specs');
     mkdirSync(specDir, { recursive: true });
-    writeFileSync(join(specDir, 'PAN-9.xbrief.json'), '{}\n', 'utf-8');
+    const targetSpecPath = join(specDir, 'PAN-9.xbrief.json');
+    writeFileSync(targetSpecPath, '{}\n', 'utf-8');
+    // A stray modified spec from another issue (PAN-4224) that must NOT be
+    // swept into this commit.
+    writeFileSync(join(specDir, 'PAN-10.xbrief.json'), '{}\n', 'utf-8');
 
-    const warning = await finishScopeTransition({ planHome: TEST_DIR, onMain: true }, 'scope: approve PAN-9 xBRIEF');
+    const warning = await finishScopeTransition(
+      { planHome: TEST_DIR, onMain: true },
+      targetSpecPath,
+      'scope: approve PAN-9 xBRIEF',
+    );
 
     expect(typeof warning === 'string' || warning === null).toBe(true);
     const { stdout: log } = await execFileAsync('git', ['log', '--format=%H'], { cwd: TEST_DIR });
     expect(log.trim().split('\n')).toHaveLength(2);
     const { stdout: changed } = await execFileAsync('git', ['diff', '--name-only', 'HEAD~1', 'HEAD'], { cwd: TEST_DIR });
     const changedPaths = changed.trim().split('\n').filter(Boolean);
-    expect(changedPaths.length).toBeGreaterThan(0);
-    expect(changedPaths.every((p) => p.startsWith('.pan/specs/'))).toBe(true);
+    expect(changedPaths).toEqual(['.pan/specs/PAN-9.xbrief.json']);
+    const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd: TEST_DIR });
+    expect(status).toContain('PAN-10.xbrief.json');
   });
 
   it('ac3: returns null and succeeds outside a git repository when onMain is false', async () => {
-    const warning = await finishScopeTransition({ planHome: TEST_DIR, onMain: false }, 'scope: approve PAN-9 xBRIEF');
+    const warning = await finishScopeTransition(
+      { planHome: TEST_DIR, onMain: false },
+      join(TEST_DIR, '.pan', 'specs', 'PAN-9.xbrief.json'),
+      'scope: approve PAN-9 xBRIEF',
+    );
 
     expect(warning).toBeNull();
     expect(existsSync(join(TEST_DIR, '.git'))).toBe(false);

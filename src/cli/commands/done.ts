@@ -39,7 +39,9 @@ import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { updateContinueState } from '../../lib/xbrief/continue-state.js';
-import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+import { commitPendingIssueArtifacts, commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+
+export { commitPendingIssueArtifacts };
 import { linkCreatedPullRequestToIssueConversations } from '../../lib/overdeck/conversation-pull-requests.js';
 
 const execAsync = promisify(exec);
@@ -269,27 +271,6 @@ export async function recordTestWaiver(workspacePath: string, reason: string): P
     paths: [join('.pan', 'continues')],
     message: planArtifactCommitMessage(issueId),
   });
-}
-
-/**
- * Commit any pending `.pan/continues/` or `.pan/specs/` changes the server
- * dirtied inside the workspace before `pan done` rebases — a dirty tracked
- * file makes `git rebase` refuse, and server writers (feedback, session
- * history, spec transitions) never commit their own writes (PAN-4225).
- */
-export async function commitPendingIssueArtifacts(workspacePath: string, issueId: string): Promise<void> {
-  const planHome = resolvePlanHome(workspacePath);
-  const paths = [join('.pan', 'continues'), join('.pan', 'specs')].filter((p) => existsSync(join(planHome, p)));
-  if (paths.length === 0) return;
-
-  const result = await commitPlanArtifacts({
-    cwd: planHome,
-    paths,
-    message: planArtifactCommitMessage(issueId),
-  });
-  if (!result.committed && result.reason !== 'nothing to commit') {
-    throw new Error(`Could not commit pending plan artifacts for ${issueId}: ${result.reason}`);
-  }
 }
 
 /**

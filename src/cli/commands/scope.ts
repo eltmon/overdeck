@@ -60,16 +60,22 @@ export function resolveScopeTarget(projectPath: string, issueId: string): ScopeT
  * checkout (the base workspace is gone) — the agent that would otherwise
  * commit it no longer exists. Returns a one-line warning to print, or null
  * when nothing needed committing (pattern: src/cli/commands/orders.ts).
+ *
+ * Stages only `specPath` (the transitioned issue's own spec file), not the
+ * whole `.pan/specs/` tree — a primary checkout can carry other issues'
+ * stray modified specs (PAN-4224), and this verb must not sweep those into
+ * its commit.
  */
 export async function finishScopeTransition(
   target: ScopeTransitionTarget,
+  specPath: string,
   message: string,
 ): Promise<string | null> {
   if (!target.onMain) return null;
 
   const commit = await commitPlanArtifacts({
     cwd: target.planHome,
-    paths: [join('.pan', 'specs')],
+    paths: [specPath],
     message,
   });
   if (!commit.committed && commit.reason !== 'nothing to commit') {
@@ -424,8 +430,8 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   }
 }
 
-async function printScopeWarning(target: ScopeTransitionTarget, message: string): Promise<void> {
-  const warning = await finishScopeTransition(target, message);
+async function printScopeWarning(target: ScopeTransitionTarget, specPath: string, message: string): Promise<void> {
+  const warning = await finishScopeTransition(target, specPath, message);
   if (warning) console.log(chalk.yellow(`⚠ ${warning}`));
 }
 
@@ -434,7 +440,7 @@ async function proposeCommand(issueId: string, options: { project?: string }): P
   const target = resolveScopeTarget(projectPath, issueId);
   const result = await transitionIssueXBrief(target.planHome, issueId, 'proposed', 'proposed');
   console.log(formatTransition(result, issueId));
-  await printScopeWarning(target, `scope: propose ${issueId.toUpperCase()} xBRIEF`);
+  await printScopeWarning(target, result.toPath, `scope: propose ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
@@ -442,7 +448,7 @@ async function approveCommand(issueId: string, options: { project?: string }): P
   const target = resolveScopeTarget(projectPath, issueId);
   const result = await transitionIssueXBrief(target.planHome, issueId, 'active', 'approved');
   console.log(formatTransition(result, issueId));
-  await printScopeWarning(target, `scope: approve ${issueId.toUpperCase()} xBRIEF`);
+  await printScopeWarning(target, result.toPath, `scope: approve ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
@@ -450,7 +456,7 @@ async function completeCommand(issueId: string, options: { project?: string }): 
   const target = resolveScopeTarget(projectPath, issueId);
   const result = await transitionIssueXBrief(target.planHome, issueId, 'completed', 'completed');
   console.log(formatTransition(result, issueId));
-  await printScopeWarning(target, `scope: complete ${issueId.toUpperCase()} xBRIEF`);
+  await printScopeWarning(target, result.toPath, `scope: complete ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
@@ -458,7 +464,7 @@ async function cancelCommand(issueId: string, options: { project?: string }): Pr
   const target = resolveScopeTarget(projectPath, issueId);
   const result = await transitionIssueXBrief(target.planHome, issueId, 'cancelled', 'cancelled');
   console.log(formatTransition(result, issueId));
-  await printScopeWarning(target, `scope: cancel ${issueId.toUpperCase()} xBRIEF`);
+  await printScopeWarning(target, result.toPath, `scope: cancel ${issueId.toUpperCase()} xBRIEF`);
 }
 
 async function restoreCommand(issueId: string, options: { project?: string }): Promise<void> {
@@ -475,7 +481,7 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
   }
   const result = await transitionIssueXBrief(target.planHome, issueId, 'active', 'approved');
   console.log(formatTransition(result, issueId));
-  await printScopeWarning(target, `scope: restore ${issueId.toUpperCase()} xBRIEF`);
+  await printScopeWarning(target, result.toPath, `scope: restore ${issueId.toUpperCase()} xBRIEF`);
 }
 
 export function registerScopeCommands(program: Command): void {
