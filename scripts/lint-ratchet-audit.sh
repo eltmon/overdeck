@@ -213,14 +213,7 @@ NODE
 
 commit_has_issue_ref() {
   local commit="$1"
-  local message
-  # Command substitution (not a pipe) so git fully exits before grep runs: a
-  # piped `git log | grep -q` lets grep exit as soon as it matches, and under
-  # `set -o pipefail` git's SIGPIPE from writing to the now-closed pipe (exit
-  # 141) becomes the pipeline's status even though grep found a match —
-  # intermittently misreporting a real issue reference as missing under load.
-  message=$(git log -1 --format=%B "$commit")
-  grep -Eq "$ISSUE_REF_RE" <<< "$message"
+  grep -Eq "$ISSUE_REF_RE" <<< "$(git log -1 --format=%B "$commit")"
 }
 
 audit_commit() {
