@@ -873,9 +873,51 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
 | `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail refused the auto-start |
 | `handoff.retried` / `.started` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
+| `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
+| `operator.decision-withdrawn` | `pan ask --withdraw` |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
+
+## Operator decisions (PAN-4383)
+
+A work agent that cannot continue without an operator decision runs
+`pan ask <ISSUE> "<question>" --option <a> --option <b> [--context <text>]`.
+The verb needs 2 to 4 non-empty options and exits 1 otherwise. It appends one
+`operator.decision-requested` entry to the issue's pipeline journal, recording
+the question, the options and the asking agent's id. `pan ask <ISSUE> --withdraw`
+appends `operator.decision-withdrawn` for the open request and exits 1 when
+there is none.
+
+Nothing stores "open". `src/lib/cloister/operator-decision.ts` derives it on
+read: the most recent `operator.decision-requested` entry is the open decision
+until a later `operator.decision-answered` or `operator.decision-withdrawn`
+entry carries the same `questionId`, or a later `verification.started` entry
+shows `pan done` ran. A newer request supersedes an older one.
+
+Every surface reads that one rule:
+
+- **Needs-you.** The enrichment poller reads the open decision on every 10 s
+  poll and reports it as a pending `askUserQuestion` on the asking agent, with
+  `toolUseId` `operator-decision:<questionId>`. The existing Needs-you panel,
+  answer dialog, TTS and desktop notification pick it up. The decision is exempt
+  from the PAN-1834 specialist suppression, because it is a fresh request, not
+  stale transcript state.
+- **Answering.** `POST /api/agents/:id/answer-question` delivers the answer
+  through `deliverAgentMessage` and appends `operator.decision-answered` only
+  when delivery returns `ok`. A failed delivery returns 502 and leaves the
+  decision open. Any other delivered operator message to the asking agent
+  (a dashboard message or `pan tell`) also answers it.
+- **Command Deck.** `deriveAttention` returns `needs-you` while a decision is
+  open, so the issue sits in the "Needs you" bucket instead of reading stuck.
+- **Parked population.** `classifyParked` emits an `operator-gate` row with
+  `gate: 'operator-decision'` instead of `idle-running`. The stall sweeper
+  re-surfaces it on its 24 h operator-gate TTL and never recommends a nudge or
+  a stop.
+
+The journal dies with the workspace, so an issue whose workspace is gone has no
+open decision.
 
 ## Deacon-lite: seven routines
 

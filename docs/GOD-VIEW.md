@@ -67,6 +67,7 @@ and status grounded in dashboard state.
 | Sweeper beam | A real parked-population scan (sweep.scan) crossing the Doldrums |
 | Thaw | A stale orb whose refreshed state confirms it is active again, returning to the river |
 | Signal flare | A parked orb only a human can release (sweep.escalated) |
+| Flare ring on the shelf | An issue whose agent asked the operator a decision with `pan ask` (needs you) |
 | Portal / wreck | Merge path into `main` and failed merge residue |
 | Flywheel sun / sequencer | Orchestration source and dispatch cadence |
 | Hook bus LED | A real event from a wired harness hook |

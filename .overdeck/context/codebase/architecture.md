@@ -142,7 +142,7 @@ Directory as `?view=history`.
 
 ## Awareness rail (Command Deck right column)
 
-`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`; Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
+`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`, fed by `lib/useDecisions.ts` (agent rows with non-empty `pendingInputKinds` from the 10 s enrichment poller `services/agent-enrichment-service.ts` → `computeAgentEnrichment` in `src/lib/agent-enrichment.ts`, which also surfaces an open `pan ask` decision from the workspace pipeline journal via `src/lib/cloister/operator-decision.ts` (PAN-4383), plus a 5 s poll of `/api/conversations/pending-input`); agent answers go to `POST /api/agents/:id/answer-question` (`routes/agents/permissions.ts`); Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
 
 ## Flywheel (PAN-3964, derived view)
 
@@ -157,4 +157,4 @@ imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
 Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
 
-<!-- last-verified: 2026-09-28 -->
+<!-- last-verified: 2026-09-29 -->
