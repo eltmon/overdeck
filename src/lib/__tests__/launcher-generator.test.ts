@@ -175,6 +175,20 @@ describe('generateLauncherScript', () => {
     expect(conversationScript).not.toContain('git-guard');
   });
 
+  it('gives conversations a gh-only shim when ghShim is set (PAN-4343)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      spawnMode: 'conversation',
+      overdeckEnv: { agentId: 'conv-123', issueId: 'PAN-806' },
+      ghShim: { id: 'conv-123', denyGrantLabels: false },
+      baseCommand: 'claude',
+    });
+    expect(script).toContain("conversations/conv-123/git-guard/gh' <<EOF");
+    expect(script).toContain('git-guard:$PATH"');
+    expect(script).not.toContain('_OVERDECK_REAL_GIT');
+    expect(script).not.toContain("/git-guard/git'");
+  });
+
   it('blocks history operations and passes permitted git commands to real git', () => {
     const { wrapperPath, worktree } = materializeGitGuard();
     const run = (args: string[]) => spawnSync(wrapperPath, args, {
@@ -485,6 +499,70 @@ describe('generateLauncherScript', () => {
       cat > '<OVERDECK_HOME>/agents/plan-abc/git-guard/gh' <<EOF
       #!/bin/sh
       _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
+      _overdeck_gh_refuse() {
+        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
+        exit 1
+      }
+      _overdeck_gh_grant_in() {
+        _og_list="\\$(printf '%s' "\\$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+        _og_ifs="\\$IFS"; IFS=','
+        for _og_v in \\$_og_list; do
+          case "\\$_og_v" in
+            released|auto-merge|hold-for-uat) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
+          esac
+        done
+        IFS="\\$_og_ifs"
+        return 1
+      }
+      case "\\$1:\\$2" in
+        issue:edit|issue:create|pr:edit|pr:create)
+          _og_next=0
+          for _og_arg in "\\$@"; do
+            if [ "\\$_og_next" = 1 ]; then
+              _og_next=0
+              _og_hit="\\$(_overdeck_gh_grant_in "\\$_og_arg")" && _overdeck_gh_refuse "\\$_og_hit"
+              continue
+            fi
+            case "\\$_og_arg" in
+              --add-label|--remove-label|--label|-l) _og_next=1 ;;
+              --add-label=*|--remove-label=*|--label=*)
+                _og_hit="\\$(_overdeck_gh_grant_in "\\\${_og_arg#*=}")" && _overdeck_gh_refuse "\\$_og_hit" ;;
+              -l?*)
+                _og_v="\\\${_og_arg#-l}"; _og_v="\\\${_og_v#=}"
+                _og_hit="\\$(_overdeck_gh_grant_in "\\$_og_v")" && _overdeck_gh_refuse "\\$_og_hit" ;;
+            esac
+          done
+          ;;
+        api:*)
+          _og_method=""; _og_fields=0; _og_hit=""; _og_next=0
+          for _og_arg in "\\$@"; do
+            if [ "\\$_og_next" = 1 ]; then _og_next=0; _og_method="\\$_og_arg"; continue; fi
+            case "\\$_og_arg" in
+              -X|--method) _og_next=1; continue ;;
+              --method=*) _og_method="\\\${_og_arg#--method=}" ;;
+              -X?*) _og_method="\\\${_og_arg#-X}" ;;
+              -f|-F|--field|--raw-field|--input|-f?*|-F?*|--field=*|--raw-field=*|--input=*) _og_fields=1 ;;
+            esac
+            _og_low="\\$(printf '%s' "\\$_og_arg" | tr '[:upper:]' '[:lower:]')"
+            case "\\$_og_low" in
+              *labels*=*|*issues/*/labels/*)
+                case "\\$_og_low" in
+                  *released*) _og_hit=released ;;
+                  *auto-merge*) _og_hit=auto-merge ;;
+                  *hold-for-uat*) _og_hit=hold-for-uat ;;
+                esac
+                ;;
+            esac
+          done
+          if [ -z "\\$_og_method" ]; then
+            if [ "\\$_og_fields" = 1 ]; then _og_method=POST; else _og_method=GET; fi
+          fi
+          _og_method="\\$(printf '%s' "\\$_og_method" | tr '[:lower:]' '[:upper:]')"
+          if [ -n "\\$_og_hit" ] && [ "\\$_og_method" != GET ]; then
+            _overdeck_gh_refuse "\\$_og_hit"
+          fi
+          ;;
+      esac
       _overdeck_gh_bucket=graphql
       if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi
       if [ "\\$OVERDECK_GH_METERED" != "1" ]; then
@@ -741,6 +819,70 @@ describe('generateLauncherScript', () => {
       cat > '<OVERDECK_HOME>/agents/spec-123/git-guard/gh' <<EOF
       #!/bin/sh
       _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
+      _overdeck_gh_refuse() {
+        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
+        exit 1
+      }
+      _overdeck_gh_grant_in() {
+        _og_list="\\$(printf '%s' "\\$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+        _og_ifs="\\$IFS"; IFS=','
+        for _og_v in \\$_og_list; do
+          case "\\$_og_v" in
+            released|auto-merge|hold-for-uat) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
+          esac
+        done
+        IFS="\\$_og_ifs"
+        return 1
+      }
+      case "\\$1:\\$2" in
+        issue:edit|issue:create|pr:edit|pr:create)
+          _og_next=0
+          for _og_arg in "\\$@"; do
+            if [ "\\$_og_next" = 1 ]; then
+              _og_next=0
+              _og_hit="\\$(_overdeck_gh_grant_in "\\$_og_arg")" && _overdeck_gh_refuse "\\$_og_hit"
+              continue
+            fi
+            case "\\$_og_arg" in
+              --add-label|--remove-label|--label|-l) _og_next=1 ;;
+              --add-label=*|--remove-label=*|--label=*)
+                _og_hit="\\$(_overdeck_gh_grant_in "\\\${_og_arg#*=}")" && _overdeck_gh_refuse "\\$_og_hit" ;;
+              -l?*)
+                _og_v="\\\${_og_arg#-l}"; _og_v="\\\${_og_v#=}"
+                _og_hit="\\$(_overdeck_gh_grant_in "\\$_og_v")" && _overdeck_gh_refuse "\\$_og_hit" ;;
+            esac
+          done
+          ;;
+        api:*)
+          _og_method=""; _og_fields=0; _og_hit=""; _og_next=0
+          for _og_arg in "\\$@"; do
+            if [ "\\$_og_next" = 1 ]; then _og_next=0; _og_method="\\$_og_arg"; continue; fi
+            case "\\$_og_arg" in
+              -X|--method) _og_next=1; continue ;;
+              --method=*) _og_method="\\\${_og_arg#--method=}" ;;
+              -X?*) _og_method="\\\${_og_arg#-X}" ;;
+              -f|-F|--field|--raw-field|--input|-f?*|-F?*|--field=*|--raw-field=*|--input=*) _og_fields=1 ;;
+            esac
+            _og_low="\\$(printf '%s' "\\$_og_arg" | tr '[:upper:]' '[:lower:]')"
+            case "\\$_og_low" in
+              *labels*=*|*issues/*/labels/*)
+                case "\\$_og_low" in
+                  *released*) _og_hit=released ;;
+                  *auto-merge*) _og_hit=auto-merge ;;
+                  *hold-for-uat*) _og_hit=hold-for-uat ;;
+                esac
+                ;;
+            esac
+          done
+          if [ -z "\\$_og_method" ]; then
+            if [ "\\$_og_fields" = 1 ]; then _og_method=POST; else _og_method=GET; fi
+          fi
+          _og_method="\\$(printf '%s' "\\$_og_method" | tr '[:lower:]' '[:upper:]')"
+          if [ -n "\\$_og_hit" ] && [ "\\$_og_method" != GET ]; then
+            _overdeck_gh_refuse "\\$_og_hit"
+          fi
+          ;;
+      esac
       _overdeck_gh_bucket=graphql
       if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi
       if [ "\\$OVERDECK_GH_METERED" != "1" ]; then

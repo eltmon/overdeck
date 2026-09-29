@@ -1,0 +1,629 @@
+{
+  "id": "fork-ensure-main-input",
+  "kind": "fork",
+  "source": "real session excerpt, overdeck PAN-4268, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01MfZeBXeqq8VgUgaH77m2We",
+            "name": "Bash",
+            "input": {
+              "command": "sed -n 1,60p src/lib/overdeck/__tests__/claude-readiness-herdr.test.ts; grep -n \"include\" vitest.config.* | head",
+              "description": "See how existing test mocks herdr/pane-io"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01MfZeBXeqq8VgUgaH77m2We",
+            "content": "/**\n * PAN-3921 x PAN-3827: on a Herdr host the Claude Code readiness wait reads the\n * visible screen through the backend and asks the backend-aware liveness door\n * at its deadline. A confirmed exit is a spawn error; an indeterminate probe is\n * not, and tmux is never asked.\n */\nimport { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n\nimport type { LivenessVerdict } from '../../agents/liveness.js';\n\nconst readAgentPaneText = vi.hoisted(() => vi.fn(async (_id: string, _lines: number, _backend?: unknown, _source?: string) => ''));\nconst isAlive = vi.hoisted(() => vi.fn(async (_id: string, _deps?: unknown): Promise<LivenessVerdict> => ({ alive: true, paneAlive: true })));\nconst tmuxExecAsync = vi.hoisted(() => vi.fn(async () => ({ stdout: '' })));\n\nvi.mock('../../terminal-backends/select.js', async (importOriginal) => ({\n  ...(await importOriginal<typeof import('../../te …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01LNbLGtvDc9pfjnzN6zbsK2",
+            "name": "Bash",
+            "input": {
+              "command": "mkdir -p ~/Projects/overdeck/workspaces/feature-pan-4268/src/lib/terminal-backends/__tests__ && cat > ~/Projects/overdeck/workspaces/feature-pan-4268/src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts <<'EOF'\n/**\n * PAN-4268: resolveAgentPaneIo binds one agent's pane reads and navigation keys\n * to the backend that holds it, and falls back to tmux on a Herdr host whose\n * agent Herdr does not hold — the same fallback deliverAgentMessage takes.\n */\nimport { beforeEach, describe, expect, it, vi } from 'vitest';\n\nimport type { TerminalBackend } from '../types.js' …[truncated]",
+              "description": "Write and run pane-io keys tests",
+              "timeout": 300000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01LNbLGtvDc9pfjnzN6zbsK2",
+            "content": "RUN  v4.1.11 ~/Projects/overdeck/workspaces/feature-pan-4268\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  11:56:25\n   Duration  4.82s (transform 1.18s, setup 15ms, import 172ms, tests 1.53s, environment 0ms)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01V7H3ZqWJijSh5aHWUYwUi4",
+            "name": "Bash",
+            "input": {
+              "command": "node -e '\nconst s=require(\"./.pan/specs/\"+require(\"fs\").readdirSync(\".pan/specs\").find(f=>f.includes(\"PAN-4268\")));\nconst walk=(items)=>items.forEach(i=>{console.log(i.id,\"|\",i.title,\"|\",(i.metadata&&i.metadata.dependsOn)||i.blockedBy||\"\");(i.subItems||i.items||[]).length&&walk(i.subItems||i.items)});\nwalk(s.plan.items||[]);'",
+              "description": "List xBRIEF items"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01V7H3ZqWJijSh5aHWUYwUi4",
+            "content": "selector-parser | Parse Claude Code's agent selector from a pane screen | \nselector-parser.ac1 | Given main-selected.txt, parseAgentSelector returns 2 rows with mainIndex 0, filledIndex 0, cursorIndex null and inputTargetFromSelector returns 'main' | \nselector-parser.ac2 | Given subagent-selected.txt, inputTargetFromSelector returns { subagent: 'Counter run' } and promptText is '' because 'Message @general-purpose…' counts as an empty prompt | \nselector-parser.ac3 | Given several-subagents.txt, the parser returns 4 rows, the grouped row has groupCount 3 and description 'Scanning handleConversationCreate for cwd defaults', and the target resolves to { subagent: 'Map the delivery door' } | \nselector-parser.ac4 | Given garbled.txt (rows without a main row), a screen with two filled rows, or fleet-view.txt (Claude Code's agents overview), inputTargetFromSelector returns 'unknown' | \nselector …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01P6KQnCsV6k7YUf59JR8XuW",
+            "name": "Bash",
+            "input": {
+              "command": "npx eslint src/lib/terminal-backends/agent-pane-io.ts src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts && git add src/lib/terminal-backends/agent-pane-io.ts src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts && git commit -q -F - <<'EOF'\nfeat(terminal): resolve one agent's pane read and key doors per backend\n\nresolveAgentPaneIo binds read and sendKey to whichever backend holds the\nagent's pane: Herdr pane.read (visible) and pane.send_keys when Herdr holds\nit, otherwise tmux capturePane and sendKeysAsync — including on a Herdr host\nwhose agent Herdr does not hold, the  …[truncated]",
+              "description": "Commit W2, push, complete, list tasks",
+              "timeout": 300000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01P6KQnCsV6k7YUf59JR8XuW",
+            "content": "✓ file-size guard passed at 5643f226c9490635c3063caa5436e433b8fa1031 (no new god files; no existing god file grew past origin/main)\npane-key-sender\tcompleted\nerror: unknown command 'list'"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "W2 is pushed and closed; starting W3, the ensure-main closed loop."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01N31gqsx6edpmFoXNZBXAg1",
+            "name": "Bash",
+            "input": {
+              "command": "pan task --help 2>&1 | head -20; pan task next PAN-4268",
+              "description": "Check task verbs and next item"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01N31gqsx6edpmFoXNZBXAg1",
+            "content": "Usage: overdeck task [options] [command]\n\nRead and update xBRIEF item state for one issue\n\nOptions:\n  -h, --help                        display help for command\n\nCommands:\n  next [options] <issue>\n  show [options] <issue> <item>\n  claim [options] <issue> <item>\n  done [options] <issue> <item>     Record an item as done. Requires a commit\n                                    carrying \"Item: <item>\" on a pushed branch.\n  block [options] <issue> <item>\n  unblock [options] <issue> <item>\n  reopen [options] <issue> <item>\n  cancel [options] <issue> <item>\n  help [command]                    display help for command\nensure-main\tpending\nread-model-input-target\tpending\ncomposer-notice\tpending"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01QG6VFbQ9tC46KjFpHrvrjj",
+            "name": "Bash",
+            "input": {
+              "command": "pan task show PAN-4268 selector-parser.ac1 2>&1 | head; pan task show PAN-4268 selector-parser 2>&1 | head -20; pan task claim PAN-4268 ensure-main | tail -1",
+              "description": "Check AC state and claim ensure-main"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01QG6VFbQ9tC46KjFpHrvrjj",
+            "content": "Task selector-parser.ac1 does not exist in the immutable xBRIEF for PAN-4268. Return the issue to planning to change scope.\nselector-parser\tcompleted\nensure-main\tin_progress"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Ru1FTBx6aFd751Vp8YNNZQ",
+            "name": "Bash",
+            "input": {
+              "command": "sed -n 1,30p src/lib/terminal-backends/herdr-api.ts | grep import; grep -n \"^import\" src/lib/terminal-backends/agent-pane-io.ts",
+              "description": "Check import graph of pane-io"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Ru1FTBx6aFd751Vp8YNNZQ",
+            "content": "import { createConnection } from 'net';\nimport { readFile } from 'fs/promises';\nimport { dirname, join } from 'path';\n14:import { Effect } from 'effect';\n16:import { getHerdrApiClient, type HerdrApiClient } from './herdr-api.js';\n17:import type { TerminalBackend } from './types.js';"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now appending the closed loop to the module."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01UH6q42VZkg7QDq99cg8gHi",
+            "name": "Bash",
+            "input": {
+              "command": "python3 - <<'PY'\np='src/lib/agents/input-target.ts'\ns=open(p).read()\ns=s.replace(\"\"\" * instead of misrouting silently.\n */\n\"\"\",\"\"\" * instead of misrouting silently.\n *\n * `ensureMainInputTarget` is the closed loop the composer route and\n * `messageAgent` run before pasting: it reads the pane, moves the filled dot\n * back to `main` with `Down`/`Up`/`Enter`/`Escape` only, re-reads after every\n * key, and refuses when the final read does not show input going to main.\n */\n\nimport { resolveAgentPaneIo, type AgentPaneIo, type SelectorKey } from '../terminal-backends/agent-pane-io.js';\n\"\"\",1)\ns+='''\n …[truncated]",
+              "description": "Append ensureMainInputTarget to input-target.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01UH6q42VZkg7QDq99cg8gHi",
+            "content": "268:        refuse('Pressing Enter on \"main\" did not switch Claude Code\\'s input to the main agent.');"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_015kopLy7nYmqnRK7YjkkTVA",
+            "name": "Bash",
+            "input": {
+              "command": "python3 - <<'PY'\np='src/lib/agents/input-target.ts'\ns=open(p).read()\ns=s.replace(\"\"\"  let readFailed = false;\n\n  const refuse = (reason: string): never => {\n    throw new EnsureMainRefusal(reason);\n  };\n\"\"\",\"\"\"  let readFailed = false;\n\"\"\",1)\ns=s.replace(\"\"\"class EnsureMainRefusal extends Error {}\n\"\"\",\"\"\"class EnsureMainRefusal extends Error {}\n\nfunction refuse(reason: string): never {\n  throw new EnsureMainRefusal(reason);\n}\n\"\"\",1)\nopen(p,'w').write(s)\nPY\nnpx tsc --noEmit -p tsconfig.json 2>&1 | grep -i \"input-target\\|agent-pane-io\" | head",
+              "description": "Hoist refuse and typecheck",
+              "timeout": 600000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_015kopLy7nYmqnRK7YjkkTVA",
+            "content": "(Bash completed with no output)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now the ensure-main tests with a scripted fake pane."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01NE4RBDjthLDkHrLZFwd98u",
+            "name": "Write",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4268/src/lib/agents/__tests__/input-target-ensure.test.ts",
+              "content": "/**\n * PAN-4268: ensureMainInputTarget against a scripted fake pane built from the\n * Claude Code 2.1.280 fixtures. Each key moves the fake pane to the frame the\n * live probe showed; a key with no scripted transition leaves the screen as it\n * was. `sleep` is a no-op, so no test waits on a real timer.\n */\nimport { readFileSync } from 'node:fs';\nimport { afterAll, describe, expect, it, vi } from 'vitest';\nimport type { SelectorKey } from '../../terminal-backends/agent-pane-io.js';\nimport { ensureMainInputTarget } from '../input-target.js';\n\nfunction fixture(name: string): string {\n  return rea …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01NE4RBDjthLDkHrLZFwd98u",
+            "content": "File created successfully at: ~/Projects/overdeck/workspaces/feature-pan-4268/src/lib/agents/__tests__/input-target-ensure.test.ts (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01MQobXfPhBrW1LhQj43dcNv",
+            "name": "Bash",
+            "input": {
+              "command": "python3 - <<'PY'\np='src/lib/agents/__tests__/input-target-ensure.test.ts'\ns=open(p).read()\ns=s.replace(\"import { afterAll, describe\",\"import { afterAll, afterEach, describe\")\ns=s.replace(\"\"\"describe('ensureMainInputTarget', () => {\n  afterAll\"\"\",\"\"\"describe('ensureMainInputTarget', () => {\n  afterEach(() => {\n    vi.restoreAllMocks();\n  });\n  afterAll\"\"\")\ns=s.replace(\"\"\"    expect(log).toHaveBeenCalledWith('[input-target] conv-x: switched input from subagent \"Counter run\" to main');\n    log.mockRestore();\n\"\"\",\"\"\"    expect(log).toHaveBeenCalledWith('[input-target] conv-x: switched input from s …[truncated]",
+              "description": "Run ensure and parser tests",
+              "timeout": 300000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01MQobXfPhBrW1LhQj43dcNv",
+            "content": "Test Files  2 passed (2)\n      Tests  27 passed (27)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01FhiZnLWMXpVNNwRMJrqmaH",
+            "name": "Bash",
+            "input": {
+              "command": "python3 - <<'PY'\np='src/lib/agents/input-target.ts'\ns=open(p).read()\nold=\"\"\"    if (state.cursorIndex !== null || inputTargetFromSelector(state) !== 'main') {\n      refuse('Claude Code kept keyboard focus in the agent selector, so the message was not sent.');\n    }\"\"\"\nnew=\"\"\"    if (state.cursorIndex !== null) {\n      refuse('Claude Code kept keyboard focus in the agent selector, so the message was not sent.');\n    }\n    if (inputTargetFromSelector(state) !== 'main') {\n      refuse(\"After leaving the agent selector, Claude Code's input was no longer on the main agent, so the message was not se …[truncated]",
+              "description": "Split final refusal, lint, check claude version",
+              "timeout": 300000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01FhiZnLWMXpVNNwRMJrqmaH",
+            "content": "LINT-OK\n2.1.280 (Claude Code)\n  --allow-dangerously-skip-permissions  Enable bypassing all permission checks\n                                        as an option, without it being enabled\n--\n  --dangerously-skip-permissions        Bypass all permission checks.\n                                        Recommended only for sandboxes with no\n--\n  --permission-mode <mode>              Permission mode to use for the session\n                                        (choices: \"acceptEdits\", \"auto\","
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now running the PRD's live checkpoint in a throwaway tmux socket (`pan4268verify`, scratch cwd, Claude Code 2.1.280 matches the fixtures)."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01KmLEqMGoXRE3WocA27nJz2",
+            "name": "Bash",
+            "input": {
+              "command": "S=/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4268/ca503810-4539-4e20-9b4f-8012e7a1e27b/scratchpad; mkdir -p $S/probe && cd $S/probe && git init -q 2>/dev/null; tmux -L pan4268verify new-session -d -s v -x 180 -y 45 -c $S/probe \"claude --model haiku\" && for i in $(seq 1 20); do out=$(tmux -L pan4268verify capture-pane -t v -p); echo \"$out\" | grep -qE \"trust|❯\" && break; sleep 1; done; tmux -L pan4268verify capture-pane -t v -p | grep -v '^$' | tail -25",
+              "description": "Start throwaway Claude Code probe session",
+              "timeout": 60000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01KmLEqMGoXRE3WocA27nJz2",
+            "content": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n Accessing workspace:\n /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4268/ca503810-4539-4e20-9b4f-8012e7a1e27b/scratchpad/probe\n Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to\n review what's in this folder first.\n Claude Code'll be able to read, edit, and execute files here.\n Security guide\n ❯ No, exit\n   Yes, I trust this folder\n Enter to confirm · Esc to cancel\nShell cwd was reset to ~/Projects/overdeck/workspaces/feature-pan-4268"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01YPmQtispYDjsp5m7DpMkwy",
+            "name": "Bash",
+            "input": {
+              "command": "T=\"tmux -L pan4268verify\"; $T send-keys -t v Down; sleep 0.5; $T send-keys -t v Enter; for i in $(seq 1 20); do $T capture-pane -t v -p | grep -q \"^❯\" && break; sleep 1; done; $T capture-pane -t v -p | grep -v '^$' | tail -12",
+              "description": "Accept trust prompt in throwaway session",
+              "timeout": 60000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01YPmQtispYDjsp5m7DpMkwy",
+            "content": "Exit code 1\nBLOCKED: tmux send-keys/paste-buffer targeting another tmux session (v) is forbidden (PAN-1084). Capture the pane with tmux -L overdeck capture-pane -t <session> -p and surface the issue via pan tell instead."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "The agent tmux-input guard (PAN-1084) blocks `send-keys` even to a throwaway socket, so I won't work around it. I'll record the live checkpoint as not run and keep the PRD's bounded-refusal fallback."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01TSeK3L42mCiLsd4Pbi8P2X",
+            "name": "Bash",
+            "input": {
+              "command": "tmux -L pan4268verify kill-server; cd ~/Projects/overdeck/workspaces/feature-pan-4268 && npx vitest run src/lib/agents/__tests__/input-target-ensure.test.ts 2>&1 | grep -E \"Tests|Test Files\"; git add src/lib/agents/input-target.ts src/lib/agents/__tests__/input-target-ensure.test.ts && git commit -q -F - <<'EOF'\nfeat(terminal): switch Claude Code's typed input back to the main agent\n\nensureMainInputTarget (PAN-4268 W3) reads the pane through\nresolveAgentPaneIo, leaves the fleet view with one Escape, enters the agent\nselector with up to four Down presses, moves the cursor to main, pr …[truncated]",
+              "description": "Kill probe, commit W3, push, complete",
+              "timeout": 300000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01TSeK3L42mCiLsd4Pbi8P2X",
+            "content": "Test Files  1 passed (1)\n      Tests  15 passed (15)\n✓ file-size guard passed at 4c6b60c577cad88aaf8e1fb9ac64dff9c398a693 (no new god files; no existing god file grew past origin/main)\nensure-main\tcompleted\ncomposer-route-ensure\tpending\nmessage-agent-ensure\tpending\nread-model-input-target\tpending\ncomposer-notice\tpending"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "W3 is pushed. Next is W4, the composer route."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Using a second tmux server with its own socket to bypass the guard was rejected; the bounded-refusal fallback stays instead. An earlier draft retried Enter up to five times; that was replaced by a single retry followed by a refusal."
+          }
+        ]
+      }
+    }
+  ],
+  "plantedFacts": [
+    {
+      "id": "w2",
+      "anyOf": [
+        [
+          "pane-key-sender"
+        ]
+      ]
+    },
+    {
+      "id": "ensure",
+      "anyOf": [
+        [
+          "ensureMainInputTarget"
+        ],
+        [
+          "ensure-main"
+        ]
+      ]
+    },
+    {
+      "id": "guard",
+      "anyOf": [
+        [
+          "PAN-1084"
+        ],
+        [
+          "send-keys",
+          "blocked"
+        ],
+        [
+          "live checkpoint"
+        ]
+      ]
+    },
+    {
+      "id": "fixtures",
+      "anyOf": [
+        [
+          "2.1.280"
+        ]
+      ]
+    },
+    {
+      "id": "next",
+      "anyOf": [
+        [
+          "composer-route-ensure"
+        ],
+        [
+          "composer route"
+        ]
+      ]
+    },
+    {
+      "id": "single-retry",
+      "anyOf": [
+        [
+          "single retry"
+        ],
+        [
+          "one retry"
+        ],
+        [
+          "retry",
+          "refus"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "second-socket",
+      "anchor": "second tmux server with its own socket"
+    },
+    {
+      "id": "five-retries",
+      "anchor": "retried Enter up to five times"
+    }
+  ]
+}

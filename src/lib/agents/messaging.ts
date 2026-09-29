@@ -481,7 +481,7 @@ export async function messageAgent(
     // buildPiCommand throws on missing piSessionDir, so the previous fallback
     // emitted a launcher that would crash on resume for any Pi role agent.
     const fallbackHarness = agentState.harness ?? 'claude-code';
-    const harnessLaunch = await prepareHarnessLaunch(fallbackHarness);
+    const harnessLaunch = await prepareHarnessLaunch(fallbackHarness, { model: resumeModel });
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),

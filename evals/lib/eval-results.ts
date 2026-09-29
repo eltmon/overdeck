@@ -1,0 +1,190 @@
+import { appendFileSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { EffortLevel } from '@overdeck/contracts';
+import type { EvalUsage } from './eval-usage.js';
+import type { PromptScenarioRun } from './prompt-harness.js';
+
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(moduleDir, '..', '..');
+
+/** Cross-run result store. Gitignored: runs are local and cost money; the posted table is the durable artifact. */
+export const DEFAULT_RESULTS_DIR = path.join(repoRoot, 'evals', 'results');
+
+export type EvalSuite = 'review-recall' | 'plan-quality' | 'summary-faithfulness' | 'feedback-acceptance';
+
+export interface EvalCaseRecord {
+  suite: EvalSuite;
+  caseId: string;
+  model: string;
+  provider: 'anthropic' | 'openai';
+  effort: EffortLevel | null;
+  openaiVia: 'api' | 'cliproxy' | null;
+  /** 0..1 */
+  score: number;
+  /** Suite-specific sub-scores. */
+  metrics: Record<string, number | null>;
+  usage: EvalUsage;
+  costUsd: number | null;
+  costBasis: 'api' | 'api-equivalent';
+  durationMs: number;
+  /** ISO 8601 */
+  recordedAt: string;
+}
+
+export function recordFromRun(
+  suite: EvalSuite,
+  caseId: string,
+  run: PromptScenarioRun,
+  score: number,
+  metrics: Record<string, number | null>,
+  now: Date = new Date(),
+): EvalCaseRecord {
+  return {
+    suite,
+    caseId,
+    model: run.model,
+    provider: run.provider,
+    effort: run.effort,
+    openaiVia: run.openaiVia,
+    score,
+    metrics,
+    usage: run.usage,
+    costUsd: run.costUsd,
+    costBasis: run.costBasis,
+    durationMs: run.durationMs,
+    recordedAt: now.toISOString(),
+  };
+}
+
+export function appendEvalRecord(record: EvalCaseRecord, resultsDir: string = DEFAULT_RESULTS_DIR): void {
+  mkdirSync(resultsDir, { recursive: true });
+  appendFileSync(path.join(resultsDir, `${record.suite}.jsonl`), `${JSON.stringify(record)}\n`, 'utf8');
+}
+
+export function parseEvalRecords(jsonl: string): EvalCaseRecord[] {
+  const records: EvalCaseRecord[] = [];
+  const lines = jsonl.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    if (line === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch (err) {
+      throw new Error(`Malformed eval record on line ${i + 1}: ${(err as Error).message}`);
+    }
+    const r = parsed as Partial<EvalCaseRecord> | null;
+    if (
+      !r ||
+      typeof r !== 'object' ||
+      typeof r.suite !== 'string' ||
+      typeof r.caseId !== 'string' ||
+      typeof r.model !== 'string' ||
+      typeof r.score !== 'number' ||
+      typeof r.recordedAt !== 'string' ||
+      !r.usage
+    ) {
+      throw new Error(`Malformed eval record on line ${i + 1}: missing suite, caseId, model, score, usage or recordedAt`);
+    }
+    records.push(r as EvalCaseRecord);
+  }
+  return records;
+}
+
+function caseKey(r: EvalCaseRecord): string {
+  return JSON.stringify([r.suite, r.model, r.effort, r.caseId]);
+}
+
+/** Latest recordedAt per (suite, model, effort, caseId). */
+export function latestRecords(records: EvalCaseRecord[]): EvalCaseRecord[] {
+  const latest = new Map<string, EvalCaseRecord>();
+  for (const r of records) {
+    const key = caseKey(r);
+    const existing = latest.get(key);
+    if (!existing || Date.parse(r.recordedAt) > Date.parse(existing.recordedAt)) {
+      latest.set(key, r);
+    }
+  }
+  return [...latest.values()];
+}
+
+/** Cases of `suite` where exactly one provider family has a record with metrics[metric] === 1. */
+export function singleFamilyFinds(
+  records: EvalCaseRecord[],
+  suite: EvalSuite,
+  metric: string,
+): { anthropic: string[]; openai: string[] } {
+  const families = new Map<string, Set<'anthropic' | 'openai'>>();
+  for (const r of latestRecords(records)) {
+    if (r.suite !== suite) continue;
+    const set = families.get(r.caseId) ?? new Set();
+    if (r.metrics[metric] === 1) set.add(r.provider);
+    families.set(r.caseId, set);
+  }
+  const result = { anthropic: [] as string[], openai: [] as string[] };
+  for (const [caseId, set] of [...families.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    if (set.size !== 1) continue;
+    const [family] = [...set];
+    result[family!].push(caseId);
+  }
+  return result;
+}
+
+export function renderPlacementTable(records: EvalCaseRecord[]): string {
+  const groups = new Map<string, EvalCaseRecord[]>();
+  for (const r of records) {
+    const key = JSON.stringify([r.suite, r.model, r.effort]);
+    const group = groups.get(key) ?? [];
+    group.push(r);
+    groups.set(key, group);
+  }
+
+  const rows = [...groups.values()]
+    .map((group) => {
+      const first = group[0]!;
+      const meanScore = group.reduce((sum, r) => sum + r.score, 0) / group.length;
+      const inputTokens = group.reduce(
+        (sum, r) => sum + r.usage.inputTokens + r.usage.cacheReadTokens + r.usage.cacheWriteTokens,
+        0,
+      );
+      const outputTokens = group.reduce((sum, r) => sum + r.usage.outputTokens, 0);
+      const cost = group.some((r) => r.costUsd === null)
+        ? 'n/a'
+        : group.reduce((sum, r) => sum + (r.costUsd ?? 0), 0).toFixed(4);
+      const costBasis = [...new Set(group.map((r) => r.costBasis))].sort().join(', ');
+      return {
+        suite: first.suite,
+        model: first.model,
+        effort: first.effort ?? 'n/a',
+        cells: [
+          first.suite,
+          first.model,
+          first.effort ?? 'n/a',
+          String(group.length),
+          meanScore.toFixed(3),
+          String(inputTokens),
+          String(outputTokens),
+          cost,
+          costBasis,
+        ],
+      };
+    })
+    .sort((a, b) => a.suite.localeCompare(b.suite) || a.model.localeCompare(b.model) || a.effort.localeCompare(b.effort));
+
+  const lines = [
+    '| Suite | Model | Effort | Cases | Mean score | Input tok | Output tok | Cost (USD) | Cost basis |',
+    '|---|---|---|---|---|---|---|---|---|',
+    ...rows.map((row) => `| ${row.cells.join(' | ')} |`),
+  ];
+
+  const finds = singleFamilyFinds(records, 'review-recall', 'recall');
+  lines.push(
+    '',
+    '### Review recall: blockers found by one family only',
+    '',
+    `- anthropic: ${finds.anthropic.length} (${finds.anthropic.join(', ')})`,
+    `- openai: ${finds.openai.length} (${finds.openai.join(', ')})`,
+  );
+  return `${lines.join('\n')}\n`;
+}

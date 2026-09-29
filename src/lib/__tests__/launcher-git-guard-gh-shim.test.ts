@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { buildGitGuardLines } from '../launcher-git-guard.js';
+import { buildConversationGhShimLines, buildGitGuardLines } from '../launcher-git-guard.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,5 +111,112 @@ describe('agent gh shim (PAN-4264)', () => {
     expect(ledgerLines()).toHaveLength(before + 1);
     expect(ledgerLines().at(-1)).toMatchObject({ caller: 'agent', bucket: 'rest' });
     expect(existsSync(join(elsewhere, 'github-quota'))).toBe(false);
+  });
+});
+
+describe('grant-label deny (PAN-4343)', () => {
+  async function runShim(args: string[], env: NodeJS.ProcessEnv = process.env) {
+    return execFileAsync('sh', [ghShim, ...args], { encoding: 'utf8', env })
+      .then(
+        ({ stdout, stderr }) => ({ code: 0, stdout, stderr }),
+        (e: { code?: number; stdout?: string; stderr?: string }) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }),
+      );
+  }
+
+  it.each([
+    [['issue', 'edit', '1', '--add-label', 'released']],
+    [['issue', 'edit', '1', '--add-label=Released']],
+    [['issue', 'edit', '1', '--add-label', 'bug, auto-merge']],
+    [['issue', 'edit', '1', '--remove-label', 'hold-for-uat']],
+    [['pr', 'edit', '5', '--add-label', 'auto-merge']],
+    [['issue', 'create', '--title', 't', '-l', 'released']],
+    [['pr', 'create', '-lhold-for-uat']],
+    [['api', 'repos/o/r/issues/1/labels', '-f', 'labels[]=released']],
+    [['api', '-X', 'DELETE', 'repos/o/r/issues/1/labels/hold-for-uat']],
+    [['api', '--method=post', 'repos/o/r/issues/1/labels', '-f', 'labels[]=AUTO-MERGE']],
+    [['api', 'repos/o/r/issues', '-f', 'title=t', '-f', 'labels[]=released']],
+    [['api', '-X', 'PATCH', 'repos/o/r/issues/1', '-F', 'labels[]=hold-for-uat']],
+  ])('refuses gh %j without running gh or counting it', async (args) => {
+    const before = ledgerLines().length;
+    const result = await runShim(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('operator grant label');
+    expect(ledgerLines()).toHaveLength(before);
+  });
+
+  it.each([
+    [['issue', 'edit', '1', '--add-label', 'bug']],
+    [['issue', 'edit', '1', '--title', 'released']],
+    [['api', 'repos/o/r/issues/1/labels']],
+    [['api', 'repos/o/r/issues/1/comments', '-f', 'body=released']],
+    [['api', 'repos/o/r/issues?labels=released']],
+    [['api', 'graphql', '-f', 'query=released']],
+  ])('passes gh %j through and counts it', async (args) => {
+    const before = ledgerLines().length;
+    const result = await runShim(args);
+    expect(result.code).toBe(3);
+    expect(result.stdout).toBe(`real-gh ${args.join(' ')}\n`);
+    expect(ledgerLines()).toHaveLength(before + 1);
+  });
+
+  it('refuses even when OVERDECK_GH_METERED=1', async () => {
+    const result = await runShim(['issue', 'edit', '1', '--add-label', 'released'], { ...process.env, OVERDECK_GH_METERED: '1' });
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('operator grant label');
+  });
+});
+
+describe('conversation gh shim (PAN-4343)', () => {
+  function install(conversationId: string, deny: boolean, path = `${fakeBin}:${process.env.PATH ?? ''}`): string {
+    execFileSync('bash', ['-ec', buildConversationGhShimLines(conversationId, deny).join('\n')], {
+      cwd: home,
+      stdio: 'ignore',
+      env: { ...process.env, PATH: path },
+    });
+    return join(home, 'conversations', conversationId, 'git-guard');
+  }
+
+  async function run(shim: string, args: string[]) {
+    return execFileAsync('sh', [shim, ...args], { encoding: 'utf8' })
+      .then(
+        ({ stdout }) => ({ code: 0, stdout }),
+        (e: { code?: number; stdout?: string }) => ({ code: e.code, stdout: e.stdout }),
+      );
+  }
+
+  it('writes only a gh shim in the conversation guard dir', () => {
+    const guardDir = install('conv-42', false);
+    expect(existsSync(join(guardDir, 'gh'))).toBe(true);
+    expect(existsSync(join(guardDir, 'git'))).toBe(false);
+  });
+
+  it('passes grant-label writes through for an operator conversation and counts them', async () => {
+    const shim = join(install('conv-42', false), 'gh');
+    for (const label of ['released', 'bug']) {
+      const result = await run(shim, ['issue', 'edit', '1', '--add-label', label]);
+      expect(result.code).toBe(3);
+      expect(result.stdout).toBe(`real-gh issue edit 1 --add-label ${label}\n`);
+    }
+    expect(ledgerLines().at(-1)).toMatchObject({ caller: 'agent', agent: 'conv-42' });
+  });
+
+  it('refuses grant-label writes for the Flywheel conversation', async () => {
+    const shim = join(install('conv-flywheel', true), 'gh');
+    expect((await run(shim, ['issue', 'edit', '1', '--add-label', 'released'])).code).toBe(1);
+    expect(await run(shim, ['issue', 'edit', '1', '--add-label', 'bug']))
+      .toEqual({ code: 3, stdout: 'real-gh issue edit 1 --add-label bug\n' });
+  });
+
+  it('bakes the real gh, not an inherited guard dir shim', () => {
+    const inherited = join(home, 'inherited', 'git-guard');
+    mkdirSync(inherited, { recursive: true });
+    writeFileSync(join(inherited, 'gh'), '#!/bin/sh\necho "inherited-shim $*"\n');
+    chmodSync(join(inherited, 'gh'), 0o755);
+
+    const shim = readFileSync(join(install('conv-inherit', false, `${inherited}:${fakeBin}:${process.env.PATH ?? ''}`), 'gh'), 'utf8');
+    expect(shim).toContain(`_OVERDECK_REAL_GH="${join(fakeBin, 'gh')}"`);
+    expect(shim).not.toContain(inherited);
   });
 });

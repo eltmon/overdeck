@@ -95,9 +95,16 @@ export function hasPendingInput(agent: AgentSnapshot): boolean {
  * planning finishes (agent-enrichment.ts adds the kind for interactive roles),
  * so simple mode must not read it as an open question. Unknown/absent kinds
  * stay conservative and report false.
+ *
+ * PAN-4371 — a confident Jev turn-end reading of `asks_operator` overrides
+ * this to false: the server only attaches `turnEndAssessment` above
+ * TURN_END_MIN_CONFIDENCE, so a real prose question is no longer mistaken
+ * for a bare turn end.
  */
 export function isBareTurnEnd(agent: AgentSnapshot): boolean {
   if (agent.pendingAskUserQuestion || agent.pendingProposedPlan) return false;
+  // PAN-4371 — the server attaches this only above TURN_END_MIN_CONFIDENCE.
+  if (agent.turnEndAssessment?.kind === 'asks_operator') return false;
   const kinds = agent.pendingInputKinds ?? [];
   return kinds.length > 0 && kinds.every((k) => k === 'agentTurnEnded');
 }

@@ -80,6 +80,7 @@ import { webhooksRouteLayer } from './routes/webhooks.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
+import { claudeCodeRouteLayer } from './routes/claude-code.js';
 import { linearMcpAuthRouteLayer } from './routes/linear-mcp-auth.js';
 import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
@@ -388,6 +389,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   hooksRouteLayer,
   diffsRouteLayer,
   codexAuthRouteLayer,
+  claudeCodeRouteLayer,
   linearMcpAuthRouteLayer,
   terminalsRouteLayer,
   discoveredSessionsRouteLayer,

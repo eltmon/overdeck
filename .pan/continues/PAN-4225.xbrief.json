@@ -1,0 +1,261 @@
+{
+  "version": "1",
+  "issueId": "PAN-4225",
+  "created": "2026-09-29T02:27:12.817Z",
+  "updated": "2026-09-29T04:41:08.199Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "continue-adapters-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T02:27:12.817Z",
+      "doneAt": "2026-09-29T02:43:00.121Z"
+    },
+    "continue-write-hardening": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T02:43:24.228Z",
+      "doneAt": "2026-09-29T02:53:19.719Z"
+    },
+    "feedback-writer-plan-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T02:53:24.085Z",
+      "doneAt": "2026-09-29T03:10:58.411Z"
+    },
+    "transition-rename": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:11:04.245Z",
+      "doneAt": "2026-09-29T03:33:50.969Z"
+    },
+    "start-transition-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:34:02.324Z",
+      "doneAt": "2026-09-29T03:37:40.363Z"
+    },
+    "closeout-skip-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:37:45.128Z",
+      "doneAt": "2026-09-29T03:47:21.450Z"
+    },
+    "cancel-spec-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:47:25.958Z",
+      "doneAt": "2026-09-29T03:50:46.436Z"
+    },
+    "scope-verbs-plan-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:50:51.359Z",
+      "doneAt": "2026-09-29T03:54:41.592Z"
+    },
+    "done-commit-pending-artifacts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:54:46.145Z",
+      "doneAt": "2026-09-29T03:58:31.374Z"
+    },
+    "continue-readers-plan-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T03:58:36.363Z",
+      "doneAt": "2026-09-29T04:10:16.353Z"
+    },
+    "slot-ledger-base-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T04:10:22.995Z",
+      "doneAt": "2026-09-29T04:13:46.026Z"
+    },
+    "docs-plan-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T04:13:58.867Z",
+      "doneAt": "2026-09-29T04:17:15.952Z"
+    },
+    "continue-adapters-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:53.923Z"
+    },
+    "continue-adapters-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:29:52.011Z"
+    },
+    "continue-adapters-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:30:23.511Z"
+    },
+    "continue-adapters-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:30:59.607Z"
+    },
+    "continue-adapters-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:29.315Z"
+    },
+    "continue-write-hardening.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:43.960Z"
+    },
+    "continue-write-hardening.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:59.682Z"
+    },
+    "continue-write-hardening.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:32:13.664Z"
+    },
+    "continue-write-hardening.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:32:26.328Z"
+    },
+    "feedback-writer-plan-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:32:38.949Z"
+    },
+    "feedback-writer-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:32:52.484Z"
+    },
+    "feedback-writer-plan-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:05.681Z"
+    },
+    "feedback-writer-plan-home.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:18.698Z"
+    },
+    "transition-rename.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:33.558Z"
+    },
+    "transition-rename.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:33:47.299Z"
+    },
+    "transition-rename.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:02.162Z"
+    },
+    "transition-rename.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:16.461Z"
+    },
+    "transition-rename.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:31.205Z"
+    },
+    "start-transition-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:44.095Z"
+    },
+    "start-transition-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:34:58.684Z"
+    },
+    "start-transition-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:35:12.386Z"
+    },
+    "closeout-skip-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:35:26.123Z"
+    },
+    "closeout-skip-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:35:39.317Z"
+    },
+    "closeout-skip-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:35:53.334Z"
+    },
+    "cancel-spec-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:06.823Z"
+    },
+    "cancel-spec-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:20.280Z"
+    },
+    "cancel-spec-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:33.750Z"
+    },
+    "scope-verbs-plan-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:41:08.199Z"
+    },
+    "scope-verbs-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:50.103Z"
+    },
+    "scope-verbs-plan-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:37:06.430Z"
+    },
+    "done-commit-pending-artifacts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:37:23.975Z"
+    },
+    "done-commit-pending-artifacts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:37:40.424Z"
+    },
+    "done-commit-pending-artifacts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:37:54.926Z"
+    },
+    "done-commit-pending-artifacts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:38:09.416Z"
+    },
+    "continue-readers-plan-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:38:25.981Z"
+    },
+    "continue-readers-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:38:39.556Z"
+    },
+    "continue-readers-plan-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:38:53.694Z"
+    },
+    "slot-ledger-base-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:06.882Z"
+    },
+    "slot-ledger-base-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:19.996Z"
+    },
+    "slot-ledger-base-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:33.241Z"
+    },
+    "docs-plan-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:46.009Z"
+    },
+    "docs-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:59.776Z"
+    },
+    "docs-plan-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:40:21.805Z"
+    },
+    "docs-plan-home.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:40:36.205Z"
+    }
+  }
+}

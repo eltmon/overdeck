@@ -422,6 +422,56 @@ describe('computeAgentEnrichment interactive turn-end', () => {
   })
 })
 
+describe('computeAgentEnrichment turnEndAssessment attachment (PAN-4371)', () => {
+  const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  function arrange(role: string, agentId: string, state: string) {
+    const agentDir = makeAgentDir(role)
+    vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentState>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state, resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
+    return agentDir
+  }
+
+  it('ac1: with no fifth argument, the idle conv-pan-1 shape is unchanged and carries no turnEndAssessment key', async () => {
+    const agentId = 'conv-pan-1'
+    const dir = arrange('', agentId, 'idle')
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+
+    expect(JSON.stringify(e)).toMatchInlineSnapshot(`"{"hasPendingQuestion":true,"pendingQuestionCount":0,"pendingQuestionPrompt":"Agent finished its turn and is waiting for your reply","pendingQuestionReason":"other","pendingInputCount":1,"pendingInputKinds":["agentTurnEnded"],"resolution":"working","resolutionCount":0,"jsonlScan":{"askUserQuestions":[],"enterPlanModeOpen":false,"exitPlanModePending":false}}"`)
+    expect('turnEndAssessment' in e).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('ac2: with an assessment, an idle conv-pan-1 agent returns it and pendingInputKinds equals [agentTurnEnded]', async () => {
+    const agentId = 'conv-pan-1'
+    const dir = arrange('', agentId, 'idle')
+    const assessment = { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' }
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN, assessment)
+
+    expect(e.turnEndAssessment).toEqual(assessment)
+    expect(e.pendingInputKinds).toEqual(['agentTurnEnded'])
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('ac3: an idle work-role agent (not interactive) given an assessment has no turnEndAssessment key', async () => {
+    const agentId = 'agent-pan-4371'
+    const dir = arrange('work', agentId, 'idle')
+    const assessment = { kind: 'reports_complete', confidence: 0.95, needsAnswer: false, model: 'm' }
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN, assessment)
+
+    expect('turnEndAssessment' in e).toBe(false)
+    expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
+
 /**
  * The plan payload was a dead wire: the scan produced it and the poller emitted
  * `enrichment.pendingProposedPlan`, but the field was never on AgentEnrichment,

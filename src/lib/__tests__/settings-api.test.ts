@@ -600,6 +600,22 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('dashscope: dashscope-test-key');
   });
 
+  it('persists the TypeSafe API key (PAN-4369)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      api_keys: {
+        ...settings.api_keys,
+        typesafe: 'typesafe-test-key',
+      },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('typesafe: typesafe-test-key');
+  });
+
   it('persists RTK agent settings without removing existing agent settings', async () => {
     mockReadFile.mockResolvedValue('agents:\n  caveman:\n    enabled: true\n');
     mockLoadConfig.mockReturnValue(baseConfig({ rtk: { enabled: true } }));

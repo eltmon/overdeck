@@ -348,7 +348,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       role: agentState.role,
       model,
     });
-    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
+    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness, { model });
     const legacyHarnessMigrated =
       !hasSessionOrigin && priorHarness !== undefined && priorHarness !== effectiveHarness;
     agentState.harness = effectiveHarness;

@@ -26,6 +26,15 @@ the vendor cleanup roots. The repository password is in the sibling `password`
 file with mode 0600. Preserve both when moving or backing up this machine.
 Settings originals and their source paths live in `settings-backups/`.
 
+## Off-machine copies: Session Vault
+
+Restic snapshots protect the local disk. Off-machine copies of transcripts are the
+Session Vault (`pan vault`): each conversation is saved as encrypted chunks in a git
+remote you own, can be resumed on another machine, and can be restored byte for byte
+with `pan vault restore <id>`. See [SESSION-VAULT.md](SESSION-VAULT.md). The vault
+never deletes a transcript on its own; the opt-in eviction flow deletes only what the
+operator confirms by fingerprint.
+
 ## Install on a Linux host
 
 Requires Python 3, Restic 0.16 or newer, and a user systemd manager. From the

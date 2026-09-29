@@ -313,10 +313,20 @@ export function harnessPathExport(resolvedBinary: string): string {
   return `export PATH=${shellQuote(dirname(resolvedBinary))}:"$PATH"`;
 }
 
+export interface HarnessLaunchOptions extends ExecutableResolutionOptions {
+  /** Model the launch will run; claude-code launches check its minimum Claude Code version (PAN-4359). */
+  model?: string;
+}
+
 export async function prepareHarnessLaunch(
   harness: RuntimeName,
-  options?: ExecutableResolutionOptions,
+  options?: HarnessLaunchOptions,
 ): Promise<{ binaryPath: string; pathExport: string }> {
-  const binaryPath = await requireHarnessBinary(harness, options);
+  const { model, ...resolution } = options ?? {};
+  const binaryPath = await requireHarnessBinary(harness, resolution);
+  if (harness === 'claude-code') {
+    const { assertClaudeCodeSupportsModel } = await import('./claude-code/requirements.js');
+    await assertClaudeCodeSupportsModel(binaryPath, model);
+  }
   return { binaryPath, pathExport: harnessPathExport(binaryPath) };
 }

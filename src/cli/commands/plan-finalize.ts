@@ -20,6 +20,7 @@ import { evaluateCritiqueGate, type CritiqueGateResult } from '../../lib/plannin
 import { isPlanFlagged, loadCritiqueGateInput } from '../../lib/planning/plan-critique-io.js';
 import { resolvePlanCritic } from '../../lib/planning/plan-critic-model.js';
 import { dispatchPlanCritic } from '../../lib/planning/plan-critic-dispatch.js';
+import { reviewAcceptanceCriteria } from '../../lib/jev/acceptance-criteria.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -349,7 +350,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       }
       return exitCli(3);
     }
-    const warnings = qualityGate.issues.filter(issue => issue.severity === 'warn');
+    const acReview = await reviewAcceptanceCriteria(planDoc);
+    const warnings = [...qualityGate.issues.filter(issue => issue.severity === 'warn'), ...acReview.issues];
     if (warnings.length > 0) {
       if (options.json) {
         console.error(JSON.stringify({ qualityWarnings: warnings }));
@@ -359,6 +361,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
           console.error(chalk.yellow('  ' + line));
         }
       }
+    }
+    if (acReview.status === 'failed' && !options.json) {
+      console.error(chalk.dim(`ℹ Jev acceptance-criteria review did not run (${acReview.reason})`));
     }
   }
   if (!options.json) {

@@ -42,6 +42,9 @@ export const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
   sessionEmbeddings: 'background:sessionEmbeddings',
   summaryFork: 'background:summaryFork',
   ttsSummarizer: 'background:ttsSummarizer',
+  jevTurnEndAssessment: 'background:jevTurnEndAssessment',
+  jevAcceptanceCriteriaReview: 'background:jevAcceptanceCriteriaReview',
+  jevMemoryRelevance: 'background:jevMemoryRelevance',
 };
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
