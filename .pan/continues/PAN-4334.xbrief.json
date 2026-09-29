@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T00:46:06.120Z",
+  "updated": "2026-09-29T00:53:47.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "pack-adapters": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4334",
-      "claimedAt": "2026-09-29T00:46:06.120Z"
+      "claimedAt": "2026-09-29T00:46:06.120Z",
+      "doneAt": "2026-09-29T00:53:47.540Z"
     }
   }
 }
