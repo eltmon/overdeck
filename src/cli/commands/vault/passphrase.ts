@@ -4,8 +4,8 @@
  * `set` wraps the vault key under a passphrase and stores it on the backend
  * as the reserved slot `keywrap/v1`, so `pan vault join` on a new machine can
  * ask for the passphrase instead of the 24-word recovery phrase. `remove`
- * deletes the slot. The vault key never changes, so the recovery phrase keeps
- * working either way.
+ * deletes the slot. Neither changes the vault key, so the recovery phrase
+ * keeps working either way; only `pan vault rotate-key` replaces the key.
  */
 import { loadVaultKey } from '../../../lib/vault/identity.js';
 import { wrapVaultKey } from '../../../lib/vault/keywrap.js';
