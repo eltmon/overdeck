@@ -10,12 +10,16 @@
  * tagged, the issue view opens filtered to what matters, the global page
  * names the projects and issues that override a skill, and a failed save
  * shows an inline error with Retry on its own row.
+ *
+ * Skill packs (PAN-4334) render above the skill list in SkillPacksSection
+ * when the response carries `packs`.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Lock } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
+import { SkillPacksSection, type PackState } from './SkillPacksSection';
 
 export type SkillOverrideLevel = 'global' | 'project' | 'issue';
 type Source = 'core' | 'global' | 'project' | 'issue' | 'default';
@@ -37,6 +41,8 @@ interface SkillStatesResponse {
   issue: string | null;
   skills: SkillState[];
   overriddenBelow?: Record<string, { projects: string[]; issues: string[] }>;
+  packs?: PackState[];
+  packOverriddenBelow?: Record<string, { projects: string[]; issues: string[] }>;
 }
 
 interface SaveResult {
@@ -192,6 +198,16 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
         <p className="text-sm text-muted-foreground" data-testid="skills-changed-since-launch">
           Skills changed since launch; applies next launch ({liveAgents.join(', ')} running).
         </p>
+      )}
+
+      {data && Array.isArray(data.packs) && (
+        <SkillPacksSection
+          level={level}
+          projectKey={projectKey}
+          issueId={issueId}
+          packs={data.packs}
+          packOverriddenBelow={data.packOverriddenBelow}
+        />
       )}
 
       {data && (

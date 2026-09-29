@@ -382,6 +382,18 @@ pan skills list --project <key> --issue <id>
 
 # Turn a skill on, off, or back to inherit (global unless --project/--issue)
 pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
+
+# Skill packs: turn a whole pack or one pack skill on, off, or back to inherit
+pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
+pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
+
+# Register, update, inspect, and cache skill packs pinned to a commit
+pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]
+pan skills pack update <id> [--ref <ref>] [--yes]
+pan skills pack list [--json] [--offline]
+pan skills pack remove <id>
+pan skills pack sync [id]
+pan skills pack gc [--max-age-days <n>]
 ```
 
 ### Release Commands

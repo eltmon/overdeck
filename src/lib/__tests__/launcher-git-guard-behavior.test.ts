@@ -337,3 +337,254 @@ describe('read-only mode guards the whole repository (review of #4027)', () => {
     expect(run(['commit', '--allow-empty', '-m', 'x'], fixtureRepo).status).toBe(0);
   });
 });
+
+describe('branch check (PAN-4337)', () => {
+  let origin: string;
+  let primary: string;
+  let workspace: string;
+  let item: string;
+  let nested: string;
+  let wrapper: string;
+  let strikeWs: string;
+  let slotWs: string;
+  let bcWorkspaceShim: string;
+  let bcItemShim: string;
+  let bcWrapperShim: string;
+  let bcStrikeShim: string;
+  let bcSlotShim: string;
+
+  const env = {
+    ...process.env,
+    OVERDECK_PAN_GIT_OP: '',
+    GIT_AUTHOR_NAME: 'guard', GIT_AUTHOR_EMAIL: 'guard@example.test',
+    GIT_COMMITTER_NAME: 'guard', GIT_COMMITTER_EMAIL: 'guard@example.test',
+  };
+
+  function run(shim: string, args: string[], cwd: string): GuardRunResult {
+    const result = spawnSync(shim, args, { cwd, encoding: 'utf8', env });
+    return { status: result.status ?? 1, stderr: result.stderr ?? '' };
+  }
+
+  function realGit(args: string[], cwd: string): string {
+    return execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  }
+
+  function checkoutOther(cwd: string, branch: string) {
+    realGit(['checkout', '--quiet', '--ignore-other-worktrees', branch], cwd);
+  }
+
+  function detach(cwd: string) {
+    realGit(['checkout', '--quiet', '--detach'], cwd);
+  }
+
+  beforeAll(() => {
+    origin = join(home, 'bc-origin.git');
+    execFileSync('git', ['init', '--bare', '--quiet', origin], { stdio: 'ignore' });
+
+    primary = join(home, 'bc-primary');
+    execFileSync('git', ['init', '--quiet', '-b', 'main', primary], { stdio: 'ignore' });
+    writeFileSync(join(primary, 'README.md'), 'x\n');
+    realGit(['add', 'README.md'], primary);
+    realGit(['commit', '--quiet', '-m', 'init'], primary);
+    realGit(['remote', 'add', 'origin', origin], primary);
+
+    workspace = join(primary, 'workspaces', 'feature-pan-1');
+    realGit(['worktree', 'add', '--quiet', '-b', 'feature/pan-1', workspace, 'main'], primary);
+    mkdirSync(join(workspace, 'src'), { recursive: true });
+
+    item = join(workspace, '.swarm', 'w1');
+    realGit(['worktree', 'add', '--quiet', '-b', 'feature/pan-1-w1', item, 'feature/pan-1'], workspace);
+
+    nested = join(workspace, '.claude', 'worktrees', 'agent-x');
+    realGit(['worktree', 'add', '--quiet', '-b', 'worktree-agent-x', nested, 'feature/pan-1'], workspace);
+
+    wrapper = join(home, 'wrapper-ws', 'feature-pan-2');
+    execFileSync('git', ['init', '--quiet', '-b', 'master', wrapper], { stdio: 'ignore' });
+
+    // pan strike (strike.ts:122): workspace basename ends in `-strike`, on `strike/<id>`.
+    strikeWs = join(primary, 'workspaces', 'feature-pan-9-strike');
+    realGit(['worktree', 'add', '--quiet', '-b', 'strike/pan-9', strikeWs, 'main'], primary);
+
+    // Blocked-slot replacement (swarm-blocked-slot.ts:112-115): the slot
+    // directory is reused on a fresh `feature/<id>-slot-<n>-attempt-<ts>` branch.
+    slotWs = join(primary, 'workspaces', 'feature-pan-8-slot-1');
+    realGit(['worktree', 'add', '--quiet', '-b', 'feature/pan-8-slot-1-attempt-20260929010203', slotWs, 'main'], primary);
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-workspace', workspace).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcWorkspaceShim = join(home, 'agents', 'bc-workspace', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-item', item).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcItemShim = join(home, 'agents', 'bc-item', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-wrapper', wrapper).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcWrapperShim = join(home, 'agents', 'bc-wrapper', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-strike', strikeWs).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcStrikeShim = join(home, 'agents', 'bc-strike', 'git-guard', 'git');
+
+    execFileSync('bash', ['-ec', buildGitGuardLines('bc-slot', slotWs).join('\n')], { cwd: home, stdio: 'ignore' });
+    bcSlotShim = join(home, 'agents', 'bc-slot', 'git-guard', 'git');
+  });
+
+  it('exits 0 on commit on the expected branch', () => {
+    expect(run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], workspace).status).toBe(0);
+  });
+
+  it('exits 0 on push to the expected branch, and it reaches origin', () => {
+    const result = run(bcWorkspaceShim, ['push', 'origin', 'feature/pan-1'], workspace);
+    expect(result.status).toBe(0);
+    expect(() =>
+      execFileSync('git', ['--git-dir', origin, 'rev-parse', '--verify', 'refs/heads/feature/pan-1'], {
+        stdio: 'ignore',
+      }),
+    ).not.toThrow();
+  });
+
+  it('refuses commit when the workspace has drifted to main', () => {
+    checkoutOther(workspace, 'main');
+    try {
+      const result = run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], workspace);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('feature/pan-1');
+      expect(result.stderr).toContain('branch main');
+      expect(result.stderr).not.toContain('OVERDECK_PAN_GIT_OP');
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('refuses push when the workspace has drifted to main', () => {
+    checkoutOther(workspace, 'main');
+    try {
+      const result = run(bcWorkspaceShim, ['push', 'origin', 'main'], workspace);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('feature/pan-1');
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('refuses merge and cherry-pick when the workspace has drifted to main', () => {
+    const sha = realGit(['rev-parse', 'feature/pan-1'], workspace);
+    checkoutOther(workspace, 'main');
+    try {
+      const mergeResult = run(bcWorkspaceShim, ['merge', 'feature/pan-1-w1'], workspace);
+      expect(mergeResult.status).toBe(1);
+      expect(mergeResult.stderr).toContain('feature/pan-1');
+
+      const cherryResult = run(bcWorkspaceShim, ['cherry-pick', sha], workspace);
+      expect(cherryResult.status).toBe(1);
+      expect(cherryResult.stderr).toContain('feature/pan-1');
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('refuses commit from a subdirectory of the drifted workspace', () => {
+    checkoutOther(workspace, 'main');
+    try {
+      const result = run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], join(workspace, 'src'));
+      expect(result.status).toBe(1);
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('refuses commit on a detached HEAD and names it', () => {
+    detach(workspace);
+    try {
+      const result = run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], workspace);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('detached');
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('does not check merge-base (not a guarded subcommand)', () => {
+    checkoutOther(workspace, 'main');
+    try {
+      const result = run(bcWorkspaceShim, ['merge-base', 'HEAD', 'main'], workspace);
+      expect(result.status).toBe(0);
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('exits 0 on commit in the item worktree on its own branch', () => {
+    expect(run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], item).status).toBe(0);
+  });
+
+  it('refuses commit in the item worktree when it has drifted to the workspace branch', () => {
+    checkoutOther(item, 'feature/pan-1');
+    try {
+      const result = run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], item);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('feature/pan-1-w1');
+    } finally {
+      checkoutOther(item, 'feature/pan-1-w1');
+    }
+  });
+
+  it('bc-item shim guards the item worktree directly', () => {
+    expect(run(bcItemShim, ['commit', '--allow-empty', '-m', 'x'], item).status).toBe(0);
+    checkoutOther(item, 'feature/pan-1');
+    try {
+      expect(run(bcItemShim, ['commit', '--allow-empty', '-m', 'x'], item).status).toBe(1);
+    } finally {
+      checkoutOther(item, 'feature/pan-1-w1');
+    }
+  });
+
+  it('has no expectation for a nested Claude Code isolation worktree', () => {
+    expect(run(bcWorkspaceShim, ['commit', '--allow-empty', '-m', 'x'], nested).status).toBe(0);
+  });
+
+  it('has no expectation for -C into an unrelated fixture repo', () => {
+    expect(run(bcWorkspaceShim, ['-C', fixtureRepo, 'commit', '--allow-empty', '-m', 'x'], home).status).toBe(0);
+  });
+
+  it('refuses -C into the drifted workspace from outside', () => {
+    checkoutOther(workspace, 'main');
+    try {
+      const result = run(bcWorkspaceShim, ['-C', workspace, 'commit', '--allow-empty', '-m', 'x'], home);
+      expect(result.status).toBe(1);
+    } finally {
+      checkoutOther(workspace, 'feature/pan-1');
+    }
+  });
+
+  it('has no expectation for a git-init wrapper repo named feature-pan-2', () => {
+    expect(run(bcWrapperShim, ['commit', '--allow-empty', '-m', 'x'], wrapper).status).toBe(0);
+  });
+
+  it('exits 0 on commit in a strike workspace on strike/<id>', () => {
+    expect(run(bcStrikeShim, ['commit', '--allow-empty', '-m', 'x'], strikeWs).status).toBe(0);
+  });
+
+  it('refuses commit in a strike workspace that has drifted to main', () => {
+    checkoutOther(strikeWs, 'main');
+    try {
+      const result = run(bcStrikeShim, ['commit', '--allow-empty', '-m', 'x'], strikeWs);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('strike/pan-9');
+    } finally {
+      checkoutOther(strikeWs, 'strike/pan-9');
+    }
+  });
+
+  it('exits 0 on commit in a blocked-slot replacement worktree on its -attempt- branch', () => {
+    expect(run(bcSlotShim, ['commit', '--allow-empty', '-m', 'x'], slotWs).status).toBe(0);
+  });
+
+  it('refuses commit in a slot workspace on an unrelated branch', () => {
+    checkoutOther(slotWs, 'main');
+    try {
+      const result = run(bcSlotShim, ['commit', '--allow-empty', '-m', 'x'], slotWs);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('feature/pan-8-slot-1');
+    } finally {
+      checkoutOther(slotWs, 'feature/pan-8-slot-1-attempt-20260929010203');
+    }
+  });
+});

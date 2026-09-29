@@ -1,0 +1,324 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T01:56:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4337: The git shim refuses commits and pushes off the workspace's feature branch",
+    "updated": "2026-09-29T01:59:57.281Z"
+  },
+  "plan": {
+    "id": "pan-4337",
+    "title": "The git shim refuses commits and pushes off the workspace's feature branch",
+    "status": "running",
+    "uid": "88b7a3dd-705e-48a1-bf0d-0d65571de87e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T01:56:04Z",
+    "updated": "2026-09-29T01:59:57.281Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4337",
+        "label": "PAN-4337",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4337.md",
+        "label": "PAN-4337 PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Deft adoption PRD, Issue 3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "git-guard",
+      "worktree-discipline",
+      "agent-safety",
+      "deft-adoption"
+    ],
+    "narratives": {
+      "Problem": "sync-sources/rules/worktree-discipline.md admits that nothing checks branch drift: a workspace or item worktree whose HEAD moves to main (or detaches) keeps accepting commits and pushes (#3505, PAN-2204). The per-agent git shim in src/lib/launcher-git-guard.ts already intercepts every agent git call and already scopes itself to the agent's worktree, so it is the cheapest deterministic place to refuse them.",
+      "Proposal": "In default mode, route commit, push, merge and cherry-pick through a new branch check that runs after the existing guardRoot target check. The expected branch is derived at call time from `git -C <target> rev-parse --show-toplevel`: only a linked worktree (top-level .git is a file) named feature-<name> expects feature/<name>, and <that>/.swarm/<item> expects feature/<name>-<item>. Any other toplevel has no expectation and passes through. On a mismatch or a detached HEAD the shim prints one line naming the expected branch and telling the agent to stop and report via pan tell, then exits 1. Behavior tests run the generated shim against a fixture repo with a workspace, an item worktree, a nested non-item worktree and a git-init wrapper. The universal worktree-discipline rule and reference/workers.mdx are updated to point at the shim. Full brief: .pan/drafts/PAN-4337.md.",
+      "NonGoals": "- Refusing pushes whose refspec names the default branch (#4344 owns that).\n- Commits made outside guardRoot, including an agent that cd's into the primary checkout.\n- Polyrepo sub-repo worktrees <ws>/<repo> and per-repo branch_prefix: they have no expectation and must pass through.\n- Checking pull, revert, am, commit-tree, update-ref, checkout or switch.\n- Following --git-dir, GIT_DIR or --work-tree in default mode.\n- A pan verify:branch command, git hooks in registered projects, or a CI branch gate.\n- Changing read-only mode, the gh shim, or the buildGitGuardLines signature.\n- Any new launcher parameter or environment variable carrying the expected branch.\n- A bypass switch, or any mention of OVERDECK_PAN_GIT_OP in refusal output.\n- Adding OVERDECK_PAN_GIT_OP=1 to pan's own git calls so they skip the check."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Derive the expected branch from the target's git toplevel path, not from an issue-id parameter.",
+        "rationale": "The issue says the shim knows the issue id, but buildGitGuardLines(agentId, guardRoot, mode) receives none; the issue's own design says 'derived rather than stamped', and a stamped value would be wrong for in-harness subagents committing in an item worktree."
+      },
+      {
+        "summary": "Match the toplevel basename feature-<name>, not a workspaces/ parent directory.",
+        "rationale": "workspaces_dir is configurable (src/lib/workspace-manager/create.ts:192)."
+      },
+      {
+        "summary": "Only enforce when the toplevel is a linked worktree (its .git is a file).",
+        "rationale": "commitCompletePlanningWorkspaceGit git-inits polyrepo scaffolds at the workspace root (planning-promotion.ts:256-259); that wrapper is named feature-<name> but sits on the init default branch, so a basename-only rule would refuse every commit in it. The test also excludes every primary checkout."
+      },
+      {
+        "summary": "Check exactly commit, push, merge and cherry-pick, as exact subcommand tokens.",
+        "rationale": "That is the issue's list; exact tokens leave merge-base, merge-tree and merge-file untouched."
+      },
+      {
+        "summary": "Do not inspect push refspecs.",
+        "rationale": "Refusing pushes to the default branch is #4344; this issue checks only the current branch."
+      },
+      {
+        "summary": "Anything without an expectation passes through unchanged.",
+        "rationale": "Covers review/test agents whose guardRoot is the primary checkout, Claude Code isolation worktrees under .claude/worktrees, polyrepo sub-repos with their own branch_prefix, and test fixture repos, none of which the issue asks to police."
+      },
+      {
+        "summary": "pan's own git commits and pushes from an agent pane go through the check.",
+        "rationale": "Only rebase-helper.ts sets OVERDECK_PAN_GIT_OP=1; on the correct branch pan passes, and refusing pan done's push from a drifted worktree is the intended outcome."
+      },
+      {
+        "summary": "Refusal text says to stop and report via pan tell, matching worktree-discipline.md.",
+        "rationale": "The issue requires a message that says to stop and report, not how to bypass."
+      },
+      {
+        "summary": "Three items: shim change, behavior tests, docs; only the tests depend on the shim.",
+        "rationale": "Each is independently reviewable; the docs describe behavior already fixed by the PRD and share no files with the code items."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4337-the-git-shim-refuses-commits-and-pushes-off-the-workspace-s-feature-branch.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "shim-branch-check",
+        "title": "Default-mode git shim refuses commit/push/merge/cherry-pick off the derived branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:56:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4337",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "shim-branch-tests"
+          ],
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/__tests__/launcher-git-guard-behavior.test.ts src/lib/__tests__/launcher-git-guard-gh-shim.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "both existing git-guard test files pass with no failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-4337.md) exactly. (1) Add a plain-POSIX-sh constant BRANCH_CHECK_SH next to READ_ONLY_SHIM_SH and a branchCheckShimLines() helper that escapes every $ as \\$ (mirror readOnlyShimLines). The script: for commit|push|merge|cherry-pick, read T=\"$_OVERDECK_REAL_GIT\" -C \"$_overdeck_git_target\" rev-parse --show-toplevel; only if T is non-empty and T/.git is a regular file, split on /.swarm/ (ws=${T%/.swarm/*}, item=${T##*/.swarm/}), expect feature/<basename(ws) minus 'feature-'> when basename(ws) matches feature-?*, append -<item> when item is non-empty, and drop the expectation when item contains '/'. With an expectation, compare to `branch --show-current`; on mismatch or empty output echo one line to stderr (\"Overdeck refused git <cmd>: <T> must be on branch <expected>, but it is on branch <actual>|a detached HEAD. Stop and report this via pan tell; do not commit or push from this worktree.\") and exit 1; otherwise exec real git. (2) In buildGitGuardLines' default-mode array, change the first case to 'rebase|stash|reset|commit|push|merge|cherry-pick) ;;' and insert ...branchCheckShimLines() immediately after the guardRoot target-dir case and before the rebase/stash/reset case. Use _overdeck_git_target, never $PWD. No backslashes or backticks inside BRANCH_CHECK_SH. Read-only mode and the gh shim stay untouched; the function signature stays unchanged. (3) Extend the module header with the PAN-4337 paragraph from the PRD, including that --git-dir, GIT_DIR and --work-tree are not followed."
+        },
+        "items": [
+          {
+            "id": "shim-branch-check.ac1",
+            "title": "Given a linked worktree named feature-pan-1 checked out on main, when the agent runs git commit through the shim, then the shim exits 1 and stderr contains feature/pan-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-check.ac2",
+            "title": "Given the workspace on feature/pan-1, when the agent runs git commit or git push origin feature/pan-1, then the shim execs real git and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-check.ac3",
+            "title": "Given a git-init repo named feature-pan-2 on master (its .git is a directory), when git commit runs through a shim guarding it, then the call passes through and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-check.ac4",
+            "title": "Given any refusal, the stderr line names the expected branch and pan tell and does not contain OVERDECK_PAN_GIT_OP or /usr/bin/git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-check.ac5",
+            "title": "Given the existing cases in launcher-git-guard-behavior.test.ts and launcher-git-guard-gh-shim.test.ts, when vitest runs both files after the change, then it exits 0 with zero failed cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shim-branch-tests",
+        "title": "Behavior tests for the git shim branch check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T01:56:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/launcher-git-guard-behavior.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-git-guard-behavior.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "launcher-git-guard-behavior.test.ts passes including the new 'branch check (PAN-4337)' describe block",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Append describe('branch check (PAN-4337)') to src/lib/__tests__/launcher-git-guard-behavior.test.ts, reusing the outer home and fixtureRepo. Fixture: bare origin bc-origin.git; primary bc-primary (git init -b main, one commit, remote origin); workspace <primary>/workspaces/feature-pan-1 via `git worktree add -b feature/pan-1`; item <workspace>/.swarm/w1 on feature/pan-1-w1; nested <workspace>/.claude/worktrees/agent-x on worktree-agent-x; wrapper <home>/wrapper-ws/feature-pan-2 via git init -b master. Install shims bc-workspace (guardRoot workspace), bc-item (guardRoot item) and bc-wrapper (guardRoot wrapper) with buildGitGuardLines. Move branches with real git `checkout --quiet --ignore-other-worktrees <branch>` or `--detach`, and restore the original branch in a finally in every test that moves one. Run the shim with spawnSync and an env that sets OVERDECK_PAN_GIT_OP='' plus GIT_AUTHOR_*/GIT_COMMITTER_* identity. Cover the 15 cases in the PRD table. Assert only on exit status, stderr and real-git ref state; never read source files, no skipIf/.only, no timers."
+        },
+        "items": [
+          {
+            "id": "shim-branch-tests.ac1",
+            "title": "Given the workspace on main, the test asserts git commit, push, merge and cherry-pick each exit 1 with stderr containing feature/pan-1, and that commit from <workspace>/src and git -C <workspace> commit from outside also exit 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-tests.ac2",
+            "title": "Given a detached HEAD in the workspace, the test asserts git commit exits 1 and stderr contains detached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-tests.ac3",
+            "title": "Given the workspace on feature/pan-1, the test asserts git commit exits 0 and git push origin feature/pan-1 exits 0 and creates refs/heads/feature/pan-1 in the bare origin; git -C <fixtureRepo> commit exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-tests.ac4",
+            "title": "Given .swarm/w1, the test asserts git commit exits 0 on feature/pan-1-w1 and exits 1 with stderr containing feature/pan-1-w1 on feature/pan-1, for both the workspace shim and a shim whose guardRoot is the item worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shim-branch-tests.ac5",
+            "title": "Given the git-init wrapper on master, the nested .claude/worktrees/agent-x worktree, and git merge-base run on a drifted workspace, the test asserts each exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "branch-check-docs",
+        "title": "Point worktree-discipline and the workers reference at the shim branch check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T01:56:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/rules/worktree-discipline.md",
+            "reference/workers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'no part of the pipeline auto-checks' sync-sources/rules/worktree-discipline.md",
+            "grep -c 'launcher-git-guard' sync-sources/rules/worktree-discipline.md",
+            "grep -c 'refuses `git commit`' reference/workers.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 1",
+            "third grep prints 1",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. (1) In sync-sources/rules/worktree-discipline.md replace the whole '**Why:** every commit and push relies on the current branch; ...' paragraph (line 19) with the one-paragraph replacement in the PRD, which names src/lib/launcher-git-guard.ts, lists commit, push, merge and cherry-pick, covers workspace and .swarm/<item> worktrees and detached HEAD, and ends with 'if it refuses, stop and report.' The rule is scope: universal, so add nothing else. (2) In reference/workers.mdx, directly after the 'Working directory and read-only mode' table (anchor '| none | Its own git worktree at'), add the PRD's paragraph saying every non-read-only worker's shim refuses `git commit`, `push`, `merge` and `cherry-pick` unless its worktree is on <feature-branch>-worker-<n>, and on a detached HEAD. Do not run pan sync."
+        },
+        "items": [
+          {
+            "id": "branch-check-docs.ac1",
+            "title": "worktree-discipline.md names src/lib/launcher-git-guard.ts as refusing commit, push, merge and cherry-pick in a drifted or detached worktree, and grep for 'no part of the pipeline auto-checks' in it returns 0 matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-check-docs.ac2",
+            "title": "reference/workers.mdx renders a paragraph after the working-directory table stating that a non-read-only worker's shim refuses git commit, push, merge and cherry-pick unless the worktree is on <feature-branch>-worker-<n>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "shim-branch-check",
+        "to": "shim-branch-tests",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
