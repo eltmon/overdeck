@@ -285,8 +285,9 @@ if ($SkipServe) {
   }
 
   # The POST answers 201 with sessionAlive=false and starts the runtime in the
-  # background, so 2b follows the row: pass once its session is alive, fail on
-  # a spawnError, an ended status, or no live session after 60 s.
+  # background, so 2b follows the row: fail on a spawnError (it wins even when
+  # the row also says sessionAlive=true, as run 36610126378 showed), an ended
+  # status or no live session after 60 s; pass once the session is alive.
   Invoke-Step '2b' "POST /api/conversations {`"message`":`"hello`"} with Origin and x-overdeck-internal-token; then GET /api/conversations for 60 s" {
     if (-not $ServeAnswers) { return @{ status = 'not-run'; note = '1c failed: the server does not answer HTTP' } }
     $headers = @{ 'Origin' = "http://localhost:$Port"; 'x-overdeck-internal-token' = $Token; 'content-type' = 'application/json' }
@@ -295,17 +296,24 @@ if ($SkipServe) {
     if (-not ($r.Status -ge 200 -and $r.Status -lt 300)) { return @{ status = 'fail'; evidence = $posted; note = 'the POST was refused' } }
     $name = ($r.Body | ConvertFrom-Json).name
     $row = $null
+    $aliveSince = $null
     $clock = [System.Diagnostics.Stopwatch]::StartNew()
     while ($clock.Elapsed.TotalSeconds -lt 60) {
       Start-Sleep -Seconds 3
       $list = Get-HttpStatus 'GET' "http://localhost:$Port/api/conversations" @{ 'Origin' = "http://localhost:$Port"; 'x-overdeck-internal-token' = $Token } $null
       try { $row = @($list.Body | ConvertFrom-Json) | Where-Object { $_.name -eq $name } | Select-Object -First 1 } catch { $row = $null }
-      if ($row -and ($row.sessionAlive -or $row.spawnError -or $row.status -eq 'ended')) { break }
+      if ($row -and ($row.spawnError -or $row.status -eq 'ended')) { break }
+      # Alive must hold for 10 s without a spawnError before it counts.
+      if ($row -and $row.sessionAlive) {
+        if (-not $aliveSince) { $aliveSince = $clock.Elapsed.TotalSeconds }
+        elseif ($clock.Elapsed.TotalSeconds - $aliveSince -ge 10) { break }
+      } else { $aliveSince = $null }
     }
     $rowText = if ($row) { $row | Select-Object name, status, sessionAlive, spawnError, tmuxSession, harness, cwd | ConvertTo-Json -Compress } else { '(row not found)' }
     $evidence = "$posted`n--- GET /api/conversations row after $([Math]::Round($clock.Elapsed.TotalSeconds)) s ---`n$rowText"
+    if ($row -and $row.spawnError) { return @{ status = 'fail'; evidence = $evidence; note = "spawnError: $($row.spawnError)" } }
     if ($row -and $row.sessionAlive) { return @{ status = 'pass'; evidence = $evidence } }
-    $note = if ($row -and $row.spawnError) { "spawnError: $($row.spawnError)" } elseif ($row -and $row.status -eq 'ended') { 'the conversation ended without a live session' } else { 'no live session 60 s after the POST' }
+    $note = if ($row -and $row.status -eq 'ended') { 'the conversation ended without a live session' } else { 'no live session 60 s after the POST' }
     @{ status = 'fail'; evidence = $evidence; note = $note }
   }
 
