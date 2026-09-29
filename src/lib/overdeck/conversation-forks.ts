@@ -10,6 +10,7 @@ import { loadConfigSync } from '../config-yaml.js';
 import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
+import { findPrimaryCheckout, primaryCheckoutLabel } from '../projects/primary-checkout.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
@@ -808,6 +809,16 @@ export async function handleConversationSummaryFork(
     const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
     if (cwd && !(await validateCwdContainment(cwd))) {
       return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+    }
+    if (cwd) {
+      const primary = await findPrimaryCheckout(cwd);
+      const operatorOverride = body['allowPrimary'] === true
+        && (body['callerKind'] === undefined || body['callerKind'] === 'operator');
+      if (primary && !operatorOverride) {
+        return jsonResponse({
+          error: `Invalid cwd: ${cwd} is the primary checkout of ${primaryCheckoutLabel(primary)}; use a worktree`,
+        }, { status: 400 });
+      }
     }
     if (typeof body['model'] === 'string' && !model) {
       return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
