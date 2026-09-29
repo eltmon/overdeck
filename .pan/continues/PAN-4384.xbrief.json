@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T14:32:47.298Z",
+  "updated": "2026-09-29T14:33:03.811Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "head-bound-review-request.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T14:32:47.298Z"
+    },
+    "head-bound-review-request.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:33:03.811Z"
     }
   }
 }
