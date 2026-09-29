@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:14:22.118Z",
+  "updated": "2026-09-29T11:14:36.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,6 +300,10 @@
     "plan-quality-fixtures.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T11:14:22.118Z"
+    },
+    "plan-quality-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:14:36.608Z"
     }
   }
 }
