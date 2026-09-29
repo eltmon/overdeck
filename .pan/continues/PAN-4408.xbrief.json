@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T14:53:12.650Z",
+  "updated": "2026-09-29T14:55:50.640Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4408",
       "claimedAt": "2026-09-29T14:51:32.073Z",
       "doneAt": "2026-09-29T14:53:12.650Z"
+    },
+    "vendor-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T14:55:50.640Z"
     }
   }
 }
