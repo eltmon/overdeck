@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T15:57:35.345Z",
+  "updated": "2026-09-29T15:57:49.661Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "contract-work-start.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T15:57:35.344Z"
+    },
+    "contract-work-start.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:49.660Z"
     }
   }
 }
