@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T00:46:11.331Z",
+  "updated": "2026-09-29T00:48:31.776Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-29T00:46:06.789Z"
     },
     "sonnet-55-compaction-budget": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4327",
-      "claimedAt": "2026-09-29T00:46:11.331Z"
+      "claimedAt": "2026-09-29T00:46:11.331Z",
+      "doneAt": "2026-09-29T00:48:31.776Z"
     }
   }
 }
