@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4341",
+  "created": "2026-09-29T04:22:08.600Z",
+  "updated": "2026-09-29T04:22:08.600Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "plan-digest": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:22:08.600Z"
+    }
+  }
+}
