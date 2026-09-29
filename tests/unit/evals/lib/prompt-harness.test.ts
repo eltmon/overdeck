@@ -146,6 +146,58 @@ describe('evals/lib/prompt-harness', () => {
     });
   });
 
+  describe('multi-turn messages', () => {
+    it('sends the messages array verbatim to Anthropic', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      const messages = [
+        { role: 'user' as const, content: 'kickoff' },
+        { role: 'assistant' as const, content: 'progress' },
+        { role: 'user' as const, content: 'feedback' },
+      ];
+      await runPromptScenario({ system: 'sys', messages });
+
+      const params = streamMock.mock.calls[0][0];
+      expect(params.messages).toEqual(messages);
+    });
+
+    it('rejects when both user and messages are given, with no request', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      await expect(
+        runPromptScenario({ system: 'sys', user: 'usr', messages: [{ role: 'user', content: 'usr' }] }),
+      ).rejects.toThrow(/exactly one of `user` or `messages`/);
+      expect(anthropicCtor).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects when neither user nor messages is given, with no request', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      await expect(runPromptScenario({ system: 'sys' })).rejects.toThrow(/exactly one of `user` or `messages`/);
+      expect(anthropicCtor).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects when messages ends with an assistant turn', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      await expect(
+        runPromptScenario({
+          system: 'sys',
+          messages: [
+            { role: 'user', content: 'kickoff' },
+            { role: 'assistant', content: 'progress' },
+          ],
+        }),
+      ).rejects.toThrow(/end with a user turn/);
+      expect(anthropicCtor).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects an empty messages array', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      await expect(runPromptScenario({ system: 'sys', messages: [] })).rejects.toThrow(/non-empty/);
+      expect(anthropicCtor).not.toHaveBeenCalled();
+    });
+  });
+
   describe('extractJsonArray', () => {
     it('returns the parsed array for a response wrapped in a json code fence', () => {
       const text = '```json\n[{"id": 1}, {"id": 2}]\n```';

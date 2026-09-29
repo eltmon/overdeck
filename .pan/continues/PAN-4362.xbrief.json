@@ -1,0 +1,456 @@
+{
+  "version": "1",
+  "issueId": "PAN-4362",
+  "created": "2026-09-29T09:50:32.527Z",
+  "updated": "2026-09-29T11:21:49.082Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T11:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-09-29T11:21:49.082Z"
+    }
+  ],
+  "items": {
+    "harness-messages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:50:32.527Z",
+      "doneAt": "2026-09-29T09:51:58.161Z"
+    },
+    "eval-results": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:52:20.665Z",
+      "doneAt": "2026-09-29T09:53:47.542Z"
+    },
+    "placement-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:53:48.503Z",
+      "doneAt": "2026-09-29T09:54:28.428Z"
+    },
+    "eval-timeout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:54:29.325Z",
+      "doneAt": "2026-09-29T09:54:48.020Z"
+    },
+    "fixture-loader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:54:49.111Z",
+      "doneAt": "2026-09-29T09:56:04.119Z"
+    },
+    "five-model-resolution": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:56:05.328Z",
+      "doneAt": "2026-09-29T09:56:35.308Z"
+    },
+    "review-recall-scorer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T09:56:36.303Z",
+      "doneAt": "2026-09-29T10:05:36.592Z"
+    },
+    "review-recall-fixtures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:05:37.660Z",
+      "doneAt": "2026-09-29T10:09:03.244Z"
+    },
+    "review-recall-eval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:09:04.239Z",
+      "doneAt": "2026-09-29T10:10:17.842Z"
+    },
+    "xbrief-parse-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:10:18.830Z",
+      "doneAt": "2026-09-29T10:11:34.449Z"
+    },
+    "plan-quality-scorer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:11:41.589Z",
+      "doneAt": "2026-09-29T10:13:45.848Z"
+    },
+    "plan-quality-fixtures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:13:47.033Z",
+      "doneAt": "2026-09-29T10:15:01.376Z"
+    },
+    "plan-quality-eval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:15:02.740Z",
+      "doneAt": "2026-09-29T10:16:01.352Z"
+    },
+    "summary-prompts-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:16:02.446Z",
+      "doneAt": "2026-09-29T10:20:46.210Z"
+    },
+    "handoff-render-export": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:20:47.330Z",
+      "doneAt": "2026-09-29T10:27:21.107Z"
+    },
+    "faithfulness-scorer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:27:22.257Z",
+      "doneAt": "2026-09-29T10:28:26.590Z"
+    },
+    "summary-fixtures": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:28:27.757Z",
+      "doneAt": "2026-09-29T10:33:41.012Z"
+    },
+    "summary-faithfulness-eval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:33:41.933Z",
+      "doneAt": "2026-09-29T10:34:44.947Z"
+    },
+    "feedback-scorer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:34:46.093Z",
+      "doneAt": "2026-09-29T10:36:02.505Z"
+    },
+    "feedback-acceptance-eval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:36:03.952Z",
+      "doneAt": "2026-09-29T10:37:11.255Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:37:12.453Z",
+      "doneAt": "2026-09-29T10:39:11.999Z"
+    },
+    "run-and-post": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4362",
+      "claimedAt": "2026-09-29T10:39:13.134Z",
+      "doneAt": "2026-09-29T11:02:30.431Z"
+    },
+    "harness-messages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:06:13.036Z"
+    },
+    "harness-messages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:06:27.400Z"
+    },
+    "harness-messages.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:06:41.160Z"
+    },
+    "harness-messages.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:06:54.280Z"
+    },
+    "eval-results.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:06.953Z"
+    },
+    "eval-results.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:19.787Z"
+    },
+    "eval-results.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:33.263Z"
+    },
+    "eval-results.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:45.952Z"
+    },
+    "eval-results.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:58.097Z"
+    },
+    "placement-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:10.207Z"
+    },
+    "placement-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:22.075Z"
+    },
+    "eval-timeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:34.070Z"
+    },
+    "eval-timeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:46.057Z"
+    },
+    "fixture-loader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:08:59.897Z"
+    },
+    "fixture-loader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:09:12.352Z"
+    },
+    "fixture-loader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:09:24.648Z"
+    },
+    "fixture-loader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:09:36.526Z"
+    },
+    "five-model-resolution.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:09:49.704Z"
+    },
+    "five-model-resolution.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:10:02.178Z"
+    },
+    "review-recall-scorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:10:16.040Z"
+    },
+    "review-recall-scorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:10:28.678Z"
+    },
+    "review-recall-scorer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:10:40.725Z"
+    },
+    "review-recall-scorer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:10:52.914Z"
+    },
+    "review-recall-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:04.244Z"
+    },
+    "review-recall-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:16.115Z"
+    },
+    "review-recall-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:29.463Z"
+    },
+    "review-recall-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:41.800Z"
+    },
+    "review-recall-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:11:54.039Z"
+    },
+    "review-recall-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:06.441Z"
+    },
+    "review-recall-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:18.883Z"
+    },
+    "xbrief-parse-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:30.385Z"
+    },
+    "xbrief-parse-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:41.390Z"
+    },
+    "xbrief-parse-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:53.760Z"
+    },
+    "plan-quality-scorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:13:07.241Z"
+    },
+    "plan-quality-scorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:13:19.279Z"
+    },
+    "plan-quality-scorer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:13:30.731Z"
+    },
+    "plan-quality-scorer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:13:42.738Z"
+    },
+    "plan-quality-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:13:54.405Z"
+    },
+    "plan-quality-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:14:07.589Z"
+    },
+    "plan-quality-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:14:22.118Z"
+    },
+    "plan-quality-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:14:36.608Z"
+    },
+    "plan-quality-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:14:50.657Z"
+    },
+    "plan-quality-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:04.785Z"
+    },
+    "summary-prompts-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:18.402Z"
+    },
+    "summary-prompts-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:29.762Z"
+    },
+    "summary-prompts-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:41.328Z"
+    },
+    "summary-prompts-extract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:52.767Z"
+    },
+    "handoff-render-export.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:03.756Z"
+    },
+    "handoff-render-export.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:15.201Z"
+    },
+    "faithfulness-scorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:26.685Z"
+    },
+    "faithfulness-scorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:37.536Z"
+    },
+    "faithfulness-scorer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:47.953Z"
+    },
+    "faithfulness-scorer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:58.765Z"
+    },
+    "summary-fixtures.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:09.615Z"
+    },
+    "summary-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:20.308Z"
+    },
+    "summary-fixtures.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:31.307Z"
+    },
+    "summary-fixtures.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:42.390Z"
+    },
+    "summary-faithfulness-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:17:53.050Z"
+    },
+    "summary-faithfulness-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:03.671Z"
+    },
+    "summary-faithfulness-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:14.977Z"
+    },
+    "feedback-scorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:25.569Z"
+    },
+    "feedback-scorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:36.287Z"
+    },
+    "feedback-scorer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:47.061Z"
+    },
+    "feedback-scorer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:18:58.297Z"
+    },
+    "feedback-acceptance-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:19:09.105Z"
+    },
+    "feedback-acceptance-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:19:19.831Z"
+    },
+    "feedback-acceptance-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:19:31.304Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:19:42.592Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:19:53.678Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:05.342Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:18.039Z"
+    },
+    "run-and-post.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:29.865Z"
+    },
+    "run-and-post.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:40.403Z"
+    },
+    "run-and-post.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:20:50.995Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-29T11:21:49Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4362 (attempt 1/3):\n\nFailed check: test-skip\n\nVerification FAILED at test-skip (25ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4362/.overdeck/verification/2026-09-29T11-21-41-795Z-5ebeef49.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4362/.overdeck/verification/2026-09-29T11-21-41-795Z-5ebeef49.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4362 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4362 -m \"Fixed test-skip\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

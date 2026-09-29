@@ -100,7 +100,7 @@ describe('pan vault resume', () => {
     git(repo, 'commit', '-q', '-m', 'b');
     const projectsRoot = join(home, '.claude', 'projects');
     const io = captureIo({ isTTY: false });
-    expect(await runCli(() => resumeCommand(vaultId, { launch: false }, io, { projectsRoot }))).toBe(1);
+    expect(await runCli(() => resumeCommand(vaultId, { launch: false, code: false }, io, { projectsRoot }))).toBe(1);
     expect(io.stderr[0]).toContain('head');
     expect(io.stderr[0]).toContain('Cancelled');
     expect(existsSync(projectsRoot)).toBe(false);
@@ -113,13 +113,13 @@ describe('pan vault resume', () => {
     writeFileSync(join(repo, 'dirty.txt'), 'dirty\n');
     const projectsRoot = join(home, '.claude', 'projects');
     const io = captureIo();
-    expect(await runCli(() => resumeCommand(vaultId, { launch: false, onDrift: 'note' }, io, { projectsRoot }))).toBe(0);
+    expect(await runCli(() => resumeCommand(vaultId, { launch: false, onDrift: 'note', code: false }, io, { projectsRoot }))).toBe(0);
     const command = io.stdout.find((line) => line.includes('claude --resume'))!;
     expect(command).toContain('[Session Vault]');
     expect(command).toMatch(/dirty, untracked|untracked/);
     const spawn = vi.fn(async () => 0);
     const launched = captureIo();
-    expect(await runCli(() => resumeCommand(vaultId, { onDrift: 'continue' }, launched, { projectsRoot, spawn }))).toBe(0);
+    expect(await runCli(() => resumeCommand(vaultId, { onDrift: 'continue', code: false }, launched, { projectsRoot, spawn }))).toBe(0);
     expect(spawn).toHaveBeenCalledWith('claude', ['--resume', expect.stringMatching(/^[0-9a-f-]{36}$/)], repo);
   });
 

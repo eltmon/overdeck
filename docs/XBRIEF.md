@@ -486,6 +486,10 @@ A change exceeding either threshold is rejected with an error message. To overri
 }
 ```
 
+### Advisory semantic AC review (PAN-4372)
+
+`ac-not-observable` (the keyword rule above `OBSERVABLE_TERMS` in `src/lib/xbrief/quality-lint.ts`) stays the gate: it is the only check that can fail finalize over an acceptance criterion's wording. When the `jevAcceptanceCriteriaReview` background-AI feature is on and Jev is configured, finalize additionally sends one Jev request for the whole plan and may print `[warn] ac-semantic-not-observable` (the AC's title doesn't name an observable behavior) or `[warn] ac-semantic-compound` (the AC bundles more than one independent behavior) alongside the existing quality warnings. This semantic review is advisory only — it never blocks finalize and never changes its exit code, in either the keyword-rule-off or Jev-unavailable case. Its thresholds (`JEV_AC_OBSERVABLE_MIN_NOUL`, `JEV_AC_COMPOUND_MAX_NOUL`) live in `src/lib/jev/questions.ts`. A failed request prints one dim `ℹ Jev acceptance-criteria review did not run (<reason>)` line; an unavailable or skipped review prints nothing. A local shadow log under `~/.overdeck/jev/eval-log/acceptance-criteria/` records each reviewed AC's id and Nouls (never its title) for offline threshold tuning. See [`configuration/jev.mdx`](../configuration/jev.mdx) for what Jev sends and the feature toggle.
+
 ---
 
 ## Resilience

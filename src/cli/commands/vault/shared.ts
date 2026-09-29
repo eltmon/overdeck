@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { exitCli } from '../../exit.js';
 import { VAULT_OFF_MESSAGE, readVaultConfig, type VaultConfig } from '../../../lib/vault/config.js';
 import { deriveSubkeys, loadVaultKey, type VaultSubkeys } from '../../../lib/vault/identity.js';
+import { checkPassphraseStrength, generatePassphrase } from '../../../lib/vault/keywrap.js';
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
 import { GitVaultStore, gitVaultCloneDir } from '../../../lib/vault/store/git.js';
 import type { VaultStore } from '../../../lib/vault/store/types.js';
@@ -72,6 +73,31 @@ export async function openVault(io: CliIo, options: { quiet?: boolean } = {}): P
 export async function readPhrase(io: CliIo, phraseFile?: string): Promise<string> {
   if (phraseFile) return (await readFile(phraseFile, 'utf8')).trim();
   return (await io.readLine('Recovery phrase (24 words): ')).trim();
+}
+
+/** Read a vault passphrase from a file (whole file, trailing newline dropped) or one prompted line. */
+export async function readPassphrase(io: CliIo, prompt: string, passphraseFile?: string): Promise<string> {
+  if (passphraseFile) return (await readFile(passphraseFile, 'utf8')).replace(/\r?\n$/, '');
+  return io.readLine(prompt);
+}
+
+export const GENERATED_PASSPHRASE_PREFIX = 'Vault passphrase (shown only now): ';
+
+/**
+ * Pick a new passphrase for `passphrase set`: from a file, generated, or
+ * prompted (an empty answer generates one). A file or typed passphrase must
+ * pass the strength check; a generated one always does.
+ */
+export async function choosePassphrase(
+  io: CliIo,
+  options: { passphraseFile?: string; generate?: boolean },
+): Promise<{ passphrase: string; generated: boolean } | { error: string }> {
+  let passphrase = '';
+  if (options.passphraseFile) passphrase = await readPassphrase(io, '', options.passphraseFile);
+  else if (!options.generate) passphrase = await readPassphrase(io, 'New vault passphrase (16+ characters, Enter for a generated one): ');
+  if (!options.passphraseFile && passphrase.trim() === '') return { passphrase: generatePassphrase(), generated: true };
+  const strength = checkPassphraseStrength(passphrase);
+  return strength.ok ? { passphrase, generated: false } : { error: strength.message };
 }
 
 export function formatBytes(bytes: number): string {

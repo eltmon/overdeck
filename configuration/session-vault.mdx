@@ -41,8 +41,36 @@ pan vault setup git@github.com:you/session-vault.git --hooks
 pan vault join git@github.com:you/session-vault.git
 ```
 
-Enter the 24 words when prompted (or pass `--phrase-file <path>`). A wrong phrase prints
+Enter the 24 words when prompted (or pass `--phrase-file <path>`). If the vault has a
+passphrase, you are asked for that first; see below. A wrong phrase prints
 `The recovery phrase does not match this vault.` and writes nothing.
+
+## Passphrase unlock
+
+Most people do not have the 24 words at hand when they set up a new machine. A vault
+passphrase lets a new machine join by typing the passphrase instead.
+
+Setup offers it right after printing the recovery phrase. On a terminal it suggests a
+generated 6-word passphrase: press Enter to use it, type your own (16 or more characters), or
+type `skip`. For scripts, pass `--generate-passphrase`, `--passphrase-file <path>` or
+`--no-passphrase`.
+
+Turn it on, change it, or turn it off later:
+
+```bash
+pan vault passphrase set                          # prompt; Enter generates one
+pan vault passphrase set --generate               # print a generated 6-word passphrase once
+pan vault passphrase set --passphrase-file <path>
+pan vault passphrase remove
+```
+
+When a passphrase is set, `pan vault join` asks for it first. Press Enter to use the
+recovery phrase instead, or pass `--passphrase-file <path>`. A wrong passphrase prints
+`The passphrase did not unlock this vault.` and writes nothing.
+
+<Warning>
+The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: the vault key never changes, and removing the passphrase never locks you out.
+</Warning>
 
 ## Save and sync
 
@@ -73,6 +101,29 @@ in scripts and `--no-launch` to print the command instead of running it.
 
 Claude Code and Codex resume natively. Other harnesses receive a markdown digest of the
 conversation in the target directory to paste into a new session.
+
+### Your uncommitted code comes along
+
+Each save also takes an encrypted snapshot of the code the conversation was working on:
+every tracked and untracked file in the working tree plus any local commits you have not
+pushed. Files matched by `.gitignore` are left out, and everything arrives unstaged. The
+snapshot is stored in your vault like the conversation, end-to-end encrypted, and is
+**never pushed to your git host**, so it works even when the first machine is switched off.
+
+```bash
+pan vault resume <id>                      # applies the snapshot, then continues
+pan vault resume <id> --worktree ../fresh  # apply into a new git worktree instead
+pan vault resume <id> --no-code            # continue the conversation only
+```
+
+`resume` fetches origin, checks out the saved commit, and applies the changes. The target
+checkout must be clean: with uncommitted changes it offers a fresh worktree at a TTY, and
+otherwise stops and asks for `--worktree <dir>`. Nothing in the dirty checkout is touched.
+
+A snapshot larger than 50 MB (`wipMaxBytes` in the vault config) is skipped, and `resume`
+says so. If the uncommitted code contains something that looks like a credential, the
+snapshot is not uploaded; `save` names the file and pattern and prints the command to allow
+it: `pan vault allow-secret <id> --file <path>`, then `pan vault save`.
 
 ## Exclude what should never leave the machine
 

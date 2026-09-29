@@ -9,6 +9,12 @@
  *                confirm a guess of a chunk's content; identical plaintext still dedupes)
  *   stored     = nonce(12) || AES-256-GCM(K_enc, zstd(plaintext), aad = chunk id) || tag(16)
  *
+ * WIP parts (PAN-4329): a git bundle of the owner's uncommitted code, split into
+ * slices of at most WIP_PART_BYTES
+ *   part id    = hex(HMAC-SHA256(K_id, "overdeck-wip-part-v1\0" || bytes))[:40]
+ *                (domain-separated, so a part id never equals a chunk id)
+ *   stored     = the chunk envelope over zstd(bytes), aad = part id
+ *
  * Refs (records, machines, header) use the same envelope with the ref name as
  * associated data, so a value cannot be moved between refs. Every decrypted ref
  * value carries `type`; readers return null for a type they do not know (P-19).
@@ -89,22 +95,30 @@ export interface RecordSegment {
 }
 
 /**
- * Reserved for PAN-4329 (WIP code snapshots, anywhere-accounts design 6.7):
- * an encrypted snapshot of the owner's uncommitted code taken with this
- * settlement, or the reason one was skipped. Phase A never writes it; readers
- * tolerate its absence and ignore fields they do not know.
+ * Written by PAN-4329 WIP capture (`wip-capture.ts`, anywhere-accounts design
+ * 6.7): an encrypted snapshot of the owner's uncommitted code taken with this
+ * settlement, or the reason one was skipped. A persisted skip carries the
+ * (base, tree) pair and capture time it was computed for. Phase A never wrote
+ * it; readers tolerate its absence and ignore fields they do not know.
  */
 export type WipSnapshotRef =
   | {
       base: string;
       branch: string | null;
       tree: string;
-      /** Chunk ids holding the encrypted bundle. */
+      /** WIP part ids holding the encrypted bundle, in order. */
       objects: string[];
       bytes: number;
       at: string;
     }
-  | { skipped: 'too-large' | 'secret' | 'no-git' | 'error'; bytes?: number; reason?: string };
+  | {
+      skipped: 'clean' | 'too-large' | 'secret' | 'no-git' | 'error';
+      base?: string;
+      tree?: string;
+      at?: string;
+      bytes?: number;
+      reason?: string;
+    };
 
 export interface Settlement {
   at: string;
@@ -122,7 +136,7 @@ export interface Settlement {
    */
   logLines?: number;
   cwdState: CwdState | null;
-  /** Reserved (PAN-4329). Absent in every Phase A settlement. */
+  /** WIP code snapshot or skip, written by PAN-4329 capture. Absent in every Phase A settlement. */
   wip?: WipSnapshotRef;
 }
 
@@ -314,6 +328,54 @@ export function splitIntoChunks(lines: readonly string[], maxChunkBytes: number)
   }
   if (current.length > 0) chunks.push(current);
   return chunks;
+}
+
+// ---------------------------------------------------------------------------
+// WIP parts (PAN-4329)
+// ---------------------------------------------------------------------------
+
+export const WIP_PART_BYTES = 8 * 1024 * 1024;
+const WIP_PART_DOMAIN = Buffer.from('overdeck-wip-part-v1\0', 'utf8');
+
+export interface EncodedWipPart {
+  id: string;
+  bytes: Uint8Array;
+}
+
+export function wipPartIdFor(bytes: Uint8Array, K_id: Uint8Array): string {
+  return hmacHex40(K_id, Buffer.concat([WIP_PART_DOMAIN, bytes]));
+}
+
+/** Split raw bundle bytes into ≤ WIP_PART_BYTES parts and seal each: zstd, then AES-256-GCM with aad = part id. */
+export async function encodeWipParts(bundle: Uint8Array, keys: VaultSubkeys): Promise<EncodedWipPart[]> {
+  if (bundle.length === 0) throw new Error('Cannot encode an empty WIP bundle');
+  const parts: EncodedWipPart[] = [];
+  for (let offset = 0; offset < bundle.length; offset += WIP_PART_BYTES) {
+    const slice = bundle.subarray(offset, offset + WIP_PART_BYTES);
+    const id = wipPartIdFor(slice, keys.K_id);
+    parts.push({ id, bytes: seal(keys.K_enc, id, await zstdCompressAsync(slice)) });
+  }
+  return parts;
+}
+
+/** Decrypt, decompress and id-check each part in order; concatenate. Any failure throws VaultAuthenticationError. */
+export async function decodeWipParts(parts: ReadonlyArray<EncodedWipPart>, keys: VaultSubkeys): Promise<Buffer> {
+  if (parts.length === 0) throw new VaultAuthenticationError('A WIP snapshot has no parts');
+  const slices: Buffer[] = [];
+  for (const part of parts) {
+    const compressed = unseal(keys.K_enc, part.id, part.bytes);
+    let slice: Buffer;
+    try {
+      slice = await zstdDecompressAsync(compressed);
+    } catch (error) {
+      throw new VaultAuthenticationError(`WIP part ${part.id} does not decompress: ${(error as Error).message}`);
+    }
+    if (wipPartIdFor(slice, keys.K_id) !== part.id) {
+      throw new VaultAuthenticationError(`WIP part ${part.id} does not match its content id`);
+    }
+    slices.push(slice);
+  }
+  return Buffer.concat(slices);
 }
 
 // ---------------------------------------------------------------------------

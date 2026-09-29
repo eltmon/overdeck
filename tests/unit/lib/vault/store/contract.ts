@@ -88,15 +88,41 @@ export function runVaultStoreContract(makeStore: () => Promise<VaultStore>): voi
       expect(creates.sort()).toEqual(['conflict', 'ok']);
     });
 
-    it('the reserved keywrap/v1 slot stores and reads like an object (PAN-4328 reservation)', async () => {
+    it('putSlot creates the reserved keywrap/v1 slot and getObject/hasObjects read it', async () => {
       const store = await makeStore();
       expect(await store.getObject(KEYWRAP_OBJECT_NAME)).toBeNull();
       expect(await store.hasObjects([KEYWRAP_OBJECT_NAME, ID_A])).toEqual(new Set());
       const wrapped = randomBytes(96);
-      await store.putObjects([{ id: KEYWRAP_OBJECT_NAME, bytes: wrapped }]);
+      await store.putSlot(KEYWRAP_OBJECT_NAME, wrapped);
       expect(Buffer.from((await store.getObject(KEYWRAP_OBJECT_NAME))!).equals(wrapped)).toBe(true);
       expect(await store.hasObjects([KEYWRAP_OBJECT_NAME])).toEqual(new Set([KEYWRAP_OBJECT_NAME]));
       await expect(store.getObject('keywrap/v2')).rejects.toThrow(/Invalid vault object id/);
+    });
+
+    it('store-slot.ac1: putSlot overwrites, deletes with null, and a second delete resolves', async () => {
+      const store = await makeStore();
+      const first = randomBytes(96);
+      const second = randomBytes(96);
+      await store.putSlot(KEYWRAP_OBJECT_NAME, first);
+      await store.putSlot(KEYWRAP_OBJECT_NAME, second);
+      expect(Buffer.from((await store.getObject(KEYWRAP_OBJECT_NAME))!).equals(second)).toBe(true);
+      // Re-setting identical bytes is a no-op, not an error.
+      await expect(store.putSlot(KEYWRAP_OBJECT_NAME, second)).resolves.toBeUndefined();
+      await store.putSlot(KEYWRAP_OBJECT_NAME, null);
+      expect(await store.getObject(KEYWRAP_OBJECT_NAME)).toBeNull();
+      expect(await store.hasObjects([KEYWRAP_OBJECT_NAME])).toEqual(new Set());
+      await expect(store.putSlot(KEYWRAP_OBJECT_NAME, null)).resolves.toBeUndefined();
+    });
+
+    it('store-slot.ac2: putSlot rejects non-slot names and putObjects rejects the slot; nothing is written', async () => {
+      const store = await makeStore();
+      await expect(store.putSlot(ID_A, randomBytes(8))).rejects.toThrow(/Invalid vault slot name/);
+      await expect(store.putSlot('keywrap/v2', randomBytes(8))).rejects.toThrow(/Invalid vault slot name/);
+      await expect(store.putObjects([
+        { id: ID_B, bytes: randomBytes(8) },
+        { id: KEYWRAP_OBJECT_NAME, bytes: randomBytes(96) },
+      ])).rejects.toThrow('Reserved vault object keywrap/v1 must be written with putSlot');
+      expect(await store.hasObjects([ID_A, ID_B, KEYWRAP_OBJECT_NAME])).toEqual(new Set());
     });
 
     it('listRefs filters by prefix and reports current versions', async () => {

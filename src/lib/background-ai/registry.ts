@@ -102,7 +102,7 @@ export const BACKGROUND_AI_FEATURE_META: readonly BackgroundAiFeatureMeta[] = [
     key: 'jevAcceptanceCriteriaReview',
     label: 'Jev: acceptance-criteria review',
     description:
-      'Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings.',
+      "Sends the id and title text of each acceptance criterion of the plan's non-cancelled items to TypeSafe at plan finalize, for advisory warnings.",
     defaultEnabled: false,
   },
   {

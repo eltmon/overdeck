@@ -52,6 +52,12 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,
   and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
+- `vault/` (PAN-2609) — Session Vault: encrypted off-machine transcript storage. Standalone
+  (Node built-ins + sibling modules only; `tests/unit/lib/vault/import-graph.test.ts`).
+  `store/types.ts` is the `VaultStore` contract (immutable objects + CAS refs; reserved
+  slot `keywrap/v1` for the PAN-4328 passphrase-wrapped key), with `store/dir.ts` and
+  `store/git.ts` backends and a shared contract suite under `tests/unit/lib/vault/store/`.
+  `identity.ts` owns the key and the 24-word phrase. CLI verbs: `src/cli/commands/vault/`.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -158,5 +164,15 @@ facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` ne
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
 Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
+
+## Session Vault (PAN-2609, standalone)
+
+`src/lib/vault/**` + `src/cli/commands/vault/**` (`pan vault`): encrypted off-machine
+storage and cross-machine resume. `settle.ts` appends transcript chunks and a `Settlement`
+to a CAS'd record through `VaultStore` (`store/dir.ts`, `store/git.ts`); `adopt.ts` +
+`materialize.ts` resume elsewhere. Must stay importable without the dashboard, Effect or
+terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
+`wip-capture.ts` / `wip-apply.ts`: encrypted git-bundle snapshots of uncommitted code on
+`Settlement.wip`.
 
 <!-- last-verified: 2026-09-29 -->

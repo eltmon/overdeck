@@ -19,6 +19,12 @@
  * this machine settled; the original record is left untouched. A
  * `VaultOfflineError` anywhere yields `offline` and leaves the local index
  * where it was, so nothing is half-saved.
+ *
+ * PAN-4329: when the transcript has a cwd, each settlement also captures a WIP
+ * code snapshot (`wip-capture.ts`) per `SettleOptions.wip` and stores it on
+ * the new settlement. A forced capture on a `noop` replaces the latest
+ * settlement's `wip` in place (D-2) and only on a record this machine owns
+ * (D-3). A capture never blocks the transcript: failures become skips.
  */
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -44,6 +50,7 @@ import { getOwned, setOwnedTail } from './local-index.js';
 import { scanNewLines, type SecretHit } from './secrets.js';
 import { VaultOfflineError, type VaultStore } from './store/types.js';
 import { countHumanTurns, isHumanTurn, type TurnHarness } from './turns.js';
+import { captureWip, latestWipEntry, pruneWipEntries, type WipCaptureResult, type WipMode } from './wip-capture.js';
 
 export const MAX_SETTLEMENTS_KEPT = 500;
 
@@ -57,10 +64,12 @@ export interface SettleOptions {
   /** Overrides the session id derived from the transcript. */
   nativeSessionId?: string;
   now?: () => Date;
+  /** WIP code-snapshot capture mode (PAN-4329 D-1). Default `'auto'`. */
+  wip?: WipMode;
 }
 
 export type SettleResult =
-  | { verdict: 'noop'; vaultId: string }
+  | { verdict: 'noop'; vaultId: string; wip?: WipCaptureResult }
   | {
       verdict: 'append';
       vaultId: string;
@@ -70,6 +79,8 @@ export type SettleResult =
       version: number;
       /** Set when P-6 saved the lines as a fork of a record another machine now owns. */
       forkedFrom?: { vaultId: string; version: number };
+      /** The WIP capture outcome; absent when the transcript has no cwd. */
+      wip?: WipCaptureResult;
     }
   | { verdict: 'diverged'; vaultId: string; reason: string }
   | { verdict: 'blocked'; vaultId: string; hits: SecretHit[] }
@@ -195,6 +206,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
   const now = options.now ?? (() => new Date());
   const config = options.config ?? (await readVaultConfig());
   const { nativePath, harness, store, keys } = options;
+  const wipMode = options.wip ?? 'auto';
 
   const owned = await getOwned(nativePath);
   const bytes = await readFile(nativePath);
@@ -214,7 +226,10 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
     return { verdict: 'diverged', vaultId, reason: `live file is ${bytes.length} bytes but ${tail.byteOffset} were settled` };
   }
   const continuity = checkContinuity(tail, lines);
-  if (continuity.verdict === 'noop') return { verdict: 'noop', vaultId };
+  if (continuity.verdict === 'noop') {
+    if (wipMode !== 'force' || !owned || !cwd) return { verdict: 'noop', vaultId };
+    return amendLatestWip({ vaultId, cwd, store, keys, config, now });
+  }
   if (continuity.verdict === 'diverged') return { verdict: 'diverged', vaultId, reason: continuity.reason };
 
   const newLines = continuity.newLines;
@@ -317,7 +332,21 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
       logLines: previousLogLines + newLines.length,
       cwdState,
     };
+    const wip = cwd
+      ? await captureWip({
+          cwd,
+          vaultId: target.vaultId,
+          mode: wipMode,
+          previous: latestWipEntry(record.settlements),
+          store,
+          keys,
+          maxBytes: config.wipMaxBytes,
+          now,
+        })
+      : undefined;
+    if (wip?.status === 'captured' || wip?.status === 'skipped') settlement.wip = wip.wip;
     record.settlements = [...record.settlements, settlement];
+    if (wip?.status === 'captured') record.settlements = pruneWipEntries(record.settlements);
     if (record.settlements.length > MAX_SETTLEMENTS_KEPT) {
       const overflow = record.settlements.splice(0, record.settlements.length - MAX_SETTLEMENTS_KEPT);
       const archive = await encodeChunk(overflow.map((entry) => JSON.stringify(entry)), keys);
@@ -352,6 +381,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
           lines: newLines.length,
           version: landedVersion,
           ...(forkedFrom ? { forkedFrom } : {}),
+          ...(wip ? { wip } : {}),
         };
       }
       // Someone else changed the record between our read and write; report it
@@ -367,9 +397,56 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
       lines: newLines.length,
       version,
       ...(forkedFrom ? { forkedFrom } : {}),
+      ...(wip ? { wip } : {}),
     };
   } catch (error) {
     if (error instanceof VaultOfflineError) return { verdict: 'offline', vaultId: owned?.vaultId ?? null };
+    throw error;
+  }
+}
+
+/**
+ * D-2: the transcript did not grow, but a forced capture was asked for. When
+ * this machine owns the record (D-3), replace the latest settlement's `wip`
+ * in place: no new settlement, so versions are unchanged. A CAS conflict drops
+ * the update; the next trigger retries.
+ */
+async function amendLatestWip(options: {
+  vaultId: string;
+  cwd: string;
+  store: VaultStore;
+  keys: VaultSubkeys;
+  config: VaultConfig;
+  now: () => Date;
+}): Promise<SettleResult> {
+  const { vaultId, cwd, store, keys, config, now } = options;
+  try {
+    const me = await ensureEnvironmentIdentity();
+    const name = refName('record', vaultId, keys.K_ref);
+    const current = await readRecord(store, name, keys);
+    const record = current.record;
+    if (!record || record.owner.environmentId !== me.environmentId || record.settlements.length === 0) {
+      return { verdict: 'noop', vaultId };
+    }
+    const wip = await captureWip({
+      cwd,
+      vaultId,
+      mode: 'force',
+      previous: latestWipEntry(record.settlements),
+      store,
+      keys,
+      maxBytes: config.wipMaxBytes,
+      now,
+    });
+    if (wip.status !== 'captured' && wip.status !== 'skipped') return { verdict: 'noop', vaultId, wip };
+    const last = record.settlements.length - 1;
+    record.settlements = [...record.settlements];
+    record.settlements[last] = { ...record.settlements[last]!, wip: wip.wip };
+    if (wip.status === 'captured') record.settlements = pruneWipEntries(record.settlements);
+    const written = await store.casRef(name, current.version, await encryptRef(name, record, keys));
+    return written === 'ok' ? { verdict: 'noop', vaultId, wip } : { verdict: 'noop', vaultId };
+  } catch (error) {
+    if (error instanceof VaultOfflineError) return { verdict: 'offline', vaultId };
     throw error;
   }
 }

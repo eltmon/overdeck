@@ -17,13 +17,31 @@ export function registerVaultCommands(program: Command): void {
     .command('setup <git-url>')
     .description('Enable the vault against your own git remote and print the recovery phrase once')
     .option('--hooks', 'Also register the Claude Code Stop hook that saves after each turn')
+    .option('--passphrase-file <path>', 'Also enable passphrase unlock with the passphrase in this file')
+    .option('--generate-passphrase', 'Also enable passphrase unlock with a generated 6-word passphrase, printed once')
+    .option('--no-passphrase', 'Do not offer passphrase unlock')
     .action(lazyAction(() => import('./setup.js'), 'setupCommand'));
 
   vault
     .command('join <git-url>')
-    .description('Join an existing vault from another machine with the recovery phrase')
+    .description('Join an existing vault from another machine with the vault passphrase or the recovery phrase')
     .option('--phrase-file <path>', 'Read the 24-word recovery phrase from a file instead of prompting')
+    .option('--passphrase-file <path>', 'Read the vault passphrase from a file instead of prompting')
     .action(lazyAction(() => import('./join.js'), 'joinCommand'));
+
+  const passphrase = vault
+    .command('passphrase')
+    .description('Turn passphrase unlock for new machines on (set) or off (remove); the vault key never changes');
+  passphrase
+    .command('set')
+    .description('Wrap the vault key under a passphrase so a new machine can join without the recovery phrase')
+    .option('--passphrase-file <path>', 'Read the passphrase from a file instead of prompting')
+    .option('--generate', 'Generate a 6-word passphrase and print it once')
+    .action(lazyAction(() => import('./passphrase.js'), 'passphraseSetCommand'));
+  passphrase
+    .command('remove')
+    .description('Delete the passphrase unlock object; joining then needs the recovery phrase')
+    .action(lazyAction(() => import('./passphrase.js'), 'passphraseRemoveCommand'));
 
   vault
     .command('status')
@@ -63,6 +81,8 @@ export function registerVaultCommands(program: Command): void {
     .option('--cwd <dir>', 'Working directory to resume in (default: the saved cwd)')
     .option('--no-launch', 'Print the launch command instead of running it')
     .option('--on-drift <choice>', 'When the cwd state differs from the saved state: continue | note | cancel')
+    .option('--no-code', 'Do not apply the saved code snapshot; only continue the conversation')
+    .option('--worktree <dir>', 'Apply the code snapshot into a new git worktree at <dir> instead of the target checkout')
     .action(lazyAction(() => import('./resume.js'), 'resumeCommand'));
 
   vault
@@ -80,8 +100,9 @@ export function registerVaultCommands(program: Command): void {
     .action(lazyAction(() => import('./exclude.js'), 'includeCommand'));
 
   vault
-    .command('allow-secret <id-or-path> <line>')
-    .description('Allow one line that the secret scan blocked, for that record only')
+    .command('allow-secret <id-or-path> [line]')
+    .description('Allow one blocked transcript line, or the blocked code lines of one file, for that record only')
+    .option('--file <path>', 'Allow the blocked lines of this file in the code snapshot (path relative to the repository root)')
     .action(lazyAction(() => import('./allow-secret.js'), 'allowSecretCommand'));
 
   vault

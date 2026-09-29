@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { EVAL_DEFAULT_MAX_OUTPUT_TOKENS, resolveEvalModelConfig } from '../../../../evals/lib/eval-model.js';
 
 describe('resolveEvalModelConfig', () => {
+  it.each([
+    ['claude-opus-5-5', 'anthropic', 'high'],
+    ['claude-sonnet-5-5', 'anthropic', 'high'],
+    ['claude-haiku-4-5', 'anthropic', null],
+    ['gpt-6-sol', 'openai', 'high'],
+    ['gpt-6-luna', 'openai', 'high'],
+  ] as const)('placement model %s resolves to provider %s with effort %s', (id, provider, effort) => {
+    const config = resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: id, OPENAI_API_KEY: 'test' });
+    expect(config.provider).toBe(provider);
+    expect(config.effort).toBe(effort);
+  });
+
   it('rejects when OVERDECK_EVAL_MODEL is unset', () => {
     expect(() => resolveEvalModelConfig({})).toThrow(/OVERDECK_EVAL_MODEL is not set/);
   });
