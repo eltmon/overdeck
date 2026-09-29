@@ -1,0 +1,655 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T09:39:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4328: Session Vault: optional passphrase unlock so a new machine needs no 24 words",
+    "updated": "2026-09-29T09:42:15.688Z"
+  },
+  "plan": {
+    "id": "pan-4328",
+    "title": "Session Vault: optional passphrase unlock so a new machine needs no 24 words",
+    "status": "proposed",
+    "uid": "001236ee-b6c9-4787-bee8-b007166aa245",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T09:39:32Z",
+    "updated": "2026-09-29T09:42:15.688Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4328",
+        "label": "PAN-4328",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4328.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/anywhere-accounts.md",
+        "label": "Design §6.5",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "crypto",
+      "cli",
+      "keywrap"
+    ],
+    "narratives": {
+      "Problem": "A second machine joins a Session Vault only by typing the 24-word recovery phrase. In the dual-boot case no other device can approve the new one, and most people will not have the phrase at hand, so the cross-machine flow fails at the step that matters most.",
+      "Proposal": "Store an optional scrypt-wrapped copy of the vault key K as the reserved object keywrap/v1 (AES-256-GCM under KEK = scrypt(passphrase, salt, N=2^17, r=8, p=1, maxmem 256 MiB), node:crypto only). Add VaultStore.putSlot so the slot can be overwritten, deleted and published immediately on dir and git. Add src/lib/vault/keywrap.ts (wrap, unwrap, strength check, generated 6-word EFF passphrase), pan vault passphrase set|remove, a passphrase offer at setup, and a passphrase-first join that falls back to the recovery phrase. A wrong passphrase fails the local GCM check and writes nothing. Full detail in .pan/drafts/pan-4328.md.",
+      "NonGoals": "- No dashboard unlock screen or account first-run card (no dashboard vault UI exists; vault may not import dashboard code)\n- No hosted overdeck:// backend or authenticated-device release rule (PAN-4297); it only has to implement putSlot later\n- No masked/no-echo input for the passphrase or recovery-phrase prompts\n- No passphrase state in pan vault status\n- No OPAQUE/PAKE, no server-held wrapping key, no unlock tied to a GitHub login\n- No rotation of K and no re-encryption of any object\n- No KDF other than node:crypto scrypt (no argon2, no new dependency)\n- No delays or backoff in the keywrap push retry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a new VaultStore.putSlot(name, bytes|null) operation instead of reusing putObjects",
+        "rationale": "putObjects skips existing ids on both backends and the git backend only commits inside casRef, so it cannot overwrite, delete or publish the keywrap; a dedicated slot write is the smallest correct change and maps onto a PUT/DELETE for the future hosted store."
+      },
+      {
+        "summary": "putObjects now rejects reserved names",
+        "rationale": "Prevents a silent no-op write of keywrap/v1 through the immutable path; only the PAN-4328 reservation test used that path."
+      },
+      {
+        "summary": "Slot writes are last-write-wins with no CAS",
+        "rationale": "Concurrent passphrase sets both wrap the same K, so neither outcome loses data; CAS would add a version protocol for no benefit."
+      },
+      {
+        "summary": "keywrap/v1 is UTF-8 JSON with base64 salt/nonce/ct and ct = ciphertext||tag",
+        "rationale": "The design lists the fields but not the byte encoding; JSON makes the 'decodes only to the fields above' acceptance criterion mechanically checkable."
+      },
+      {
+        "summary": "Passphrase prompts echo like the existing recovery-phrase prompt",
+        "rationale": "Matches current CliIo behavior and avoids changing every test double; masked input for both prompts is a separate change."
+      },
+      {
+        "summary": "Setup validates --passphrase-file before creating anything, and non-TTY setup without flags only prints a hint",
+        "rationale": "Meets the 12-character refusal criterion without leaving a half-set-up vault and keeps every existing non-TTY setup test unchanged."
+      },
+      {
+        "summary": "Passphrases are normalized with NFKC, trimmed and whitespace-collapsed; the strength floor is 16 code points, a 20-entry blocklist and at least 6 distinct characters",
+        "rationale": "The issue asks for a 16-character floor and a small blocklist without listing it; normalization prevents unlock failures from invisible whitespace or Unicode form differences."
+      },
+      {
+        "summary": "The dashboard unlock screen is out of scope",
+        "rationale": "No dashboard vault UI exists and import-graph.test.ts bans dashboard imports from the vault; the design places that screen in the account first-run flow."
+      },
+      {
+        "summary": "Unwrap validates scrypt params (N power of two in [2^14, 2^20], r<=16, p<=4, 128*N*r*p <= 256 MiB) before deriving",
+        "rationale": "A tampered backend object must not be able to make the client allocate unbounded memory."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The seven 'subsystems' are one feature's lockstep surfaces, not independent scope: src/lib/vault (store slot + keywrap), src/cli/commands/vault (three verbs), their tests, sync-sources/skills/pan-vault/SKILL.md and packages/contracts/src/composer-commands.generated.ts (both required in the same commit as any pan vault flag change by lint:skills and lint:slash-commands), and the two doc files the PRD's documentation item names. Only 21 files are touched. Splitting into sibling issues would ship a store slot nobody writes or a CLI verb with no join path, neither of which delivers the issue's acceptance criteria.",
+      "canonicalFilename": "2026-09-29-PAN-4328-session-vault-optional-passphrase-unlock-so-a-new-machine-needs-no-24-words.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "store-slot",
+        "title": "Add VaultStore.putSlot for reserved slots on dir and git backends",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/store/types.ts",
+            "src/lib/vault/store/dir.ts",
+            "src/lib/vault/store/git.ts",
+            "tests/unit/lib/vault/store/contract.ts",
+            "tests/unit/lib/vault/store/git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/store/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/vault/store/dir.test.ts and git.test.ts pass including the new putSlot contract cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "passphrase-cmd",
+            "setup-offer",
+            "join-passphrase"
+          ],
+          "parallelSafeReason": "Touches only src/lib/vault/store/* and its tests; no other item edits those files, so it can run in its own slot alongside eff-wordlist and docs."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-4328.md work item W1 and decisions D-1..D-4. Add putSlot(name, bytes|null) to the VaultStore interface in src/lib/vault/store/types.ts with assertSlotName (only RESERVED_OBJECT_NAMES). Make both putObjects loops throw 'Reserved vault object <id> must be written with putSlot' for reserved names. Dir: writeAtomic or ENOENT-tolerant unlink. Git: inside locked() and chained on casQueue, up to CAS_ATTEMPTS: refreshUnlocked; for null return immediately when the slot file does not exist (a no-match pathspec makes git add exit non-zero and the git() helper throw), else rm it; for bytes writeAtomic; git add -A -- objects/keywrap (never '-- .'); run git diff --cached --name-only -- objects/keywrap and return when stdout is empty (never --quiet, which exits 1 on changes and throws through git()); commit 'vault: keywrap' with COMMIT_IDENTITY; push origin HEAD:main; on push failure undoLocalCommit, resetToRemote, git clean -fdq -- objects/keywrap with .catch(() => undefined), retry on isNonFastForward else throw VaultOfflineError. No delays between attempts. Replace the contract case 'the reserved keywrap/v1 slot stores and reads like an object' with the putSlot cases listed in W1 step 5, and add the three git.test.ts cases in W1 step 6."
+        },
+        "items": [
+          {
+            "id": "store-slot.ac1",
+            "title": "Given an empty store on dir and git, when putSlot('keywrap/v1', A) then putSlot('keywrap/v1', B) runs, then getObject('keywrap/v1') returns B, and after putSlot('keywrap/v1', null) it returns null and a second delete resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-slot.ac2",
+            "title": "Given putSlot on a name that is not reserved ('a'.repeat(40) or 'keywrap/v2'), or putObjects with id 'keywrap/v1', when called, then each rejects and nothing is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-slot.ac3",
+            "title": "Given a git vault, when putSlot writes the slot, then a second clone of the bare remote reads the new bytes and the pushed commit's file list contains only objects/keywrap/v1 even when an untracked content object is pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-slot.ac4",
+            "title": "Given a git clone whose origin points at a missing path, when putSlot runs, then it rejects with VaultOfflineError and objects/keywrap/v1 does not exist in the clone afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eff-wordlist",
+        "title": "Vendor the EFF long wordlist as eff-wordlist.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/eff-wordlist.ts",
+            "tests/unit/lib/vault/eff-wordlist.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/eff-wordlist.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "eff-wordlist.test.ts passes",
+            "file-size guard reports no violation for src/lib/vault/eff-wordlist.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Download https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt and confirm sha256 addd35536511597a02fa0a9ff1e5284677b8883b83e986e43f15a3db996b903e. Write src/lib/vault/eff-wordlist.ts in the style of src/lib/vault/bip39-english.ts: header with source URL, sha256 and 'CC BY 3.0 US, Electronic Frontier Foundation'; export const EFF_LONG as one space-separated string wrapped at about 96 characters per source line (well under 1000 lines); export const EFF_LONG_WORDS = Object.freeze(EFF_LONG.split(' ')). Test per W2 step 3 rebuilds the upstream file text from the words with base-6 dice indices (digits 1-6, 5 chars) and checks the sha256."
+        },
+        "items": [
+          {
+            "id": "eff-wordlist.ac1",
+            "title": "Given EFF_LONG_WORDS, when the test counts it, then it returns 7776 unique entries matching /^[a-z-]+$/ with first 'abacus' and last 'zoom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eff-wordlist.ac2",
+            "title": "Given the words rendered as '<dice index>\\t<word>\\n' lines, when hashed with sha256, then the digest equals addd35536511597a02fa0a9ff1e5284677b8883b83e986e43f15a3db996b903e",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eff-wordlist.ac3",
+            "title": "Given scripts/lint-file-size.sh, when it runs, then it exits 0 with src/lib/vault/eff-wordlist.ts under the 1000-line ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keywrap",
+        "title": "Implement keywrap.ts: wrap, unwrap, strength check and generated passphrase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/keywrap.ts",
+            "tests/unit/lib/vault/keywrap.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/keywrap.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "keywrap.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "passphrase-cmd",
+            "setup-offer",
+            "join-passphrase"
+          ],
+          "parallelSafeReason": "Creates the new files src/lib/vault/keywrap.ts and its test only; no other item edits them, and it runs after eff-wordlist via its blocks edge."
+        },
+        "narrative": {
+          "Action": "PRD W3, the 'keywrap/v1 encoding (decided)' section, D-12, D-13 and D-15. Create src/lib/vault/keywrap.ts exporting exactly the API in W3: KEYWRAP_AAD, KEYWRAP_MAXMEM (256 MiB), DEFAULT_KEYWRAP_PARAMS {N:131072,r:8,p:1}, PASSPHRASE_MIN_LENGTH 16, GENERATED_PASSPHRASE_WORDS 6, KeywrapFormatError, normalizePassphrase (NFKC, trim, collapse whitespace), checkPassphraseStrength (code-point length >= 16, D-12 blocklist compared after lowercasing and stripping non [a-z0-9], fewer than 6 distinct chars refused), generatePassphrase (6 EFF words via crypto.randomInt joined by spaces), wrapVaultKey(key, passphrase, params?), parseKeywrap(bytes) with every validation listed in the encoding section, unwrapVaultKey(bytes, passphrase) returning null on GCM failure, and the five D-13 message constants. JSON with exactly eight keys; ct = 32-byte ciphertext || 16-byte tag, base64. Use promisify(scrypt) with maxmem, never scryptSync. Imports: node built-ins and ./eff-wordlist.js only. Unit tests use {N:2**14,r:8,p:1}; one test uses DEFAULT_KEYWRAP_PARAMS."
+        },
+        "items": [
+          {
+            "id": "keywrap.ac1",
+            "title": "Given a 32-byte key and a passphrase, when wrapVaultKey then unwrapVaultKey run (including once at DEFAULT_KEYWRAP_PARAMS), then unwrap returns the key byte for byte, and a whitespace/NFKC variant of the passphrase also unwraps it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keywrap.ac2",
+            "title": "Given a wrapped key, when unwrapVaultKey runs with a different passphrase, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keywrap.ac3",
+            "title": "Given the wrapped bytes, when JSON.parse runs, then the sorted keys equal ['N','ct','kdf','nonce','p','r','salt','v'] and salt/nonce/ct decode to 16/12/48 bytes; parseKeywrap rejects an extra key, v:2, kdf:'argon2', N:3, N:2**21, r:32, a 15-byte salt and non-JSON bytes with KeywrapFormatError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keywrap.ac4",
+            "title": "Given a 12-character passphrase, when checkPassphraseStrength runs, then it returns {ok:false, message: PASSPHRASE_LENGTH_MESSAGE}; 'Correct Horse Battery Staple' and 'aaaaaaaaaaaaaaaaaaaa' return PASSPHRASE_COMMON_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keywrap.ac5",
+            "title": "Given generatePassphrase(), when called, then it returns 6 space-separated words that are all in EFF_LONG_WORDS, and checkPassphraseStrength of the result returns {ok:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "passphrase-cmd",
+        "title": "Add pan vault passphrase set|remove",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/passphrase.ts",
+            "src/cli/commands/vault/index.ts",
+            "src/cli/commands/vault/shared.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/vault/passphrase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/passphrase.test.ts",
+            "npm run typecheck",
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "passphrase.test.ts passes",
+            "typecheck completes without errors",
+            "lint:skills and lint:slash-commands exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Add readPassphrase and choosePassphrase to src/cli/commands/vault/shared.ts exactly as W4 step 1 describes. Create src/cli/commands/vault/passphrase.ts with passphraseSetCommand({passphraseFile?, generate?}, io) and passphraseRemoveCommand(_, io): openVault (return when null), both-flags error, strength failure exits 1 with no backend write, set = store.putSlot(KEYWRAP_OBJECT_NAME, await wrapVaultKey(await loadVaultKey(), passphrase)), remove = putSlot(KEYWRAP_OBJECT_NAME, null), generated passphrase printed once with prefix 'Vault passphrase (shown only now): ', VaultOfflineError exits 1 with 'Backend <backend> is unreachable; nothing was changed. Try again later.'. Register the 'passphrase' group with 'set' (--passphrase-file <path>, --generate) and 'remove' in src/cli/commands/vault/index.ts using lazyAction, with the descriptions in W4 step 3. Update sync-sources/skills/pan-vault/SKILL.md with a 'Passphrase unlock' block and regenerate the manifest with 'npm run build:cli && npm run generate:slash-commands' in the same commit."
+        },
+        "items": [
+          {
+            "id": "passphrase-cmd.ac1",
+            "title": "Given a dir-backend vault, when pan vault passphrase set --passphrase-file <20+ char file> runs, then <root>/objects/keywrap/v1 exists and unwrapVaultKey of it with that passphrase returns the bytes of vault/key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "passphrase-cmd.ac2",
+            "title": "Given a 12-character passphrase file, when passphrase set runs, then it exits 1 printing PASSPHRASE_LENGTH_MESSAGE and objects/keywrap/v1 does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "passphrase-cmd.ac3",
+            "title": "Given passphrase set --generate, when it runs, then stdout contains exactly one 'Vault passphrase (shown only now): ' line with 6 words that unwraps the stored object, and a later set with another passphrase replaces the object while vault/key bytes stay unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "passphrase-cmd.ac4",
+            "title": "Given a vault with a passphrase, when pan vault passphrase remove runs, then objects/keywrap/v1 is gone and machine B's joinCommand with the recovery phrase file exits 0 and writes the same vault/key bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "passphrase-cmd.ac5",
+            "title": "Given pan vault --help after npm run build:cli, when lint:skills and lint:slash-commands run, then both exit 0 with 'passphrase set' and 'passphrase remove' present in SKILL.md and composer-commands.generated.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-offer",
+        "title": "Offer passphrase unlock in pan vault setup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/setup.ts",
+            "src/cli/commands/vault/index.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/vault/setup-passphrase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/setup-passphrase.test.ts tests/unit/cli/vault/setup.test.ts tests/unit/cli/vault/setup-hooks.test.ts",
+            "npm run typecheck",
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "setup-passphrase.test.ts, setup.test.ts and setup-hooks.test.ts pass",
+            "typecheck completes without errors",
+            "lint:skills and lint:slash-commands exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5, D-6 and D-7. Add passphraseFile, generatePassphrase and passphrase (false from --no-passphrase) to SetupOptions. Before readVaultConfig: both-flags error and, with --passphrase-file, read + checkPassphraseStrength; failure prints the message and exits 1 before any key, clone, config or remote write. After KEY_LOSS_WARNING (only when a new key was created) run the D-7 decision tree: --no-passphrase nothing; file; generated (printed once); TTY prompt with a generated suggestion (Enter = suggestion, 'skip' = none, weak typed passphrase re-prompts up to 3 attempts then PASSPHRASE_LATER_HINT); non-TTY without flags prints PASSPHRASE_LATER_HINT only. Store with store.putSlot(KEYWRAP_OBJECT_NAME, await wrapVaultKey(key, passphrase)); VaultOfflineError prints 'Could not store the passphrase: <message>. Run: pan vault passphrase set' and setup still exits 0. Register --passphrase-file <path>, --generate-passphrase and --no-passphrase in index.ts, update SKILL.md and regenerate the manifest (npm run build:cli && npm run generate:slash-commands)."
+        },
+        "items": [
+          {
+            "id": "setup-offer.ac1",
+            "title": "Given a 12-character --passphrase-file, when pan vault setup <bare-remote> runs, then it exits 1 with PASSPHRASE_LENGTH_MESSAGE, no vault/key or vault/git exists, the config backend is unset and the bare remote has no main branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-offer.ac2",
+            "title": "Given --generate-passphrase, when setup runs, then stdout has one 24-word line and one 'Vault passphrase (shown only now): ' 6-word line, and the bare remote's main tree contains objects/keywrap/v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-offer.ac3",
+            "title": "Given a TTY io with answers [''], when setup runs, then the printed suggestion unwraps the stored keywrap; with answers ['short','skip'] PASSPHRASE_LENGTH_MESSAGE is printed once and no keywrap is stored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-offer.ac4",
+            "title": "Given a non-TTY io with no passphrase flags, when setup runs, then it prints PASSPHRASE_LATER_HINT, stores no keywrap, and the existing setup.test.ts and setup-hooks.test.ts files exit 0 unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-passphrase",
+        "title": "Make pan vault join try the passphrase before the recovery phrase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4328",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/join.ts",
+            "src/cli/commands/vault/index.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/vault/join-passphrase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/join-passphrase.test.ts tests/unit/cli/vault/setup.test.ts tests/unit/cli/vault/list-show.test.ts",
+            "npm run typecheck",
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "join-passphrase.test.ts, setup.test.ts and list-show.test.ts pass",
+            "typecheck completes without errors",
+            "lint:skills and lint:slash-commands exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Its shared files (index.ts, SKILL.md, the generated manifest) are serialized behind setup-offer and passphrase-cmd by blocks edges; join.ts and its test are touched by no other item."
+        },
+        "narrative": {
+          "Action": "PRD W6, D-8..D-11. Add passphraseFile to JoinOptions (both --phrase-file and --passphrase-file → exit 1). With --phrase-file keep today's phrase-first flow. Otherwise open/clone the store first; if a git clone pre-existed, refresh() ignoring VaultOfflineError; getObject(KEYWRAP_OBJECT_NAME); if absent and --passphrase-file was given exit 1 with the D-11 message; if present and parseKeywrap throws KeywrapFormatError print KEYWRAP_UNREADABLE_MESSAGE and go straight to the recovery phrase without any passphrase prompt (track a 'parsed' flag as in the PRD sketch); else prompt 'Vault passphrase (press Enter to use the recovery phrase instead): ' (or read --passphrase-file); non-empty → unwrapVaultKey; null → print PASSPHRASE_MISMATCH_MESSAGE, remove a clone join created, exit 1 without reading the header. An empty answer or no keywrap → the existing recovery-phrase prompt; a phraseToKey error now also removes a created clone. On success keep the existing readVaultHeader check, saveVaultKey, writeVaultConfig and syncOnce. Register --passphrase-file <path> and the new join description in index.ts, update SKILL.md, regenerate the manifest. Tests run over dir and git backends with describe.each per W6."
+        },
+        "items": [
+          {
+            "id": "join-passphrase.ac1",
+            "title": "Given machine A set up with --passphrase-file and one saved transcript, when machine B with an empty OVERDECK_HOME runs joinCommand and answers the passphrase, then it exits 0, no prompt contained 'Recovery phrase', vault/key equals machine A's bytes and listCommand prints the saved title (dir and git)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-passphrase.ac2",
+            "title": "Given a wrong passphrase on the dir backend, when join runs, then it exits 1 with stderr [PASSPHRASE_MISMATCH_MESSAGE], no vault/key or config backend is written, and DirVaultStore spies show getObject called once with 'keywrap/v1' and readRef, casRef, putObjects, putSlot, listRefs and hasObjects never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-passphrase.ac3",
+            "title": "Given a wrong passphrase on the git backend, when join runs, then it exits 1 with the same message, no vault/key or vault/git exists, and the bare remote's main sha is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-passphrase.ac4",
+            "title": "Given answers ['', <recovery phrase>], when join runs against a vault with a keywrap, then it falls back to the recovery-phrase prompt and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-passphrase.ac5",
+            "title": "Given a joined vault, when the test byte-scans every blob on main of the bare remote and every file of the dir root, then neither raw, hex nor base64 K nor the UTF-8 passphrase is found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document passphrase unlock in SESSION-VAULT.md and session-vault.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:39:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4328",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Passphrase unlock' docs/SESSION-VAULT.md configuration/session-vault.mdx",
+            "grep -n 'pan vault passphrase set' docs/SESSION-VAULT.md configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "one '## Passphrase unlock' heading printed per file",
+            "both files contain 'pan vault passphrase set'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. docs/SESSION-VAULT.md: in the Model table 'Backend' row replace 'Phase A never writes it' with 'written and deleted only through putSlot, which publishes immediately (PAN-4328)'; add '## Passphrase unlock' after '## Encryption and the key' with the eight-field keywrap/v1 table, KEK derivation with maxmem 256 MiB, normalization, the strength rule (16 characters, blocklist, 6 distinct characters, generated 6-word EFF default ≈ 77 bits), the offline-guessing tradeoff (each guess costs 128 MiB and one scrypt derivation), and that the recovery phrase stays the root of recovery; add 'pan vault passphrase set [--passphrase-file p | --generate]', 'pan vault passphrase remove' and the new setup/join flags to '## Commands'; add keywrap.ts and eff-wordlist.ts to '## Module map'. configuration/session-vault.mdx: add '## Passphrase unlock' after '## Join from a second machine' covering the setup offer, set/remove, join trying the passphrase first with Enter falling back to the phrase, the exact message 'The passphrase did not unlock this vault.', and a <Warning> about offline guessing and the recovery phrase remaining the root of recovery."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/SESSION-VAULT.md, when read, then a '## Passphrase unlock' section lists the eight keywrap/v1 fields, the 16-character rule and the offline-guessing tradeoff, and '## Commands' lists pan vault passphrase set and remove",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/session-vault.mdx, when rendered, then a '## Passphrase unlock' section shows pan vault passphrase set and remove, the message 'The passphrase did not unlock this vault.' and a <Warning> stating the recovery phrase remains the root of recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/SESSION-VAULT.md, when grepped for 'Phase A never writes it', then it returns no match and the Module map row names keywrap.ts and eff-wordlist.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-slot",
+        "to": "passphrase-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "eff-wordlist",
+        "to": "keywrap",
+        "type": "blocks"
+      },
+      {
+        "from": "keywrap",
+        "to": "passphrase-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "passphrase-cmd",
+        "to": "setup-offer",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-offer",
+        "to": "join-passphrase",
+        "type": "blocks"
+      },
+      {
+        "from": "passphrase-cmd",
+        "to": "join-passphrase",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
