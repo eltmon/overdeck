@@ -80,8 +80,9 @@ export function registerVaultCommands(program: Command): void {
     .action(lazyAction(() => import('./exclude.js'), 'includeCommand'));
 
   vault
-    .command('allow-secret <id-or-path> <line>')
-    .description('Allow one line that the secret scan blocked, for that record only')
+    .command('allow-secret <id-or-path> [line]')
+    .description('Allow one blocked transcript line, or the blocked code lines of one file, for that record only')
+    .option('--file <path>', 'Allow the blocked lines of this file in the code snapshot (path relative to the repository root)')
     .action(lazyAction(() => import('./allow-secret.js'), 'allowSecretCommand'));
 
   vault
