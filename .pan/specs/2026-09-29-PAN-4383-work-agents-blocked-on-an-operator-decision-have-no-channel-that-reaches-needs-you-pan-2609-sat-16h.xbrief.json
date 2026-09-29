@@ -4,17 +4,17 @@
     "created": "2026-09-29T06:19:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4383: Work agents blocked on an operator decision have no channel that reaches Needs-you (PAN-2609 sat 16h)",
-    "updated": "2026-09-29T06:21:21.588Z"
+    "updated": "2026-09-29T06:22:01.344Z"
   },
   "plan": {
     "id": "pan-4383",
     "title": "Work agents blocked on an operator decision have no channel that reaches Needs-you (PAN-2609 sat 16h)",
-    "status": "proposed",
+    "status": "running",
     "uid": "dd17d8d6-e1a6-45e5-ac94-e5078671c5d7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T06:19:05Z",
-    "updated": "2026-09-29T06:21:21.588Z",
+    "updated": "2026-09-29T06:22:01.344Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4383",
