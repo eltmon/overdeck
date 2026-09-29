@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4383",
   "created": "2026-09-29T06:22:16.508Z",
-  "updated": "2026-09-29T07:46:07.583Z",
+  "updated": "2026-09-29T07:46:19.754Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "operator-message-closes.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T07:46:07.582Z"
+    },
+    "derived-attention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:19.754Z"
     }
   }
 }
