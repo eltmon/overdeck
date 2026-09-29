@@ -17,6 +17,9 @@ export function registerVaultCommands(program: Command): void {
     .command('setup <git-url>')
     .description('Enable the vault against your own git remote and print the recovery phrase once')
     .option('--hooks', 'Also register the Claude Code Stop hook that saves after each turn')
+    .option('--passphrase-file <path>', 'Also enable passphrase unlock with the passphrase in this file')
+    .option('--generate-passphrase', 'Also enable passphrase unlock with a generated 6-word passphrase, printed once')
+    .option('--no-passphrase', 'Do not offer passphrase unlock')
     .action(lazyAction(() => import('./setup.js'), 'setupCommand'));
 
   vault

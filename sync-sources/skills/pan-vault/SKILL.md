@@ -19,6 +19,9 @@ Session Vault stores agent transcripts, encrypted, in a git remote the user owns
 ```bash
 pan vault setup <git-url>          # enable; prints the 24-word recovery phrase ONCE
 pan vault setup <git-url> --hooks  # also register the Claude Code Stop hook (saves after each turn)
+pan vault setup <git-url> --generate-passphrase        # also turn on passphrase unlock with a generated 6-word passphrase
+pan vault setup <git-url> --passphrase-file <path>     # also turn on passphrase unlock with the passphrase in this file
+pan vault setup <git-url> --no-passphrase              # do not offer passphrase unlock
 pan vault join <git-url>           # second machine: enter the phrase
 pan vault join <git-url> --phrase-file <path>
 pan vault status                   # backend, this machine, owned records, last sync, machines
@@ -26,6 +29,8 @@ pan vault status --json
 ```
 
 With no backend configured every verb except `setup` and `join` prints `Session Vault is off. Run: pan vault setup <git-url>` and exits 0.
+
+After printing the recovery phrase, setup on a TTY offers passphrase unlock with a suggested passphrase (Enter accepts it, `skip` declines); a non-TTY run without a flag prints a hint to run `pan vault passphrase set` later. A `--passphrase-file` shorter than 16 characters is refused before anything is created.
 
 The recovery phrase is the vault key. Anyone with these words can read the vault; losing every device and these words loses the vault. Store it in a password manager.
 
