@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T00:53:47.540Z",
+  "updated": "2026-09-29T00:54:09.479Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4334",
       "claimedAt": "2026-09-29T00:46:06.120Z",
       "doneAt": "2026-09-29T00:53:47.540Z"
+    },
+    "pack-registry": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T00:54:09.479Z"
     }
   }
 }
