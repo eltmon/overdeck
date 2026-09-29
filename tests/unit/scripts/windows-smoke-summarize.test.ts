@@ -40,6 +40,14 @@ describe('windows-smoke summarize renderTable', () => {
     expect(row(md, '1c')).toContain('❌ fail: server up, GET / -> 404');
   });
 
+  it('keeps an expected env without a results file as a column of missing cells', () => {
+    const md = renderTable([pwsh], { expectedEnvs: ['windows-pwsh', 'windows-gitbash'] });
+
+    expect(md).toContain('| Step | windows-pwsh | windows-gitbash |');
+    expect(md).toContain('- **windows-gitbash**: ⚠️ no results file');
+    expect(row(md, '3a')).toBe('| 3a vault join | ✅ pass | missing |');
+  });
+
   it('marks a step a results file lacks as missing', () => {
     const md = renderTable([wsl, pwsh]);
 

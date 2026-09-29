@@ -59,8 +59,8 @@ function truncate(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-function orderEnvs(results) {
-  const envs = [...new Set(results.map((r) => r.env))];
+function orderEnvs(results, expectedEnvs = []) {
+  const envs = [...new Set([...expectedEnvs, ...results.map((r) => r.env)])];
   const known = ENV_ORDER.filter((env) => envs.includes(env));
   const others = envs.filter((env) => !ENV_ORDER.includes(env)).sort();
   return [...known, ...others];
@@ -93,10 +93,12 @@ function fence(text) {
 
 /**
  * Render the whole report. `results` is the parsed probe files; `options.runUrl`
- * names the workflow run and `options.problems` lists files that did not parse.
+ * names the workflow run, `options.problems` lists files that did not parse, and
+ * `options.expectedEnvs` are columns to show even without a results file (every
+ * cell then reads `missing`), so a probe that died cannot drop its column.
  */
 export function renderTable(results, options = {}) {
-  const envs = orderEnvs(results);
+  const envs = orderEnvs(results, options.expectedEnvs);
   const byEnv = new Map(results.map((r) => [r.env, r]));
   const out = ['# windows-smoke results', ''];
   if (options.runUrl) out.push(`Run: ${options.runUrl}`, '');
@@ -104,6 +106,10 @@ export function renderTable(results, options = {}) {
   if (subjects.length > 0) out.push(`Subject: ${subjects.join('; ')}`, '');
   for (const env of envs) {
     const r = byEnv.get(env);
+    if (!r) {
+      out.push(`- **${env}**: ⚠️ no results file (the probe did not finish or its upload is missing)`);
+      continue;
+    }
     const diagnostic = DIAGNOSTIC_ENVS[env] ? ` (${DIAGNOSTIC_ENVS[env]})` : '';
     out.push(`- **${env}**: ${r.runner ?? '?'}; node ${r.node ?? '?'}; ${r.git ?? '?'}${diagnostic}`);
   }
@@ -178,5 +184,8 @@ if (isMain) {
     ? `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`
     : undefined;
   const { results, problems } = loadResults(dir);
-  process.stdout.write(renderTable(results, { runUrl, problems }));
+  // The workflow always runs these legs; WSL1 replaces WSL2 under the PRD's CP-3 fallback.
+  const wsl = results.some((r) => r.env === 'wsl1-fallback') ? 'wsl1-fallback' : 'wsl2';
+  const expectedEnvs = ['windows-pwsh', 'windows-gitbash', wsl];
+  process.stdout.write(renderTable(results, { runUrl, problems, expectedEnvs }));
 }
