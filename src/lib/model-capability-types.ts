@@ -61,6 +61,13 @@ export interface ModelCapability {
    *     left undefined pending the per-model vision audit in PAN-1685.
    */
   supportsImages?: boolean;
+  /**
+   * Whether the model accepts non-default sampling parameters (`temperature`,
+   * `top_p`, `top_k`). `false` = the API returns 400 for them, so callers must
+   * omit them; `undefined` = accepted. Populate `false` only from the
+   * provider's model docs (Claude API thinking/sampling table, PAN-4327).
+   */
+  supportsSamplingParams?: boolean;
   /** Additional notes about this model's strengths */
   notes?: string;
 }

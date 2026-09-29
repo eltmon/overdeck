@@ -1,0 +1,265 @@
+{
+  "version": "1",
+  "issueId": "PAN-4327",
+  "created": "2026-09-29T00:25:15.717Z",
+  "updated": "2026-09-29T01:42:33.888Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "sampling-capability-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:25:15.716Z",
+      "doneAt": "2026-09-29T00:30:48.292Z"
+    },
+    "sonnet-55-catalog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:30:56.647Z",
+      "doneAt": "2026-09-29T00:38:34.183Z"
+    },
+    "claude-flag-full-sonnet-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:38:41.677Z",
+      "doneAt": "2026-09-29T00:40:58.347Z"
+    },
+    "sonnet-55-cost-pricing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:41:08.919Z",
+      "doneAt": "2026-09-29T00:43:38.038Z"
+    },
+    "sonnet-55-cost-normalization": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:43:42.498Z",
+      "doneAt": "2026-09-29T00:46:06.789Z"
+    },
+    "sonnet-55-compaction-budget": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:46:11.331Z",
+      "doneAt": "2026-09-29T00:48:31.776Z"
+    },
+    "sonnet-55-frontend-pickers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:48:35.908Z",
+      "doneAt": "2026-09-29T00:52:02.795Z"
+    },
+    "sonnet-55-friendly-name": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:52:10.617Z",
+      "doneAt": "2026-09-29T00:54:12.869Z"
+    },
+    "memory-providers-omit-sampling": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:54:16.675Z",
+      "doneAt": "2026-09-29T00:57:01.414Z"
+    },
+    "tts-summarizer-omit-sampling": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:57:08.012Z",
+      "doneAt": "2026-09-29T00:59:34.563Z"
+    },
+    "sonnet-55-backend-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:59:38.743Z",
+      "doneAt": "2026-09-29T01:13:07.020Z"
+    },
+    "sonnet-55-dashboard-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T01:13:11.578Z",
+      "doneAt": "2026-09-29T01:15:53.004Z"
+    },
+    "sonnet-55-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T01:15:57.478Z",
+      "doneAt": "2026-09-29T01:19:03.406Z"
+    },
+    "sonnet-55-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T01:19:07.840Z",
+      "doneAt": "2026-09-29T01:20:04.108Z"
+    },
+    "sampling-capability-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:34:31.294Z"
+    },
+    "sampling-capability-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:35:31.884Z"
+    },
+    "sampling-capability-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:35:42.362Z"
+    },
+    "sonnet-55-catalog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:35:52.563Z"
+    },
+    "sonnet-55-catalog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:03.105Z"
+    },
+    "sonnet-55-catalog-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:13.661Z"
+    },
+    "sonnet-55-catalog-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:24.683Z"
+    },
+    "claude-flag-full-sonnet-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:35.060Z"
+    },
+    "claude-flag-full-sonnet-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:45.190Z"
+    },
+    "claude-flag-full-sonnet-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:36:55.699Z"
+    },
+    "sonnet-55-cost-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:05.909Z"
+    },
+    "sonnet-55-cost-pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:16.274Z"
+    },
+    "sonnet-55-cost-pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:26.832Z"
+    },
+    "sonnet-55-cost-normalization.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:36.718Z"
+    },
+    "sonnet-55-cost-normalization.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:47.590Z"
+    },
+    "sonnet-55-cost-normalization.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:37:57.529Z"
+    },
+    "sonnet-55-compaction-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:38:08.049Z"
+    },
+    "sonnet-55-compaction-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:38:19.116Z"
+    },
+    "sonnet-55-compaction-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:38:30.349Z"
+    },
+    "sonnet-55-frontend-pickers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:38:41.298Z"
+    },
+    "sonnet-55-frontend-pickers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:38:52.695Z"
+    },
+    "sonnet-55-frontend-pickers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:04.080Z"
+    },
+    "sonnet-55-friendly-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:14.338Z"
+    },
+    "sonnet-55-friendly-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:24.361Z"
+    },
+    "memory-providers-omit-sampling.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:33.961Z"
+    },
+    "memory-providers-omit-sampling.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:43.441Z"
+    },
+    "memory-providers-omit-sampling.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:39:53.115Z"
+    },
+    "memory-providers-omit-sampling.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:03.155Z"
+    },
+    "tts-summarizer-omit-sampling.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:14.723Z"
+    },
+    "tts-summarizer-omit-sampling.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:25.396Z"
+    },
+    "sonnet-55-backend-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:36.691Z"
+    },
+    "sonnet-55-backend-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:46.594Z"
+    },
+    "sonnet-55-backend-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:40:56.880Z"
+    },
+    "sonnet-55-backend-defaults.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:41:08.076Z"
+    },
+    "sonnet-55-dashboard-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:41:19.148Z"
+    },
+    "sonnet-55-dashboard-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:41:30.536Z"
+    },
+    "sonnet-55-dashboard-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:41:41.754Z"
+    },
+    "sonnet-55-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:41:53.240Z"
+    },
+    "sonnet-55-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:42:04.335Z"
+    },
+    "sonnet-55-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:42:14.282Z"
+    },
+    "sonnet-55-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:42:23.888Z"
+    },
+    "sonnet-55-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:42:33.888Z"
+    }
+  }
+}

@@ -46,7 +46,7 @@ const CALLOUTS = ['off', 'notify', 'corroborate'] as const;
 // Frontier models stay fully selectable — they are just never the unchosen
 // default. Enforced by __tests__/TieredExecutionSection.test.tsx.
 export const DEFAULT_MODEL = 'claude-haiku-4-5';
-export const DEFAULT_SUPERVISOR_MODEL = 'claude-sonnet-5';
+export const DEFAULT_SUPERVISOR_MODEL = 'claude-sonnet-5-5';
 
 function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
   return {

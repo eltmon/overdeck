@@ -91,6 +91,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
   },
 
@@ -115,6 +116,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 100,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Released 2026-09-22 for long-running agentic coding and knowledge work. Native 1M context, 128K max output, always-on adaptive thinking, Medium default effort, and $4/$20 per MTok API pricing. Skill scores inherit the Opus 5 baseline until benchmarked.',
   },
 
@@ -138,6 +140,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 100,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Opus generation released 2026-07-24. Near-Fable-5 capability at half the cost ($5/$25 per MTok, same as Opus 4.8). Adaptive thinking on by default; full effort range with stronger low/medium than 4.8; disabling thinking is capped at effort high. 1M context, 128K max output, May 2026 knowledge cutoff. Scores provisional — verify against benchmarks.',
   },
 
@@ -161,6 +164,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks.',
   },
 
@@ -184,6 +188,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks.',
   },
 
@@ -232,7 +237,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
-    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; pricing is $2/M input and $10/M output; the planned September increase was cancelled. Scores are provisional until benchmarks are verified.',
+    supportsSamplingParams: false,
+    notes: 'Previous Sonnet generation (June 2026); superseded by Sonnet 5.5. Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; pricing is $2/M input and $10/M output; the planned September increase was cancelled. Scores are provisional until benchmarks are verified.',
   },
 
   'claude-sonnet-4-6': {
@@ -1403,4 +1409,14 @@ export function getModelEffortLevels(model: ModelId | string): readonly EffortLe
 export function modelSupportsImages(model: ModelId | string): boolean {
   const resolved = resolveModelId(String(model));
   return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsImages !== false;
+}
+
+/**
+ * Whether `temperature`/`top_p`/`top_k` may be sent to a model. Returns
+ * `false` ONLY for models whose capability sets `supportsSamplingParams:
+ * false`; unknown IDs are allowed. Resolves deprecated IDs first (PAN-4327).
+ */
+export function modelSupportsSamplingParams(model: ModelId | string): boolean {
+  const resolved = resolveModelId(String(model));
+  return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsSamplingParams !== false;
 }

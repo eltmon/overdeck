@@ -46,7 +46,7 @@ declare -A BASELINE=(
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
   ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
   ["src/lib/overdeck/conversation-delivery.ts"]=1                # PAN-4254
-  ["src/dashboard/frontend/src/components/chat/ModelPicker.tsx"]=28  # PAN-4259
+  ["src/dashboard/frontend/src/components/chat/ModelPicker.tsx"]=30  # PAN-4259, +2 PAN-4327 (Sonnet 5.5 rows)
 )
 
 PATTERNS=(

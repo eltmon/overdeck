@@ -29,6 +29,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-opus-4-8': 'anthropic',
   'claude-opus-4-7': 'anthropic',
   'claude-opus-4-6': 'anthropic',
+  'claude-sonnet-5-5': 'anthropic',
   'claude-sonnet-5': 'anthropic',
   'claude-sonnet-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
@@ -120,89 +121,89 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  * Fallback mapping: non-Anthropic model → Anthropic equivalent
  *
  * Mapping strategy:
- * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 5 (good balance)
+ * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 5.5 (good balance)
  * - Economy models (GPT-4o-mini, Gemini Flash) → Haiku 4.5
- * - GPT-4o → Sonnet 5 (similar tier)
+ * - GPT-4o → Sonnet 5.5 (similar tier)
  *
  * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
  * Users who want Opus can explicitly set it in their config.
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
-  'gpt-6-astra': 'claude-sonnet-5', // GPT-6 flagship → Sonnet
-  'gpt-5.6-sol': 'claude-sonnet-5', // Flagship model → Sonnet
-  'gpt-5.6-terra': 'claude-sonnet-5', // Balanced model → Sonnet
+  'gpt-6-astra': 'claude-sonnet-5-5', // GPT-6 flagship → Sonnet
+  'gpt-5.6-sol': 'claude-sonnet-5-5', // Flagship model → Sonnet
+  'gpt-5.6-terra': 'claude-sonnet-5-5', // Balanced model → Sonnet
   'gpt-5.6-luna': 'claude-haiku-4-5', // Fast/cheap tier → Haiku
-  'gpt-6-sol': 'claude-sonnet-5', // GPT-6 mid tier → Sonnet
+  'gpt-6-sol': 'claude-sonnet-5-5', // GPT-6 mid tier → Sonnet
   'gpt-6-luna': 'claude-haiku-4-5', // GPT-6 fast/cheap tier → Haiku
-  'gpt-5.5': 'claude-sonnet-5', // Flagship model → Sonnet
-  'gpt-5.5-pro': 'claude-sonnet-5', // Top-tier model → Sonnet
-  'gpt-5.4': 'claude-sonnet-5', // Flagship model → Sonnet
+  'gpt-5.5': 'claude-sonnet-5-5', // Flagship model → Sonnet
+  'gpt-5.5-pro': 'claude-sonnet-5-5', // Top-tier model → Sonnet
+  'gpt-5.4': 'claude-sonnet-5-5', // Flagship model → Sonnet
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
-  'gpt-5.4-pro': 'claude-sonnet-5', // Top-tier model → Sonnet
-  'gpt-5.3-codex': 'claude-sonnet-5', // Coding flagship → Sonnet
+  'gpt-5.4-pro': 'claude-sonnet-5-5', // Top-tier model → Sonnet
+  'gpt-5.3-codex': 'claude-sonnet-5-5', // Coding flagship → Sonnet
   'gpt-5.3-codex-spark': 'claude-haiku-4-5', // Ultra-fast coder → Haiku
-  'gpt-5.2': 'claude-sonnet-5', // Previous-gen flagship → Sonnet
-  'o3': 'claude-sonnet-5', // Reasoning model → Sonnet
-  'o4-mini': 'claude-sonnet-5', // Compact reasoning model → Sonnet
+  'gpt-5.2': 'claude-sonnet-5-5', // Previous-gen flagship → Sonnet
+  'o3': 'claude-sonnet-5-5', // Reasoning model → Sonnet
+  'o4-mini': 'claude-sonnet-5-5', // Compact reasoning model → Sonnet
   // Retired OpenAI IDs — mappings preserve semantic tier intent
-  'o3-deep-research': 'claude-sonnet-5',
+  'o3-deep-research': 'claude-sonnet-5-5',
   // Active OpenAI API names — NOT deprecated. Included here so configs using these
   // IDs still fall back correctly if the OpenAI provider is disabled.
-  'gpt-4o': 'claude-sonnet-5', // flagship-tier → Sonnet
+  'gpt-4o': 'claude-sonnet-5-5', // flagship-tier → Sonnet
   'gpt-4o-mini': 'claude-haiku-4-5', // economy-tier → Haiku
 
   // Google → Anthropic
-  'gemini-3.1-pro-preview': 'claude-sonnet-5', // Flagship → Sonnet
+  'gemini-3.1-pro-preview': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
   // Deprecated Google IDs
-  'gemini-3-pro-preview': 'claude-sonnet-5',
-  'gemini-2.5-pro': 'claude-sonnet-5',
+  'gemini-3-pro-preview': 'claude-sonnet-5-5',
+  'gemini-2.5-pro': 'claude-sonnet-5-5',
   'gemini-2.5-flash': 'claude-haiku-4-5',
 
   // Kimi → Anthropic
-  'k3': 'claude-sonnet-5', // Coding flagship → Sonnet
-  'k3[1m]': 'claude-sonnet-5', // Long-context coding flagship → Sonnet
-  'kimi-k2.7-code': 'claude-sonnet-5', // Coding flagship → Sonnet
-  'kimi-k2.6': 'claude-sonnet-5', // Latest flagship → Sonnet
-  'kimi-k2.5': 'claude-sonnet-5', // Premium model → Sonnet
-  'kimi-k2': 'claude-sonnet-5', // Previous gen
-  'K2.6-code-preview': 'claude-sonnet-5',
+  'k3': 'claude-sonnet-5-5', // Coding flagship → Sonnet
+  'k3[1m]': 'claude-sonnet-5-5', // Long-context coding flagship → Sonnet
+  'kimi-k2.7-code': 'claude-sonnet-5-5', // Coding flagship → Sonnet
+  'kimi-k2.6': 'claude-sonnet-5-5', // Latest flagship → Sonnet
+  'kimi-k2.5': 'claude-sonnet-5-5', // Premium model → Sonnet
+  'kimi-k2': 'claude-sonnet-5-5', // Previous gen
+  'K2.6-code-preview': 'claude-sonnet-5-5',
 
   // MiniMax → Anthropic
-  'minimax-m2.7': 'claude-sonnet-5', // Near-Opus performance → Sonnet
-  'minimax-m2.7-highspeed': 'claude-sonnet-5', // Same quality, faster → Sonnet
-  'MiniMax-M3': 'claude-sonnet-5', // Top-tier coding → Sonnet
+  'minimax-m2.7': 'claude-sonnet-5-5', // Near-Opus performance → Sonnet
+  'minimax-m2.7-highspeed': 'claude-sonnet-5-5', // Same quality, faster → Sonnet
+  'MiniMax-M3': 'claude-sonnet-5-5', // Top-tier coding → Sonnet
 
   // Z.AI → Anthropic
-  'glm-5.2': 'claude-sonnet-5', // Current GLM flagship → Sonnet
-  'glm-5.1': 'claude-sonnet-5', // Previous GLM flagship → Sonnet
+  'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet
+  'glm-5.1': 'claude-sonnet-5-5', // Previous GLM flagship → Sonnet
   // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of
   // MODEL_DEPRECATIONS resolution order (both resolve glm-4.7→glm-5.1 then FALLBACK_MAP,
   // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
-  'glm-4.7': 'claude-sonnet-5', // strong-tier → Sonnet
+  'glm-4.7': 'claude-sonnet-5-5', // strong-tier → Sonnet
   'glm-4.7-flash': 'claude-haiku-4-5', // economy-tier → Haiku
 
   // MiMo → Anthropic
-  'mimo-v2.5-pro': 'claude-sonnet-5', // Flagship reasoning → Sonnet
-  'mimo-v2.5': 'claude-sonnet-5', // Multimodal → Sonnet
+  'mimo-v2.5-pro': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
+  'mimo-v2.5': 'claude-sonnet-5-5', // Multimodal → Sonnet
 
   // Nous Portal → Anthropic
-  'qwen/qwen3.6-plus': 'claude-sonnet-5',
+  'qwen/qwen3.6-plus': 'claude-sonnet-5-5',
 
   // DashScope → Anthropic
-  'qwen3-max': 'claude-sonnet-5',
-  'qwen3-coder-plus': 'claude-sonnet-5',
+  'qwen3-max': 'claude-sonnet-5-5',
+  'qwen3-coder-plus': 'claude-sonnet-5-5',
   'qwen3-plus': 'claude-haiku-4-5',
-  'qwen3.7-max': 'claude-sonnet-5',
-  'qwen3.8-max': 'claude-sonnet-5',
+  'qwen3.7-max': 'claude-sonnet-5-5',
+  'qwen3.8-max': 'claude-sonnet-5-5',
 
   // xAI → Anthropic
-  'grok-build-0.1': 'claude-sonnet-5', // Coding flagship → Sonnet
+  'grok-build-0.1': 'claude-sonnet-5-5', // Coding flagship → Sonnet
 
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
-  'ql-reason-70b': 'claude-sonnet-5', // Flagship reasoning → Sonnet
+  'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
   'ql-swift-8b': 'claude-haiku-4-5', // Mid-tier → Haiku
   'ql-nano-1b': 'claude-haiku-4-5', // Economy tier → Haiku
 };
@@ -302,7 +303,7 @@ export function isProviderEnabled(
 }
 
 export const DEFAULT_QUICK_ENRICHMENT_MODEL = 'claude-haiku-4-5-20251001';
-export const DEFAULT_DEEP_ENRICHMENT_MODEL = 'claude-sonnet-5';
+export const DEFAULT_DEEP_ENRICHMENT_MODEL = 'claude-sonnet-5-5';
 
 export type EnrichmentTier = 1 | 2 | 3;
 
@@ -341,7 +342,7 @@ function getBestAnthropicAtTier(
   // Determine which tier Anthropic model to use
   if (targetRank >= 2 || originalRank >= 2) {
     // User is pro-tier or original was top-tier → use the current Sonnet.
-    return 'claude-sonnet-5';
+    return 'claude-sonnet-5-5';
   }
   // User is free or plus tier → use Haiku 4.5 for economy
   return 'claude-haiku-4-5';
