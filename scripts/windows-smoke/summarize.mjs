@@ -37,6 +37,12 @@ export const STEP_TITLES = {
 };
 
 const ENV_ORDER = ['windows-pwsh', 'windows-gitbash', 'wsl2'];
+
+/** Legs that exist to look behind a blocker; they rate no supported path. */
+const DIAGNOSTIC_ENVS = {
+  'windows-pwsh-autocrlf-false':
+    'diagnostic: windows-pwsh with `git config --global core.autocrlf false`, to see what breaks behind the step 3a blocker',
+};
 const STATUSES = new Set(['pass', 'fail', 'partial', 'not-run']);
 
 function escapeCell(text) {
@@ -97,7 +103,8 @@ export function renderTable(results, options = {}) {
   if (subjects.length > 0) out.push(`Subject: ${subjects.join('; ')}`, '');
   for (const env of envs) {
     const r = byEnv.get(env);
-    out.push(`- **${env}**: ${r.runner ?? '?'}; node ${r.node ?? '?'}; ${r.git ?? '?'}`);
+    const diagnostic = DIAGNOSTIC_ENVS[env] ? ` (${DIAGNOSTIC_ENVS[env]})` : '';
+    out.push(`- **${env}**: ${r.runner ?? '?'}; node ${r.node ?? '?'}; ${r.git ?? '?'}${diagnostic}`);
   }
   for (const problem of options.problems ?? []) out.push(`- ⚠️ ${problem}`);
   out.push('');
