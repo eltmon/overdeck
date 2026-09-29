@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:13:39.062Z",
+  "updated": "2026-09-29T10:13:51.371Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "keywrap.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T10:13:39.061Z"
+    },
+    "keywrap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:51.371Z"
     }
   }
 }
