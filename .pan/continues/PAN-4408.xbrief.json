@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T15:57:27.927Z",
+  "updated": "2026-09-29T15:57:41.344Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "okf-ci-selftest.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T15:57:27.926Z"
+    },
+    "okf-ci-selftest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:41.344Z"
     }
   }
 }
