@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:31:52.634Z",
+  "updated": "2026-09-29T10:32:05.990Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "save-wip-output.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T10:31:52.634Z"
+    },
+    "allow-secret-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:05.990Z"
     }
   }
 }
