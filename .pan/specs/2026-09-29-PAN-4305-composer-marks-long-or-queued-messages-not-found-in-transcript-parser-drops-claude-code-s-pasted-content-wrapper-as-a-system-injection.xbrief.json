@@ -4,17 +4,17 @@
     "created": "2026-09-29T00:28:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4305: Composer marks long or queued messages \"Not found in transcript\": parser drops Claude Code's <pasted_content> wrapper as a system injection",
-    "updated": "2026-09-29T00:31:57.576Z"
+    "updated": "2026-09-29T00:32:25.369Z"
   },
   "plan": {
     "id": "pan-4305",
     "title": "Composer marks long or queued messages \"Not found in transcript\": parser drops Claude Code's <pasted_content> wrapper as a system injection",
-    "status": "proposed",
+    "status": "running",
     "uid": "01e2a087-323e-420d-b672-0c0ee90b3f8e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T00:28:19Z",
-    "updated": "2026-09-29T00:31:57.576Z",
+    "updated": "2026-09-29T00:32:25.369Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4305",
