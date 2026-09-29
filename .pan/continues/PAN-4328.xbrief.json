@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T10:16:22.229Z",
+  "updated": "2026-09-29T10:16:35.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "join-passphrase.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T10:16:22.228Z"
+    },
+    "join-passphrase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:16:35.098Z"
     }
   }
 }
