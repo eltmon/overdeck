@@ -9,6 +9,20 @@
 
 > Update (PAN-3116): The committed baseline was deleted. The guard now derives allowed counts from `origin/main` at lint time, with `FILE_SIZE_BASE_REF` available as an override. Audited growth uses `scripts/file-size-allowlist.txt` rows in the form `<lines> <path> # <ISSUE-REF>`. The `--update` mode, `file-size-reconcile.ts`, and the UAT-promote amend step are gone, so branches that shrink god files no longer edit lint metadata.
 
+## Raising a ceiling is an operator decision (PAN-3308)
+
+When the file-size guard fails, the fix is to shrink the file to its allowed count. The guard's message names only that remedy and prints no allowlist row.
+
+Lowering an allowlist row is always allowed: run `bash scripts/lint-file-size.sh --lower`, or edit the row down by hand.
+
+Raising a row, or adding a row above the file's allowance on the base (its last row, else `max(line count, 1000)`), is an operator decision. `scripts/guard-allowlist-raise.sh` runs from `.husky/pre-push` and refuses the push when the pusher is an agent: `OVERDECK_AGENT_ID` is set (other than an operator `conv-*` conversation), the git identity ends in `[bot]`, or the pusher is the Flywheel (`conv-flywheel`, identified by `OVERDECK_AGENT_ID`, `OVERDECK_CONVERSATION`, or a `flywheel:` `OVERDECK_AGENT_STARTED_BY`). Identity comes from `scripts/lib/pusher-identity.sh`.
+
+The operator raises a ceiling in its own commit that names the issue, then pushes with:
+
+    OVERDECK_OPERATOR_PUSH=1 git push
+
+The primary checkout commits as `overdeck-agent[bot]`, so a plain terminal push needs this too. A raise already on the remote branch is not re-checked on later pushes of that branch.
+
 ## Glossary
 
 - **God file** — a source file so large that understanding it to make a change is itself the cost. This repo has 45 non-test `src/` files over 1,000 lines (`src/lib/cloister/deacon.ts` 7,180; `src/dashboard/server/routes/workspaces.ts` 6,638; `src/lib/agents.ts` 5,824).
