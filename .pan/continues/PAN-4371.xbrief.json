@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:46:35.430Z",
+  "updated": "2026-09-29T11:46:46.519Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "contracts-turn-end-field.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T11:46:35.429Z"
+    },
+    "enrichment-attach.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:46.519Z"
     }
   }
 }
