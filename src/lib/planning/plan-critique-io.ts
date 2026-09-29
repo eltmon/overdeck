@@ -9,11 +9,19 @@
  */
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { planDigest } from '../xbrief/plan-digest.js';
-import { isFlaggedByLabels, parseCritique, type CritiqueGateInput } from './plan-critique.js';
+import {
+  evaluateCritiqueGate,
+  isFlaggedByLabels,
+  parseCritique,
+  withUnresolvedSection,
+  type CritiqueGateInput,
+  type CritiqueGateResult,
+} from './plan-critique.js';
 
 export type ExecFileLike = (file: string, args: string[], options: { cwd: string }) => Promise<{ stdout: string }>;
 
@@ -114,4 +122,40 @@ export async function loadCritiqueGateInput(input: {
     gateInput: { required: input.required, currentDigest, roundsUsed, latest, prdText: readFileSync(prdPath, 'utf-8') },
     prdPath,
   };
+}
+
+/**
+ * The complete-planning server's critique check (FR-13, FR-14). It verifies
+ * and never dispatches a critic. At the two-round cap it writes the unanswered
+ * `blocks-the-design` titles into the workspace PRD before promotion commits it.
+ */
+export async function applyCritiqueGateForPromotion(input: {
+  issueId: string;
+  workspacePath: string;
+  doc: unknown;
+  forced: boolean;
+  getLabels?: (id: string) => Promise<string[]>;
+  warn: (msg: string) => void;
+  execFileImpl?: ExecFileLike;
+}): Promise<{ ok: true; result: CritiqueGateResult } | { ok: false; result: CritiqueGateResult; message: string }> {
+  const required = await isPlanFlagged({
+    issueId: input.issueId,
+    forced: input.forced,
+    getLabels: input.getLabels,
+    warn: input.warn,
+  });
+  const { gateInput, prdPath } = await loadCritiqueGateInput({
+    workspacePath: input.workspacePath,
+    issueId: input.issueId,
+    doc: input.doc,
+    required,
+    execFileImpl: input.execFileImpl,
+  });
+  const result = evaluateCritiqueGate(gateInput);
+  if (!result.ok) return { ok: false, result, message: result.reason };
+  if (result.kind === 'cap-reached' && result.unresolved.length > 0 && prdPath && gateInput.prdText !== null) {
+    const updated = withUnresolvedSection(gateInput.prdText, result.unresolved);
+    if (updated !== gateInput.prdText) await writeFile(prdPath, updated, 'utf-8');
+  }
+  return { ok: true, result };
 }
