@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-29T23:16:32.087Z",
+  "updated": "2026-09-29T23:19:03.506Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-29T23:16:25.775Z"
     },
     "doctor-sageox": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2444",
-      "claimedAt": "2026-09-29T23:16:32.087Z"
+      "claimedAt": "2026-09-29T23:16:32.087Z",
+      "doneAt": "2026-09-29T23:19:03.506Z"
     }
   }
 }
