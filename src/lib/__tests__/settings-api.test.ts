@@ -919,6 +919,20 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('accepts the plan.critic sub-role (PAN-4341)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        plan: { model: 'workhorse:expensive', sub: { critic: { model: 'gpt-5.5' } } },
+      },
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
   it('rejects unknown roles and sub-roles', async () => {
     const { validateSettingsApi } = await import('../settings-api.js');
     const result = validateSettingsApi({

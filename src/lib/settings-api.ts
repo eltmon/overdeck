@@ -300,6 +300,7 @@ function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
 }
 
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
+  plan: ['critic'],
   review: ['security', 'performance', 'correctness', 'requirements'],
 };
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'workhorses'>): WorkhorsesConfig {
