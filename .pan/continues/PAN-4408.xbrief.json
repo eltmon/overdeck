@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:01:12.212Z",
+  "updated": "2026-09-29T16:01:27.587Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "vendor-apply-v010.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:01:12.212Z"
+    },
+    "vendor-apply-v010.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:01:27.587Z"
     }
   }
 }
