@@ -159,6 +159,64 @@ describe('pan skills set', () => {
     await expect(run('set', 'pan-done', 'off')).rejects.toThrow('exit 1');
     expect(errors.join('\n')).toContain('core skill');
   });
+
+  it('sets a pack toggle at issue level (PAN-4334)', async () => {
+    await run('set', '--pack', 'mattpocock', 'off', '--issue', 'PAN-1');
+    expect(mocks.setSkillOverride).toHaveBeenCalledWith({ level: 'issue', pack: 'mattpocock', enabled: false, issueId: 'PAN-1' });
+    expect(logs).toContain('mattpocock (pack): off at issue PAN-1');
+  });
+
+  it('reports a global pack on without the native default wording', async () => {
+    await run('set', '--pack', 'mattpocock', 'on');
+    expect(mocks.setSkillOverride).toHaveBeenCalledWith({ level: 'global', pack: 'mattpocock', enabled: true });
+    expect(logs).toContain('mattpocock (pack): on at global');
+  });
+
+  it('sets a pack skill by its pack/skill id', async () => {
+    await run('set', 'mattpocock/tdd', 'on');
+    expect(mocks.setSkillOverride).toHaveBeenCalledWith({ level: 'global', skill: 'mattpocock/tdd', enabled: true });
+    expect(logs).toContain('mattpocock/tdd: on at global');
+  });
+
+  it('reports an unknown pack skill with exit 1', async () => {
+    mocks.setSkillOverride.mockRejectedValue(new mocks.SkillOverrideError('unknown-skill', 'unknown skill: mattpocock/unknown'));
+    await expect(run('set', 'mattpocock/unknown', 'on')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('unknown skill');
+  });
+
+  it('prints the usage line for the wrong number of positionals', async () => {
+    await expect(run('set', '--pack', 'mattpocock', 'grilling', 'off')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('usage: pan skills set');
+    await expect(run('set', 'grilling')).rejects.toThrow('exit 1');
+    expect(mocks.setSkillOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe('pan skills list packs (PAN-4334)', () => {
+  it('prints a Skill packs block after the native skills', async () => {
+    mocks.listSkillStates.mockResolvedValue({
+      project: null, issue: null, skills: [grilling],
+      packs: [{
+        id: 'mattpocock', cached: true, enabled: true, source: 'global',
+        skills: [
+          { id: 'mattpocock/grilling', enabled: true, source: 'global-pack', optIn: false },
+          { id: 'mattpocock/setup-matt-pocock-skills', enabled: false, source: 'default', optIn: true },
+        ],
+      }],
+    });
+    await run('list');
+    const out = logs.join('\n');
+    expect(out.indexOf('Skill packs (1)')).toBeGreaterThan(out.indexOf('grilling'));
+    expect(out).toMatch(/mattpocock\s+on\s+global/);
+    expect(out).toMatch(/ {2}mattpocock\/grilling\s+on\s+global-pack/);
+    expect(out).toMatch(/ {2}mattpocock\/setup-matt-pocock-skills\s+off\s+default\s+opt-in/);
+  });
+
+  it('keeps list --json to the native skills array', async () => {
+    mocks.listSkillStates.mockResolvedValue({ project: null, issue: null, skills: [grilling], packs: [{ id: 'x', skills: [] }] });
+    await run('list', '--json');
+    expect(JSON.parse(logs.join('\n'))).toEqual([grilling]);
+  });
 });
 
 describe('pan skills launch-settings', () => {

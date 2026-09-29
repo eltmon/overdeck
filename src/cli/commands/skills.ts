@@ -4,6 +4,7 @@
  *
  *   pan skills [list] [--project <key>] [--issue <id>] [--json]
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
+ *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
  *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
@@ -17,7 +18,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
-interface SetOptions { project?: string; issue?: string }
+interface SetOptions { project?: string; issue?: string; pack?: string }
 interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; codexHome?: string; pluginLink?: string }
 interface PackAddOptions { ref: string; adapter?: string; yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
@@ -28,6 +29,7 @@ type PackPreview = import('../../lib/skill-packs/sources.js').PackPreview;
 type NotAppliedLabels = (capabilities: PackPreview['manifest']['capabilities']) => string[];
 
 const STATES = { on: true, off: false, inherit: null } as const;
+const SET_USAGE = 'usage: pan skills set <skill> on|off|inherit | pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]';
 
 async function failOnOverrideError(error: unknown): Promise<never> {
   const { SkillOverrideError } = await import('../../lib/skill-overrides/store.js');
@@ -56,18 +58,37 @@ export async function skillsListCommand(options: ListOptions): Promise<void> {
   console.log(chalk.bold(`\nSkills (${result.skills.length})${context ? ` for ${context}` : ''}\n`));
   if (result.skills.length === 0) {
     console.log(chalk.yellow('No skills found. Run "pan sync" to install them.'));
-    return;
+  } else {
+    const nameWidth = Math.max(4, ...result.skills.map(skill => skill.name.length));
+    console.log(chalk.dim(`${'NAME'.padEnd(nameWidth)}  STATE  ${'SOURCE'.padEnd(7)}  DESCRIPTION`));
+    for (const skill of result.skills) {
+      const state = skill.enabled ? 'on ' : 'off';
+      console.log(`${skill.name.padEnd(nameWidth)}  ${state}    ${skill.source.padEnd(7)}  ${chalk.dim(skill.description)}`);
+    }
   }
-  const nameWidth = Math.max(4, ...result.skills.map(skill => skill.name.length));
-  console.log(chalk.dim(`${'NAME'.padEnd(nameWidth)}  STATE  ${'SOURCE'.padEnd(7)}  DESCRIPTION`));
-  for (const skill of result.skills) {
-    const state = skill.enabled ? 'on ' : 'off';
-    console.log(`${skill.name.padEnd(nameWidth)}  ${state}    ${skill.source.padEnd(7)}  ${chalk.dim(skill.description)}`);
+  const packs = result.packs ?? [];
+  if (packs.length > 0) {
+    console.log(chalk.bold(`\nSkill packs (${packs.length})\n`));
+    const width = Math.max(4, ...packs.flatMap(pack => [pack.id.length, ...pack.skills.map(skill => skill.id.length + 2)]));
+    for (const pack of packs) {
+      const cached = pack.cached ? '' : chalk.yellow(`  not cached; run pan skills pack sync ${pack.id}`);
+      console.log(`${chalk.bold(pack.id.padEnd(width))}  ${pack.enabled ? 'on ' : 'off'}    ${pack.source}${cached}`);
+      for (const skill of pack.skills) {
+        console.log(`  ${skill.id.padEnd(width - 2)}  ${skill.enabled ? 'on ' : 'off'}    ${skill.source}${skill.optIn ? chalk.dim('  opt-in') : ''}`);
+      }
+    }
   }
   console.log(chalk.dim('\nChanges apply to Claude Code and Codex agents at their next launch.'));
 }
 
-export async function skillsSetCommand(skill: string, state: string, options: SetOptions): Promise<void> {
+export async function skillsSetCommand(args: string[], options: SetOptions): Promise<void> {
+  // PD-9: with --pack exactly one positional (the state); without it, skill and state.
+  if (args.length !== (options.pack ? 1 : 2)) {
+    console.error(chalk.red(SET_USAGE));
+    process.exit(1);
+  }
+  const state = args[args.length - 1] as string;
+  const target = options.pack ? { pack: options.pack } : { skill: args[0] as string };
   if (!Object.prototype.hasOwnProperty.call(STATES, state)) {
     console.error(chalk.red('state must be on, off, or inherit'));
     process.exit(1);
@@ -80,10 +101,10 @@ export async function skillsSetCommand(skill: string, state: string, options: Se
   const { setSkillOverride } = await import('../../lib/skill-overrides/store.js');
   const issueId = options.issue?.toUpperCase();
   const update = options.project
-    ? { level: 'project' as const, skill, enabled, projectKey: options.project }
+    ? { level: 'project' as const, ...target, enabled, projectKey: options.project }
     : issueId
-      ? { level: 'issue' as const, skill, enabled, issueId }
-      : { level: 'global' as const, skill, enabled };
+      ? { level: 'issue' as const, ...target, enabled, issueId }
+      : { level: 'global' as const, ...target, enabled };
 
   let result;
   try {
@@ -93,14 +114,21 @@ export async function skillsSetCommand(skill: string, state: string, options: Se
   }
 
   const where = update.level === 'global' ? 'global' : update.level === 'project' ? `project ${options.project}` : `issue ${issueId}`;
-  // Global is two-state: "on" and "inherit" both clear the stored override.
-  const shown = update.level === 'global' && enabled !== false ? 'on (default)' : state;
+  // Global is two-state. Native skills: "on" and "inherit" both clear the key.
+  // Packs: "off" and "inherit" both clear it. Pack skills show the chosen state.
+  let shown = state;
+  if ('pack' in target) {
+    if (update.level === 'global') shown = enabled === true ? 'on' : 'off (default)';
+  } else if (update.level === 'global' && !target.skill.includes('/') && enabled !== false) {
+    shown = 'on (default)';
+  }
+  const label = 'pack' in target ? `${target.pack} (pack)` : target.skill;
   let outcome = '';
   if (result.committed) {
     const push = result.pushed ? 'pushed' : `push pending: ${result.reason ?? 'unknown'}`;
     outcome = ` (committed ${result.sha?.slice(0, 7) ?? ''}, ${push})`;
   }
-  console.log(`${skill}: ${shown} at ${where}${outcome}`);
+  console.log(`${label}: ${shown} at ${where}${outcome}`);
 }
 
 export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions): Promise<void> {
@@ -345,8 +373,9 @@ export function registerSkillsCommands(program: Command): void {
   skills.command('list', { isDefault: true }).description('List skills with effective on/off state and its source')
     .option('--project <key>', 'Resolve for a project').option('--issue <id>', 'Resolve for an issue').option('--json', 'Output as JSON')
     .action(skillsListCommand);
-  skills.command('set <skill> <state>').description('Set a skill on, off, or inherit (global unless --project/--issue)')
+  skills.command('set <args...>').description('Set a skill (<skill> <state>) or a pack (--pack <id> <state>) on, off, or inherit')
     .option('--project <key>', 'Project override').option('--issue <id>', 'Issue override')
+    .option('--pack <id>', 'Set a whole skill pack instead of one skill')
     .action(skillsSetCommand);
   skills.command('launch-settings', { hidden: true }).description('Resolve skill overrides for a managed launch (used by launchers)')
     .requiredOption('--harness <harness>', 'claude-code or codex').requiredOption('--cwd <dir>', 'Launch working directory')
