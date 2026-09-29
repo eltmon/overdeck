@@ -47,13 +47,15 @@ export interface SyncReport {
   /** Refs skipped because their decrypted type is not "session". */
   skipped: number;
   machines: MachineRecord[];
+  /** Transcripts whose settlement threw; one bad file never stops the cycle. */
+  errors: Array<{ nativePath: string; message: string }>;
 }
 
 export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
   const { store, keys } = options;
   const now = options.now ?? (() => new Date());
   const config = options.config ?? (await readVaultConfig());
-  const report: SyncReport = { offline: false, settled: [], records: 0, skipped: 0, machines: [] };
+  const report: SyncReport = { offline: false, settled: [], records: 0, skipped: 0, machines: [], errors: [] };
 
   try {
     await store.refresh();
@@ -72,7 +74,14 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
       continue; // gone (evicted or moved); eviction handles its own bookkeeping
     }
     if (size <= entry.tail.byteOffset) continue;
-    const result = await settle({ nativePath, harness: entry.harness, store, keys, config, now });
+    let result: SettleResult;
+    try {
+      result = await settle({ nativePath, harness: entry.harness, store, keys, config, now });
+    } catch (error) {
+      if (error instanceof VaultOfflineError) return { ...report, offline: true };
+      report.errors.push({ nativePath, message: (error as Error).message });
+      continue;
+    }
     report.settled.push({ nativePath, result });
     if (result.verdict === 'offline') return { ...report, offline: true };
   }

@@ -84,6 +84,25 @@ describe('vault sync: syncOnce', () => {
     expect(reportB.machines.map((machine) => machine.environmentId).sort()).toEqual([a.environmentId, b.environmentId].sort());
   });
 
+  it('one transcript whose settlement throws is reported and does not stop the cycle', async () => {
+    useHome(homeA);
+    const good = join(root, 'good.jsonl');
+    writeFileSync(good, `${user('fine', cwd)}\n`);
+    expect((await settle({ nativePath: good, harness: 'claude-code', store, keys, config })).verdict).toBe('append');
+    // An owned entry whose "file" is a directory: readFile throws EISDIR inside settle.
+    const { setOwnedTail } = await import('../../../../src/lib/vault/local-index.js');
+    const broken = join(root, 'broken-dir');
+    mkdirSync(broken);
+    await setOwnedTail(broken, { vaultId: 'v-broken', harness: 'claude-code', tail: { lineCount: 0, byteOffset: 0, lastHashes: [] } });
+    appendFileSync(good, `${user('more', cwd)}\n`);
+    const report = await syncOnce({ store, keys, config });
+    expect(report.offline).toBe(false);
+    expect(report.errors).toEqual([{ nativePath: broken, message: expect.stringMatching(/EISDIR|directory/i) }]);
+    expect(report.settled.map((entry) => entry.nativePath)).toEqual([good]);
+    expect(report.settled[0]!.result).toMatchObject({ verdict: 'append', lines: 1 });
+    expect(report.records).toBe(1);
+  });
+
   it('ac2: a ref whose type is "task" is skipped without error', async () => {
     useHome(homeA);
     const taskName = refName('record', 'task-1', keys.K_ref);

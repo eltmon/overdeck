@@ -42,8 +42,9 @@ export function describeVerdict(result: SettleResult): string {
   }
 }
 
+/** Codex rollouts live under `.codex/`, a managed agent's `codex-home/`, or are named `rollout-*.jsonl`. */
 export function harnessForPath(path: string): string {
-  return /[\\/]\.codex[\\/]/.test(path) ? 'codex' : 'claude-code';
+  return /[\\/]\.codex[\\/]|[\\/]codex-home[\\/]|[\\/]rollout-[^\\/]*\.jsonl$/.test(path) ? 'codex' : 'claude-code';
 }
 
 /** Turn the positional argument and flags into the transcripts to settle. */
@@ -138,7 +139,15 @@ export async function saveCommand(
   }
   let failed = 0;
   for (const entry of targets) {
-    const result = await settle({ nativePath: entry.nativePath, harness: entry.harness, store: vault.store, keys: vault.keys, config: vault.config });
+    let result: SettleResult;
+    try {
+      result = await settle({ nativePath: entry.nativePath, harness: entry.harness, store: vault.store, keys: vault.keys, config: vault.config });
+    } catch (error) {
+      // One broken transcript must not stop the rest of --all.
+      io.out(`${basename(entry.nativePath)}: error: ${(error as Error).message}`);
+      failed++;
+      continue;
+    }
     io.out(`${basename(entry.nativePath)}: ${describeVerdict(result)}`);
     if (result.verdict === 'blocked' || result.verdict === 'diverged' || result.verdict === 'offline') failed++;
     if (result.verdict === 'offline') break;

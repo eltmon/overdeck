@@ -16,6 +16,7 @@ export async function syncCommand(_options: Record<string, never> = {}, io: CliI
   const appended = report.settled.filter((entry) => entry.result.verdict === 'append').length;
   const blocked = report.settled.filter((entry) => entry.result.verdict === 'blocked');
   io.out(`Settled ${appended} transcript${appended === 1 ? '' : 's'}; ${report.records} record${report.records === 1 ? '' : 's'} listed; ${report.machines.length} machine${report.machines.length === 1 ? '' : 's'}${report.skipped > 0 ? `; ${report.skipped} non-session ref${report.skipped === 1 ? '' : 's'} skipped` : ''}.`);
+  for (const failure of report.errors) io.out(`${failure.nativePath}: error: ${failure.message}`);
   for (const entry of blocked) {
     if (entry.result.verdict !== 'blocked') continue;
     io.out(`${entry.nativePath}: ${entry.result.hits.map((hit) => `blocked at line ${hit.line}: ${hit.pattern}`).join('; ')} (pan vault allow-secret ${entry.result.vaultId} <line>)`);
