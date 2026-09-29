@@ -17,11 +17,9 @@ import { ENVIRONMENT_PROTOCOL_VERSION, EnvironmentDescriptor } from '@overdeck/c
 
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { jsonResponse } from '../http-helpers.js';
+import { WS_UPGRADE_REQUIRES_CREDENTIAL } from '../ws-auth.js';
 import { getOverdeckVersion } from './misc/shared.js';
 
-// `/ws/*` upgrades do not require a credential yet; flip this when the
-// WebSocket auth module from PR #4317 (PAN-1166) lands.
-const TERMINAL_AUTH = false;
 
 const decodeDescriptor = Schema.decodeUnknownSync(EnvironmentDescriptor);
 
@@ -34,7 +32,7 @@ export async function buildEnvironmentDescriptor(): Promise<EnvironmentDescripto
     platform: { os: platform(), arch: arch() },
     serverVersion: await getOverdeckVersion(),
     protocolVersion: ENVIRONMENT_PROTOCOL_VERSION,
-    capabilities: { pairing: true, deviceSessions: true, terminalAuth: TERMINAL_AUTH },
+    capabilities: { pairing: true, deviceSessions: true, terminalAuth: WS_UPGRADE_REQUIRES_CREDENTIAL },
   });
 }
 

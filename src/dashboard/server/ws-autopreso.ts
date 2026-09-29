@@ -2,7 +2,7 @@ import http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { autoPresoSession } from '../../autopreso/session.js';
 import { boundedAutoPresoElements } from '../../autopreso/limits.js';
-import { authorizeDashboardUpgrade, rejectUpgrade } from './ws-auth.js';
+import { authorizeDashboardUpgrade, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -40,6 +40,7 @@ export function setupAutoPresoWebSocket(server: http.Server): void {
       return;
     }
     wss.handleUpgrade(request, socket, head, (ws) => {
+      trackDeviceSocket(auth.credential, ws);
       wss.emit('connection', ws, request);
     });
   });

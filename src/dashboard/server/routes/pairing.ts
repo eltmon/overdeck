@@ -10,8 +10,9 @@
  *   unauthenticated by design and rate limited on failures.
  *
  * - `GET /api/devices` lists paired devices (never their token hashes).
- * - `DELETE /api/devices/:id` revokes one. A device may revoke itself but not
- *   another device; the internal token and root session may revoke any.
+ * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket and
+ *   SSE connections. A device may revoke itself but not another device; the
+ *   internal token and root session may revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
  */
@@ -21,6 +22,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
   consumePairingCredential,
@@ -175,11 +177,12 @@ const revokeDeviceRoute = HttpRouter.add(
 
     const revoked = yield* Effect.promise(() => revokeAccessToken(id));
     if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
+    const closed = closeDeviceConnections(id);
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       message: `Revoked device "${revoked.name}"`,
-      details: JSON.stringify({ deviceId: id }),
+      details: JSON.stringify({ deviceId: id, closedConnections: closed }),
     });
     return noStore(jsonResponse({ ok: true, device: deviceView(revoked) }));
   }),
