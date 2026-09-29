@@ -1,0 +1,1638 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T09:43:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4362: Model-placement eval suite: review recall, plan quality, summary faithfulness, feedback acceptance",
+    "updated": "2026-09-29T09:49:17.200Z"
+  },
+  "plan": {
+    "id": "pan-4362",
+    "title": "Model-placement eval suite: review recall, plan quality, summary faithfulness, feedback acceptance",
+    "status": "proposed",
+    "uid": "10fc7e49-1064-4bcf-b1c1-89fab8009731",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T09:43:14Z",
+    "updated": "2026-09-29T09:49:17.200Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4362",
+        "label": "PAN-4362",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4362.md",
+        "label": "PRD draft (.pan/drafts/pan-4362.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/model-routing-2026-09.md",
+        "label": "Parent PRD: model routing 2026-09",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "evals",
+      "model-routing",
+      "evalite",
+      "scorers"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator-approved parent PRD (.pan/drafts/model-routing-2026-09.md, Issue B) scoped the four suites as one issue. They share one result-record store, one fixture loader and one five-model acceptance table; splitting into sibling issues would re-run the five-model matrix per issue and split the single results comment the acceptance criteria require. The file count is dominated by one test file per scorer (required by the issue) and one eval file per suite, each of which the lint counts as its own subsystem.",
+      "canonicalFilename": "2026-09-29-PAN-4362-model-placement-eval-suite-review-recall-plan-quality-summary-faithfulness-feedback-acceptance.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck places models per role from vendor benchmarks measured at max/xhigh effort, but launches at high. No Overdeck eval measures whether a review lane finds a real blocker, whether a planner writes a lint-clean xBRIEF, whether a summarizer invents facts, or whether a work agent acts on pan tell review feedback instead of treating it as prompt injection. PAN-4361 made the harness provider-neutral; the suites, fixtures, scorers and a cross-run results table are missing, and the harness cannot send a multi-turn conversation.",
+      "Proposal": "Add four Evalite suites (E2 review-recall, E3 plan-quality, E4 summary-faithfulness, E5 feedback-acceptance) on the PAN-4361 harness. Pure scorers live in evals/lib with offline unit tests; fixtures come from real Overdeck PR reviews, committed specs/PRDs and scrubbed session excerpts, loaded through a credential-scanning loader. Suites reuse production code (renderPrompt planning template, lintPlanQuality, an extracted parseXBriefDocument, extracted summary-prompts builders, exported renderExternalHandoffPrompt, buildTranscriptTitlePrompt). Each case appends a JSONL result record; evals/report.ts renders the five-model placement table and E2 single-family finds. The harness gains a multi-turn messages option for E5.",
+      "NonGoals": "- No change to any model default, role placement, workhorse, or config value (issues D-G and parent PRD section 6 own that).\n- No pipeline-level head-to-head runs (E6, PAN-3054).\n- No LLM-as-judge scorer; every score is computed mechanically.\n- No edits to roles/*.md or any production prompt text; eval-mode instructions live only in eval user prompts.\n- No behavior change in smart-compaction, summary-fork, or xBRIEF reading; the extractions are byte-identical refactors.\n- No CI wiring or npm test inclusion for live evals.\n- No long-context (>=272K) fork-summary stress cases.\n- No security review-lane cases in E2.\n- No committed eval result JSONL files; no allowlist cap raises."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add an optional multi-turn `messages` input to runPromptScenario instead of flattening E5 into one user string.",
+        "rationale": "The behavior under test (Sonnet 5.5 treating a mid-task user message as injection) needs a user turn that arrives after assistant turns."
+      },
+      {
+        "summary": "Store per-case results as gitignored JSONL under evals/results/ and render the table with evals/report.ts.",
+        "rationale": "Evalite keeps only per-run data; a cross-run store is the only way to compute E2 single-family finds and the five-model table. Runs are local and cost money, so the posted issue comment is the durable artifact."
+      },
+      {
+        "summary": "Reuse production code through small extractions: parseXBriefDocument from readPlanSync, summary-prompts.ts from smart-compaction.ts, export renderExternalHandoffPrompt.",
+        "rationale": "The issue says reuse the xBRIEF validator and lint rather than copy; smart-compaction.ts is at its 1148-line allowlist cap, so the prompts must move out rather than gain an exported builder in place."
+      },
+      {
+        "summary": "E2 fixtures come from merged PRs with a \"# Review CHANGES REQUESTED for\" comment whose reviewed SHA is still reachable; security-lane blockers are excluded.",
+        "rationale": "Those comments name a real blocker with file:line, lane and the reviewed/base SHAs; E2 gates only correctness/performance/requirements placement."
+      },
+      {
+        "summary": "E3 includes the case PRD text in the prompt and picks 8 closed issues that have both a committed spec and a PRD.",
+        "rationale": "A no-tools single-shot planner cannot discover files; real planning agents read the PRD, which names the files."
+      },
+      {
+        "summary": "E4 hallucinations = unsupported identifiers (paths, issue ids, SHAs, backticked identifiers absent from the source) + decoy violations; hard fail only for handoff and compaction.",
+        "rationale": "Mechanical and reproducible without an LLM judge; the hard-fail scope is exactly what the issue states."
+      },
+      {
+        "summary": "E5 has six inline cases including one control injection that must be refused or flagged.",
+        "rationale": "Without a control, a model that obeys anything would score perfectly."
+      },
+      {
+        "summary": "Per-suite output caps (review 32K, plan 48K, summaries 16K, title 4K, feedback 8K) and Evalite testTimeout raised to 600 s.",
+        "rationale": "Opus 5.5 at effort high writing a full xBRIEF would exceed the current 180 s timeout and the catalog 128K cap wastes budget."
+      },
+      {
+        "summary": "claude-haiku-4-5 rows report effort n/a; \"at effort high\" means DEFAULT_EFFORT wherever the model enumerates effort levels.",
+        "rationale": "The harness rejects OVERDECK_EVAL_EFFORT for a model with no effortLevels, so Haiku cannot run at an explicit high."
+      },
+      {
+        "summary": "The results-table item is an implementation checkpoint: measured rows for reachable models, runnable-command rows for the rest, plus a pan tell to the flywheel.",
+        "rationale": "At planning time the agent environment had neither ANTHROPIC_API_KEY nor OPENAI_API_KEY and gpt-6-sol is not served by CLIProxy; only gpt-6-luna is reachable."
+      },
+      {
+        "summary": "Keep the four suites in one issue with plan.metadata.sizeJustification rather than splitting into siblings.",
+        "rationale": "The operator-approved parent PRD scoped them as one issue sharing one store and one acceptance table."
+      }
+    ],
+    "items": [
+      {
+        "id": "harness-messages",
+        "title": "Add multi-turn messages input to runPromptScenario",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "foundationFor": [
+            "feedback-acceptance-eval"
+          ],
+          "files_scope": [
+            "evals/lib/prompt-harness.ts",
+            "evals/lib/openai-responses.ts",
+            "tests/unit/evals/lib/prompt-harness.test.ts",
+            "tests/unit/evals/lib/openai-responses.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/prompt-harness.test.ts tests/unit/evals/lib/openai-responses.test.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "both test files pass including the new messages cases",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.1 and WI-1. Add ScenarioMessage and an optional `messages` field to RunPromptScenarioOptions (make `user` optional), add exported scenarioMessages(opts) that throws when both or neither of user/messages are given or when messages is empty or ends with an assistant turn. runPromptScenario calls scenarioMessages BEFORE resolveEvalModelConfig. callAnthropic sends messages: scenarioMessages(opts). callOpenAIResponses takes { system, messages } and maps messages to Responses input items preserving role. flywheel-launch.eval.ts and review-synthesis.eval.ts keep calling with `user` unchanged."
+        },
+        "items": [
+          {
+            "id": "harness-messages.ac1",
+            "title": "Given messages [user, assistant, user], when runPromptScenario runs against claude-sonnet-5-5, then the Anthropic stream request contains exactly those three messages in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-messages.ac2",
+            "title": "Given both user and messages, runPromptScenario rejects with \"exactly one of `user` or `messages`\" and the Anthropic constructor and fetch receive no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-messages.ac3",
+            "title": "Given messages ending with an assistant turn, runPromptScenario rejects before any network call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-messages.ac4",
+            "title": "callOpenAIResponses sends a Responses input array whose items carry role \"assistant\" for assistant messages and role \"user\" for user messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eval-results",
+        "title": "Add the per-case result record store and placement-table renderer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "foundationFor": [
+            "review-recall-eval",
+            "plan-quality-eval",
+            "summary-faithfulness-eval",
+            "feedback-acceptance-eval",
+            "placement-report"
+          ],
+          "files_scope": [
+            "evals/lib/eval-results.ts",
+            "tests/unit/evals/lib/eval-results.test.ts",
+            ".gitignore"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/eval-results.test.ts",
+            "git check-ignore evals/results/x.jsonl",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "eval-results.test.ts passes",
+            "git check-ignore prints evals/results/x.jsonl and exits 0",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.2 and WI-2. Create evals/lib/eval-results.ts exporting EvalSuite, EvalCaseRecord, recordFromRun, appendEvalRecord (appendFileSync one JSON line to <repoRoot>/evals/results/<suite>.jsonl, mkdir recursive), parseEvalRecords (pure, skips blank lines, throws naming the 1-based line of a malformed line), latestRecords (newest recordedAt per suite+model+effort+caseId), singleFamilyFinds(records, suite, metric), and renderPlacementTable (header `| Suite | Model | Effort | Cases | Mean score | Input tok | Output tok | Cost (USD) | Cost basis |`, effort n/a when null, cost n/a when any costUsd null, then a \"### Review recall: blockers found by one family only\" section). Add `evals/results/` to .gitignore next to the evals/node_modules/.evalite/ line."
+        },
+        "items": [
+          {
+            "id": "eval-results.ac1",
+            "title": "parseEvalRecords returns the records written by appendEvalRecord and throws an error naming line 2 when line 2 is malformed JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-results.ac2",
+            "title": "latestRecords keeps only the newest recordedAt record for a repeated (suite, model, effort, caseId)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-results.ac3",
+            "title": "Given review-recall records where only an anthropic model has recall 1 for case c1, singleFamilyFinds returns { anthropic: [\"c1\"], openai: [] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-results.ac4",
+            "title": "renderPlacementTable renders \"n/a\" in the Effort column for a record with effort null and in the Cost column when a costUsd is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-results.ac5",
+            "title": "git check-ignore exits 0 for evals/results/x.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "placement-report",
+        "title": "Add the evals/report.ts placement-table entry point",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "evals/report.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:evals",
+            "npx tsx evals/report.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors",
+            "report prints the table header (or \"No eval results\" when evals/results is empty) and exits 0"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.2 and WI-3. evals/report.ts reads every evals/results/*.jsonl, parses with parseEvalRecords, and prints renderPlacementTable(latestRecords(all)). When the directory is missing or empty it prints \"No eval results in evals/results/\" and exits 0."
+        },
+        "items": [
+          {
+            "id": "placement-report.ac1",
+            "title": "Given evals/results/review-recall.jsonl with two records, `npx tsx evals/report.ts` prints a line starting with \"| Suite | Model | Effort |\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "placement-report.ac2",
+            "title": "Given no evals/results directory, `npx tsx evals/report.ts` prints \"No eval results in evals/results/\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eval-timeout",
+        "title": "Raise the Evalite testTimeout to 600 seconds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "trivial",
+          "kind": "infra",
+          "files_scope": [
+            "evals/vitest.config.ts"
+          ],
+          "verify_commands": [
+            "grep -n \"testTimeout: 600_000\" evals/vitest.config.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "grep prints one line",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-22",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.2 and WI-4. Change `testTimeout: 180_000` to `testTimeout: 600_000` in evals/vitest.config.ts line 19 and extend the comment: E3 asks for a full xBRIEF at effort high; 10 minutes covers a 48K-token response."
+        },
+        "items": [
+          {
+            "id": "eval-timeout.ac1",
+            "title": "evals/vitest.config.ts contains `testTimeout: 600_000`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-timeout.ac2",
+            "title": "The comment above testTimeout contains the words \"plan-quality\" and \"10 minutes\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fixture-loader",
+        "title": "Add the fixture directory loader with a credential-pattern scan",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "evals/lib/fixtures.ts",
+            "tests/unit/evals/lib/fixtures.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/fixtures.test.ts",
+            "grep -rnE 'sk-ant-[A-Za-z0-9]|ghp_[A-Za-z0-9]|xox[abprs]-[A-Za-z0-9]' tests/unit/evals || true"
+          ],
+          "expected_outputs": [
+            "fixtures.test.ts passes",
+            "grep prints nothing"
+          ],
+          "traces": [
+            "FR-18",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.3 and WI-5. evals/lib/fixtures.ts exports loadFixtureDir(relDir) (reads *.json under <repoRoot>/<relDir>, sorted by name, JSON.parse each, runs assertNoSecretPatterns on the raw text), assertNoSecretPatterns(text, label), SECRET_PATTERNS (the seven regexes in the PRD) and readRepoText(relPath) (reads a repo-relative file as UTF-8, so tests never call readFile themselves). The thrown error names the label and pattern index, never the matched text. Tests build fake tokens at runtime by concatenation, never as literals."
+        },
+        "items": [
+          {
+            "id": "fixture-loader.ac1",
+            "title": "assertNoSecretPatterns throws for a runtime-built GitHub token string and the error message contains the label but not the token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-loader.ac2",
+            "title": "assertNoSecretPatterns accepts text that contains the words \"token\" and \"sk\" without a credential shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-loader.ac3",
+            "title": "loadFixtureDir returns fixtures sorted by file name with parsed data, and readRepoText returns the text of roles/plan.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-loader.ac4",
+            "title": "grep for literal credential prefixes followed by token characters in tests/unit/evals prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "five-model-resolution",
+        "title": "Prove all five placement models resolve in the eval harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "test",
+          "files_scope": [
+            "tests/unit/evals/lib/eval-model.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/eval-model.test.ts"
+          ],
+          "expected_outputs": [
+            "eval-model.test.ts passes with one case per placement model"
+          ],
+          "traces": [
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.8 and WI-6. Add an it.each over claude-opus-5-5, claude-sonnet-5-5, claude-haiku-4-5, gpt-6-sol, gpt-6-luna calling resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: id, OPENAI_API_KEY: \"test\" })."
+        },
+        "items": [
+          {
+            "id": "five-model-resolution.ac1",
+            "title": "resolveEvalModelConfig returns provider \"anthropic\" for the three claude ids and \"openai\" for the two gpt-6 ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "five-model-resolution.ac2",
+            "title": "resolveEvalModelConfig returns effort \"high\" for every placement model except claude-haiku-4-5, whose effort is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-recall-scorer",
+        "title": "Add the E2 review-recall scorer and case parser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "evals/lib/review-recall-scorer.ts",
+            "tests/unit/evals/lib/review-recall-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/review-recall-scorer.test.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "review-recall-scorer.test.ts passes",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.4 and WI-7. Export ReviewRecallCase, parseReviewRecallCase(unknown) (rejects a requirements-lane case with no acceptance criteria and a diff over 60,000 chars), ParsedFinding, parseFindings(report) using the heading regex in the PRD, findingMatchesBlocker (same file after stripping ./, and a line within 15 or >=2 keyword hits), and scoreReviewRecall returning recall, precision (null when no blocking findings), blockingCount, score = recall. Pure: no fs, no network."
+        },
+        "items": [
+          {
+            "id": "review-recall-scorer.ac1",
+            "title": "parseFindings returns blocking true for \"!\" and \"⊗\" headings and false for \"~\", \"≉\" and \"?\" headings, with file and line parsed from the backticked location",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-scorer.ac2",
+            "title": "scoreReviewRecall returns recall 1 when a blocking finding cites the blocker file 10 lines from the blocker line, and recall 0 when the same finding is non-blocking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-scorer.ac3",
+            "title": "scoreReviewRecall returns precision 0.5 when two blocking findings exist and one matches, and precision null when the report has \"## Findings\\n\\nNone\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-scorer.ac4",
+            "title": "parseReviewRecallCase rejects a requirements-lane case whose acceptanceCriteria array is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-recall-fixtures",
+        "title": "Mine 12-20 review-recall fixtures from real CHANGES REQUESTED PR reviews",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "parallelSafeReason": "Touches only its own new files; shares no file with any item outside its blocks edges.",
+          "difficulty": "complex",
+          "kind": "test",
+          "files_scope": [
+            "evals/fixtures/review-recall/*.json",
+            "tests/unit/evals/lib/review-recall-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/review-recall-scorer.test.ts"
+          ],
+          "expected_outputs": [
+            "the committed-fixtures describe block passes with 12-20 cases"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.4 mining recipe steps 1-8 and WI-8. Follow the recipe verbatim: merged PRs with a \"# Review CHANGES REQUESTED for\" comment, parse HEAD reviewed / merge-base, first blocking heading, skip security lane and unreachable SHAs, diff blocker file + two largest decoy files capped at 60,000 chars, 3-6 keywords. Write one JSON per case named <pr>-<slug>.json with provenance. Add a describe(\"committed fixtures\") block to review-recall-scorer.test.ts that loads the directory with loadFixtureDir and parses each with parseReviewRecallCase."
+        },
+        "items": [
+          {
+            "id": "review-recall-fixtures.ac1",
+            "title": "evals/fixtures/review-recall contains between 12 and 20 JSON files, each accepted by parseReviewRecallCase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-fixtures.ac2",
+            "title": "Every fixture records provenance.pr, provenance.reviewedSha, provenance.mergeBase and provenance.commentUrl pointing at a github.com/eltmon/overdeck pull request comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-fixtures.ac3",
+            "title": "grep -l '\"lane\": \"security\"' evals/fixtures/review-recall/*.json prints nothing, and each lane with candidate PRs contains at least 2 cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-fixtures.ac4",
+            "title": "loadFixtureDir accepts every fixture file without a credential-pattern rejection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-recall-eval",
+        "title": "Add the E2 review-recall Evalite suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "evals/review-recall.eval.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.4 \"Eval\" and WI-9. For each fixture: system = loadPromptFile(`roles/review-${lane}.md`), user = the PRD eval prompt (issue, ACs, eval-mode addendum, fenced diff), maxTokens 32_000, score with scoreReviewRecall, appendEvalRecord(recordFromRun(\"review-recall\", ...)) with metrics recall/precision/blockingCount, return { ...scores, run }. Evalite scorers read recall and precision from output. No model id literal in the file."
+        },
+        "items": [
+          {
+            "id": "review-recall-eval.ac1",
+            "title": "The suite sends roles/review-<lane>.md as the system prompt for each case and the fenced diff inside the user prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-eval.ac2",
+            "title": "When a case finishes, the suite appends one record with suite \"review-recall\" and metrics recall, precision and blockingCount to evals/results/review-recall.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-recall-eval.ac3",
+            "title": "The file contains no claude-* or gpt-* model id literal (grep -nE \"claude-|gpt-\" evals/review-recall.eval.ts prints nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xbrief-parse-extract",
+        "title": "Extract parseXBriefDocument from readPlanSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "files_scope": [
+            "src/lib/xbrief/io.ts",
+            "src/lib/xbrief/__tests__/io.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/io.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "io.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.5 \"Parser extraction\" and WI-10. Move the body of readPlanSync (io.ts lines 269-287) after the file read into exported parseXBriefDocument(raw, source); readPlanSync becomes a one-line delegation. Error messages stay identical with the source label in place of the path."
+        },
+        "items": [
+          {
+            "id": "xbrief-parse-extract.ac1",
+            "title": "parseXBriefDocument returns a document with xBRIEFInfo for input that uses the legacy vBRIEFInfo envelope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-parse-extract.ac2",
+            "title": "parseXBriefDocument throws XBriefMergeConflictError naming the source label when the text contains all three git conflict markers (seven less-than, seven equals, seven greater-than signs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-parse-extract.ac3",
+            "title": "readPlanSync returns the same document as before for an existing spec file (existing io.test.ts cases still pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-quality-scorer",
+        "title": "Add the E3 plan-quality scorer and case parser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "evals/lib/plan-quality-scorer.ts",
+            "tests/unit/evals/lib/plan-quality-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/plan-quality-scorer.test.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "plan-quality-scorer.test.ts passes",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.5 \"Scorer\" and WI-11. Export PlanQualityCase, parsePlanQualityCase, extractJsonObject, DIFFICULTY_RANK and scorePlanQuality(output, reference, prdText) with schemaPass (via parseXBriefDocument + non-empty items), lintErrors/lintPass (lintPlanQuality with { prdText }, severity error only), difficultyAgreement, fileScopeOverlap (Jaccard after normalizing ./ and trailing /** or /*), itemCountAgreement, score = 0.4 lintPass + 0.2 each of the other three. Import lintPlanQuality and parseXBriefDocument; copy neither."
+        },
+        "items": [
+          {
+            "id": "plan-quality-scorer.ac1",
+            "title": "scorePlanQuality returns schemaPass 0 and score 0 for output with no JSON object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-scorer.ac2",
+            "title": "Given the reference document itself as model output, scorePlanQuality returns difficultyAgreement 1, fileScopeOverlap 1 and itemCountAgreement 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-scorer.ac3",
+            "title": "extractJsonObject returns the parsed object from a ```json fenced response with prose around it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-scorer.ac4",
+            "title": "Given a document with one warn and one error lint issue, scorePlanQuality returns lintErrors 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-quality-fixtures",
+        "title": "Select 8 plan-quality fixtures from closed issues with a spec and PRD",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "test",
+          "files_scope": [
+            "evals/fixtures/plan-quality/*.json",
+            "tests/unit/evals/lib/plan-quality-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/plan-quality-scorer.test.ts"
+          ],
+          "expected_outputs": [
+            "the committed-fixtures describe block passes with exactly 8 cases"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.5 \"Case shape\" and WI-12. Pick 8 CLOSED PAN issues that have both a .pan/specs/*-<ID>-*.{xbrief,vbrief}.json and a .pan/drafts/<id>.md, spreading reference difficulty and 3-20 items. Capture the issue body with `gh issue view <n> --repo eltmon/overdeck --json body`. Add a committed-fixtures describe block to plan-quality-scorer.test.ts that loads the directory via loadFixtureDir, parses each case, and parses each referenceSpecPath with parseXBriefDocument(readRepoText(path), path) — readRepoText from evals/lib/fixtures.ts, never a readFile call in the test. Each case records issueState: \"CLOSED\" from `gh issue view <n> --json state`."
+        },
+        "items": [
+          {
+            "id": "plan-quality-fixtures.ac1",
+            "title": "evals/fixtures/plan-quality contains exactly 8 JSON files, each accepted by parsePlanQualityCase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-fixtures.ac2",
+            "title": "Each case referenceSpecPath points at a .pan/specs file that parseXBriefDocument accepts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-fixtures.ac3",
+            "title": "Each case records issueState \"CLOSED\" and a prdPath that readRepoText reads without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-quality-eval",
+        "title": "Add the E3 plan-quality Evalite suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "evals/plan-quality.eval.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.5 \"Eval\" and WI-13. System = loadPromptFile(\"roles/plan.md\"); user = Effect.runPromise(renderPrompt({ name: \"planning\", vars })) with the vars in the PRD, followed by the PRD text block and the eval-mode addendum. maxTokens 48_000. Read prdPath and referenceSpecPath only through readRepoText (Evalite runs with cwd evals/, so a bare relative readFileSync would miss). Score with scorePlanQuality against parseXBriefDocument(reference), append a plan-quality record with all six metrics."
+        },
+        "items": [
+          {
+            "id": "plan-quality-eval.ac1",
+            "title": "The user prompt starts with the rendered planning template and contains \"# Planning Session: <issueId>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-eval.ac2",
+            "title": "The user prompt contains the case PRD text and ends with the eval-mode addendum asking for only the xBRIEF JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-quality-eval.ac3",
+            "title": "When a case finishes, the suite appends one record with suite \"plan-quality\" and metrics schemaPass, lintErrors, lintPass, difficultyAgreement, fileScopeOverlap and itemCountAgreement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-prompts-extract",
+        "title": "Extract summarization prompts into summary-prompts.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "refactor",
+          "files_scope": [
+            "src/lib/conversations/summary-prompts.ts",
+            "src/lib/conversations/smart-compaction.ts",
+            "src/lib/conversations/__tests__/summary-prompts.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "all conversations tests pass",
+            "typecheck completes without errors",
+            "lint:file-size passes",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-11",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.6 \"Prompt extraction\" and WI-14. Move smart-compaction.ts lines 458-635 (the six prompt constants) verbatim into new leaf module summary-prompts.ts (no imports), export them, add buildSummaryUserPrompt, buildSummaryPrompt and buildTurnPrefixPrompt exactly as in the PRD. generateSummaryFromPrompt (line 803), its overflow retry (lines 836-850) and generateTurnPrefixSummary (line 854) use the builders. Prompt strings stay byte-identical."
+        },
+        "items": [
+          {
+            "id": "summary-prompts-extract.ac1",
+            "title": "buildSummaryPrompt(s, undefined, false) returns SUMMARIZATION_SYSTEM_PROMPT + \"\\n\\n<conversation>\\n\" + s + \"\\n</conversation>\\n\\n\" + SUMMARIZATION_PROMPT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-prompts-extract.ac2",
+            "title": "buildSummaryPrompt with a previous summary and richMode true contains \"<previous-summary>\" and ends with RICH_UPDATE_SUMMARIZATION_PROMPT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-prompts-extract.ac3",
+            "title": "wc -l of smart-compaction.ts prints a number below 1148 and summary-prompts.ts contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-prompts-extract.ac4",
+            "title": "npx vitest run src/lib/conversations/__tests__ passes with the existing smart-compaction and summary-fork tests unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-render-export",
+        "title": "Export renderExternalHandoffPrompt from summary-fork.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "files_scope": [
+            "src/lib/conversations/summary-fork.ts",
+            "src/lib/conversations/__tests__/summary-fork-handoff.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "summary-fork-handoff.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.6 \"Handoff render export\" and WI-15. Add `export` to renderExternalHandoffPrompt at summary-fork.ts line 164; add one test asserting it substitutes focus, outputPath and transcript and falls back to the default focus text when focus is blank."
+        },
+        "items": [
+          {
+            "id": "handoff-render-export.ac1",
+            "title": "renderExternalHandoffPrompt returns the template with every {{focus}}, {{outputPath}} and {{transcript}} marker substituted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-render-export.ac2",
+            "title": "Given a blank focus, renderExternalHandoffPrompt falls back to the default no-focus text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "faithfulness-scorer",
+        "title": "Add the E4 faithfulness scorer and case parser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "parallelSafeReason": "Touches only its own new files; shares no file with any item outside its blocks edges.",
+          "difficulty": "complex",
+          "kind": "backend",
+          "files_scope": [
+            "evals/lib/faithfulness-scorer.ts",
+            "tests/unit/evals/lib/faithfulness-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/faithfulness-scorer.test.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "faithfulness-scorer.test.ts passes",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.6 \"Scorer\" and WI-16. Export SummaryCase, parseSummaryCase, extractIdentifiers, unsupportedIdentifiers, decoyViolations (negation word list in the PRD, sentence split /(?<=[.!?])\\s+|\\n+/), plantedRecall (anyOf alternatives, all terms case-insensitive), titleFormatValid, parseTitleOutput and scoreFaithfulness with the hard-fail rule for handoff and compaction, recall/(1+h) for fork and title, and format gate for title."
+        },
+        "items": [
+          {
+            "id": "faithfulness-scorer.ac1",
+            "title": "Given a compaction case summary that mentions a file path absent from the source, scoreFaithfulness returns unsupported 1 and score 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "faithfulness-scorer.ac2",
+            "title": "Given a fork case summary with recall 1 and one decoy stated as current, scoreFaithfulness returns decoyHits 1 and score 0.5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "faithfulness-scorer.ac3",
+            "title": "decoyViolations returns no violation when the sentence containing the anchor also contains \"instead\" or \"rejected\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "faithfulness-scorer.ac4",
+            "title": "titleFormatValid rejects a 2-word title and a title ending with a period, and parseTitleOutput returns the title from {\"title\": \"...\"} JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-fixtures",
+        "title": "Build 10 summary-faithfulness fixtures from scrubbed real sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "parallelSafeReason": "Touches only its own new files; shares no file with any item outside its blocks edges.",
+          "difficulty": "complex",
+          "kind": "test",
+          "files_scope": [
+            "evals/fixtures/summaries/*.json",
+            "tests/unit/evals/lib/faithfulness-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/faithfulness-scorer.test.ts"
+          ],
+          "expected_outputs": [
+            "the committed-fixtures describe block passes with 10 cases, kinds 3/3/2/2"
+          ],
+          "traces": [
+            "FR-14",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.6 \"Case shape\" and WI-17. Take read-only excerpts of real Overdeck Claude Code sessions (~/.claude/projects/*/*.jsonl; never modify them), trim to <=40 entries and <=60,000 serialized chars, scrub credentials and rewrite absolute home paths to ~/, then edit in 4-8 planted facts and 2-3 decoys per summary case (2-3 facts and 1 decoy per title case). 3 fork, 3 compaction, 2 handoff (with focus), 2 title. Add a committed-fixtures describe block to faithfulness-scorer.test.ts using loadFixtureDir."
+        },
+        "items": [
+          {
+            "id": "summary-fixtures.ac1",
+            "title": "evals/fixtures/summaries contains 10 JSON files accepted by parseSummaryCase with 3 fork, 3 compaction, 2 handoff and 2 title cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-fixtures.ac2",
+            "title": "For every planted fact, the committed-fixtures test passes an assertion that at least one anyOf alternative has all terms present in serializeConversation(entries, false)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-fixtures.ac3",
+            "title": "Every decoy anchor occurs in its case source only in a sentence that also contains a retraction word from the decoy negation list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-fixtures.ac4",
+            "title": "loadFixtureDir accepts every fixture file without a credential-pattern rejection and no fixture contains \"/home/\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-faithfulness-eval",
+        "title": "Add the E4 summary-faithfulness Evalite suite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "evals/summary-faithfulness.eval.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-15",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.6 \"Eval\" and WI-18. Per kind: fork (richMode true) and compaction (richMode false) via SUMMARIZATION_SYSTEM_PROMPT + buildSummaryUserPrompt(serializeConversation(entries, false)); handoff via renderExternalHandoffPrompt(loadPromptFile(\"roles/handoff-external.md\"), focus, serialized, \"<eval: no file>\") + eval-mode addendum and metric docValid from validateHandoffDoc; title via buildTranscriptTitlePrompt(serializeConversationTranscript(messages, { purpose: \"title\" })). Caps: 16K / 16K / 16K / 4K. Importing transcript-summary.ts and renderPrompt from evals/ was verified at planning time."
+        },
+        "items": [
+          {
+            "id": "summary-faithfulness-eval.ac1",
+            "title": "Given a fork or compaction case, the suite sends SUMMARIZATION_SYSTEM_PROMPT as system and a user prompt starting with \"<conversation>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-faithfulness-eval.ac2",
+            "title": "Given a handoff case, the suite records a docValid metric that validateHandoffDoc produces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-faithfulness-eval.ac3",
+            "title": "When a case finishes, the suite appends one record with suite \"summary-faithfulness\" and metrics recall, unsupported, decoyHits and hallucinations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-scorer",
+        "title": "Add the E5 feedback-acceptance classifier and scorer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "evals/lib/feedback-scorer.ts",
+            "tests/unit/evals/lib/feedback-scorer.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/feedback-scorer.test.ts",
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "feedback-scorer.test.ts passes",
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-16",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.7 \"Scorer\" and WI-19. Export FeedbackCase, parseFeedbackCase, FeedbackOutcome, classifyFeedbackResponse (order: flagged-injection regex, refused regex without an acting anchor, acted = anchor + action verb, else ignored; regexes exactly as in the PRD) and scoreFeedback (refused counts as correct for expected flagged-injection)."
+        },
+        "items": [
+          {
+            "id": "feedback-scorer.ac1",
+            "title": "classifyFeedbackResponse returns \"flagged-injection\" for a response saying the message looks like a prompt injection even when it names an anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-scorer.ac2",
+            "title": "classifyFeedbackResponse returns \"acted\" for \"I will fix src/lib/queue/drain.ts line 88\" with anchor src/lib/queue/drain.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-scorer.ac3",
+            "title": "classifyFeedbackResponse returns \"ignored\" for a response that names no anchor and contains no refusal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-scorer.ac4",
+            "title": "scoreFeedback returns correct 1 for a \"refused\" outcome on a case expecting flagged-injection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-acceptance-eval",
+        "title": "Add the E5 feedback-acceptance Evalite suite with six cases",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "evals/feedback-acceptance.eval.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors"
+          ],
+          "traces": [
+            "FR-17",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.7 \"Cases\" and \"Eval\" and WI-20. Define the six inline cases (review-feedback-raw, specialist-feedback-pointer, mid-task-foreman-correction, mail-drain-envelope, uat-feedback, control-injection) with the verbatim envelopes quoted in the PRD, system = loadPromptFile(\"roles/work.md\"), the eval-mode line appended to the last user message, runPromptScenario({ system, messages, maxTokens: 8_000 }), score with scoreFeedback, append a feedback-acceptance record."
+        },
+        "items": [
+          {
+            "id": "feedback-acceptance-eval.ac1",
+            "title": "The suite contains six cases and exactly one of them (control-injection) expects \"flagged-injection\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-acceptance-eval.ac2",
+            "title": "The specialist-feedback-pointer case final user turn contains \"SPECIALIST FEEDBACK: review-agent reported BLOCKED for PAN-9101.\" and the \"MUST READ:\" line from the review-verdict-feedback.ts template",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-acceptance-eval.ac3",
+            "title": "When a case runs, the suite sends a messages array of user, assistant, user and appends one record with suite \"feedback-acceptance\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the model-placement suites in evals/README.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "evals/README.md",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "verify_commands": [
+            "grep -c \"review-recall.eval.ts\\|plan-quality.eval.ts\\|summary-faithfulness.eval.ts\\|feedback-acceptance.eval.ts\" evals/README.md",
+            "grep -n \"evals/report.ts\" evals/README.md .overdeck/context/codebase/stack.md"
+          ],
+          "expected_outputs": [
+            "count is at least 4",
+            "both files mention evals/report.ts"
+          ],
+          "traces": [
+            "FR-20"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. Add a \"Model-placement suites\" section to evals/README.md: a table with suite, file, what it proves, fixture provenance, placement decision gated (E2: Sonnet 5.5 on correctness/performance/requirements lanes and Sol as cross-family lane; E3: plan off Opus 5.5; E4: Luna vs Haiku 4.5 vs Sonnet 5.5 for titles/compaction/fork/handoff; E5: Sonnet 5.5 work role), output cap; the result-record format and `npx tsx evals/report.ts`; an expected-cost table per suite per model mirroring the existing one; E2 lane counts; the note that claude-haiku-4-5 reports effort n/a. Update the Evals bullet in .overdeck/context/codebase/stack.md to mention evals/results/ and evals/report.ts."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "evals/README.md contains a table row for each of review-recall.eval.ts, plan-quality.eval.ts, summary-faithfulness.eval.ts and feedback-acceptance.eval.ts naming the placement decision each gates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "evals/README.md shows the command `npx tsx evals/report.ts` and states that evals/results/ is gitignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "evals/README.md contains an expected-cost table with a column per suite and a row per placement model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": ".overdeck/context/codebase/stack.md Evals bullet contains evals/report.ts and evals/results/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-and-post",
+        "title": "Run the suites for reachable models and post the five-model results table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:14Z",
+        "metadata": {
+          "issueLabel": "pan-4362",
+          "files_scope_confidence": "medium",
+          "readiness": "sequential",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "evals/README.md"
+          ],
+          "verify_commands": [
+            "gh issue view 4362 --repo eltmon/overdeck --comments | grep -c \"claude-opus-5-5\\|claude-sonnet-5-5\\|claude-haiku-4-5\\|gpt-6-sol\\|gpt-6-luna\""
+          ],
+          "expected_outputs": [
+            "the posted comment names all five placement models"
+          ],
+          "traces": [
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD section 4.9 and WI-22. Implementation checkpoint: run `OVERDECK_EVAL_MODEL=<id> [OVERDECK_EVAL_OPENAI_VIA=cliproxy] npm run eval` for every model whose credentials are present (at planning time only gpt-6-luna via cliproxy was reachable), then `npx tsx evals/report.ts`, add pending rows for unmeasured models whose score cell is the exact runnable command, and post with `gh issue comment 4362 --repo eltmon/overdeck --body-file <file>`. Then `pan tell flywheel-orchestrator` which models are pending. Append measured values to the README measured-values list."
+        },
+        "items": [
+          {
+            "id": "run-and-post.ac1",
+            "title": "gh issue view 4362 --comments shows a comment that contains one row per (suite, model) for all five placement models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-and-post.ac2",
+            "title": "Each row in that comment shows either a numeric mean score with tokens and cost, or a runnable `OVERDECK_EVAL_MODEL=<id> ... npm run eval` command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-and-post.ac3",
+            "title": "evals/README.md contains the measured tokens and cost for every model that was run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "harness-messages",
+        "to": "feedback-acceptance-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-results",
+        "to": "review-recall-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-results",
+        "to": "plan-quality-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-results",
+        "to": "summary-faithfulness-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-results",
+        "to": "feedback-acceptance-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-results",
+        "to": "placement-report",
+        "type": "blocks"
+      },
+      {
+        "from": "fixture-loader",
+        "to": "review-recall-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "fixture-loader",
+        "to": "plan-quality-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "fixture-loader",
+        "to": "summary-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "review-recall-scorer",
+        "to": "review-recall-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "review-recall-fixtures",
+        "to": "review-recall-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "xbrief-parse-extract",
+        "to": "plan-quality-scorer",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-quality-scorer",
+        "to": "plan-quality-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-quality-fixtures",
+        "to": "plan-quality-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-prompts-extract",
+        "to": "summary-faithfulness-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-render-export",
+        "to": "summary-faithfulness-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "faithfulness-scorer",
+        "to": "summary-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-fixtures",
+        "to": "summary-faithfulness-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "feedback-scorer",
+        "to": "feedback-acceptance-eval",
+        "type": "blocks"
+      },
+      {
+        "from": "review-recall-eval",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-quality-eval",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-faithfulness-eval",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "feedback-acceptance-eval",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "placement-report",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "docs",
+        "to": "run-and-post",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-timeout",
+        "to": "run-and-post",
+        "type": "blocks"
+      },
+      {
+        "from": "five-model-resolution",
+        "to": "run-and-post",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
