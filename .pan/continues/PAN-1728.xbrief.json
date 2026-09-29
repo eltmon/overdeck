@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-1728",
+  "created": "2026-09-29T01:58:51.551Z",
+  "updated": "2026-09-29T01:58:51.551Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "trailer-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T01:58:51.551Z"
+    }
+  }
+}
