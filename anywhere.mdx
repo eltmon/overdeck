@@ -1,0 +1,232 @@
+---
+title: "Overdeck Anywhere: plans and pricing"
+description: "What Overdeck Anywhere is, what stays free and open source, the planned paid plan, and how we arrived at its price. Planned, not yet available."
+---
+
+# Overdeck Anywhere: plans and pricing
+
+<Warning>
+Everything on this page is **planned and not yet available**. Nothing here can be bought
+today. The prices below are the ones we intend to charge at launch; we publish them now,
+with the reasoning, so you can see how we got there and tell us where we are wrong.
+</Warning>
+
+## What Overdeck Anywhere is
+
+Overdeck runs on your own machine. Your agents, workspaces and conversations live there.
+Overdeck Anywhere is the set of features that let you and your work leave that machine:
+
+- continue an agent conversation on a different machine, including when the first one is
+  switched off;
+- reach your Overdeck from a laptop, phone or another service without opening ports;
+- get a notification when an agent needs you;
+- later, share a live session with someone else.
+
+The plan lives in the Overdeck Anywhere epic,
+[PAN-2350](https://github.com/eltmon/overdeck/issues/2350). "Overdeck Anywhere" and
+"Session Vault" are working names.
+
+### Roadmap
+
+Most of Anywhere is open-source software you run yourself. The paid part comes last and
+consists of hosted services.
+
+| Order | What | Issue | Cost to you |
+| --- | --- | --- | --- |
+| 1 | **Session Vault, Phase A.** Saves agent conversations (Claude Code and Codex) as versioned, encrypted records on a backend you choose: a private git remote or a directory. Browse every saved conversation from any of your machines and continue one from any saved version. | [PAN-2609](https://github.com/eltmon/overdeck/issues/2609) | Free, open source |
+| 2 | **One Overdeck server per machine**, with machine identity, pairing and federation, so your machines can see each other. Then SSH hosts and remote servers on top of it. | [PAN-3762](https://github.com/eltmon/overdeck/issues/3762), [PAN-3863](https://github.com/eltmon/overdeck/issues/3863) | Free, open source |
+| 3 | **Needs-you notifications sent to a notification service you configure, remote dashboard access through a tunnel you control, and a mobile web app.** | [PAN-2354](https://github.com/eltmon/overdeck/issues/2354), [PAN-2352](https://github.com/eltmon/overdeck/issues/2352), [PAN-2355](https://github.com/eltmon/overdeck/issues/2355) | Free, open source |
+| 4 | **Remote agent workspaces on Fly.io** that you run yourself. | [PAN-1775](https://github.com/eltmon/overdeck/issues/1775), [PAN-1676](https://github.com/eltmon/overdeck/issues/1676) | Free, open source; you pay Fly directly |
+| 5 | **Hosted services on overdeck.ai:** an account, the subscription, the hosted Session Vault, then the relay (reach your machines from anywhere, with hosted push notifications delivered through it), then shared sessions. | [PAN-4293](https://github.com/eltmon/overdeck/issues/4293), [PAN-4294](https://github.com/eltmon/overdeck/issues/4294), [PAN-4297](https://github.com/eltmon/overdeck/issues/4297), [PAN-2356](https://github.com/eltmon/overdeck/issues/2356), [PAN-658](https://github.com/eltmon/overdeck/issues/658) | The paid plan below |
+| 6 | **Hosted agent capacity:** your agents running on machines we manage. | [PAN-4298](https://github.com/eltmon/overdeck/issues/4298) | Billed separately by usage |
+
+## What stays free and open source
+
+These are not trials and do not expire:
+
+- **Overdeck itself**, including every feature that runs on your own machines.
+- **All of Session Vault Phase A**: the `pan vault` commands, the git and directory
+  backends, end-to-end encryption, full version history, resume from any saved version,
+  and moving your vault to another backend. Your vault can be as large as your own
+  backend allows.
+- **Per-machine servers, federation and SSH hosts.** Connecting your own machines to each
+  other needs no account and no subscription.
+- **Leaving.** `pan vault migrate` copies every record out of the hosted vault to a backend
+  you run, whether or not your subscription is active.
+
+Self-hosting has no feature gate, and we do not plan to add one.
+
+## Planned plans and prices
+
+| Plan | Price | What you get |
+| --- | --- | --- |
+| **Self-hosted** (open source) | $0, forever | Unlimited storage on your own backend. All of Session Vault Phase A. |
+| **Vault Free** (hosted) | $0 | 1 GB of hosted vault storage, 2 machines, end-to-end encrypted. |
+| **Anywhere** | **$96 a year** (shown as $8 a month), or **$10 month-to-month** | 100 GB of hosted vault storage, unlimited machines, and the relay and hosted push notifications as they ship. Hosted agent compute is billed separately by usage. |
+| **Anywhere founding price** | **$60 a year**, annual only | Everything in Anywhere. The price stays at $60 for as long as you stay subscribed. Open to the first 500 subscribers, or until the relay ships, whichever comes first. |
+| **Extra storage** | +$3 a month or +$30 a year per 100 GB | For the few who pass 100 GB and prefer not to prune old records. |
+| **Team** | Not at launch | Needs a key-sharing design first (see section 9 below). |
+
+**Encryption.** Your transcripts are encrypted on your machine before upload, with a key
+only you hold. The hosted service stores ciphertext it cannot read, and your account never
+gains the ability to decrypt it. This also means we cannot recover your vault if you lose
+every device and your recovery phrase.
+
+**Deletion.** Deleting your account deletes all of your hosted vault data within 24 hours.
+
+**Payments.** We plan to sell through [Creem](https://www.creem.io) as merchant of record.
+Creem is the legal seller, so it collects and remits VAT, GST and sales tax where they
+apply.
+
+## How we arrived at these prices
+
+### 1. What comparable products charge
+
+We looked at two groups, with prices as published in September 2026.
+
+**Products that save or move AI coding sessions.** Most of them do it for free, or as part
+of a subscription you already buy for model access. Claude Code's Remote Control, included
+with Claude subscriptions, controls a session that is still running on its original machine.
+None of the products we found sell session storage by the gigabyte, and none encrypt agent
+transcripts with a key only the user holds.
+
+**Paid sync or hosted add-ons on top of a free or open-source core:**
+
+| Product | Price | Notes |
+| --- | --- | --- |
+| [Obsidian Sync](https://obsidian.md/sync) | Standard $4/mo annual or $5 monthly (1 GB); Plus $8/mo annual or $10 monthly (10 GB) | Encrypted, versioned sync for a free app. The closest analogue. |
+| [Raycast Pro](https://www.raycast.com/pricing) | $10/mo or $96/yr | Includes cloud sync |
+| [Termius Pro](https://termius.com/pricing) | $10/mo billed annually | Adds personal cloud vault sync |
+| [Zed Pro](https://zed.dev/pricing) | $10/mo | |
+| [ngrok Hobbyist](https://ngrok.com/pricing) | $10/mo, less billed annually | |
+| [Bitwarden Premium](https://bitwarden.com/pricing/) | $19.80/yr | Server is open source and self-hostable |
+| [Atuin](https://atuin.sh/sync-shell-history/) | Hosted sync free | Server is open source; client-side encryption |
+| [iCloud+](https://support.apple.com/en-us/108047) | 200 GB for $2.99/mo | Consumer storage anchor |
+
+Two conclusions:
+
+- **$8 a month billed annually, or $10 monthly, is the settled price for an individual pro
+  plan** on a developer tool. Obsidian Sync Plus sits exactly there with 10 GB. We offer
+  100 GB at the same price, because storing it costs us very little (next section).
+- **Nobody should pay per gigabyte for this.** Consumer cloud storage costs about $1.50 per
+  100 GB a month, so a per-gigabyte price above that would feel wrong. The price has to be
+  for the workflow, not the bytes.
+
+### 2. What it costs us to store your vault
+
+**Volume.** A heavy user running many agents at once writes about 13 GB of raw transcripts
+a month. Transcripts compress well: zstd at level 3 shrank a sample of real transcripts by
+about 3.2x. That heavy user therefore adds about 4 GB of stored data a month and would take
+about two years to fill 100 GB. A typical single-agent user writes far less; we estimate
+0.1 to 0.6 GB of stored data a month, but we have not measured it yet.
+
+**Storage.** The hosted vault is planned on Cloudflare R2 at $0.015 per GB-month, with no
+egress fee, which matters because restoring a conversation on a new machine is a download.
+Durable Objects hold each vault's version pointers.
+
+**Requests.** A heavy user with ten agents saving every five minutes makes about 21,000
+writes and 50,000 reads a month. On R2 with Workers and Durable Objects that costs about
+$0.16 a month.
+
+All-in cost per user per month:
+
+| Stored | Typical user | Heavy user |
+| --- | --- | --- |
+| 1 GB | $0.04 | $0.18 |
+| 5 GB | $0.10 | $0.24 |
+| 20 GB | $0.32 | $0.46 |
+| 50 GB | $0.77 | $0.91 |
+| 100 GB | $1.52 | $1.66 |
+
+A free user costs us at most about 4 cents a month, so a free hosted tier is affordable. The
+fixed platform cost is small (Cloudflare Workers has a $5 monthly minimum). The real cost of
+running this is support time: lost keys, billing questions and sync bugs.
+
+### 3. Payment fees
+
+Creem charges 3.9% plus $0.40 per successful charge, with no extra fee for international
+cards. Payouts to us cost the higher of $7 or 1% of each payout. The fixed $0.40 is what
+shapes the plan:
+
+| Charge | Fee | Share of the price |
+| --- | --- | --- |
+| $5 a month | $0.60 | 11.9% |
+| $10 a month | $0.79 | 7.9% |
+| $60 a year | $2.74 | 4.6% |
+| $96 a year | $4.14 | 4.3% |
+
+In countries with VAT or GST the fee is charged on the tax-inclusive amount, so its share of
+our revenue there is somewhat higher.
+
+### 4. What the price pays for
+
+Storage and requests for a user at the full 100 GB cap cost us about $1.70 a month, and a
+typical user costs well under that. Creem's fees take about $4 of a $96 annual plan. The rest
+of the price pays for building and maintaining Overdeck, supporting subscribers, and the
+parts of Anywhere that are not built yet.
+
+The relay and push notifications will add cost that we have not modeled yet. We will build
+that cost model before the relay leaves beta. Hosted agent compute is the one thing whose
+cost scales directly with use, which is why it is billed by usage instead of being included.
+
+### 5. Why annual billing
+
+Because of the fixed $0.40 per charge, a monthly plan loses about three times as much of
+each dollar to fees as an annual one. We still offer monthly at $10 for people who want to
+try it without committing, but the annual price is 20% lower ($96 against $120), the same
+discount Raycast and Obsidian use. The founding price is annual only for the same reason.
+
+### 6. Why the vault is not sold on its own
+
+A standalone "encrypted backup of your transcripts" competes with free tools and with
+Obsidian Sync Standard at $4 a month, and at $3 to $5 a month card fees would take 12% to
+17% of it. Its honest price would be low, and most of it would go to fees.
+
+What the vault does that nothing else does is let your work follow you: continue on your
+laptop while your desktop is off, from any saved version, across harnesses, with a key only
+you hold. That is the same promise as the relay, push notifications and, later, shared
+sessions. So the vault anchors one Anywhere subscription instead of being a separate
+product.
+
+At launch only the vault exists, so we would be charging a bundle price for one feature.
+The founding price addresses that: $60 a year, locked for as long as you stay subscribed,
+until the relay ships or 500 people have joined.
+
+### 7. Why self-hosting stays ungated
+
+- It is the promise the project was built on. Weakening the free git backend would break
+  that promise, and the promise is worth more than the subscriptions it might add.
+- It removes lock-in. You can start self-hosted, move to the hosted vault, and move back
+  with `pan vault migrate`.
+- It does not take much away from the paid plan. Encrypted records cannot be delta
+  compressed, so a heavy user outgrows a free git host's recommended repository size in a
+  few months. The people who value the vault most are the ones most likely to want someone
+  else to run it. Bitwarden and Atuin both publish their servers and still run popular
+  hosted services.
+
+### 8. Why a free hosted tier and not a trial
+
+Every direct alternative stores sessions for free, so a time-limited trial would lose the
+"try it" comparison. The 1 GB free tier costs us about 4 cents per user a month. Transcripts
+only grow, so the free tier fills up on its own for anyone who uses it heavily, and no
+feature needs to be held back to encourage upgrades. Version history is never gated,
+because resuming from any saved version is the point of the vault.
+
+### 9. Why there is no team plan yet
+
+Every record is encrypted with a single key that one person holds. Sharing a vault with a
+team needs a key-sharing design, and it depends on shared sessions
+([PAN-658](https://github.com/eltmon/overdeck/issues/658)). We will not publish a team price
+until that design exists.
+
+## What we still need to learn
+
+- How much a typical user actually stores. The vault collects no telemetry, so we plan a
+  local `pan vault stats` command and will ask early users to share its output.
+- What the relay costs to run per user.
+- Whether people will pay $96 a year, and $60 at the founding price. We plan a waitlist
+  before launch.
+
+If you have a view on any of this, comment on
+[PAN-4294](https://github.com/eltmon/overdeck/issues/4294) (subscription and billing) or
+[PAN-4297](https://github.com/eltmon/overdeck/issues/4297) (hosted Session Vault).

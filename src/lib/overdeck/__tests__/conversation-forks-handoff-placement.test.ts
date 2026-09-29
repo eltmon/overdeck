@@ -10,10 +10,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 const workspacePath = vi.hoisted(() => ({ current: null as string | null }));
+const primaryRoot = vi.hoisted(() => ({ current: null as string | null }));
 
 vi.mock('../issue-projects.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../issue-projects.js')>()),
   getIssueWorkspacePath: vi.fn(() => workspacePath.current),
+}));
+vi.mock('../../projects/primary-checkout.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../projects/primary-checkout.js')>()),
+  findPrimaryCheckout: vi.fn(async (path: string) =>
+    primaryRoot.current && path === primaryRoot.current
+      ? { projectKey: 'demo', repoName: null, root: primaryRoot.current }
+      : null),
 }));
 vi.mock('../../conversations/summary-fork.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../conversations/summary-fork.js')>()),
@@ -76,6 +84,7 @@ beforeEach(async () => {
     harness: 'claude-code',
   });
   workspacePath.current = null;
+  primaryRoot.current = null;
   vi.mocked(generateSummaryForFork).mockClear();
 });
 
@@ -134,6 +143,69 @@ describe('fork route issue workspace placement (PAN-3921 FR-6)', () => {
     workspacePath.current = join(testHome, 'project', 'workspaces', 'feature-pan-1');
 
     const { body } = await fork({ issueId: 'PAN-1' });
+    expect((body['conversation'] as { cwd: string }).cwd).toBe(parentCwd);
+  });
+});
+
+describe('fork route refuses a primary checkout as cwd (PAN-4338)', () => {
+  it('refuses a summary fork with a 400 and creates no conversation', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    mkdirSync(primaryRoot.current, { recursive: true });
+    const { listConversations } = await import('../conversations.js');
+    const before = listConversations().length;
+
+    const { status, body } = await fork({ cwd: primaryRoot.current });
+    expect(status).toBe(400);
+    expect(body['error']).toBe(`Invalid cwd: ${primaryRoot.current} is the primary checkout of demo; use a worktree`);
+    expect(listConversations().length).toBe(before);
+  });
+
+  it('refuses a handoff fork with a 400', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    mkdirSync(primaryRoot.current, { recursive: true });
+
+    const { status } = await fork({ cwd: primaryRoot.current, forkMode: 'handoff' });
+    expect(status).toBe(400);
+  });
+
+  it('accepts a worktree under the primary checkout', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    const worktree = join(primaryRoot.current, 'workspaces', 'feature-pan-1');
+    mkdirSync(worktree, { recursive: true });
+
+    const { body } = await fork({ cwd: worktree });
+    expect((body['conversation'] as { cwd: string }).cwd).toBe(worktree);
+  });
+
+  it('refuses allowPrimary from an agent caller', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    mkdirSync(primaryRoot.current, { recursive: true });
+
+    const { status } = await fork({ cwd: primaryRoot.current, allowPrimary: true, callerKind: 'agent' });
+    expect(status).toBe(400);
+  });
+
+  it('honors allowPrimary from an operator caller', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    mkdirSync(primaryRoot.current, { recursive: true });
+
+    const { status } = await fork({ cwd: primaryRoot.current, allowPrimary: true, callerKind: 'operator' });
+    expect(status).toBe(200);
+  });
+
+  it('honors allowPrimary when callerKind is omitted', async () => {
+    primaryRoot.current = join(testHome, 'project');
+    mkdirSync(primaryRoot.current, { recursive: true });
+
+    const { status } = await fork({ cwd: primaryRoot.current, allowPrimary: true });
+    expect(status).toBe(200);
+  });
+
+  it('never refuses an inherited cwd, even when it is a primary checkout (D1)', async () => {
+    primaryRoot.current = parentCwd;
+
+    const { status, body } = await fork({});
+    expect(status).toBe(200);
     expect((body['conversation'] as { cwd: string }).cwd).toBe(parentCwd);
   });
 });

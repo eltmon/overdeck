@@ -1,0 +1,135 @@
+{
+  "version": "1",
+  "issueId": "PAN-4338",
+  "created": "2026-09-29T02:00:20.609Z",
+  "updated": "2026-09-29T02:40:07.409Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "primary-checkout-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:00:20.609Z",
+      "doneAt": "2026-09-29T02:05:39.390Z"
+    },
+    "cwd-containment-collapse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:06:01.809Z",
+      "doneAt": "2026-09-29T02:10:04.360Z"
+    },
+    "fork-route-primary-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:10:10.283Z",
+      "doneAt": "2026-09-29T02:21:12.654Z"
+    },
+    "worker-primary-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:15:46.382Z",
+      "doneAt": "2026-09-29T02:22:19.596Z"
+    },
+    "docs-worker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:22:26.017Z",
+      "doneAt": "2026-09-29T02:23:56.012Z"
+    },
+    "cli-allow-primary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:24:04.208Z",
+      "doneAt": "2026-09-29T02:30:25.437Z"
+    },
+    "docs-handoff-fork": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4338",
+      "claimedAt": "2026-09-29T02:30:33.928Z",
+      "doneAt": "2026-09-29T02:32:40.990Z"
+    },
+    "primary-checkout-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:11.778Z"
+    },
+    "primary-checkout-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:24.191Z"
+    },
+    "primary-checkout-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:36.209Z"
+    },
+    "primary-checkout-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:47.719Z"
+    },
+    "cwd-containment-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:59.014Z"
+    },
+    "cwd-containment-collapse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:37:10.131Z"
+    },
+    "cwd-containment-collapse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:37:21.612Z"
+    },
+    "fork-route-primary-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:37:33.578Z"
+    },
+    "fork-route-primary-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:37:45.983Z"
+    },
+    "fork-route-primary-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:37:57.845Z"
+    },
+    "fork-route-primary-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:38:09.507Z"
+    },
+    "cli-allow-primary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:38:21.412Z"
+    },
+    "cli-allow-primary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:38:34.643Z"
+    },
+    "cli-allow-primary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:38:49.415Z"
+    },
+    "worker-primary-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:39:03.223Z"
+    },
+    "worker-primary-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:39:16.080Z"
+    },
+    "docs-handoff-fork.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:39:28.596Z"
+    },
+    "docs-handoff-fork.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:39:41.299Z"
+    },
+    "docs-worker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:39:54.483Z"
+    },
+    "docs-worker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:40:07.409Z"
+    }
+  }
+}

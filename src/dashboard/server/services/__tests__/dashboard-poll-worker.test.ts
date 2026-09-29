@@ -17,7 +17,7 @@ import { runDashboardDbJob, workerLane } from '../dashboard-db-task.js';
 describe('polling reads dispatch to database worker', () => {
   it.each(['getCostsByIssueSnapshot', 'getConversationSearchStats', 'getConversationLedgerCosts', 'getAgentCostStats'] as const)(
     'coalesces %s and receives its result from the read worker', async operation => {
-      expect(workerLane(operation)).toBe('read');
+      expect(workerLane(operation)).toBe('poll');
       const payload = operation === 'getConversationSearchStats' ? { dbPath: '/fixture/search.db', model: 'small' }
         : operation === 'getAgentCostStats' ? { agentIds: ['agent-a'], nowMs: 1000 } : undefined;
       const first = runDashboardDbJob(operation, payload);
@@ -32,6 +32,10 @@ describe('polling reads dispatch to database worker', () => {
       await expect(first).resolves.toEqual(result);
     },
   );
+
+  it('keeps point lookups on the read lane', () => {
+    expect(workerLane('getConversationByName')).toBe('read');
+  });
 
   it('rejects failed worker reads and allows the next refresh', async () => {
     const first = runDashboardDbJob('getCostsByIssueSnapshot');

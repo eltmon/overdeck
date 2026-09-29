@@ -90,6 +90,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   forever, so any patrol that iterates it and emits per agent must dedupe per
   death — deacon-lite's `reconcileAgentLiveness` did not, and emitted ~50k
   events/day (PAN-4300).
+  Close-out's DoD row 5 (`checkPostMergeRow`, `lifecycle/dod-gate.ts`) trusted
+  the label and blocked every close-out on exited agents; PAN-4324 confirms
+  claimed-live rows with `isAlive` (indeterminate still blocks).
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
@@ -262,5 +265,28 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
+  `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
+  handles, never agent ids. Six server sites joined by `terminalId ?? id` and
+  served every Herdr agent as stopped. Use `indexPanesByAgentKey` /
+  `paneAgentKey` from `@overdeck/contracts` (non-exited pane wins a key
+  collision). Test fixtures must be Herdr-shaped; a tmux-shaped pane
+  (`terminalId` = agent id) hides the bug. Herdr work agents run without the
+  PTY supervisor, so the enrichment poller's `agent.created` is the only way a
+  post-boot agent enters the read model's `agentsById`.
+- **Composer text reaches Claude Code as a paste** (PAN-4305) — Claude Code
+  records a long paste as `<pasted_content id="N">…</pasted_content id="N">`
+  in landed and queued records (closer carries the id). Any filter that drops
+  user text starting with `<` (`isSystemInjection`, `summary-fork.ts`) hides
+  the operator's own message; unwrap through `src/lib/pasted-content.ts` first.
+- **The spec is immutable after planning** (PAN-1728) — the required
+  `plan-integrity` verification check (`cloister/plan-integrity-run.ts`) fails
+  any change to `.pan/specs/<…>-<ISSUE>-*.xbrief.json` beyond five lifecycle
+  fields: top-level `status`, `plan.status`, `plan.updated`, `plan.sequence`,
+  `xBRIEFInfo.updated`. A new spec writer that touches anything else must make
+  a finalize commit with a valid `Plan-Finalized: <sha256>` trailer
+  (`xbrief/plan-finalized.ts`) or every open branch fails verification. For a
+  polyrepo `pan_records.repo` project, finalize makes that commit in the nested
+  plan-home repo, not the wrapper.
 
-<!-- last-verified: 2026-09-28 -->
+<!-- last-verified: 2026-09-29 -->

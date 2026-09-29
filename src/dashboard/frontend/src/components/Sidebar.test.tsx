@@ -163,7 +163,6 @@ describe('Sidebar navigation', () => {
     expect(screen.queryByTestId('sidebar-metrics')).toBeNull();
     expect(screen.queryByTestId('sidebar-costs')).toBeNull();
     expect(screen.queryByTestId('sidebar-health')).toBeNull();
-    expect(screen.queryByTestId('sidebar-skills')).toBeNull();
     expect(screen.queryByTestId('sidebar-god-view')).toBeNull();
     expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
@@ -180,14 +179,15 @@ describe('Sidebar navigation', () => {
     expect(screen.getByTestId('sidebar-metrics')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-costs')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-health')).toBeInTheDocument();
-    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-god-view')).toBeInTheDocument();
   });
 
-  it('includes Context in System navigation without requiring experimental pages', () => {
+  it('includes Context and Skills in System navigation without requiring experimental pages', () => {
     const { onTabChange } = renderSidebar({ activeTab: 'context' });
 
     expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
+    // PAN-3942: the Skills page holds the global skill on/off defaults.
+    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('sidebar-context'));

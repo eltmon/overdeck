@@ -14,6 +14,8 @@ git worktree add "$HOME/Projects/hoff-<slug>" main   # if you don't already have
 pan handoff --model <m> --cwd "$HOME/Projects/hoff-<slug>" --project <key> self "Read .pan/handoff-brief.md FIRST. <goal>"
 ```
 
+The server also refuses a project's primary checkout (or any directory inside it) with `Invalid cwd: <path> is the primary checkout of <project>; use a worktree`, and only an operator may override with `--allow-primary`.
+
 `pan lane start` creates the isolated directory for you.
 
 Run the `pan handoff` command itself from your project directory (not from the `--cwd` target or `/tmp` — sandboxed harnesses block network there). Project association inherits automatically from a project-scoped source; use `--project <key>` to override it or associate an unscoped source. Point `--cwd` at any isolated checkout — anything but the primary.

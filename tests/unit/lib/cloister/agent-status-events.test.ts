@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildConfirmedDeadAgentEvents } from '../../../../src/lib/cloister/agent-status-events.js';
+import { buildAgentStatusChangedPayload, buildConfirmedDeadAgentEvents } from '../../../../src/lib/cloister/agent-status-events.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state-read.js';
 
 function state(overrides: Partial<AgentState> = {}): AgentState {
@@ -60,5 +60,17 @@ describe('buildConfirmedDeadAgentEvents', () => {
     buildConfirmedDeadAgentEvents('agent-pan-1', input, () => '2026-09-28T00:00:00.000Z');
 
     expect(input.status).toBe('running');
+  });
+});
+
+describe('buildAgentStatusChangedPayload — stoppedByUser (PAN-4290)', () => {
+  it('carries stoppedByUser: true when the state has it set', () => {
+    const payload = buildAgentStatusChangedPayload(state({ status: 'stopped', stoppedByUser: true }), 'running', false);
+    expect(payload.stoppedByUser).toBe(true);
+  });
+
+  it('carries stoppedByUser: false when the state does not have it set', () => {
+    const payload = buildAgentStatusChangedPayload(state({ status: 'stopped' }), 'running', false);
+    expect(payload.stoppedByUser).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ import {
   type ExtractionProviderResult,
 } from '../../../src/lib/memory/providers/index.js';
 import { CliproxyExtractionProvider } from '../../../src/lib/memory/providers/cliproxy.js';
+import { AnthropicExtractionProvider } from '../../../src/lib/memory/providers/anthropic.js';
 
 interface ExtractedPayload {
   summary: string;
@@ -97,5 +98,61 @@ describe('memory extraction providers', () => {
     });
     expect(result.cost.usd).toBeGreaterThan(0);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  // PAN-4327: Sonnet 5+, Opus 4.7+ and Fable 400 on non-default temperature.
+  it('omits temperature for a sampling-restricted model via cliproxy', async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      id: 'msg-1',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }), { status: 200 }));
+    const provider = new CliproxyExtractionProvider('http://127.0.0.1:8317', fetchFn as typeof fetch);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-sonnet-5-5' });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1]!.body as string);
+    expect(body).not.toHaveProperty('temperature');
+  });
+
+  it('keeps sending temperature for a model that accepts it via cliproxy', async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      id: 'msg-1',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }), { status: 200 }));
+    const provider = new CliproxyExtractionProvider('http://127.0.0.1:8317', fetchFn as typeof fetch);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'gpt-4.1-nano' });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1]!.body as string);
+    expect(body.temperature).toBe(0);
+  });
+
+  it('omits temperature for a sampling-restricted model via the Anthropic SDK', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-2',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-sonnet-5-5' });
+
+    expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0][0]).not.toHaveProperty('temperature');
+  });
+
+  it('keeps sending temperature for the default Anthropic model', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-3',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' });
+
+    expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0 });
   });
 });

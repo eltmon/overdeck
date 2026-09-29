@@ -10,12 +10,14 @@
  * on branch `<feature-branch>-worker-<n>`, or, with `readOnly`, the issue
  * workspace itself behind a read-only git guard. `cwd` overrides both and must
  * resolve inside the issue workspace. The project's primary checkout is never
- * a worker's directory.
+ * a worker's directory: a read-write `--cwd` that resolves to one (symlinks
+ * followed) is refused (PAN-4338); a `--read-only` worker is not checked.
  */
 import { access, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RuntimeName } from '../../runtimes/types.js';
+import type { PrimaryCheckoutMatch } from '../../projects/primary-checkout.js';
 import { createItemWorktree, worktreeBranch } from '../../workspaces/item-worktree.js';
 import type { AgentState } from '../agent-state-read.js';
 import { removeAgentStateDir } from '../state-dir-removal.js';
@@ -68,6 +70,7 @@ export interface StartWorkerDeps {
   worktreeBranch?: (path: string) => Promise<string | null>;
   resolveWorkspace?: (issueId: string) => string;
   allocateWorkerId?: (issueId: string) => Promise<string>;
+  findPrimaryCheckout?: (path: string) => Promise<PrimaryCheckoutMatch | null>;
   now?: () => Date;
 }
 
@@ -104,6 +107,11 @@ async function defaultResolveWorkspace(issueId: string): Promise<string> {
   return defaultRunWorkspace(issueId);
 }
 
+async function defaultFindPrimaryCheckout(path: string): Promise<PrimaryCheckoutMatch | null> {
+  const { findPrimaryCheckout } = await import('../../projects/primary-checkout.js');
+  return findPrimaryCheckout(path);
+}
+
 export async function startWorker(options: StartWorkerOptions, deps: StartWorkerDeps = {}): Promise<StartedWorker> {
   const issueId = options.issueId.toUpperCase();
   if (!options.prompt.trim()) throw new Error('The worker brief is empty.');
@@ -124,6 +132,14 @@ export async function startWorker(options: StartWorkerOptions, deps: StartWorker
       throw new Error(`--cwd ${requested} is outside ${issueId}'s workspace ${workspace}; a worker runs inside its issue workspace.`);
     }
     explicitCwd = realCwd;
+
+    if (options.readOnly !== true) {
+      const primary = await (deps.findPrimaryCheckout ?? defaultFindPrimaryCheckout)(realCwd);
+      if (primary) {
+        const label = primary.repoName ? `${primary.projectKey}/${primary.repoName}` : primary.projectKey;
+        throw new Error(`--cwd ${requested} is the primary checkout of ${label}; use a worktree`);
+      }
+    }
   }
 
   const id = await (deps.allocateWorkerId ?? allocateWorkerId)(issueId);

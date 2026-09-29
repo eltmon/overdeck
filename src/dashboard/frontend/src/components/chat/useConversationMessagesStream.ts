@@ -166,7 +166,6 @@ export function useConversationMessagesStream(
     if (!enabled) return;
 
     const queryKey = conversationMessagesQueryKey(conversation.name);
-    void queryClient.cancelQueries({ queryKey });
     const unsubscribe = getTransport().subscribe(
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,

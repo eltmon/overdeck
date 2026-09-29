@@ -323,8 +323,11 @@ a pane that carries Overdeck tokens, because Herdr names every agent it detects 
 `claude-1`), the operator's own panes included; on tmux it is the session name of an Overdeck
 session (agent state, or an `agent-`/`planning-`/`strike-`/`conv-` name). On Herdr `pane.id` is the
 backend handle (`w1:p1`), not the agent name, so any join from an agent to its pane — the
-Agents Directory's first of all — must match `pane.agentId === agent.id`, never `pane.id`.
-A pane created by a live event gets its `agentId` on the next inventory refresh (at most 5 s).
+Agents Directory's first of all — must go through `indexPanesByAgentKey`
+(`packages/contracts/src/backend-pane.ts`, PAN-4320), never `pane.id`. The Herdr `pane-created`
+and `metadata` events carry `agentId` (the same `agentIdOf` rule the adapter's `list()` uses)
+and `pane-created` carries the pane's real `terminalId`, so an event-created pane answers for
+its agent at once, not on the next inventory refresh.
 
 ## Spawn paths (PAN-3960)
 

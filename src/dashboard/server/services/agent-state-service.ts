@@ -32,11 +32,13 @@ import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';
 import {
   applyEvent as applyReducerEvent,
   INITIAL_READ_MODEL_STATE,
+  indexPanesByAgentKey,
 } from '@overdeck/contracts';
 import type {
   Activity,
   AgentRuntimeSnapshot,
   AgentState,
+  BackendPane,
   DomainEvent,
 } from '@overdeck/contracts';
 import { initEventStore } from '../event-store.js';
@@ -133,21 +135,7 @@ export const AgentStateServiceLive = Layer.effect(
     // arrived during the fork (they carry a higher sequence than the seed).
     const seedFromBackend = Effect.gen(function* () {
       const panes = yield* Effect.promise(() => getBackendPanes());
-      const seeded: Record<string, AgentRuntimeSnapshot> = {};
-      const liveById: Record<string, boolean> = {};
-      for (const pane of panes) {
-        const id = pane.terminalId ?? pane.id;
-        liveById[id] = pane.state !== 'exited';
-        seeded[id] = {
-          id,
-          activity: activityForPaneState(pane.state),
-          lastActivity: new Date(pane.stateSince ?? Date.now()).toISOString(),
-          ...(pane.model && pane.model !== 'unknown' ? { model: pane.model } : {}),
-          ...(pane.harness && pane.harness !== 'unknown' ? { sessionHarness: pane.harness } : {}),
-          ...(pane.issue ? { currentIssue: pane.issue } : {}),
-          updatedAtSequence: 0,
-        } as AgentRuntimeSnapshot;
-      }
+      const { seeded, liveById } = seedRuntimeFromPanes(panes);
       if (Object.keys(seeded).length > 0) {
         yield* SubscriptionRef.update(ref, (current) =>
           mergeRuntimeBySequence(current, seeded, liveById),
@@ -188,6 +176,28 @@ export const AgentStateServiceLive = Layer.effect(
 );
 
 // ─── Internals ────────────────────────────────────────────────────────────────
+
+/** Runtime seed from the pane inventory, keyed by agent id (PAN-4320). */
+export function seedRuntimeFromPanes(panes: readonly BackendPane[]): {
+  seeded: Record<string, AgentRuntimeSnapshot>
+  liveById: Record<string, boolean>
+} {
+  const seeded: Record<string, AgentRuntimeSnapshot> = {};
+  const liveById: Record<string, boolean> = {};
+  for (const [id, pane] of indexPanesByAgentKey(panes)) {
+    liveById[id] = pane.state !== 'exited';
+    seeded[id] = {
+      id,
+      activity: activityForPaneState(pane.state),
+      lastActivity: new Date(pane.stateSince ?? Date.now()).toISOString(),
+      ...(pane.model && pane.model !== 'unknown' ? { model: pane.model } : {}),
+      ...(pane.harness && pane.harness !== 'unknown' ? { sessionHarness: pane.harness } : {}),
+      ...(pane.issue ? { currentIssue: pane.issue } : {}),
+      updatedAtSequence: 0,
+    } as AgentRuntimeSnapshot;
+  }
+  return { seeded, liveById };
+}
 
 /** BackendPane state → the read model's Activity vocabulary. */
 export function activityForPaneState(state: AgentState): Activity {

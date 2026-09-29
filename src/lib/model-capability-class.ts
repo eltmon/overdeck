@@ -40,6 +40,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'ql-reason-70b': 'frontier',
   'mistral-large-latest': 'frontier',
   // workhorse
+  'claude-sonnet-5-5': 'workhorse',
   'claude-sonnet-5': 'workhorse',
   'claude-sonnet-4-6': 'workhorse',
   'claude-sonnet-4-5': 'workhorse',

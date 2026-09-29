@@ -131,7 +131,7 @@ It mirrors `OVERDECK_OPERATOR_PUSH=1` for the push guard. Use it only when the
 operator has actually directed the release.
 
 **2. The push guard.** `scripts/guard-agent-main-push.sh` exempts `conv-`
-prefixed agent ids but not pipeline roles, so pushing `main` and the tag needs:
+prefixed agent ids except `conv-flywheel`, and never pipeline roles, so pushing `main` and the tag needs:
 
 ```bash
 OVERDECK_OPERATOR_PUSH=1 git push origin main

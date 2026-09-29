@@ -27,7 +27,8 @@ vi.mock('../../../../lib/agent-enrichment.js', () => ({
   computeAgentEnrichment: mocks.computeAgentEnrichment,
   getAgentJsonlMtime: mocks.getAgentJsonlMtime,
 }))
-vi.mock('../backend-inventory.js', () => ({ getBackendPanes: mocks.getBackendPanes }))
+vi.mock('../backend-inventory.js', () => ({ getBackendPanes: mocks.getBackendPanes, isBackendInventoryDegraded: () => false }))
+vi.mock('../../../../lib/terminal-backends/select.js', () => ({ hostTerminalBackendName: async () => 'tmux' }))
 vi.mock('../../../../lib/runtime-census.js', () => ({ getRuntimeCensus: mocks.getRuntimeCensus }))
 vi.mock('../../event-store.js', () => ({ getEventStore: () => mocks.store }))
 vi.mock('../agent-projection.js', () => ({ saveAgentStateAndEmitEvent: mocks.saveAgentStateAndEmitEvent }))

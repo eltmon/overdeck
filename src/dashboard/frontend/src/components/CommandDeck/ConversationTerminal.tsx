@@ -7,6 +7,7 @@ import { ContextWindowMeter } from '../chat/ContextWindowMeter';
 import { ConversationResumeControls } from '../chat/ConversationResumeControls';
 import { resumeConversation } from '../chat/conversationResumeApi';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
+import { SESSION_ENDED_FALLBACK } from '../../lib/sessionOutcome';
 import type { Conversation } from './ConversationList';
 import styles from './styles/command-deck.module.css';
 
@@ -93,7 +94,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
           <XTerminal sessionName={conversation.tmuxSession} />
         ) : (
           <div className={styles.conversationResumeOverlay}>
-            <p>Session ended</p>
+            <p>{SESSION_ENDED_FALLBACK.label}</p>
             <ConversationResumeControls
               sendResumeContract={sendResumeContract}
               onSendResumeContractChange={setSendResumeContract}

@@ -1,0 +1,125 @@
+{
+  "version": "1",
+  "issueId": "PAN-4305",
+  "created": "2026-09-29T00:33:19.689Z",
+  "updated": "2026-09-29T00:58:50.068Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pasted-content-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4305",
+      "claimedAt": "2026-09-29T00:33:19.689Z",
+      "doneAt": "2026-09-29T00:34:38.337Z"
+    },
+    "parser-unwrap-pasted": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4305",
+      "claimedAt": "2026-09-29T00:34:45.825Z",
+      "doneAt": "2026-09-29T00:39:02.174Z"
+    },
+    "landing-strip-pasted": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4305",
+      "claimedAt": "2026-09-29T00:39:06.254Z",
+      "doneAt": "2026-09-29T00:42:24.771Z"
+    },
+    "composer-echo-matching": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4305",
+      "claimedAt": "2026-09-29T00:42:28.736Z",
+      "doneAt": "2026-09-29T00:47:03.874Z"
+    },
+    "docs-delivery-landing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4305",
+      "claimedAt": "2026-09-29T00:47:08.707Z",
+      "doneAt": "2026-09-29T00:47:55.544Z"
+    },
+    "pasted-content-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:54:55.055Z"
+    },
+    "pasted-content-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:05.238Z"
+    },
+    "pasted-content-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:16.322Z"
+    },
+    "pasted-content-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:27.176Z"
+    },
+    "parser-unwrap-pasted.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:43.124Z"
+    },
+    "parser-unwrap-pasted.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:55.449Z"
+    },
+    "parser-unwrap-pasted.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:56:07.430Z"
+    },
+    "parser-unwrap-pasted.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:56:18.910Z"
+    },
+    "landing-strip-pasted.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:56:33.919Z"
+    },
+    "landing-strip-pasted.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:56:45.546Z"
+    },
+    "landing-strip-pasted.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:56:57.519Z"
+    },
+    "landing-strip-pasted.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:57:08.521Z"
+    },
+    "composer-echo-matching.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:57:23.221Z"
+    },
+    "composer-echo-matching.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:57:33.553Z"
+    },
+    "composer-echo-matching.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:57:44.606Z"
+    },
+    "composer-echo-matching.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:57:55.002Z"
+    },
+    "docs-delivery-landing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:58:08.934Z"
+    },
+    "docs-delivery-landing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:58:21.034Z"
+    },
+    "docs-delivery-landing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:58:33.177Z"
+    },
+    "parser-unwrap-pasted.ac5": {
+      "status": "cancelled"
+    },
+    "composer-echo-matching.ac5": {
+      "status": "cancelled"
+    }
+  }
+}

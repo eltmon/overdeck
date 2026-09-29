@@ -166,8 +166,8 @@ models:
 
   # Anthropic model substituted when a model's provider is disabled and the
   # model has no explicit fallback entry (src/lib/model-fallback.ts).
-  # Default: claude-sonnet-5 (src/lib/config-yaml/defaults.ts)
-  provider_fallback_model: claude-sonnet-5
+  # Default: claude-sonnet-5-5 (src/lib/config-yaml/defaults.ts)
+  provider_fallback_model: claude-sonnet-5-5
 ```
 
 For OpenRouter:
@@ -216,7 +216,7 @@ With `tiered_execution.enabled`, a planned issue's work agent takes the model of
 A tier `model`, a `distribution[].model` entry, and `supervisor.model` accept the same `workhorse:<slot>` refs as `roles.*`. They resolve through `derefWorkhorse` (`src/lib/config-yaml/roles.ts`), so re-pointing a workhorse slot re-points every tier that uses it:
 
 ```yaml
-workhorses: { expensive: claude-opus-5-5, mid: claude-sonnet-5, cheap: claude-haiku-4-5 }
+workhorses: { expensive: claude-opus-5-5, mid: claude-sonnet-5-5, cheap: claude-haiku-4-5 }
 tiered_execution:
   enabled: true
   tiers:
@@ -228,7 +228,7 @@ tiered_execution:
 
 A ref to an undefined slot, or the `parent` sentinel, is invalid. The Settings save refuses it. On config load it disables tiered staffing and reports the reason through `pan doctor`. A Settings save writes the ref back to `config.yaml`, never the model the slot currently holds.
 
-To see the effective model per tier, run `pan admin config tiers`. It prints `roles.work`'s model and each tier's declared ref with its resolved model (`workhorse:mid → claude-sonnet-5`), and marks each tier that `[overrides roles.work]` while tiered execution is on. Settings › Tiered Execution shows the same information: crew labels show the resolved model, and a crew is tagged `overrides roles.work (<model>)` when it launches a different model than `roles.work`.
+To see the effective model per tier, run `pan admin config tiers`. It prints `roles.work`'s model and each tier's declared ref with its resolved model (`workhorse:mid → claude-sonnet-5-5`), and marks each tier that `[overrides roles.work]` while tiered execution is on. Settings › Tiered Execution shows the same information: crew labels show the resolved model, and a crew is tagged `overrides roles.work (<model>)` when it launches a different model than `roles.work`.
 
 ## Capability classes
 

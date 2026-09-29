@@ -82,6 +82,31 @@ describe('the tracker owns closed', () => {
     expect(deriveIssueState(facts({ issueOpen: false })).state).toBe('closed');
     expect(deriveIssueState(facts({ issueOpen: null })).state).toBe('backlog');
   });
+
+  it('a closed issue with a merged PR carries pr.merged true (PAN-4290)', async () => {
+    const derived = await getDerivedIssueState('PAN-3917', {
+      ...offline,
+      readIssue: async () => ({ open: false, labels: [] }),
+      readPr: async () => ({
+        url: 'https://example.test/pr/1', number: 1, reviewState: 'approved' as const,
+        checks: 'green' as const, mergeable: true, merged: true,
+      }),
+    });
+    expect(derived.state).toBe('closed');
+    expect(derived.pr?.merged).toBe(true);
+  });
+
+  it('an open PR carries no merged key on pr (PAN-4290)', async () => {
+    const derived = await getDerivedIssueState('PAN-3917', {
+      ...offline,
+      readIssue: async () => ({ open: true, labels: [] }),
+      readPr: async () => ({
+        url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested' as const,
+        checks: 'pending' as const, mergeable: null, merged: false,
+      }),
+    });
+    expect(derived.pr).not.toHaveProperty('merged');
+  });
 });
 
 describe('the plan home owns the spec', () => {

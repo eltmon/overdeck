@@ -74,6 +74,31 @@ To add or move an issue-view section without losing an existing surface:
 
 The no-loss tests are a surface lock. The root test fixes the historical inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
 
+### Ended session outcomes (PAN-4290)
+
+Every surface that shows an ended session (`SessionNode.presence === 'ended'`, or `isEndedAgent(agent)` for the drawer's `SessionAgent` shape) renders a derived **outcome** in place of a bare "Session ended": AgentStepRow (cockpit and rail, plus the status tooltip), SessionPanel's terminal tab, and DrawerAgentSession's terminal toggle and body. The two surfaces that are not mounted in production, `ConversationTerminal` and `TerminalSessionWrapper`, still route through the same fallback for consistency (D7).
+
+The outcome is computed at render time, in the browser, by one pure function: `deriveSessionOutcome` in `src/dashboard/frontend/src/lib/sessionOutcome.ts`. Nothing about it is persisted — no new store slice, no server-side `SessionNode` field, no endpoint or polling loop (NFR-1, NFR-3). Two adapters, `outcomeFactsFromSessionNode` and `outcomeFactsFromAgent`, turn a `SessionNode`/agent snapshot pair or a drawer `SessionAgent` into the shared `SessionOutcomeFacts` shape; the store-reading hooks `useSessionNodeOutcome` and `useAgentSessionOutcome` (`src/dashboard/frontend/src/lib/useSessionOutcome.ts`) wire the adapters to `useDerivedIssueState` and `agentsById` and return `null` while the session is still live. No surface hard-codes an outcome string (NFR-2).
+
+| kind | label | tone |
+| --- | --- | --- |
+| `merged` | Merged | quiet |
+| `review-approved` | Review approved | quiet |
+| `changes-requested` | Changes requested | quiet |
+| `tests-passed` | Tests passed | quiet |
+| `tests-failed` | Tests failed | quiet |
+| `plan-finalized` | Plan finalized | quiet |
+| `stopped-by-operator` | Stopped by operator | quiet |
+| `stopped-by-close-out` | Stopped by close-out | quiet |
+| `ended-unexpectedly` | Ended unexpectedly | attention |
+| `ended` (the fallback) | Session ended | quiet |
+
+The outcome is picked by a 12-row precedence table, first match wins, with PR-derived outcomes (`Merged`, the review verdict, the test result) ranked above every stop-cause outcome — where the PR and a stop cause disagree, the PR wins (FR-2). `ended-unexpectedly` is the only kind that renders with `attention` tone (the style guide's `--destructive` treatment); every other outcome, and the fallback, renders `quiet` (`--muted-foreground`) — an ended Review row with changes requested is no longer red, because tone comes from the outcome, not from the lossy `status` `normalizeAgentStatus` maps `blocked`/`failed` onto (FR-4).
+
+`ended-unexpectedly` is claimed only on positive evidence, never on a missing match: a recorded `error`/`failed`/`dead` status, an agent-backed session that ended while its recorded status was still `running`/`starting` (the pane vanished with no recorded stop), or a primary agent (plan/work/strike) that ended cleanly with no outcome while the issue is known to be neither closed nor merged. A synthesized specialist row (Review/Test, built from PR facts even when no agent ever ran), a worker, a paused agent, or any session whose issue state is unknown gets the plain fallback instead (D5) — the operator's complaint was false alarms, and a "no match" default of `ended-unexpectedly` would have recreated it.
+
+`DerivedPrState.merged` (`packages/contracts/src/derived-issue-state.ts`) is what keeps `Merged` visible after close-out: `deriveState` ranks `closed` above `merged`, so once an issue closes the wire state is `closed` and the row's own `merged` state is gone unless the PR fact carries `merged: true` forward. The field is optional, derived, and `emitOnly` like the rest of `DerivedIssueState` — present only when true, so every existing open-PR fixture stays byte-identical (FR-3, NFR-1).
+
 ### Full-screen artifact overlays
 
 The xBRIEF expand controls stay inside the existing `DrawerPlanPanel / XBriefViewer` and `PlanMapCard` sections. They set `xbriefViewerIssueId`, which opens the globally mounted `XBriefFullscreen` overlay above the current issue surface. The overlay is an interaction layer, not another density section, so it does not belong in `ISSUE_VIEW_INVENTORY` or `DENSITY_SECTIONS`.

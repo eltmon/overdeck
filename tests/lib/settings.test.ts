@@ -38,8 +38,8 @@ describe('settings', () => {
 
       // Default model configuration per DEFAULT_SETTINGS
       expect(defaults.models.specialists.review_agent).toBe('claude-opus-4-6');
-      expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-5');
-      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-5');
+      expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-5-5');
+      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-5-5');
       expect(defaults.api_keys).toEqual({});
     });
 
@@ -211,8 +211,8 @@ describe('settings', () => {
       expect(loaded.models.specialists.review_agent).toBe('gpt-5.3-codex');
 
       // Other specialists should be defaults per DEFAULT_SETTINGS
-      expect(loaded.models.specialists.test_agent).toBe('claude-sonnet-5');
-      expect(loaded.models.specialists.merge_agent).toBe('claude-sonnet-5');
+      expect(loaded.models.specialists.test_agent).toBe('claude-sonnet-5-5');
+      expect(loaded.models.specialists.merge_agent).toBe('claude-sonnet-5-5');
 
       // Other sections should be defaults per DEFAULT_SETTINGS
       expect(loaded.models.status_review).toBe('claude-opus-4-6');
@@ -236,6 +236,7 @@ describe('settings', () => {
         'claude-opus-4-8',
         'claude-opus-4-7',
         'claude-opus-4-6',
+        'claude-sonnet-5-5',
         'claude-sonnet-5',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',

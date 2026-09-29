@@ -213,7 +213,7 @@ NODE
 
 commit_has_issue_ref() {
   local commit="$1"
-  git log -1 --format=%B "$commit" | grep -Eq "$ISSUE_REF_RE"
+  grep -Eq "$ISSUE_REF_RE" <<< "$(git log -1 --format=%B "$commit")"
 }
 
 audit_commit() {

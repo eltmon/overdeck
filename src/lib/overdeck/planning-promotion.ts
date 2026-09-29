@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -32,6 +32,7 @@ import { resolveGitHubIssue } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
 import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
+import { formatPlanFinalizedTrailer, planFinalizedHash } from '../xbrief/plan-finalized.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
 import { resolveIssueProjectPath } from './issue-reads.js';
@@ -241,12 +242,18 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string
  * runs. The `git init` stays for every other shape: PAN-2386 polyrepo
  * scaffolds are not git repos until this commit lands (see the comment on
  * completePlanningWorkspaceGitAddCommands).
+ *
+ * PAN-1728: with `specPath`, the commit holding the spec carries
+ * `Plan-Finalized: <sha256>` — the reference the plan-integrity gate reads.
+ * When the spec lives in a nested plan-home repo (polyrepo `pan_records.repo`),
+ * the wrapper commit stays as before and a second commit there carries it.
  */
 export async function commitCompletePlanningWorkspaceGit(
   gitRoot: string,
   issueId: string,
   taskWarning: string | null,
   execImpl: typeof execFileAsync = execFileAsync,
+  specPath?: string,
 ): Promise<{ pushed: boolean; taskWarning: string | null }> {
   if (isPreWorktreeMetadataOnlyDir(gitRoot)) {
     console.log('[complete-planning] workspace ' + gitRoot + ' is a pre-worktree metadata dir; skipping workspace git init/commit');
@@ -262,10 +269,23 @@ export async function commitCompletePlanningWorkspaceGit(
     await execImpl('git', args, { cwd: gitRoot, encoding: 'utf-8' });
   }
 
+  const subject = `chore(plan): complete planning for ${issueId}`;
+  const finalized = await planFinalizedTarget(gitRoot, issueId, specPath, execImpl);
   try {
     await execImpl('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
   } catch {
-    await execImpl('git', ['commit', '-m', `chore(plan): complete planning for ${issueId}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
+    const trailerArgs = finalized?.inGitRoot ? ['-m', finalized.trailer] : [];
+    await execImpl('git', ['commit', '-m', subject, ...trailerArgs, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+  if (finalized && !finalized.inGitRoot) {
+    try {
+      await execImpl('git', ['add', '.pan/'], { cwd: finalized.specRepo, encoding: 'utf-8' });
+      await execImpl('git', ['diff', '--cached', '--quiet'], { cwd: finalized.specRepo, encoding: 'utf-8' }).catch(async () => {
+        await execImpl('git', ['commit', '-m', subject, '-m', finalized.trailer, '--no-verify'], { cwd: finalized.specRepo, encoding: 'utf-8' });
+      });
+    } catch (error) {
+      console.warn(`[complete-planning] Could not commit the ${issueId} spec in ${finalized.specRepo}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   try {
@@ -277,6 +297,29 @@ export async function commitCompletePlanningWorkspaceGit(
     return { pushed: true, taskWarning };
   } catch {
     return { pushed: false, taskWarning };
+  }
+}
+
+async function realpathOrSelf(path: string): Promise<string> {
+  return realpath(path).catch(() => path);
+}
+
+/** PAN-1728: the spec's `Plan-Finalized` trailer and the repo that holds it; null when the spec is in no repo. */
+async function planFinalizedTarget(
+  gitRoot: string,
+  issueId: string,
+  specPath: string | undefined,
+  execImpl: typeof execFileAsync,
+): Promise<{ trailer: string; specRepo: string; inGitRoot: boolean } | null> {
+  if (!specPath) return null;
+  try {
+    const trailer = formatPlanFinalizedTrailer(planFinalizedHash(await readFile(specPath)));
+    const { stdout } = await execImpl('git', ['rev-parse', '--show-toplevel'], { cwd: dirname(specPath), encoding: 'utf-8' });
+    const specRepo = stdout.trim();
+    return { trailer, specRepo, inGitRoot: (await realpathOrSelf(specRepo)) === (await realpathOrSelf(gitRoot)) };
+  } catch (error) {
+    console.warn(`[complete-planning] No Plan-Finalized trailer for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
   }
 }
 
@@ -745,7 +788,7 @@ export async function completePlanningForIssue(options: {
       // PAN-3917: the spec is promoted into the workspace's own `.pan/` and
       // committed on the feature branch below — there is no separate commit on
       // main, and no state branch to flush.
-      const committed = await commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
+      const committed = await commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning, undefined, proposed.path);
       return { ...committed, specPath: proposed.path };
     })();
 

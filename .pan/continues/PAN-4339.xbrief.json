@@ -1,0 +1,147 @@
+{
+  "version": "1",
+  "issueId": "PAN-4339",
+  "created": "2026-09-29T02:04:26.104Z",
+  "updated": "2026-09-29T03:16:43.514Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "claim-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:04:26.104Z",
+      "doneAt": "2026-09-29T02:12:11.454Z"
+    },
+    "task-state-lock": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:12:22.434Z",
+      "doneAt": "2026-09-29T02:21:30.470Z"
+    },
+    "spawn-claim-identity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:21:37.293Z",
+      "doneAt": "2026-09-29T02:29:39.947Z"
+    },
+    "claim-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:29:45.274Z",
+      "doneAt": "2026-09-29T02:42:57.396Z"
+    },
+    "lock-write-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:43:03.626Z",
+      "doneAt": "2026-09-29T02:46:57.260Z"
+    },
+    "claim-contention-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:47:03.378Z",
+      "doneAt": "2026-09-29T02:53:23.500Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4339",
+      "claimedAt": "2026-09-29T02:53:28.717Z",
+      "doneAt": "2026-09-29T03:01:51.269Z"
+    },
+    "claim-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:07.138Z"
+    },
+    "claim-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:21.353Z"
+    },
+    "claim-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:35.193Z"
+    },
+    "claim-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:49.693Z"
+    },
+    "task-state-lock.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:06.220Z"
+    },
+    "task-state-lock.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:20.591Z"
+    },
+    "task-state-lock.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:34.911Z"
+    },
+    "task-state-lock.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:50.177Z"
+    },
+    "spawn-claim-identity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:13:08.065Z"
+    },
+    "spawn-claim-identity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:13:23.292Z"
+    },
+    "claim-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:13:38.654Z"
+    },
+    "claim-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:13:55.087Z"
+    },
+    "claim-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:10.900Z"
+    },
+    "claim-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:26.387Z"
+    },
+    "lock-write-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:42.290Z"
+    },
+    "lock-write-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:14:56.964Z"
+    },
+    "lock-write-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:15:15.385Z"
+    },
+    "claim-contention-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:15:30.119Z"
+    },
+    "claim-contention-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:15:44.139Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:15:58.122Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:16:14.825Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:16:29.875Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:16:43.513Z"
+    }
+  }
+}

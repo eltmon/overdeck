@@ -79,6 +79,7 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
     label: 'Anthropic',
     models: [
       { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30 },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9 },
       { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12 },

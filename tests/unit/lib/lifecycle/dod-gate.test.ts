@@ -476,12 +476,14 @@ describe('Definition-of-Done post-merge row', () => {
     github: { owner: 'eltmon', repo: 'overdeck', number: 2715 },
   };
   const clearAgents = () => [];
+  const aliveAgent = async () => ({ alive: true as const, paneAlive: true });
 
   it('passes when the issue is verifying on main and issue agents are stopped', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
       readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('no running work/planning agents') });
   });
@@ -494,6 +496,7 @@ describe('Definition-of-Done post-merge row', () => {
         { id: 'agent-pan-2715', issueId, role: 'work', status: 'running' },
         { id: 'planning-pan-2715', issueId, role: 'plan', status: 'starting' },
       ],
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'miss' });
     expect(row.observed).toContain('agent-pan-2715');
@@ -505,6 +508,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'in_review',
       readMergedAt: () => undefined,
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('canonical state: in_review') });
   });
@@ -517,6 +521,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'done',
       readMergedAt: () => undefined,
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('terminal canonical state: done') });
   });
@@ -526,6 +531,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'canceled',
       readMergedAt: () => undefined,
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'skip', observed: expect.stringContaining('terminal canonical state: canceled') });
   });
@@ -535,6 +541,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'done',
       readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'miss' });
   });
@@ -544,6 +551,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => { throw new Error('gh timed out'); },
       readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('gh timed out') });
   });
@@ -559,6 +567,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'in_review',
       readMergedAt: () => undefined,
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
 
     expect(row).toMatchObject({
@@ -578,6 +587,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'in_review',
       readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: aliveAgent,
     });
 
     expect(row).toMatchObject({ status: 'miss' });
@@ -592,6 +602,7 @@ describe('Definition-of-Done post-merge row', () => {
       readCanonicalState: async () => 'in_review',
       readMergedAt: () => undefined,
       listAgents: clearAgents,
+      isAlive: aliveAgent,
     });
 
     expect(row).toMatchObject({ status: 'skip' });
@@ -606,6 +617,7 @@ describe('Definition-of-Done post-merge row', () => {
       readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
       readStrikeLanded: () => true,
+      isAlive: aliveAgent,
     });
 
     expect(row).toMatchObject({ status: 'miss' });
@@ -618,10 +630,89 @@ describe('Definition-of-Done post-merge row', () => {
       readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
       readStrikeLanded: () => true,
+      isAlive: aliveAgent,
     });
 
     expect(row).toMatchObject({ status: 'pass' });
     expect(row.observed).not.toContain('strikeLandingState');
+  });
+
+  it('passes when stored-running agents have no live pane (PAN-4324)', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
+      listAgents: () => [
+        { id: 'agent-pan-2715', issueId, role: 'work', status: 'running' },
+        { id: 'planning-pan-2715', issueId, role: 'plan', status: 'running' },
+      ],
+      isAlive: async () => ({ alive: false, reason: 'no-session' }),
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('no running work/planning agents');
+    expect(row.observed).toContain('stored running, not live: agent-pan-2715, planning-pan-2715');
+  });
+
+  it('misses when a stored-running agent is really live', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: async () => ({ alive: true, paneAlive: true, backendState: 'idle' }),
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('running agents: agent-pan-2715');
+  });
+
+  it('misses when liveness is indeterminate', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: async () => ({ alive: false, reason: 'runtime-indeterminate' }),
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('liveness indeterminate: agent-pan-2715');
+    expect(row.observed).not.toContain('running agents:');
+  });
+
+  it('treats a thrown liveness probe as indeterminate', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: async () => { throw new Error('herdr socket unreachable'); },
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('liveness indeterminate: agent-pan-2715');
+    expect(row.observed).not.toContain('post-merge evidence unavailable');
+  });
+
+  it('passes terminal state done when the stored-running agent exited', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'done',
+      readMergedAt: () => undefined,
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      isAlive: async () => ({ alive: false, reason: 'pane-dead' }),
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+  });
+
+  it('does not probe stored-stopped agents', async () => {
+    const isAliveSpy = vi.fn();
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'stopped' }],
+      isAlive: isAliveSpy,
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(isAliveSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -1124,6 +1215,7 @@ describe('assembled Definition-of-Done gate', () => {
         readCanonicalState: async () => 'in_review',
         readMergedAt: () => undefined,
         listAgents: () => [],
+        isAlive: async () => ({ alive: true, paneAlive: true }),
       }),
       mainVerify: async () => makeRow('main-verify', 'skip'),
       ship: async () => makeRow('ship', 'skip'),
@@ -1158,6 +1250,7 @@ describe('assembled Definition-of-Done gate', () => {
         readCanonicalState: async () => 'in_review',
         readMergedAt: () => undefined,
         listAgents: () => [],
+        isAlive: async () => ({ alive: true, paneAlive: true }),
       }),
       mainVerify: async () => makeRow('main-verify'),
       ship: async () => makeRow('ship', 'skip'),

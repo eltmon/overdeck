@@ -2,8 +2,9 @@
 #
 # lint-file-size.sh — ceiling guard against god files (A3, codebase health).
 # No new non-test src file may exceed CEILING lines. Existing files may not grow
-# beyond their line count on BASE_REF unless scripts/file-size-allowlist.txt
-# explicitly accepts audited growth with an issue reference.
+# beyond their line count on BASE_REF, or beyond their scripts/file-size-allowlist.txt
+# cap. A failing file is fixed by shrinking it. Raising a cap is an operator
+# decision (scripts/guard-allowlist-raise.sh refuses agent raises at pre-push).
 #
 # Modes:
 #   (default)       evaluate the working tree (local lint)
@@ -170,8 +171,8 @@ while IFS= read -r f; do
 
   if (( n > allowed )); then
     echo "✖ $f is $n lines (allowed $allowed) — god files must shrink, not grow."
-    echo "  Shrink the file, or add an audited exception to $ALLOWLIST:"
-    echo "  $n $f # <ISSUE-REF>"
+    echo "  Fix: shrink $f to $allowed lines or fewer (extract a module). The allowlist number must not increase."
+    echo "  Raising a ceiling is an operator decision made in its own commit — see docs/codebase-health/A3-file-size-guard.md."
     fail=1
   fi
 done < <(file_list)
@@ -179,9 +180,9 @@ done < <(file_list)
 if (( fail )); then
   echo ""
   if [[ "$MODE" == "at" ]]; then
-    echo "file-size guard failed at $AT_REF. No commit pushed to $BASE_REF may grow a god file past its base count without an issue-referenced allowlist entry."
+    echo "file-size guard failed at $AT_REF. Shrink each file above to its allowed count; do not raise the allowlist."
   else
-    echo "file-size guard failed. Working-tree files may not exceed their $BASE_REF line count without an issue-referenced allowlist entry."
+    echo "file-size guard failed. Shrink each file above to its allowed count; do not raise the allowlist."
   fi
   exit 1
 fi

@@ -31,8 +31,10 @@ function makeBuffer(lines: object[]): Buffer {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('computeContextUsage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { __resetContextUsageCacheForTests } = await import('../conversation-service.js');
+    __resetContextUsageCacheForTests();
     mockStat.mockImplementation(async () => {
       const buf = await mockReadFile();
       return { mtimeMs: Date.now() - 10_000, birthtimeMs: Date.now() - 10_000, size: buf.length };
@@ -238,6 +240,53 @@ describe('computeContextUsage', () => {
     const result = await computeContextUsage('/fake/context-overflow.jsonl', 'gpt-5.3-codex-spark');
 
     expect(result?.percentUsed).toBe(100);
+  });
+
+  it('serves an unchanged size and mtimeMs from cache without opening the file again', async () => {
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 4_000, cache_read_input_tokens: 1_000 } },
+    })}\n`;
+    const buffer = Buffer.from(line);
+    mockReadFile.mockResolvedValue(buffer);
+    mockStat.mockResolvedValue({ mtimeMs: 1_000, birthtimeMs: 1_000, size: buffer.length });
+
+    const { computeContextUsage } = await import('../conversation-service.js');
+    const first = await computeContextUsage('/fake/context-memo-cached.jsonl', 'claude-opus-4-7');
+    const openCallsAfterFirst = mockOpen.mock.calls.length;
+    expect(openCallsAfterFirst).toBeGreaterThan(0);
+
+    const second = await computeContextUsage('/fake/context-memo-cached.jsonl', 'claude-opus-4-7');
+
+    expect(mockOpen.mock.calls.length).toBe(openCallsAfterFirst);
+    expect(second).toEqual(first);
+  });
+
+  it('recomputes when mtimeMs changes', async () => {
+    const staleLine = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 4_000 } },
+    })}\n`;
+    const freshLine = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 9_000 } },
+    })}\n`;
+
+    mockReadFile.mockResolvedValue(Buffer.from(staleLine));
+    mockStat.mockResolvedValue({ mtimeMs: 1_000, birthtimeMs: 1_000, size: Buffer.byteLength(staleLine) });
+
+    const { computeContextUsage } = await import('../conversation-service.js');
+    const first = await computeContextUsage('/fake/context-memo-stale.jsonl', 'claude-opus-4-7');
+    const openCallsAfterFirst = mockOpen.mock.calls.length;
+
+    mockReadFile.mockResolvedValue(Buffer.from(freshLine));
+    mockStat.mockResolvedValue({ mtimeMs: 2_000, birthtimeMs: 1_000, size: Buffer.byteLength(freshLine) });
+
+    const second = await computeContextUsage('/fake/context-memo-stale.jsonl', 'claude-opus-4-7');
+
+    expect(mockOpen.mock.calls.length).toBeGreaterThan(openCallsAfterFirst);
+    expect(second?.estimatedTokens).toBe(9_000);
+    expect(second?.estimatedTokens).not.toBe(first?.estimatedTokens);
   });
 });
 

@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -35,6 +36,24 @@ export interface ConversationDiffDependencies {
 
 function result(body: unknown, status?: number): ConversationDiffResult {
   return status === undefined ? { body } : { body, status };
+}
+
+const DIFFS_CACHE_MAX = 32;
+const DIFFS_CACHE_TTL_MS = 30_000;
+interface DiffsCacheEntry {
+  size: number;
+  mtimeMs: number;
+  at: number;
+  body: { summaries: unknown[] };
+}
+const diffsCache = new Map<string, DiffsCacheEntry>();
+
+function cacheDiffsResult(cacheKey: string, entry: DiffsCacheEntry): void {
+  diffsCache.set(cacheKey, entry);
+  if (diffsCache.size > DIFFS_CACHE_MAX) {
+    const firstKey = diffsCache.keys().next().value;
+    if (firstKey !== undefined) diffsCache.delete(firstKey);
+  }
 }
 
 function lookupConversation(name: string): Conversation | null {
@@ -97,12 +116,15 @@ async function diffFilesSinceBase(
   filePaths: string[],
 ): Promise<TurnDiffFileChange[]> {
   const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
+  // --no-renames: a per-turn lookup keyed by the input path would otherwise drop a
+  // file entirely when git's rename detection folds "a.ts => b.ts" into one line.
+  // -c core.quotePath=false: keep non-ASCII paths unquoted so the lookup key matches.
   const { stdout: numstat } = await promisify(exec)(
-    `git diff --numstat --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --numstat --no-color ${baseCommit} -- ${quotedPaths}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const { stdout: nameStatus } = await promisify(exec)(
-    `git diff --name-status --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --name-status --no-color ${baseCommit} -- ${quotedPaths}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const statusMap = new Map<string, string>();
@@ -159,10 +181,27 @@ export async function getConversationDiffs(
       return result({ summaries: [] });
     }
 
+    // Repo HEAD is deliberately not part of the cache key: `git diff <base> -- <paths>`
+    // compares against the working tree, so the transcript's own stat signature is
+    // what decides whether the edited-file set (and therefore the diff) could differ.
+    const cacheKey = `${conv.name}\0${sessionFile}`;
+    const fileStats = await stat(sessionFile);
+    const cached = diffsCache.get(cacheKey);
+    if (
+      cached &&
+      cached.size === fileStats.size &&
+      cached.mtimeMs === fileStats.mtimeMs &&
+      Date.now() - cached.at < DIFFS_CACHE_TTL_MS
+    ) {
+      return result(cached.body);
+    }
+
     const parsed = await deps.getCachedMessages(sessionFile, false);
     const { fileEditsByAssistantId } = parsed;
     if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
-      return result({ summaries: [] });
+      const body = { summaries: [] };
+      cacheDiffsResult(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, at: Date.now(), body });
+      return result(body);
     }
 
     const summaries: Array<{
@@ -179,39 +218,68 @@ export async function getConversationDiffs(
     const repoRootCache = new Map<string, string | null>();
     const baseCommitCache = new Map<string, string | null>();
 
+    // First pass: group each turn's edits by repo, and build the per-repo
+    // union of paths so each repo's diff runs once instead of once per turn.
+    const turnFiles = new Map<string, Map<string, string[]>>();
+    const repoFiles = new Map<string, Set<string>>();
     for (const [assistantId, edits] of fileEditsByAssistantId) {
+      const filesByRepo = await groupFilesByRepo(edits, repoRootCache);
+      turnFiles.set(assistantId, filesByRepo);
+      for (const [repoRoot, filePaths] of filesByRepo) {
+        let union = repoFiles.get(repoRoot);
+        if (!union) { union = new Set(); repoFiles.set(repoRoot, union); }
+        for (const filePath of filePaths) union.add(filePath);
+      }
+    }
+
+    // Second pass: one diff pair per repo over the union of edited paths,
+    // indexed by path so each turn's summary can pull out only its own files.
+    const repoChanges = new Map<string, Map<string, TurnDiffFileChange>>();
+    for (const [repoRoot, pathSet] of repoFiles) {
+      try {
+        if (!baseCommitCache.has(repoRoot)) {
+          baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+        }
+        const baseCommit = baseCommitCache.get(repoRoot) ?? null;
+        const filePaths = [...pathSet];
+        const diffs = baseCommit
+          ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
+          : await diffFilesAgainstHead(repoRoot, filePaths);
+        repoChanges.set(repoRoot, new Map(diffs.map(change => [change.path, change])));
+      } catch {
+        // git diff failed — skip this repo
+      }
+    }
+
+    for (const assistantId of fileEditsByAssistantId.keys()) {
       const asstMsg = assistantById.get(assistantId);
       const completedAt = asstMsg?.completedAt ?? asstMsg?.createdAt ?? new Date().toISOString();
-      const filesByRepo = await groupFilesByRepo(edits, repoRootCache);
+      const filesByRepo = turnFiles.get(assistantId) ?? new Map<string, string[]>();
 
-      const allFiles: TurnDiffFileChange[] = [];
+      const files: TurnDiffFileChange[] = [];
       for (const [repoRoot, filePaths] of filesByRepo) {
-        try {
-          if (!baseCommitCache.has(repoRoot)) {
-            baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
-          }
-          const baseCommit = baseCommitCache.get(repoRoot) ?? null;
-          const diffs = baseCommit
-            ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
-            : await diffFilesAgainstHead(repoRoot, filePaths);
-          allFiles.push(...diffs);
-        } catch {
-          // git diff failed — skip this repo
+        const changes = repoChanges.get(repoRoot);
+        if (!changes) continue;
+        for (const filePath of filePaths) {
+          const change = changes.get(filePath);
+          if (change) files.push(change);
         }
       }
 
-      if (allFiles.length > 0) {
+      if (files.length > 0) {
         summaries.push({
           turnId: `conv-turn-${assistantId}`,
           completedAt,
           status: 'completed',
-          files: allFiles,
+          files,
           assistantMessageId: assistantId,
         });
       }
     }
 
-    return result({ summaries });
+    const body = { summaries };
+    cacheDiffsResult(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, at: Date.now(), body });
+    return result(body);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] diffs failed:', msg);
