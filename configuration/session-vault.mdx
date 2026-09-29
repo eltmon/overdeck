@@ -201,6 +201,33 @@ anything on its own. To use it:
 `pan vault evict --decline <id>` keeps a transcript out of future lists; `--clear` empties the
 list without deleting anything.
 
+## Windows
+
+Checked on 2026-09-29 in the `windows-smoke` workflow
+([run 36615182191](https://github.com/eltmon/overdeck/actions/runs/36615182191)), on GitHub's
+`windows-2022` runner: Windows Server 2022 Datacenter, Git for Windows 2.55.0, Node 22.23, and
+Ubuntu 24.04 in WSL2 (Git 2.43, Node 22.23). Windows 11 and continuing a conversation after
+dual-booting the same machine were not verified.
+
+- **WSL2 is supported.** Run `pan vault` inside your WSL2 distro. Join, list and resume work,
+  the code snapshot arrives, and Claude Code finds the conversation and starts. (The test had no
+  Claude credentials, so no reply was exchanged.) The tested checkout was in
+  the Linux filesystem (`~/w/proj`); a checkout under `/mnt/c` was not tested.
+- **Native Windows is not supported yet.** `pan vault join` fails with `... is neither empty nor
+  a vault (no VAULT-FORMAT on main)` when git has `core.autocrlf=true`, which is the Git for
+  Windows default ([#4418](https://github.com/eltmon/overdeck/issues/4418)). With that setting
+  turned off in a test run, `pan vault resume` still could not start Claude Code
+  (`spawn claude ENOENT`, [#4419](https://github.com/eltmon/overdeck/issues/4419)).
+  `--no-launch` printed the `claude --resume <id>` command instead.
+- **Files in the code snapshot:** in WSL2, line endings, the executable bit and symlinks arrive
+  as saved. In the native Windows test run (with `core.autocrlf` off), line endings and the
+  symlink arrived as saved, but `run.sh` lost its executable bit (mode 100644; the clone's
+  `core.filemode` was `false`).
+- **The dashboard on native Windows:** `npx @overdeck/core` starts, but every page returns 404
+  ([#4420](https://github.com/eltmon/overdeck/issues/4420)). Starting a conversation fails
+  because the Herdr terminal backend is not available; the error says to run `pan install` or
+  set `terminal.backend: tmux`.
+
 ## Where things live
 
 | Path | Contents |
