@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4363",
   "created": "2026-09-29T04:31:37.212Z",
-  "updated": "2026-09-29T06:56:25.660Z",
+  "updated": "2026-09-29T06:56:39.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "policy-codex-floor.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:56:25.660Z"
+    },
+    "resolver-policy-context.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:56:39.048Z"
     }
   }
 }
