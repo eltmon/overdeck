@@ -408,6 +408,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/environment',                      kind: 'http', disposition: 'READ',        door: 'environment-identity.ensureEnvironmentIdentity (descriptor)' },
   { surface: 'POST /api/pairing/credentials',              kind: 'http', disposition: 'WRITE',       door: 'pairing-credentials.issuePairingCredential' },
   { surface: 'POST /api/pairing/exchange',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (pairing)' },
+  { surface: 'GET /api/devices',                          kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind device)' },
+  { surface: 'DELETE /api/devices/:id',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
   { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },

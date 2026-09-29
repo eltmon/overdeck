@@ -9,12 +9,16 @@
  *   (browsers) or in the body (`delivery: 'bearer'`, desktop clients). It is
  *   unauthenticated by design and rate limited on failures.
  *
- * Neither response is cacheable, and neither ever contains the internal token.
+ * - `GET /api/devices` lists paired devices (never their token hashes).
+ * - `DELETE /api/devices/:id` revokes one. A device may revoke itself but not
+ *   another device; the internal token and root session may revoke any.
+ *
+ * No pairing response is cacheable, and none ever contains the internal token.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { createAccessToken } from '../../../lib/access-tokens.js';
+import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -27,6 +31,7 @@ import {
 import {
   dashboardCsrfToken,
   dashboardDeviceCookieHeader,
+  rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
   resolveDashboardCredential,
 } from './dashboard-auth.js';
@@ -128,4 +133,61 @@ const exchangePairingCredentialRoute = HttpRouter.add(
   }),
 );
 
-export const pairingRouteLayer = Layer.mergeAll(issuePairingCredentialRoute, exchangePairingCredentialRoute);
+function deviceView(record: PublicAccessTokenRecord) {
+  return {
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    lastUsedAt: record.lastUsedAt,
+    revokedAt: record.revokedAt ?? null,
+  };
+}
+
+const listDevicesRoute = HttpRouter.add(
+  'GET',
+  '/api/devices',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    const records = yield* Effect.promise(() => listAccessTokens());
+    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device').map(deviceView) }));
+  }),
+);
+
+const revokeDeviceRoute = HttpRouter.add(
+  'DELETE',
+  '/api/devices/:id',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return noStore(authError);
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+
+    const records = yield* Effect.promise(() => listAccessTokens());
+    const target = records.find((record) => record.id === id && record.kind === 'device');
+    if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
+
+    const credential = resolveDashboardCredential(request.headers as HeaderMap);
+    if (credential?.kind === 'device' && credential.deviceId !== id) {
+      return noStore(jsonResponse({ error: 'a paired device may revoke only itself' }, { status: 403 }));
+    }
+
+    const revoked = yield* Effect.promise(() => revokeAccessToken(id));
+    if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
+    emitActivityEntry({
+      source: 'dashboard',
+      level: 'info',
+      message: `Revoked device "${revoked.name}"`,
+      details: JSON.stringify({ deviceId: id }),
+    });
+    return noStore(jsonResponse({ ok: true, device: deviceView(revoked) }));
+  }),
+);
+
+export const pairingRouteLayer = Layer.mergeAll(
+  issuePairingCredentialRoute,
+  exchangePairingCredentialRoute,
+  listDevicesRoute,
+  revokeDeviceRoute,
+);
