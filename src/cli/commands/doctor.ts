@@ -41,6 +41,7 @@ import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
+import { checkMemoryExtraction } from './doctor-memory-provider.js';
 import { checkOllama } from './doctor-ollama.js';
 import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
@@ -883,6 +884,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }));
   checks.push(checkOrphanProposedSpecs());
   checks.push(checkTierFitnessConfig()); // PAN-3842
+  checks.push(await checkMemoryExtraction()); // PAN-4370
   checks.push(...await checkMainDivergence());
   checks.push(await checkPlanHomePanIgnore()); // PAN-3996
   try {
