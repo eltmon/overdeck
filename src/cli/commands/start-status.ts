@@ -1,14 +1,14 @@
 import { sep } from 'path';
 import { findPlanSync } from '../../lib/xbrief/io.js';
-import { transitionXBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
+import { transitionIssueXBrief, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 
 export async function transitionStartedXBrief(projectRoot: string, issueId: string) {
-  return transitionXBriefOnMain(
-    projectRoot,
+  return transitionIssueXBrief(
+    resolvePlanHome(projectRoot),
     issueId,
     'active',
     'running',
-    `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
   );
 }
 

@@ -2,8 +2,8 @@
  * pan scope — xBRIEF lifecycle manual overrides
  *
  * Commands to inspect and move scope xBRIEFs between lifecycle directories.
- * All transitions use `transitionXBriefOnMain` so they inherit idempotency,
- * branch-awareness, and background-push behavior.
+ * All transitions use `transitionIssueXBrief`, which writes files only and
+ * never commits — the caller is responsible for committing the result.
  */
 
 import { exitCli } from '../exit.js';
@@ -14,7 +14,7 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   findXBriefByIssueSync,
-  transitionXBriefOnMain,
+  transitionIssueXBrief,
   type XBriefTransitionResult,
 } from '../../lib/xbrief/lifecycle-io.js';
 import { findPlanSync, readPlanSync } from '../../lib/xbrief/io.js';
@@ -47,11 +47,6 @@ function formatTransition(result: XBriefTransitionResult, _issueId: string): str
   }
   if (result.statusUpdated) {
     lines.push(`${chalk.green('✓')} Updated plan.status → ${result.toDir}`);
-  }
-  if (result.committed) {
-    lines.push(`${chalk.green('✓')} Committed on main`);
-  } else if (result.moved || result.statusUpdated) {
-    lines.push(`${chalk.yellow('⚠')} On-disk state updated but not committed (not on main)`);
   }
   return lines.join('\n');
 }
@@ -389,48 +384,44 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
 
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
+  const result = await transitionIssueXBrief(
+    resolvePlanHome(projectPath),
     issueId,
     'proposed',
     'proposed',
-    `scope: propose ${issueId.toUpperCase()} xBRIEF`,
   );
   console.log(formatTransition(result, issueId));
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
+  const result = await transitionIssueXBrief(
+    resolvePlanHome(projectPath),
     issueId,
     'active',
     'approved',
-    `scope: approve ${issueId.toUpperCase()} xBRIEF`,
   );
   console.log(formatTransition(result, issueId));
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
+  const result = await transitionIssueXBrief(
+    resolvePlanHome(projectPath),
     issueId,
     'completed',
     'completed',
-    `scope: complete ${issueId.toUpperCase()} xBRIEF`,
   );
   console.log(formatTransition(result, issueId));
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await transitionXBriefOnMain(
-    projectPath,
+  const result = await transitionIssueXBrief(
+    resolvePlanHome(projectPath),
     issueId,
     'cancelled',
     'cancelled',
-    `scope: cancel ${issueId.toUpperCase()} xBRIEF`,
   );
   console.log(formatTransition(result, issueId));
 }
@@ -446,12 +437,11 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`xBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     return exitCli(1);
   }
-  const result = await transitionXBriefOnMain(
-    projectPath,
+  const result = await transitionIssueXBrief(
+    resolvePlanHome(projectPath),
     issueId,
     'active',
     'approved',
-    `scope: restore ${issueId.toUpperCase()} xBRIEF`,
   );
   console.log(formatTransition(result, issueId));
 }

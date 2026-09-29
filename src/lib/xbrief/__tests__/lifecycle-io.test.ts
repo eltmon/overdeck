@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -10,7 +9,7 @@ import {
   clearFeedbackForIssue,
   findXBriefByIssueSync,
   readContinueStateForIssue,
-  transitionXBriefOnMain,
+  transitionIssueXBrief,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
@@ -22,18 +21,6 @@ import { continueStatePath, writeContinueState, type ContinueState } from '../co
 import type { XBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
-let isGitRepo = false;
-
-function initGitRepo(dir: string): void {
-  execSync('git init -q -b main', { cwd: dir });
-  execSync('git config user.email test@test.local', { cwd: dir });
-  execSync('git config user.name "Test"', { cwd: dir });
-  // Ensure repo has at least one commit so HEAD is real
-  writeFileSync(join(dir, 'README.md'), '# test\n');
-  execSync('git add README.md', { cwd: dir });
-  execSync('git -c commit.gpgsign=false commit -q -m "init"', { cwd: dir });
-  isGitRepo = true;
-}
 
 function makePlan(issueId: string, slug: string, status: string = 'proposed'): XBriefDocument {
   return {
@@ -58,7 +45,6 @@ function writePlan(dir: string, filename: string, doc: XBriefDocument): string {
 
 beforeEach(() => {
   TEST_DIR = mkdtempSync(join(tmpdir(), 'xbrief-io-'));
-  isGitRepo = false;
 });
 
 afterEach(() => {
@@ -170,43 +156,47 @@ describe('updatePlanStatus', () => {
 });
 
 
-describe('transitionXBriefOnMain', () => {
-  it('moves xBRIEF between dirs and updates status, without committing', async () => {
-    initGitRepo(TEST_DIR);
+describe('transitionIssueXBrief', () => {
+  it('moves xBRIEF between dirs and updates status (ac2)', async () => {
     ensureXBriefDirs(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
+    const filename = generateXBriefFilename('PAN-7', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
+      makePlan('PAN-7', 'foo', 'proposed'),
     );
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
 
-    const result = await transitionXBriefOnMain(
-      TEST_DIR,
-      'PAN-1',
-      'active',
-      'approved',
-      'scope: approve PAN-1 xBRIEF',
-    );
+    const result = await transitionIssueXBrief(TEST_DIR, 'PAN-7', 'active', 'running');
 
     expect(result.fromDir).toBe('proposed');
     expect(result.toDir).toBe('active');
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
-    // PAN-3917: the door never commits — the agent does, on its feature branch.
-    expect(result.committed).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(existsSync(join(resolveXBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
 
     const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
-    expect(updatedDoc.plan.status).toBe('approved');
+    expect(updatedDoc.plan.status).toBe('running');
     expect(updatedDoc.plan.sequence).toBe(2);
   });
 
+  it('a second identical call is a no-op (ac3)', async () => {
+    ensureXBriefDirs(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-7', 'foo', '2026-05-03');
+    writePlan(
+      resolveXBriefDir(TEST_DIR, 'proposed'),
+      filename,
+      makePlan('PAN-7', 'foo', 'proposed'),
+    );
+
+    await transitionIssueXBrief(TEST_DIR, 'PAN-7', 'active', 'running');
+    const second = await transitionIssueXBrief(TEST_DIR, 'PAN-7', 'active', 'running');
+
+    expect(second.moved).toBe(false);
+    expect(second.statusUpdated).toBe(false);
+  });
+
   it('is idempotent once the issue already lives in .pan/specs with the target lifecycle and status', async () => {
-    initGitRepo(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const migratedPath = join(TEST_DIR, '.pan', 'specs', filename);
     mkdirSync(join(TEST_DIR, '.pan', 'specs'), { recursive: true });
@@ -218,28 +208,15 @@ describe('transitionXBriefOnMain', () => {
       }, null, 2),
       'utf-8',
     );
-    execSync('git add .pan/specs/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed pan spec"', { cwd: TEST_DIR });
 
-    const result = await transitionXBriefOnMain(
-      TEST_DIR,
-      'PAN-1',
-      'active',
-      'approved',
-      'scope: approve PAN-1 xBRIEF',
-    );
+    const result = await transitionIssueXBrief(TEST_DIR, 'PAN-1', 'active', 'approved');
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(false);
-    expect(result.committed).toBe(false);
     expect(result.toPath).toBe(migratedPath);
-
-    const logCount = execSync('git rev-list --count HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
-    expect(logCount).toBe('2');
   });
 
   it('updates status only when already in target dir but status differs', async () => {
-    initGitRepo(TEST_DIR);
     ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
@@ -247,58 +224,22 @@ describe('transitionXBriefOnMain', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'), // wrong status
     );
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed active proposed"', { cwd: TEST_DIR });
 
-    const result = await transitionXBriefOnMain(
-      TEST_DIR,
-      'PAN-1',
-      'active',
-      'approved',
-      'scope: approve PAN-1 xBRIEF',
-    );
+    const result = await transitionIssueXBrief(TEST_DIR, 'PAN-1', 'active', 'approved');
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(false);
 
     const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(doc.plan.status).toBe('approved');
   });
 
-  it('leaves continue file at canonical path during lifecycle transitions', async () => {
-    initGitRepo(TEST_DIR);
-    ensureXBriefDirs(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed"', { cwd: TEST_DIR });
-
-    const result = await transitionXBriefOnMain(
-      TEST_DIR,
-      'PAN-1',
-      'active',
-      'approved',
-      'scope: approve PAN-1 xBRIEF',
-    );
-
-    expect(result.moved).toBe(true);
-    expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(false);
-  });
-
   it('throws when no xBRIEF exists for the issue', async () => {
-    initGitRepo(TEST_DIR);
     ensureXBriefDirs(TEST_DIR);
-    await expect(transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF')).rejects.toThrow();
+    await expect(transitionIssueXBrief(TEST_DIR, 'PAN-999', 'active', 'approved')).rejects.toThrow();
   });
 
-  it('does NOT commit when projectRoot is not on main', async () => {
-    initGitRepo(TEST_DIR);
+  it('runs no git command — works on a plan home that is not a git repository (ac4)', async () => {
     ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
@@ -306,28 +247,24 @@ describe('transitionXBriefOnMain', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed proposed"', { cwd: TEST_DIR });
-    execSync('git checkout -q -b feature/test', { cwd: TEST_DIR });
 
-    const result = await transitionXBriefOnMain(
-      TEST_DIR,
-      'PAN-1',
-      'active',
-      'approved',
-      'scope: approve PAN-1 xBRIEF',
+    await expect(transitionIssueXBrief(TEST_DIR, 'PAN-1', 'active', 'approved')).resolves.toMatchObject({
+      moved: true,
+      statusUpdated: true,
+    });
+  });
+
+  it('creates no vbrief/ directory on a plan home that lacks one (ac5)', async () => {
+    mkdirSync(join(TEST_DIR, '.pan', 'specs'), { recursive: true });
+    writeFileSync(
+      join(TEST_DIR, '.pan', 'specs', generateXBriefFilename('PAN-1', 'foo', '2026-05-03')),
+      JSON.stringify(makePlan('PAN-1', 'foo', 'proposed'), null, 2),
+      'utf-8',
     );
 
-    // The on-disk move + status update happens regardless of branch.
-    expect(result.moved).toBe(true);
-    expect(result.statusUpdated).toBe(true);
-    // But no commit since we're not on main.
-    expect(result.committed).toBe(false);
-    expect(existsSync(result.toPath)).toBe(true);
+    await transitionIssueXBrief(TEST_DIR, 'PAN-1', 'active', 'approved');
 
-    // git log should still show only the init + seed commits, no scope commit.
-    const logCount = execSync('git rev-list --count HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
-    expect(logCount).toBe('2');
+    expect(existsSync(join(TEST_DIR, 'vbrief'))).toBe(false);
   });
 });
 

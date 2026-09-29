@@ -30,7 +30,8 @@ import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spaw
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
-import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
+import { transitionIssueXBrief, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
+import { resolvePlanHome } from '../../../../lib/pan-dir/paths.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -611,12 +612,11 @@ export const postAgentsRoute = HttpRouter.add(
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-      await transitionXBriefOnMain(
-        projectPath,
+      await transitionIssueXBrief(
+        resolvePlanHome(projectPath),
         issueId,
         'active',
         'running',
-        `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
       ).then(
         (result) => {
           if (result.moved) {
@@ -624,9 +624,6 @@ export const postAgentsRoute = HttpRouter.add(
           }
           if (result.statusUpdated) {
             console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-          }
-          if (result.committed) {
-            console.log(`[start-agent] Committed running transition for ${issueId}`);
           }
         },
         (err: unknown) => {

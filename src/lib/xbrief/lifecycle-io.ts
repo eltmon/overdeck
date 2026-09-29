@@ -14,7 +14,6 @@ import { Effect } from 'effect';
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
   LEGACY_VBRIEF_LIFECYCLE_DIRS,
-  ensureXBriefDirs,
   generateXBriefFilename,
   parseXBriefFilename,
   resolveXBriefDir,
@@ -235,32 +234,34 @@ export interface XBriefTransitionResult {
   toDir: XBriefLifecycleDir;
   toPath: string;
   statusUpdated: boolean;
-  committed: boolean;
   moved: boolean;
 }
 
-/** Move an issue's xBRIEF to `targetDir` with `newStatus` and commit the move on main. */
-export async function transitionXBriefOnMain(
-  projectRoot: string,
+/**
+ * Move an issue's xBRIEF to `targetDir` with `newStatus` inside `planHome`.
+ * Writes files only — it never runs git and never commits. The caller
+ * chooses `planHome` (the issue's base workspace while it exists, else the
+ * primary checkout) and, if it wants the change committed, commits it itself.
+ */
+export async function transitionIssueXBrief(
+  planHome: string,
   issueId: string,
   targetDir: XBriefLifecycleDir,
   newStatus: string,
-  commitMessage: string,
 ): Promise<XBriefTransitionResult> {
-  const found = findXBriefByIssueSync(projectRoot, issueId);
+  const found = findXBriefByIssueSync(planHome, issueId);
   if (!found) {
-    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
+    throw new Error(`No xBRIEF found for issue ${issueId} under ${planHome}`);
   }
 
-  ensureXBriefDirs(projectRoot);
-  const ensured = ensurePanSpecForIssue(projectRoot, found);
+  const ensured = ensurePanSpecForIssue(planHome, found);
   const ensuredSpec = ensured.found;
   const needsMove = ensuredSpec.lifecycleDir !== targetDir;
   const needsStatus = ensuredSpec.document.plan.status !== newStatus;
 
   let toPath = ensuredSpec.path;
   if (needsMove) {
-    const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
+    const updatedSpec = updateSpecStatusSync(planHome, issueId, targetDir);
     if (!updatedSpec) {
       throw new Error(`Failed to update pan spec lifecycle status for ${issueId}`);
     }
@@ -273,12 +274,8 @@ export async function transitionXBriefOnMain(
 
   const changed = ensured.createdPanSpec || needsMove || needsStatus;
 
-  // PAN-3917: the caller's agent commits the spec on its feature branch, so a
-  // transition never commits by itself. `committed` stays false.
-  const committed = false;
-
   if (changed) {
-    invalidateXBriefIndex(projectRoot);
+    invalidateXBriefIndex(planHome);
   }
 
   return {
@@ -286,7 +283,6 @@ export async function transitionXBriefOnMain(
     toDir: targetDir,
     toPath,
     statusUpdated: needsStatus,
-    committed,
     moved: needsMove,
   };
 }
