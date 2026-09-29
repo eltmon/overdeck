@@ -4,17 +4,17 @@
     "created": "2026-09-29T03:38:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4358: Ctrl+K conversation search ignores titles and returns duplicate chunks: a conversation can't be found by its topic",
-    "updated": "2026-09-29T03:39:59.484Z"
+    "updated": "2026-09-29T03:40:40.299Z"
   },
   "plan": {
     "id": "pan-4358",
     "title": "Ctrl+K conversation search ignores titles and returns duplicate chunks: a conversation can't be found by its topic",
-    "status": "proposed",
+    "status": "running",
     "uid": "d0a780ac-d1f8-4f23-b9e0-6a4ea061ef8f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T03:38:22Z",
-    "updated": "2026-09-29T03:39:59.484Z",
+    "updated": "2026-09-29T03:40:40.299Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4358",
