@@ -23,6 +23,7 @@ import {
   writeVerificationArtifact,
 } from './verification-artifact.js';
 import { evaluateTestSkipGate } from './test-skip-run.js';
+import { evaluatePlanIntegrityGate } from './plan-integrity-run.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   announceVerificationFailure,
@@ -526,8 +527,12 @@ export async function runVerificationForIssueInProcess(
     // repo cannot slip past it.
     const testSkipStart = Date.now();
     const testSkip = await evaluateTestSkipGate(issueId, repoRoots, testSkipHead);
+    // PAN-1728: the spec is immutable after planning; a work-agent edit to it fails
+    // a required `plan-integrity` check before the quality gates run.
+    const planIntegrityStart = Date.now();
+    const planIntegrity = testSkip.failed ? null : await evaluatePlanIntegrityGate(issueId, workspacePath, repoRoots);
 
-    const rawGateResults = !testSkip.failed
+    const rawGateResults = !testSkip.failed && !planIntegrity?.failed
       ? await runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
@@ -558,7 +563,9 @@ export async function runVerificationForIssueInProcess(
         writeLiveArtifact();
       },
     })
-      : [{ name: 'test-skip', passed: false, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart, error: testSkip.error ?? 'Diff adds skipped or only-tests or removes test cases' }];
+      : planIntegrity?.failed
+        ? [{ name: 'plan-integrity', passed: false, required: true, output: planIntegrity.evidence, durationMs: Date.now() - planIntegrityStart, error: planIntegrity.error ?? 'Diff changes the spec beyond lifecycle status fields' }]
+        : [{ name: 'test-skip', passed: false, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart, error: testSkip.error ?? 'Diff adds skipped or only-tests or removes test cases' }];
 
     // PAN-3906: an operator override stays visible in the verification artifact
     // even though it let the gate pass.

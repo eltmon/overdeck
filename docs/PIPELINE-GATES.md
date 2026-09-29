@@ -173,6 +173,78 @@ run. CI runs vitest on every push; the `overdeck/test` commit status records
 only that the verification gate passed for the tested sha (changed-file scope
 in `local` mode, typecheck+lint in `ci` mode).
 
+## Plan-integrity gate (PAN-1728)
+
+The canonical spec (`.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json`) is
+immutable after planning. A work agent records item and AC completion in the
+continue file through `pan task done`, never in the spec. The required
+`plan-integrity` check enforces this. It runs after test-skip passes and before
+the quality gates. When it fails, the quality gates do not run, the gate
+results are one `plan-integrity` row, and the runner emits
+`verification.failed { failedCheck: 'plan-integrity' }`.
+
+**What it compares.** The gate reads the issue's spec files at HEAD and at a
+reference commit, then diffs them with `diffPlanDocuments`
+(`src/lib/cloister/plan-integrity-gate.ts`). Five fields are ignored, because
+lifecycle writers change them after planning: top-level `status`,
+`plan.status`, `plan.updated`, `plan.sequence`, and `xBRIEFInfo.updated`. Every
+other change is a violation: one per added, removed, or changed item id
+(nested acceptance criteria included), one per changed non-item path such as
+`plan.narratives` or `plan.edges`, and one per added, removed, or renamed spec
+file for the issue. Key order does not count, and a legacy `vBRIEFInfo`
+envelope equals the same `xBRIEFInfo` content.
+
+**The `Plan-Finalized` trailer.** Planning finalize
+(`commitCompletePlanningWorkspaceGit`) writes `Plan-Finalized: <sha256>` on the
+commit that holds the finalized spec. The value is the SHA-256 of the spec
+file's exact bytes (`src/lib/xbrief/plan-finalized.ts`). For a polyrepo project
+with `pan_records.repo`, the spec lives in that nested sub-repo: the wrapper
+commit stays as before, and a second commit in the spec repo carries the
+trailer. The gate runs in `resolvePlanHome(workspacePath)`.
+
+**Reference chain.** `resolvePlanReference`
+(`src/lib/cloister/plan-integrity-run.ts`) looks at commits in
+`mergeBase..HEAD` of the plan home, newest first, and takes the first match:
+
+1. **`trailer`** — a commit whose `Plan-Finalized` value equals the SHA-256 of
+   one of the issue's spec blobs at that commit. A trailer that does not match
+   is ignored and recorded as `hash mismatch` evidence. A later valid trailer
+   (re-planning) becomes the new reference.
+2. **`legacy-finalize`** — a `chore(plan): complete planning for <ISSUE>`
+   commit that touches the issue's spec, written before the trailer existed.
+3. **`merge-base`** — the spec as it exists at the merge base with
+   `origin/<target>`.
+4. **`first-add`** — the first branch commit that added a spec for the issue,
+   which covers `pan start --auto` specs that never get a finalize commit.
+
+Nothing is stored: the reference is derived from git on every run.
+
+**Threat model.** The gate catches misguided edits, such as the PAN-1700 commit
+`chore: mark … acceptance criteria complete`. It does not stop deliberate
+forgery, because an agent can compute a hash and write the trailer itself. The
+work role forbids both editing `.pan/specs/` and writing the trailer.
+
+**Pass with evidence.** The gate passes, and says why, when the plan home is not
+the root of a git work tree, when no spec exists for the issue, or when the
+HEAD spec has merge-conflict markers. The `vbrief-conflicts` check owns
+conflict markers and its resolution instructions still fire.
+
+**Fail closed.** A git command that fails inside a valid plan-home work tree
+fails the gate with the git diagnostic, as does a plan home that cannot be
+resolved (for example, a `pan_records.repo` missing from `workspace.repos`).
+This mirrors test-skip (PR #3872 finding 4).
+
+**Remediation.** The generic failure feedback says to fix the code, so the gate
+evidence ends with the exact fix:
+
+```bash
+git restore --source=<reference sha> --staged --worktree -- <spec path(s)>
+```
+
+Then commit, and record completion with `pan task done`. The same command also
+removes an added spec file. If the plan itself is wrong, stop and ask for
+re-planning (`pan plan <ISSUE>`). Never use `git checkout` in a workspace.
+
 ## Verdict feedback routing
 
 A review `request changes` or a failing test/UAT run returns work to the work
