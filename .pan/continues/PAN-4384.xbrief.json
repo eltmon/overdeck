@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T14:25:20.368Z",
+  "updated": "2026-09-29T14:25:56.398Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "conflict-repair-core.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T14:25:20.367Z"
+    },
+    "conflict-repair-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:25:56.398Z"
     }
   }
 }
