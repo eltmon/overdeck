@@ -9,14 +9,7 @@ import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
-import {
-  OVERDECK_HOME,
-  SKILLS_DIR,
-  COMMANDS_DIR,
-  AGENTS_DIR,
-  CLAUDE_DIR,
-  ohmypiExtensionCandidates,
-} from '../../lib/paths.js';
+import { OVERDECK_HOME, SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, CLAUDE_DIR, ohmypiExtensionCandidates } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentState } from '../../lib/agents.js';
 import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
