@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T16:07:50.801Z",
+  "updated": "2026-09-29T16:08:03.997Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "workflow.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T16:07:50.801Z"
+    },
+    "workflow.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:03.997Z"
     }
   }
 }
