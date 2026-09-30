@@ -203,6 +203,27 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
     expect(starts.map((start) => start.tokens.role)).toEqual(['review', 'review']);
   });
 
+  it('launches a gauntlet lane row under the lane nice level (PAN-4311)', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'lane-root', tmuxSession: 'conv-lane-root', cwd: overdeckHome, workspaceId: null });
+    createConversation({
+      name: 'lane-b1',
+      tmuxSession: 'conv-lane-b1',
+      cwd: overdeckHome,
+      workspaceId: null,
+      parentName: 'lane-root',
+      lane: { run: 'alpha', key: 'b1', role: 'builder' },
+    });
+    const { backend, starts } = fakeBackend('herdr');
+
+    await spawn('conv-lane-b1', backend);
+    await spawn('conv-lane-root', backend);
+
+    const launcher = (name: string) => join(overdeckHome, 'conversations', name, 'launcher.sh');
+    expect(starts[0]!.argv).toEqual(['nice', '-n', '15', '--', 'bash', launcher('conv-lane-b1')]);
+    expect(starts[1]!.argv).toEqual(['bash', launcher('conv-lane-root')]);
+  });
+
   it('passes the conversation role through the prompt guard unchanged', () => {
     expect(toPaneRole('conversation')).toBe('conversation');
   });

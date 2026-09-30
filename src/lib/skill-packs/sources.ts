@@ -281,7 +281,7 @@ export async function packUpdateAvailable(entry: PackRegistryEntry): Promise<str
   return remote && remote !== entry.commit ? remote : null;
 }
 
-export type PackSourceErrorCode = 'bad-id' | 'exists' | 'integration' | 'unknown-pack' | 'git';
+export type PackSourceErrorCode = 'bad-id' | 'exists' | 'unknown-pack' | 'git';
 
 export class PackSourceError extends Error {
   constructor(
@@ -323,7 +323,7 @@ async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): P
 }
 
 async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Promise<PackManifest> {
-  return gitStep(id, () => readPackManifest(dir, adapter, { optIn: KNOWN_PACKS[id]?.optIn ?? [] }));
+  return gitStep(id, () => readPackManifest(dir, adapter, { optIn: KNOWN_PACKS[id]?.optIn ?? [], skillsRoot: KNOWN_PACKS[id]?.skillsRoot }));
 }
 
 async function requirePack(id: string): Promise<PackRegistryEntry> {
@@ -346,8 +346,6 @@ export async function addPack(
   if (input.reservedIds?.includes(id)) {
     throw new PackSourceError('bad-id', `pack id ${id} is reserved by a core skill; choose another id`);
   }
-  const known = KNOWN_PACKS[id];
-  if (known?.kind === 'integration') throw new PackSourceError('integration', known.note ?? `${id} is an integration, not a skill pack`);
   if (await getPack(id)) throw new PackSourceError('exists', `pack ${id} is already registered; use pan skills pack update ${id}`);
 
   const commit = await gitStep(id, async () => {

@@ -14,7 +14,7 @@
  */
 import { create } from 'zustand';
 
-export type ConnectionPhase = 'live' | 'delayed' | 'unreachable' | 'restarting';
+export type ConnectionPhase = 'live' | 'delayed' | 'unreachable' | 'restarting' | 'unauthorized';
 
 export interface ConnectionInputs {
   /** The server answers HTTP (reachability rule: see `probeServerHealth`). */
@@ -23,6 +23,8 @@ export interface ConnectionInputs {
   streamLive: boolean;
   /** A planned restart is in progress (`dashboardLifecycle.active`). */
   restarting: boolean;
+  /** The dashboard session mint returned 401 (FR-5). */
+  sessionAuthFailed: boolean;
   /** A cached snapshot was loaded or a bootstrap succeeded. */
   hasSnapshot: boolean;
   /** Epoch ms of the last live data (bootstrap / applied batch, else cache timestamp). */
@@ -35,6 +37,7 @@ interface ConnectionStore extends ConnectionInputs {
   /** `true` also sets `lastLiveAt = at ?? Date.now()` and `hasSnapshot = true`. */
   setStreamLive: (v: boolean, at?: number) => void;
   setRestarting: (v: boolean) => void;
+  setSessionAuthFailed: (v: boolean) => void;
   /** Records a cached snapshot; `lastLiveAt` keeps any newer live timestamp. */
   markSnapshotCached: (timestamp: number) => void;
   registerReconnect: (fn: (() => void) | null) => void;
@@ -46,6 +49,7 @@ export const useConnectionState = create<ConnectionStore>((set, get) => ({
   serverReachable: true,
   streamLive: false,
   restarting: false,
+  sessionAuthFailed: false,
   hasSnapshot: false,
   lastLiveAt: null,
   reconnect: null,
@@ -53,15 +57,17 @@ export const useConnectionState = create<ConnectionStore>((set, get) => ({
   setStreamLive: (streamLive, at) =>
     set(streamLive ? { streamLive, hasSnapshot: true, lastLiveAt: at ?? Date.now() } : { streamLive }),
   setRestarting: (restarting) => set({ restarting }),
+  setSessionAuthFailed: (sessionAuthFailed) => set({ sessionAuthFailed }),
   markSnapshotCached: (timestamp) =>
     set((s) => ({ hasSnapshot: true, lastLiveAt: s.lastLiveAt ?? timestamp })),
   registerReconnect: (reconnect) => set({ reconnect }),
   requestReconnect: () => get().reconnect?.(),
 }));
 
-/** Precedence: restarting > unreachable > delayed > live. */
+/** Precedence: restarting > unauthorized > unreachable > delayed > live. */
 export function deriveConnectionPhase(s: ConnectionInputs): ConnectionPhase {
   if (s.restarting) return 'restarting';
+  if (s.sessionAuthFailed) return 'unauthorized';
   if (!s.serverReachable) return 'unreachable';
   if (!s.streamLive) return 'delayed';
   return 'live';
@@ -71,9 +77,9 @@ export function useConnectionPhase(): ConnectionPhase {
   return useConnectionState(deriveConnectionPhase);
 }
 
-/** Server writes are blocked when HTTP is down or a restart is in progress; `delayed` still writes. */
+/** Server writes are blocked when HTTP is down, a restart is in progress, or the session is unauthorized; `delayed` still writes. */
 export function isWriteBlockedPhase(p: ConnectionPhase): boolean {
-  return p === 'unreachable' || p === 'restarting';
+  return p === 'unreachable' || p === 'restarting' || p === 'unauthorized';
 }
 
 /** Non-hook read for event handlers. */

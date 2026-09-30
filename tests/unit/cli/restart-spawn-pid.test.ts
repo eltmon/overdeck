@@ -90,6 +90,28 @@ describe('dashboard spawn pid handles', () => {
     expect(runSystemctl).toHaveBeenCalledTimes(2);
   });
 
+  it('starts the systemd unit with the default dashboard CPUWeight (PAN-4311)', () => {
+    const bundle = createDashboardBundleFixture();
+    processMocks.execFileSync.mockReturnValue(undefined);
+
+    spawnDashboardDetached(config, { ...bundle, runSystemctl: vi.fn(() => '1\n') });
+
+    const [command, args] = processMocks.execFileSync.mock.calls.at(-1)!;
+    expect(command).toBe('systemd-run');
+    expect(args).toContain('--property=CPUWeight=1000');
+  });
+
+  it('starts the systemd unit with a configured dashboard CPUWeight (PAN-4311)', () => {
+    const bundle = createDashboardBundleFixture();
+    processMocks.execFileSync.mockReturnValue(undefined);
+
+    spawnDashboardDetached(config, { ...bundle, dashboardCpuWeight: 400, runSystemctl: vi.fn(() => '1\n') });
+
+    const [, args] = processMocks.execFileSync.mock.calls.at(-1)!;
+    expect(args).toContain('--property=CPUWeight=400');
+    expect(args).not.toContain('--property=CPUWeight=1000');
+  });
+
   it('returns null when the systemd unit has already vanished', async () => {
     const bundle = createDashboardBundleFixture();
     processMocks.execFileSync.mockReturnValue(undefined);

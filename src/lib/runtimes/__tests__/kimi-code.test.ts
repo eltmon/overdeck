@@ -349,7 +349,7 @@ describe('KimiCodeRuntimeSync', () => {
     expect(backend.starts[0]!.spec).toMatchObject({
       name: 'agent-kimi-spawn',
       cwd: workspace,
-      argv: ['bash', launcherScript],
+      argv: ['nice', '-n', '10', '--', 'bash', launcherScript],
       env: { EXTRA: 'value' },
       tokens: { harness: 'kimi-code', model: 'k3', role: 'work' },
     });
@@ -435,7 +435,7 @@ describe('KimiCodeRuntimeSync', () => {
     expect(backend.starts[0]!.spec).toMatchObject({
       name: 'agent-pan-3936-review',
       cwd: workspace,
-      argv: ['bash', launcherScript],
+      argv: ['nice', '-n', '10', '--', 'bash', launcherScript],
       detection: 'not-required',
       tokens: { issue: 'PAN-3936', role: 'review', harness: 'kimi-code', model: 'k3' },
     });

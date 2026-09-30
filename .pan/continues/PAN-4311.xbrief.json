@@ -1,0 +1,388 @@
+{
+  "version": "1",
+  "issueId": "PAN-4311",
+  "created": "2026-09-28T13:59:42.470Z",
+  "updated": "2026-09-29T13:14:37.910Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T13:14Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-09-29T13:14:37.909Z"
+    }
+  ],
+  "items": {
+    "cfg-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T13:59:42.469Z",
+      "doneAt": "2026-09-28T14:05:24.682Z"
+    },
+    "dashboard-supervisor-weight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:05:29.929Z",
+      "doneAt": "2026-09-28T14:12:51.408Z"
+    },
+    "verification-weight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:12:54.421Z",
+      "doneAt": "2026-09-28T14:22:42.993Z"
+    },
+    "cpu-class-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:22:45.988Z",
+      "doneAt": "2026-09-28T14:43:32.437Z"
+    },
+    "lane-cpu-class": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:45:21.274Z",
+      "doneAt": "2026-09-28T14:50:14.975Z"
+    },
+    "cpu-psi-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:50:18.571Z",
+      "doneAt": "2026-09-28T14:58:44.123Z"
+    },
+    "governor-cpu-trigger": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:58:47.870Z",
+      "doneAt": "2026-09-28T15:04:19.027Z"
+    },
+    "governor-cpu-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:04:21.806Z",
+      "doneAt": "2026-09-28T15:15:03.224Z"
+    },
+    "lane-door-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:15:07.533Z",
+      "doneAt": "2026-09-28T15:17:39.314Z"
+    },
+    "flywheel-spawn-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:17:43.368Z",
+      "doneAt": "2026-09-28T15:20:17.066Z"
+    },
+    "guardrail-cpu-warning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:20:20.706Z",
+      "doneAt": "2026-09-28T15:22:05.143Z"
+    },
+    "gate-admission-psi": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:22:08.980Z",
+      "doneAt": "2026-09-28T15:28:06.149Z"
+    },
+    "history-psi": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:28:09.700Z",
+      "doneAt": "2026-09-28T15:29:28.801Z"
+    },
+    "runaway-classify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:29:33.166Z",
+      "doneAt": "2026-09-28T15:37:16.753Z"
+    },
+    "runaway-patrol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:37:22.016Z",
+      "doneAt": "2026-09-28T15:41:08.320Z"
+    },
+    "runaway-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:41:12.022Z",
+      "doneAt": "2026-09-28T15:42:47.510Z"
+    },
+    "docs-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:42:51.927Z",
+      "doneAt": "2026-09-28T15:43:50.915Z"
+    },
+    "docs-weights": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:43:54.832Z",
+      "doneAt": "2026-09-28T15:44:27.823Z"
+    },
+    "cfg-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:55:47.391Z"
+    },
+    "cfg-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:55:58.055Z"
+    },
+    "cfg-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:56:09.072Z"
+    },
+    "cfg-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:56:20.256Z"
+    },
+    "dashboard-supervisor-weight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:56:32.015Z"
+    },
+    "dashboard-supervisor-weight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:56:43.636Z"
+    },
+    "dashboard-supervisor-weight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:56:56.766Z"
+    },
+    "verification-weight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:07.753Z"
+    },
+    "verification-weight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:19.897Z"
+    },
+    "verification-weight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:31.217Z"
+    },
+    "cpu-class-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:43.860Z"
+    },
+    "cpu-class-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:56.021Z"
+    },
+    "cpu-class-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:07.881Z"
+    },
+    "cpu-class-launch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:20.364Z"
+    },
+    "lane-cpu-class.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:32.802Z"
+    },
+    "lane-cpu-class.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:44.713Z"
+    },
+    "lane-cpu-class.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:56.649Z"
+    },
+    "cpu-psi-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:08.798Z"
+    },
+    "cpu-psi-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:20.376Z"
+    },
+    "cpu-psi-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:31.457Z"
+    },
+    "cpu-psi-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:43.233Z"
+    },
+    "governor-cpu-trigger.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:55.625Z"
+    },
+    "governor-cpu-trigger.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:10.251Z"
+    },
+    "governor-cpu-trigger.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:23.732Z"
+    },
+    "governor-cpu-trigger.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:36.809Z"
+    },
+    "governor-cpu-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:48.832Z"
+    },
+    "governor-cpu-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:59.529Z"
+    },
+    "governor-cpu-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:11.470Z"
+    },
+    "lane-door-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:24.034Z"
+    },
+    "lane-door-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:35.658Z"
+    },
+    "lane-door-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:47.279Z"
+    },
+    "lane-door-hold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:58.729Z"
+    },
+    "flywheel-spawn-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:02:11.136Z"
+    },
+    "flywheel-spawn-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:02:23.734Z"
+    },
+    "flywheel-spawn-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:02:36.520Z"
+    },
+    "guardrail-cpu-warning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:02:48.751Z"
+    },
+    "guardrail-cpu-warning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:00.923Z"
+    },
+    "guardrail-cpu-warning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:12.550Z"
+    },
+    "gate-admission-psi.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:25.071Z"
+    },
+    "gate-admission-psi.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:36.821Z"
+    },
+    "gate-admission-psi.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:48.417Z"
+    },
+    "history-psi.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:59.630Z"
+    },
+    "history-psi.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:12.276Z"
+    },
+    "history-psi.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:23.536Z"
+    },
+    "runaway-classify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:35.539Z"
+    },
+    "runaway-classify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:47.698Z"
+    },
+    "runaway-classify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:59.957Z"
+    },
+    "runaway-classify.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:12.355Z"
+    },
+    "runaway-patrol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:24.267Z"
+    },
+    "runaway-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:36.198Z"
+    },
+    "runaway-patrol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:47.576Z"
+    },
+    "runaway-patrol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:59.455Z"
+    },
+    "runaway-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:06:12.717Z"
+    },
+    "runaway-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:06:25.203Z"
+    },
+    "runaway-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:06:37.740Z"
+    },
+    "runaway-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:06:50.858Z"
+    },
+    "docs-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:03.998Z"
+    },
+    "docs-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:17.340Z"
+    },
+    "docs-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:30.826Z"
+    },
+    "docs-gates.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:42.702Z"
+    },
+    "docs-weights.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:54.318Z"
+    },
+    "docs-weights.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:08:05.858Z"
+    },
+    "docs-weights.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:08:17.333Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-29T13:14:37Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4311 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (225743ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4311/.overdeck/verification/2026-09-29T13-08-10-287Z-c94f0545.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4311/.overdeck/verification/2026-09-29T13-08-10-287Z-c94f0545.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4311 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4311 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

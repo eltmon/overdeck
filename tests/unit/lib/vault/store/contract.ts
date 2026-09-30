@@ -1,6 +1,7 @@
 /**
  * Shared VaultStore contract suite (PAN-2609). Every backend must pass it.
- * Call from a `*.test.ts` file with a factory that yields a fresh, empty store.
+ * Call from a `*.test.ts` file with the backend's name and a factory that
+ * yields a fresh, empty store.
  */
 import { describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
@@ -10,7 +11,7 @@ const ID_A = 'a'.repeat(40);
 const ID_B = 'b'.repeat(40);
 const ID_C = '0123456789abcdef0123456789abcdef01234567';
 
-export function runVaultStoreContract(makeStore: () => Promise<VaultStore>): void {
+export function runVaultStoreContract(backend: 'dir' | 'git', makeStore: () => Promise<VaultStore>): void {
   describe('VaultStore contract', () => {
     it('putObjects stores bytes and getObject returns them; missing ids are null', async () => {
       const store = await makeStore();
@@ -138,6 +139,131 @@ export function runVaultStoreContract(makeStore: () => Promise<VaultStore>): voi
       expect((await store.listRefs('h/')).map((ref) => ref.name)).toEqual(['h/header']);
       expect(await store.listRefs('z/')).toEqual([]);
       expect((await store.listRefs('')).length).toBe(4);
+    });
+
+    it('casRefs.ac1: writes every valued op when all versions match', async () => {
+      const store = await makeStore();
+      const names = ['r/' + ID_A, 'm/' + ID_B, 'h/header'];
+      await store.casRef(names[0]!, null, Buffer.from('a1'));
+      await store.casRef(names[1]!, null, Buffer.from('b1'));
+      const versionA = (await store.readRef(names[0]!))!.version;
+      const versionB = (await store.readRef(names[1]!))!.version;
+      expect(await store.casRefs([
+        { name: names[0]!, expectedVersion: versionA, value: Buffer.from('a2') },
+        { name: names[1]!, expectedVersion: versionB, value: Buffer.from('b2') },
+        { name: names[2]!, expectedVersion: null, value: Buffer.from('h1') },
+      ])).toBe('ok');
+      await store.refresh();
+      expect(Buffer.from((await store.readRef(names[0]!))!.value).toString()).toBe('a2');
+      expect(Buffer.from((await store.readRef(names[1]!))!.value).toString()).toBe('b2');
+      expect(Buffer.from((await store.readRef(names[2]!))!.value).toString()).toBe('h1');
+    });
+
+    it('casRefs takes its locks in name order whatever order the ops come in: opposite-order batches both finish', async () => {
+      const store = await makeStore();
+      const nameA = 'r/' + ID_A;
+      const nameB = 'r/' + ID_B;
+      const results = await Promise.all([
+        store.casRefs([{ name: nameB, expectedVersion: null, value: Buffer.from('1b') }, { name: nameA, expectedVersion: null, value: Buffer.from('1a') }]),
+        store.casRefs([{ name: nameA, expectedVersion: null, value: Buffer.from('2a') }, { name: nameB, expectedVersion: null, value: Buffer.from('2b') }]),
+      ]);
+      expect(results.sort()).toEqual(['conflict', 'ok']);
+      await store.refresh();
+      const values = [Buffer.from((await store.readRef(nameA))!.value).toString(), Buffer.from((await store.readRef(nameB))!.value).toString()];
+      expect([['1a', '1b'], ['2a', '2b']]).toContainEqual(values);
+    });
+
+    it('casRefs.ac2: one stale version writes nothing and returns conflict', async () => {
+      const store = await makeStore();
+      const nameA = 'r/' + ID_A;
+      const nameB = 'r/' + ID_B;
+      const nameC = 'r/' + ID_C;
+      await store.casRef(nameA, null, Buffer.from('a1'));
+      await store.casRef(nameB, null, Buffer.from('b1'));
+      const versionA = (await store.readRef(nameA))!.version;
+      const staleB = (await store.readRef(nameB))!.version;
+      await store.casRef(nameB, staleB, Buffer.from('b2'));
+      expect(await store.casRefs([
+        { name: nameA, expectedVersion: versionA, value: Buffer.from('a2') },
+        { name: nameB, expectedVersion: staleB, value: Buffer.from('b3') },
+        { name: nameC, expectedVersion: null, value: Buffer.from('c1') },
+      ])).toBe('conflict');
+      await store.refresh();
+      expect(Buffer.from((await store.readRef(nameA))!.value).toString()).toBe('a1');
+      expect(Buffer.from((await store.readRef(nameB))!.value).toString()).toBe('b2');
+      expect(await store.readRef(nameC)).toBeNull();
+      // A ref that must not exist yet but does is stale too.
+      expect(await store.casRefs([
+        { name: nameC, expectedVersion: null, value: Buffer.from('c1') },
+        { name: nameA, expectedVersion: null, value: Buffer.from('a2') },
+      ])).toBe('conflict');
+      expect(await store.readRef(nameC)).toBeNull();
+    });
+
+    it('casRefs.ac3: an assert-only op gates the batch and is never written', async () => {
+      const store = await makeStore();
+      const guard = 'h/header';
+      const target = 'r/' + ID_A;
+      await store.casRef(guard, null, Buffer.from('g1'));
+      const first = (await store.readRef(guard))!.version;
+      expect(await store.casRefs([
+        { name: guard, expectedVersion: first },
+        { name: target, expectedVersion: null, value: Buffer.from('t1') },
+      ])).toBe('ok');
+      await store.refresh();
+      expect(Buffer.from((await store.readRef(target))!.value).toString()).toBe('t1');
+      const guardRef = (await store.readRef(guard))!;
+      expect(Buffer.from(guardRef.value).toString()).toBe('g1');
+      expect(guardRef.version).toBe(first);
+
+      await store.casRef(guard, first, Buffer.from('g2'));
+      const targetVersion = (await store.readRef(target))!.version;
+      expect(await store.casRefs([
+        { name: guard, expectedVersion: first },
+        { name: target, expectedVersion: targetVersion, value: Buffer.from('t2') },
+      ])).toBe('conflict');
+      await store.refresh();
+      expect(Buffer.from((await store.readRef(target))!.value).toString()).toBe('t1');
+      expect(Buffer.from((await store.readRef(guard))!.value).toString()).toBe('g2');
+      // An assert-only op on a ref that must not exist never creates it.
+      expect(await store.casRefs([
+        { name: 'm/' + ID_C, expectedVersion: null },
+        { name: target, expectedVersion: targetVersion, value: Buffer.from('t3') },
+      ])).toBe('ok');
+      expect(await store.readRef('m/' + ID_C)).toBeNull();
+    });
+
+    it('casRefs.ac4: duplicate names throw', async () => {
+      const store = await makeStore();
+      const name = 'r/' + ID_A;
+      await expect(store.casRefs([
+        { name, expectedVersion: null, value: Buffer.from('one') },
+        { name, expectedVersion: null, value: Buffer.from('two') },
+      ])).rejects.toThrow(/Duplicate vault ref name/);
+      await expect(store.casRefs([
+        { name, expectedVersion: null, value: Buffer.from('one') },
+        { name, expectedVersion: null },
+      ])).rejects.toThrow(/Duplicate vault ref name/);
+      expect(await store.readRef(name)).toBeNull();
+    });
+
+    it('discardUnpublished.ac1: an object put but never published is gone after discardUnpublished on git and still present on dir', async () => {
+      const store = await makeStore();
+      await store.putObjects([{ id: ID_A, bytes: randomBytes(16) }]);
+      await store.casRef('r/' + ID_A, null, Buffer.from('published'));
+      const pending = randomBytes(16);
+      await store.putObjects([{ id: ID_B, bytes: pending }]);
+      expect(await store.hasObjects([ID_A, ID_B])).toEqual(new Set([ID_A, ID_B]));
+      await expect(store.discardUnpublished()).resolves.toBeUndefined();
+      if (backend === 'git') {
+        expect(await store.hasObjects([ID_A, ID_B])).toEqual(new Set([ID_A]));
+        expect(await store.getObject(ID_B)).toBeNull();
+      } else {
+        expect(await store.hasObjects([ID_A, ID_B])).toEqual(new Set([ID_A, ID_B]));
+        expect(Buffer.from((await store.getObject(ID_B))!).equals(pending)).toBe(true);
+      }
+      // Published state is untouched on every backend.
+      expect(Buffer.from((await store.readRef('r/' + ID_A))!.value).toString()).toBe('published');
     });
   });
 }

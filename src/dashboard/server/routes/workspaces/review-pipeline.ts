@@ -39,6 +39,7 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { getReleaseSet } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
+import { readApprovalStandsAtHead } from '../../../../lib/cloister/merge-gate.js';
 import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
@@ -605,14 +606,21 @@ const postWorkspaceReviewRoute = HttpRouter.add(
  * The guarded review request: what `POST /api/review/:issueId/request` does
  * without `force` or `nudge`, and what every re-request that is not an
  * operator override goes through (PAN-3911: the dashboard Unpause). It refuses
- * a merged issue, never re-reviews an approved head (it re-queues the tests
- * when the approved PR's checks are not green, and is a no-op otherwise), and
+ * a merged issue, never re-reviews a head whose approval stands (it re-queues
+ * the tests when the approved PR's checks are not green, and is a no-op
+ * otherwise; a stale approval — the head moved since the approving review — is
+ * re-reviewed, PAN-4384), and
  * counts review spawns against the per-issue `MAX_AUTO_REQUEUE` breaker
  * before it starts the review pipeline.
  */
 export async function requestReviewGuarded(
   issueId: string,
-  options: { message?: string; source: RequestReviewSource; derived?: DerivedIssueState },
+  options: {
+    message?: string;
+    source: RequestReviewSource;
+    derived?: DerivedIssueState;
+    approvalStandsAtHead?: (issueId: string) => Promise<boolean | undefined>;
+  },
 ): Promise<GuardedReviewRequestOutcome> {
   const canonicalIssueId = issueId.toUpperCase();
   const derived = options.derived ?? await getDerivedIssueState(canonicalIssueId);
@@ -622,7 +630,10 @@ export async function requestReviewGuarded(
     return { kind: 'already-merged' };
   }
 
-  if (derived.pr?.reviewState === 'approved') {
+  // PAN-4384: GitHub does not dismiss an approval on push here, so a stale
+  // approval must not short-circuit a re-request for a new head.
+  if (derived.pr?.reviewState === 'approved'
+    && await (options.approvalStandsAtHead ?? readApprovalStandsAtHead)(canonicalIssueId) !== false) {
     if (derived.pr?.checks !== 'green') {
       console.log(
         `[request-review] ${issueId}: PR approved but checks ${derived.pr?.checks ?? 'unknown'} — dispatching test role`

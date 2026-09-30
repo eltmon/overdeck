@@ -72,6 +72,16 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
     expect(launchMock).not.toHaveBeenCalled();
   });
 
+  it('passes a 429 cpu-saturated refusal through and forwards force (PAN-4311)', async () => {
+    launchMock.mockRejectedValueOnce(new LaneLaunchError(429, 'cpu-saturated: psi-some-avg60 55 is at or above 50'));
+    expect(await call('POST', '/api/lanes', { body: BODY }))
+      .toEqual({ status: 429, json: { error: 'cpu-saturated: psi-some-avg60 55 is at or above 50' } });
+
+    launchMock.mockResolvedValueOnce({ conversation: { id: 9, name: 'lane-1' }, cwd: '/l', branch: null, iteration: 1, warnings: [] });
+    expect((await call('POST', '/api/lanes', { body: { ...BODY, force: true } })).status).toBe(201);
+    expect(launchMock).toHaveBeenLastCalledWith({ ...BODY, force: true });
+  });
+
   it('passes a LaneLaunchError status and message through', async () => {
     launchMock.mockRejectedValue(new LaneLaunchError(409, 'lane hotel/663 builder is live as conversation #7'));
     const res = await call('POST', '/api/lanes', { body: BODY });
@@ -90,6 +100,9 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
   it('rejects a body missing required fields or with wrong types', async () => {
     expect((await call('POST', '/api/lanes', { body: { ...BODY, brief: undefined } })).status).toBe(400);
     expect((await call('POST', '/api/lanes', { body: { ...BODY, reuse: 'yes' } })).status).toBe(400);
+    // PAN-4311: force is a boolean like reuse and replace.
+    expect(await call('POST', '/api/lanes', { body: { ...BODY, force: 'yes' } }))
+      .toEqual({ status: 400, json: { error: 'force must be a boolean' } });
     expect(launchMock).not.toHaveBeenCalled();
   });
 

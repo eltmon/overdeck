@@ -23,6 +23,7 @@ export function BackendConnectionBoundary({ children }: { children: ReactNode })
       serverReachable: s.serverReachable,
       streamLive: s.streamLive,
       restarting: s.restarting,
+      sessionAuthFailed: s.sessionAuthFailed,
       hasSnapshot: s.hasSnapshot,
       lastLiveAt: s.lastLiveAt,
     })),
@@ -56,10 +57,16 @@ function FirstLoadScreen({ phase }: { phase: ConnectionPhase }) {
         <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" aria-hidden="true" />
         <div>
           <h2 className="text-sm font-medium text-foreground">
-            {phase === 'restarting' ? 'Overdeck server is restarting' : "Can't reach the Overdeck server"}
+            {phase === 'restarting'
+              ? 'Overdeck server is restarting'
+              : phase === 'unauthorized'
+                ? 'Dashboard session could not be established'
+                : "Can't reach the Overdeck server"}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            The dashboard will load as soon as the server answers.
+            {phase === 'unauthorized'
+              ? "The server refused this browser's session. See docs/DASHBOARD-AUTH.md."
+              : 'The dashboard will load as soon as the server answers.'}
           </p>
           <button
             type="button"

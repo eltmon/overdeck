@@ -1,0 +1,160 @@
+{
+  "version": "1",
+  "issueId": "PAN-4384",
+  "created": "2026-09-29T13:04:47.711Z",
+  "updated": "2026-09-29T15:23:24.173Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T15:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-09-29T15:23:24.173Z"
+    }
+  ],
+  "items": {
+    "conflict-repair-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:04:47.711Z",
+      "doneAt": "2026-09-29T13:06:08.191Z"
+    },
+    "head-bound-review-request": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:06:15.835Z",
+      "doneAt": "2026-09-29T13:07:50.701Z"
+    },
+    "conflict-repair-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:07:56.373Z",
+      "doneAt": "2026-09-29T13:25:36.369Z"
+    },
+    "conflict-repair-review-backstop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:25:57.105Z",
+      "doneAt": "2026-09-29T13:30:14.713Z"
+    },
+    "conflict-repair-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:30:16.231Z",
+      "doneAt": "2026-09-29T13:40:11.962Z"
+    },
+    "conflict-repair-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4384",
+      "claimedAt": "2026-09-29T13:40:14.139Z",
+      "doneAt": "2026-09-29T13:40:36.743Z"
+    },
+    "conflict-repair-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:23:20.084Z"
+    },
+    "conflict-repair-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:23:49.606Z"
+    },
+    "conflict-repair-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:24:18.670Z"
+    },
+    "conflict-repair-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:24:49.122Z"
+    },
+    "conflict-repair-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:25:20.367Z"
+    },
+    "conflict-repair-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:25:56.398Z"
+    },
+    "conflict-repair-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:26:36.662Z"
+    },
+    "conflict-repair-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:27:09.503Z"
+    },
+    "conflict-repair-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:27:39.988Z"
+    },
+    "conflict-repair-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:28:09.607Z"
+    },
+    "conflict-repair-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:28:38.956Z"
+    },
+    "conflict-repair-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:29:08.846Z"
+    },
+    "conflict-repair-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:29:38.276Z"
+    },
+    "conflict-repair-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:30:10.306Z"
+    },
+    "conflict-repair-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:30:36.872Z"
+    },
+    "conflict-repair-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:30:54.856Z"
+    },
+    "conflict-repair-host.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:31:12.794Z"
+    },
+    "conflict-repair-review-backstop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:31:31.373Z"
+    },
+    "conflict-repair-review-backstop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:31:50.572Z"
+    },
+    "conflict-repair-review-backstop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:32:11.197Z"
+    },
+    "head-bound-review-request.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:32:28.892Z"
+    },
+    "head-bound-review-request.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:32:47.298Z"
+    },
+    "head-bound-review-request.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:33:03.811Z"
+    },
+    "head-bound-review-request.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:33:19.678Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-09-29T15:23:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4384\n\n# Review — PAN-4384\n## Verdict: CHANGES REQUESTED — CI test job is red on the PR head: the delivery no-loss audit test rejects the two new `messageAgent` call sites in `conflict-repair.ts`\n\n## Context\n- Run ID: agent-pan-4384-review-13361fa2\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4384/.pan/review/agent-pan-4384-review-13361fa2/context.json\n- Branch / workspace: feature/pan-4384 — /home/eltmon/Projects/overdeck/workspaces/feature-pan-4384\n- PR: https://github.com/eltmon/overdeck/pull/4411\n- HEAD reviewed: 13361fa240d4c515387d3d491e208cb9e47b0587\n- Base / prior cycle SHA: merge-base abaeeab9647e897f2f115d04cf0cd0ace466455d; no prior review cycle\n\n## Blocking Findings\n\n### [correctness] New delivery call sites are missing from the no-loss audit list, so the CI test job fails — `src/lib/cloister/conflict-repair.ts:118`\n- Severity: `!` MUST\n- Classification / requirement scope: implementation defect (validation gap); in_pr_scope\n- Trigger and changed-code connection: `defaultDeliver` in the new `conflict-repair.ts` calls `messageAgent(` twice (line 118, keyed; line 122, the unkeyed retry). `tests/unit/lib/agents/delivery-no-loss-audit.test.ts` scans `lib/cloister`, `cli` and `dashboard/server` for `messageAgent(|deliverAgentMessage(|resumeAgent(` and requires every hit to appear in `KNOWN_CALL_SITES`. These two lines are not in it.\n- Expected / observed / impact: expected the CI `test` job green on the PR head. Observed `test-shard (4/4)` failed with exactly 1 failed test (3912 passed), and the aggregate `test` check is red. The failure is deterministic: it failed again on its automatic retry (`retry x1`). The PR cannot pass the verification gate (`verification.tests: ci`) or merge.\n- Evidence: `gh pr checks 4411` → `test fail`, `test-shard (4/4) fail` (run 36583643220, job 109458055386). Failure output:\n  ```\n  FAIL tests/unit/lib/agents/delivery-no-loss-audit.test.ts > delivery call-site inventory (W7 no-loss audit) > finds no message-delivery call site missing from the audited list\n  + \"lib/cloister/conflict-repair.ts|return await messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true, dedupKey });\",\n  + \"lib/cloister/conflict-repair.ts|return messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true });\",\n  ```\n  Shards 1–3 are green; this is the only failing test on the head.\n- Fix (for the work agent; the reviewer does not edit code): add those two exact `path|line` strings to `KNOWN_CALL_SITES` in `tests/unit/lib/agents/delivery-no-loss-audit.test.ts`, next to the `lib/cloister/review-verdict-feedback.ts` entries (same keyed-delivery-with-unkeyed-retry pattern). Then run `npx vitest run tests/unit/lib/agents/delivery-no-loss-audit.test.ts`.\n\n## Non-blocking Findings\n\n### [correctness] `readApprovalStandsAtHead` can read a stale head from the 60 s PR-facts cache, so the agent's own post-repair `pan review request` can no-op — `src/lib/cloister/merge-gate.ts:176`\n- Severity: `~` SHOULD\n- Classification / requirement scope: implementation defect (bounded, self-healing); in_pr_scope (FR-6)\n- Trigger and changed-code connection: `getPrFacts` caches a result for 60 s whenever `deps` is empty and `options.preferBranch` is unset (`src/lib/cloister/pr-facts.ts`, `getPrFacts`, `const cacheable = Object.keys(deps).length === 0 && !options.preferBranch`). In the dashboard process nothing invalidates that cache (`resetPrFactsCache` is called only from `src/cli/commands/specialists/done.ts`, a separate CLI process). The new patrol calls the default `getPrFacts` for every candidate every 60 s tick, so it keeps the cache warm for exactly the issues whose agent is about to push a repair and run `pan review request`. `requestReviewGuarded` then calls `readApprovalStandsAtHead`, which reads the cached pre-push facts (old head H1):\n  - a verdict marker naming H1 sets `approvedAtHead: true`, so it returns `true`;\n  - a GitHub-review approval makes `forgeApprovalAtHead` re-read reviews, see `headRefOid` = H2 ≠ cached H1, and return `undefined`.\n  Either answer is `!== false`, so the guard short-circuits.\n- Expected / observed / impact: expected a stale approval at the new head to start the review pipeline (FR-6). With a cache entry older than the push, the request returns `already-passed` (the agent is told \"Review already passed\"), or `tests-requeued` with a test-role spawn on the unapproved head when the derived checks are no longer green. The FR-7 backstop recovers it: `already-passed` and `tests-requeued` journal no `review.requested`, and the backstop's own gate read refreshes the cache in the same tick, so the next backstop request reads H2 and gets `false`. Net effect: up to `CONFLICT_REPAIR_REVIEW_BACKSTOP_MS` (15 min) plus one tick of delay, a misleading message to the agent, and a possible wasted test run. No stuck PR.\n- Evidence: static trace only (no runtime reproduction). The new unit tests inject `approvalStandsAtHead` or `getFacts`, which bypass the cache, so they cannot see this.\n- Fix: make `readApprovalStandsAtHead` read fresh facts. `PrFactsOptions` has no cache-bypass flag, and `pr-facts.ts` must not grow (993/1000, a non-goal). So do it in `merge-gate.ts`: pass a non-empty `deps` object to `getPrFacts` (any key bypasses the cache), or treat a head mismatch between the cached facts and `forgeApprovalAtHead`'s re-read as \"not standing\".\n\n### [requirements] The backstop discards the guarded door's outcome (CodeRabbit, `conflict-repair.ts:278`)\n- Severity: `~` SHOULD\n- Classification: validation gap; in_pr_scope (FR-7)\n- `reviewBackstop` awaits `d.requestReview(issueId)` and ignores the result. A `circuit-breaker` refusal (`MAX_AUTO_REQUEUE`) is then retried every 15 min with only a generic log line, and nobody is told. Log the outcome `kind` at least. Surfacing Needs-you only for real refusals (`circuit-breaker`, `no-project`, `dirty-workspace`) is reasonable. Given the finding above, an `already-passed` answer from the backstop is itself a sign of a stale read, so logging the kind is useful for diagnosis too. Advisory; FR-7 as written is met.\n\n### [correctness] A partial repair that moves the head but still conflicts gets no escalation\n- Severity: `?` MAY\n- Classification: unconfirmed hypothesis / spec gap (whole_feature_scope)\n- If the agent pushes a new head H2 that still conflicts (for example, main moved again during the repair) and does not request review, the gate reports \"not approved at head\" for H2 (not `conflicting`), the backstop requires `mergeable === true`, and the H1 escalation clock no longer applies. The PR sits until someone requests review. The FR-3 episode key (head sha) makes this the specified behavior. Whether it matters depends on how often an agent pushes without running `pan review request`. It would be established by a journal showing `conflict.repair-requested` followed by a push and no `review.requested` while the PR stays CONFLICTING.\n\n### Notes (no action)\n- Delivery dedup: a repeated `dedupKey` delivery returns `ok: true, deduplicated: true` (`src/lib/agents/delivery.ts`), which maps to `delivered: true`, so a re-send after a crash does not falsely escalate as `unreachable`.\n- `getPrFacts` never throws (lookup failures come back as `facts.error`), so the new `await readApprovalStandsAtHead` in `requestReviewGuarded` adds no new throw path.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/workspaces/review-pipeline.ts | Reviewed — head-bound guard (FR-6); 971 lines, under the 1000 ceiling; stale-cache advisory above |\n| src/lib/cloister/merge-gate.ts | Reviewed — `evaluateConflictRepairGate` mirrors `evaluateIssueMergeGate` policy (ciTestsRequired, uatRequired, requireApprovalAtHead) judged as `mergeable: true`; `readApprovalStandsAtHead` true/false/undefined contract matches `forgeApprovalAtHead` |\n| src/lib/cloister/conflict-repair.ts | Reviewed — pre-filter, one repair per head, grace escalation, unreachable escalation, backstop, per-issue in-flight, never-throws; audit-list blocker and backstop advisory above |\n| src/dashboard/server/services/conflict-repair-patrol.ts | Reviewed — env/peer/frozen skips, overlapping-tick guard, `unref`'d interval |\n| src/dashboard/server/main.ts | Reviewed — started beside the auto-merge executor, stopped in `handleShutdownSignal` |\n| src/lib/cloister/pipeline-journal.ts | Reviewed — two new entry types, action records only |\n| src/lib/cloister/request-review-pipeline.ts | Reviewed — `conflict-repair` source added to `RequestReviewSource` |\n| src/cli/commands/show.ts | Reviewed — summaries for the two new entry types |\n| src/cli/commands/__tests__/show-pipeline-journal.test.ts | Reviewed |\n| src/dashboard/server/routes/workspaces/__tests__/review-pipeline-stale-approval.test.ts | Reviewed — stale/standing/unknown/tests-requeued/default reader |\n| src/dashboard/server/services/__tests__/conflict-repair-patrol.test.ts | Reviewed — fake timers |\n| src/lib/cloister/__tests__/conflict-repair.test.ts | Reviewed — fake timers + `setSystemTime`, injected deps, no `skipIf`/`.only`, no source reads |\n| src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts | Reviewed |\n| docs/PIPELINE-GATES.md | Reviewed — conflict-repair step, journal rows, head-bound request, escalation rule |\n| docs/MERGE-WORKFLOW.md | Reviewed — PAN-4384 references; old \"nothing re-dispatches\" text removed |\n| .pan/drafts/PAN-4384.md | Not applicable as code — read as the requirements source (FR/NFR, decisions, non-goals, ACs) |\n| .pan/specs/2026-09-29-PAN-4384-…xbrief.json | Not applicable — planning artifact |\n| .pan/continues/PAN-4384.xbrief.json | Not applicable — planning artifact |\n\n### Dimensions\n- **Correctness:** one blocker (CI audit test) and one bounded advisory (stale cache in FR-6 read). The episode logic, journal-derived counting, escalation, pause skip and error isolation trace correctly.\n- **Security:** no new trust boundary. The prompt interpolates only the issue id, an 8-char head sha and paths from `git merge-tree`, delivered to a trusted local agent. No new route, no auth change.\n- **Performance:** each tick does one sync `readPipelineJournal` per workspace. Measured on this host: 7 journals, 22,323 bytes total (largest 5,224 B), so the cost is negligible. Forge reads happen only for journal-approved candidates and go through the 60 s `getPrFacts` cache. The reviews read happens only when conflicting + green (NFR-1). `requestReviewGuarded` adds one cached facts read (plus a possible reviews read) only for approved PRs.\n- **Requirements/UX:** FR-1..FR-10 and NFR-1..NFR-3 are implemented as specified. FR-6 has the stale-cache caveat above. Non-goals: `git diff --name-only origin/main...HEAD | grep -E \"conflict-gate|merge-train|auto-merge|merge-sync|pr-facts|no-loss\"` returned nothing. No new HTTP route, no stored status, no agent pause.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1) merge-gate-conflict-repair tests | Met | CI shards run the file; all shards other than the audit failure are green; test cases cover conflicting/mergeable/null/red/changes-requested/stale and the three `readApprovalStandsAtHead` answers |\n| AC-2 (WI-2) stale-approval tests; review-pipeline.ts ≤ 1000 | Met | Tests present and green on CI; `wc -l` = 971 |\n| AC-3 (WI-3) conflict-repair core tests with fake timers | Met | `vi.useFakeTimers()` + `vi.setSystemTime()`; cases for one repair, no second repair in grace or after reset, one escalation past 45 min, unreachable escalation |\n| AC-4 (WI-4) backstop tests | Met | Seven backstop cases in conflict-repair.test.ts |\n| AC-5 (WI-5) patrol tests; main.ts start/stop | Met | Patrol test green; `main.ts` starts after the auto-merge executor and stops in `handleShutdownSignal` |\n| AC-6 (WI-6) docs | Met | `grep conflict.repair-requested docs/PIPELINE-GATES.md` → lines 538, 954; `grep PAN-4384 docs/MERGE-WORKFLOW.md` → lines 127, 151, 191; `grep -i \"nothing re-dispatch\"` → no match |\n| AC-7 typecheck + lint | Met | `overdeck/test` (typecheck+lint) pass; `lint`, `lint-group (core/effect/skills/state)` pass on this head |\n| Implicit: CI test job green | **Unmet** | `test` and `test-shard (4/4)` fail — blocker above |\n\n## Verification\n- `gh pr checks 4411` at HEAD 13361fa2: `test` **fail**, `test-shard (4/4)` **fail** (run https://github.com/eltmon/overdeck/actions/runs/36583643220, job 109458055386: 1 failed / 3912 passed, the failure is `delivery-no-loss-audit.test.ts`). `test-shard (1/4)`, `(2/4)`, `(3/4)`, `test-e2e`, `build (22)`, `lint`, all four `lint-group` jobs, `overdeck/test`, the clean-install smoke test and the prompt-trailer gate pass.\n- `npm run lint:effect-diagnostics`: reused the green `lint-group (effect)` on this head. `scripts/run-lint-group.mjs` maps `npm run lint:effect-diagnostics` to the `effect` group, so that job ran it.\n- Full test suite: not run (CI owns it). No local focused tests were run; the CI result on this exact head answers every test question this review had.\n- Stale-cache finding: static trace only; not reproduced at runtime.\n\n## Scope Note\n- The workspace has an uncommitted change to `.pan/continues/PAN-4384.xbrief.json`. That is workspace state, not part of the reviewed HEAD.\n- The branch carries about 25 consecutive `chore(workspace): plan artifacts` commits. They are harmless, but they are noise the squash merge will absorb.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4384/.pan/review/agent-pan-4384-review-13361fa2/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4384 -m \"Fixed review issues\"`"
+    }
+  ]
+}

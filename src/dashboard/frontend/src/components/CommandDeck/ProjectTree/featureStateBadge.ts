@@ -1,4 +1,4 @@
-import type { IssueState, PipelineBucket, SessionNode } from '@overdeck/contracts';
+import type { DerivedWorkStart, IssueState, PipelineBucket, SessionNode } from '@overdeck/contracts';
 
 export type FeatureStateTone = 'rest' | 'machine' | 'specialist' | 'human' | 'outcome';
 
@@ -17,6 +17,8 @@ export interface FeatureStateBadgeInput {
   sessions?: readonly SessionNode[];
   pipelineBucket?: PipelineBucket;
   rawTrackerState?: string;
+  /** PAN-4399: the workspace journal's read on a post-planning auto-start. */
+  workStart?: DerivedWorkStart | null;
 }
 
 const STATE_BADGES: Record<IssueState, Omit<FeatureStateBadge, 'key'>> = {
@@ -51,6 +53,30 @@ export function resolveFeatureStateBadge(input: FeatureStateBadgeInput): Feature
   }
 
   if (state !== null) {
+    if (input.workStart?.status === 'not-started') {
+      return {
+        key: 'work-not-started',
+        label: 'Work agent not started',
+        tone: 'human',
+        title: 'Planning finished but the work agent never started. Start it from Needs you or run pan start.',
+      };
+    }
+    if (input.workStart?.status === 'retrying' && input.workStart.held) {
+      return {
+        key: 'work-start-held',
+        label: 'Work start held',
+        tone: 'machine',
+        title: 'The automatic work-agent start is deferred and held while the Deacon is frozen — unfreeze it, or run pan start.',
+      };
+    }
+    if (input.workStart?.status === 'retrying') {
+      return {
+        key: 'work-start-retrying',
+        label: 'Work start retrying',
+        tone: 'machine',
+        title: 'The automatic work-agent start was refused and is being retried.',
+      };
+    }
     return { key: state, ...STATE_BADGES[state] };
   }
 

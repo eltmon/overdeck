@@ -15,6 +15,7 @@ import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
   getConversationByName,
+  getConversationByTmuxSession,
   createConversation,
   markConversationEnded,
   markConversationActive,
@@ -32,6 +33,7 @@ import {
 import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { cpuClassForConversation } from '../terminal-backends/cpu-class.js';
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
@@ -835,6 +837,8 @@ export async function spawnConversationSession(
         cwd,
         agentId: tmuxSession,
         argv: ['bash', launcherScript],
+        // PAN-4311: a lane row launches as `lane` (read from the row, so a resume keeps it).
+        cpuClass: cpuClassForConversation(getConversationByTmuxSession(tmuxSession)?.laneRole, role),
         env: {
           ...BLANKED_PROVIDER_ENV,
           ...(primeLaunch?.paneEnv ?? {}),

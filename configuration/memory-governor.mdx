@@ -1,17 +1,18 @@
 ---
 title: Memory governor
-description: Reserve and spawn-threshold defaults scale with RAM, and how available memory and stall are measured on Linux vs macOS
+description: Reserve and spawn-threshold defaults scale with RAM, how available memory and stall are measured on Linux vs macOS, and the CPU pressure keys
 ---
 
 # Memory governor
 
 The deacon's memory governor (`assessMemoryPressure` in
-`src/lib/cloister/memory-governor.ts`) watches available RAM and holds back
-one thing: the preemptive scheduler's automatic resume of agents it
-previously yielded (`preemption.ts:resumeYieldedAgents`). It also feeds the
-activity-feed memory-pressure patrol, which only reports the band — its
-`shed()` reclaim function (stopping merged Docker stacks, pausing idle work
-agents) has no caller anywhere in the codebase.
+`src/lib/cloister/memory-governor.ts`) watches available RAM and CPU pressure
+and reports what it sees to the activity feed through the memory-pressure
+patrol. Its verdict holds nothing back by itself: the preemptive scheduler's
+automatic resume (`preemption.ts:resumeYieldedAgents`) and the `shed()`
+reclaim function (stopping merged Docker stacks, pausing idle work agents)
+have no production caller. CPU pressure acts at the dispatch doors instead;
+see [CPU pressure](#cpu-pressure).
 
 **The governor never blocks conversations, `pan start`, or dashboard Start.**
 A separate, unrelated check — `evaluateSpawnGuardrails` in
@@ -101,3 +102,42 @@ resources:
 
 Then `pan restart`. `normalizeGovernorReserves` will correct anything in this
 override that violates the ordering invariants above and log why.
+
+## CPU pressure
+
+On Linux the governor and the dispatch doors read CPU Pressure Stall
+Information (`/proc/pressure/cpu`, `some avg60`): the share of the last minute
+during which a runnable task waited for a CPU. Unlike load average, it does not
+count tasks blocked on IO. Where PSI is unavailable (macOS, old kernels), load
+per core (`governor_cpu_soft_load_per_core` / `governor_cpu_recovery_load_per_core`)
+is the fallback.
+
+When CPU pressure is at or above the hold threshold:
+
+- `pan lane start` and `POST /api/lanes` refuse with HTTP 429 `cpu-saturated`.
+  Pass `pan lane start --force` (or `"force": true`) to launch anyway.
+- Starting an agent from the dashboard shows an acknowledgeable
+  `cpu_saturated` warning. Your confirm covers it; the planning auto-handoff
+  does not, so it waits and retries.
+- Flywheel-started work agents are held only if you turn on
+  `governor_cpu_hold_dispatch`.
+
+Conversations, `pan start`, and dashboard Start are never blocked on CPU.
+Runaway processes (for example a tool call that outlived its agent) are
+reported in the activity feed with the `kill -TERM -<pgid>` command to stop
+them; Overdeck never kills them itself.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `resources.dashboard_cpu_weight` | `1000` | systemd `CPUWeight` of the dashboard and supervisor units, so the control plane keeps its share of CPU under contention. |
+| `resources.verification_cpu_weight` | `20` | systemd `CPUWeight` of verification-worker scopes (quality gates). |
+| `resources.agent_nice` | `10` | `nice` level of batch agents (work, review, test, plan, worker, strike, UAT). |
+| `resources.lane_nice` | `15` | `nice` level of gauntlet lane conversations. Operator conversations run at nice 0. |
+| `resources.governor_cpu_psi_hold_avg60` | `50` | CPU PSI `some avg60` percentage at which the governor holds and the doors above react. |
+| `resources.governor_cpu_psi_recovery_avg60` | `25` | The governor stays held until CPU PSI falls below this. Must be lower than the hold threshold, or both fall back to the defaults with a warning. |
+| `resources.governor_cpu_hold_dispatch` | `false` | Hold Flywheel-started work agents while CPU is saturated. Off until calibration data exists. |
+
+The deacon log (`~/.overdeck/logs/deacon.log`) gets one `cpu-pressure sample`
+line every 5 minutes with PSI some avg10/avg60 and load per core, so you can
+calibrate the hold threshold for your host. New weights and nice levels apply
+to units and agents started after the change.

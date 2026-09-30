@@ -12,6 +12,8 @@ import {
   nextReconnectDelay,
   type ReconnectPolicyState,
 } from '../lib/terminalReconnectPolicy';
+import { ensureDashboardSession } from '../lib/wsTransport';
+import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -164,6 +166,13 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(false);
+  // Bumped on every connect() call, snapshotted by each call's async mint
+  // continuation. A newer connect() (a sessionName change, a manual
+  // Reconnect click, or the server-closed reconnect timer) invalidates any
+  // in-flight mint from an older call, so a stale continuation that resolves
+  // after being superseded never opens a second socket (review advisory,
+  // PAN-1166).
+  const connectGeneration = useRef(0);
   const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
   const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
   const readyForLiveData = useRef(false);
@@ -426,6 +435,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
   const connect = useCallback(() => {
     if (!terminalRef.current || !sessionName) return;
+    const generation = ++connectGeneration.current;
     const tProf = performance.now();
     profMark(sessionName, tProf, 'connect() entered');
 
@@ -570,8 +580,41 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
 
-    profMark(sessionName, tProf, 'new WebSocket()');
-    const ws = new WebSocket(wsUrl);
+    // The upgrade requires the session cookie (PAN-1166 ws-auth.ts gate), so the
+    // mint must complete before the socket is opened. `connect()` stays a plain
+    // (non-async) useCallback for its React identity, with this async tail as a
+    // fire-and-forget continuation guarded by mountedRef (unmount) and the
+    // captured `generation` (a newer connect() superseded this one — e.g. a
+    // sessionName change or a manual Reconnect while the first mint is still
+    // in flight) so a stale continuation never opens a second socket or
+    // touches disposed state.
+    void (async () => {
+      try {
+        await ensureDashboardSession();
+      } catch (err) {
+        if (!mountedRef.current || generation !== connectGeneration.current) return;
+        if (err instanceof DashboardSessionUnauthorizedError) {
+          setConnectionStatus('failed');
+          return;
+        }
+        // Any other mint error falls through to the existing reconnect policy.
+        const now = Date.now();
+        const policy = reconnectPolicy.current ?? { attempt: 0, windowStartedAt: now };
+        reconnectPolicy.current = policy;
+        const delay = nextReconnectDelay(policy, now, reconnectJitterMs);
+        if (delay !== null) {
+          policy.attempt += 1;
+          setConnectionStatus('reconnecting');
+          reconnectTimer.current = setTimeout(() => connect(), delay);
+        } else {
+          setConnectionStatus('failed');
+        }
+        return;
+      }
+      if (!mountedRef.current || generation !== connectGeneration.current) return;
+
+      profMark(sessionName, tProf, 'new WebSocket()');
+      const ws = new WebSocket(wsUrl);
     // IMPORTANT: Use arraybuffer for synchronous binary processing
     // Default 'blob' requires async handling which can cause out-of-order writes
     ws.binaryType = 'arraybuffer';
@@ -792,6 +835,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       }
     };
     connectionCleanupRef.current = cleanupConnection;
+    })();
   }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
   connectRef.current = connect;
 

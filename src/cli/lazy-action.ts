@@ -15,7 +15,7 @@
  */
 
 type ActionFn = (...args: never[]) => unknown;
-type ActionKeys<M> = { [K in keyof M]: M[K] extends ActionFn ? K : never }[keyof M];
+export type ActionKeys<M> = { [K in keyof M]: M[K] extends ActionFn ? K : never }[keyof M];
 
 export function lazyAction<M, K extends ActionKeys<M>>(
   load: () => Promise<M>,

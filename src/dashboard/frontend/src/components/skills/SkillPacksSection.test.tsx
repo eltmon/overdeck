@@ -37,6 +37,7 @@ function pack(overrides: Partial<PackState> = {}): PackState {
     license: 'MIT',
     cached: true,
     notApplied: [],
+    disclosure: null,
     duplicatePluginInstall: false,
     global: null,
     project: null,
@@ -97,6 +98,13 @@ describe('SkillPacksSection', () => {
     expect(screen.getByText('Overdeck also bundles grilling')).toBeTruthy();
   });
 
+  it('shows the sageox disclosure and none for a pack without one', () => {
+    const disclosure = 'SageOx records agent sessions on this machine. With uploads off nothing is sent.';
+    renderSection({ level: 'global', packs: [pack(), pack({ id: 'sageox', disclosure, skills: [] })] });
+    expect(within(packRow('sageox')).getByTestId('pack-disclosure').textContent).toBe(disclosure);
+    expect(within(packRow('mattpocock')).queryByTestId('pack-disclosure')).toBeNull();
+  });
+
   it('notes the opt-in skill', () => {
     renderSection({ level: 'global', packs: [pack()] });
     fireEvent.click(within(packRow('mattpocock')).getByRole('button', { name: 'mattpocock' }));
@@ -141,6 +149,6 @@ describe('SkillPacksSection', () => {
   it('renders the add command when there are no packs', () => {
     renderSection({ level: 'global', packs: [] });
     expect(screen.getByText('No skill packs. Add one from the CLI:')).toBeTruthy();
-    expect(screen.getByText('pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3')).toBeTruthy();
+    expect(screen.getByText('pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3')).toBeTruthy();
   });
 });

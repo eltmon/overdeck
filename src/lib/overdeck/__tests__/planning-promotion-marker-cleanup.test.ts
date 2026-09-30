@@ -38,6 +38,9 @@ vi.mock('../../pan-dir/index.js', () => ({
     filename: '2026-07-28-PAN-3229-test.xbrief.json',
   }),
 }));
+vi.mock('../../planning/plan-critique-io.js', () => ({
+  applyCritiqueGateForPromotion: async () => ({ ok: true, result: { ok: true, kind: 'not-required' } }),
+}));
 vi.mock('../../planning/spawn-planning-session.js', () => ({
   resolveAutoSpawnOnFinalize: async () => false,
 }));

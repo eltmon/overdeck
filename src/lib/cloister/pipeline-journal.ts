@@ -38,6 +38,7 @@ export type PipelineJournalEntryType =
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
+  | 'conflict.repair-requested' | 'conflict.repair-escalated'
   | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
   | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 

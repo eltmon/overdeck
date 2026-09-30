@@ -23,11 +23,16 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
 
-**Two WebSocket endpoints:**
+**WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
   Terminal data bypasses Effect RPC because the RPC serialization layer can't handle
   high-throughput binary-like terminal data reliably.
+- `/ws/voice` — Raw WebSocket: microphone audio in, transcript events out.
+- `/ws/autopreso` — Raw WebSocket: whiteboard element stream.
+
+Every upgrade passes `authorizeDashboardUpgrade` (`ws-auth.ts`): trusted-or-absent
+Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBOARD-AUTH.md).
 
 **Terminal architecture** (`ws-terminal.ts` + `XTerminal.tsx`):
 - Server: raw `WebSocketServer` with `noServer: true`, deferred PTY spawn (waits for
@@ -449,6 +454,28 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## CPU weight and the runaway patrol (PAN-4311)
+
+The dashboard runs in its own transient systemd unit started with
+`CPUWeight=<resources.dashboard_cpu_weight>` (default 1000; the supervisor
+unit uses the same value). That weight enables the `cpu` controller in
+`app.slice`, so under contention the dashboard's cgroup gets its weighted
+share instead of competing thread by thread with every agent in the Herdr
+unit. It fixes scheduler starvation of the event loop. It does not fix the
+event-loop p99 the dashboard causes itself with its own blocking work.
+
+The runaway-process patrol (`src/lib/cloister/runaway-process-patrol.ts`)
+runs in the dashboard **main** process, not the deacon child, because
+`/api/resources` is built there and `isIdle` has runtime data only there.
+`main.ts` starts it next to `startResourcesSnapshotService()` and stops it on
+the same shutdown path. Every 30 s it reads `/proc` with async
+`fs/promises` calls only (no child processes, no `*Sync` reads): one `stat`
+per process in the Overdeck cgroups, and `environ`, `cmdline` and `cwd` once
+per process identity. Its latest sample feeds `/api/resources`
+`hostProcesses` and the load-spike sampler. It only reports: it never kills,
+pauses or messages anything (see "Runaway processes" in
+[PIPELINE-GATES.md](PIPELINE-GATES.md)).
+
 ## Terminal permission prompts and held messages (PAN-4278)
 
 Claude Code draws a blocking tool-permission prompt in a conversation's pane (`Bash command`,
@@ -521,11 +548,12 @@ store that holds the inputs and derives one **connection phase** from them.
 | Phase | Meaning | Banner (`components/DegradedModeBanner.tsx`) |
 | --- | --- | --- |
 | `restarting` | A planned restart is in progress (`dashboardLifecycle.active`). | "Overdeck server is restarting — showing data from HH:MM", plus the lifecycle issue and reason. |
+| `unauthorized` | The session mint returned 401. | "Dashboard session could not be established (HTTP 401) — see docs/DASHBOARD-AUTH.md", with **Retry**. |
 | `unreachable` | The server does not answer HTTP. | "Can't reach the Overdeck server — showing data from HH:MM", with **Retry** and **Force Restart**. |
 | `delayed` | HTTP answers, but the `/ws/rpc` domain stream is reconnecting or has not bootstrapped. | "Live updates are delayed — reconnecting · showing data from HH:MM", with **Retry**. |
 | `live` | HTTP answers and the stream has bootstrapped. | Nothing. After any degraded phase, "Reconnected" shows for 2.5 s. |
 
-Precedence is `restarting` > `unreachable` > `delayed` > `live`.
+Precedence is `restarting` > `unauthorized` > `unreachable` > `delayed` > `live`.
 
 - **Reachability rule.** A response is *reachable* when its body is JSON with a
   string `status` field, at any HTTP status. `/api/health` answers 503 with
@@ -677,6 +705,14 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 | 12 | issue agent, PR checks pending | CI running | Waiting | waiting |
 | 13 | `idle` | idle — no known blocker | Idle | waiting |
 | 14 | otherwise | agent stopped | Idle | waiting |
+
+`deriveIssueState`'s fourth attention value, `work-not-started` (PAN-4399, a
+gave-up or stalled post-planning auto-start read from the workspace journal —
+see "Work agent not started" in `docs/PIPELINE-GATES.md`), never appears in
+this table: it is derived only when there is no live pane at all, so no row
+here can carry it. Command Deck's state badge (`featureStateBadge.ts`) and
+the Needs-you strip's "Start work" card (`NeedsYouStrip.tsx`) render it
+instead.
 
 Needs you sorts oldest wait first. Live sorts by start time so rows never reshuffle under the
 pointer as agents write output; Waiting and Idle sort most recent activity first. A subagent

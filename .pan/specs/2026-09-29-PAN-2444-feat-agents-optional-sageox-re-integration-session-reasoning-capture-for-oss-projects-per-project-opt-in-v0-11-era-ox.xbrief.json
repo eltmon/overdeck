@@ -1,0 +1,1188 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T22:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2444: SageOx as an off-by-default skill pack, fork-first host-managed ox",
+    "updated": "2026-09-29T22:30:42.590Z"
+  },
+  "plan": {
+    "id": "pan-2444",
+    "title": "feat(agents): optional SageOx re-integration — session-reasoning capture for OSS projects (per-project opt-in, v0.11-era ox)",
+    "status": "running",
+    "uid": "d9dc47d2-ac96-4b1a-a9fe-2a5ef7676474",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T22:40:00Z",
+    "updated": "2026-09-29T22:30:42.590Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2444",
+        "label": "PAN-2444",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2444/.pan/drafts/pan-2444.md",
+        "label": "PRD draft (.pan/drafts/pan-2444.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/PAN-4334.md",
+        "label": "PAN-4334 skill packs PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "sageox",
+      "skill-packs",
+      "fork",
+      "launch",
+      "privacy"
+    ],
+    "narratives": {
+      "Problem": "Operators want to try SageOx session capture without it taking over the repo. Upstream ox writes AGENTS.md/CLAUDE.md markers and .claude/settings.json hooks on every prime, injects attribution, nags agents to run ox init, and uploads sessions by default. Overdeck removed it twice as a trust-boundary problem, and PAN-4334 currently refuses SageOx as a pack.",
+      "Proposal": "Fork first: add an env-gated host-managed mode to eltmon/ox (no repo writes, no attribution, quiet when uninitialized, network off unless OX_HOST_NETWORK=on, a host-contract probe, a minimal init), PR'd inside the fork only. In Overdeck, make sageox a normal PAN-4334 pack sourced from eltmon/ox, off by default and toggled at global/project/issue level; when active on a Claude Code launch with .sageox/ present and a passing probe, the launch-settings step adds host-managed env and the six ox hooks to the --settings JSON. Uploads need a second per-project flag. Fail closed everywhere; disclose what leaves the machine in the UI and docs; doctor reports the binary state.",
+      "NonGoals": "- Any issue, PR or comment on sageox/* (upstream); upstreaming is the operator's later decision\n- Force-pushing or rewriting the fork's main branch\n- Overdeck running ox init, ox login or any upload command; pan install installing ox\n- SageOx wiring for Codex, ohmypi, Kimi, ACP or remote (Fly) launches\n- A local-only ledger that works without ox login + ox init, or a self-hosted ledger\n- murmur, ox plan, carts, Ox Dot, or storing ox agent ids in Overdeck\n- Turning the sageox pack on by default anywhere, or initializing SageOx in a commercial project (MYN)\n- A dashboard control for the upload flag (CLI only in v1)\n- Editing src/lib/projects.ts or growing any file above the 1000-line ceiling"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The operator's 2026-09-29 fork-first comment supersedes revision 1 of the PRD; the PRD was rewritten, retiring FR-1..FR-3.",
+        "rationale": "The latest operator comment explicitly replaces the upstream-first plan and forbids upstream contact; revision 1 required an upstream PR."
+      },
+      {
+        "summary": "Fork and Overdeck work stay in one plan, with fork items recording their results in docs/SAGEOX-FORK.md under Item: trailers.",
+        "rationale": "The operator scoped the eltmon/ox work to this issue; eltmon/ox is not a registered Overdeck project, and pan task done checks trailers on the overdeck branch."
+      },
+      {
+        "summary": "Fork PRs target a new fork branch overdeck-base at upstream v0.19.0; the stale fork main is untouched.",
+        "rationale": "Fork main is 1019 commits behind and 3 ahead; syncing it would need a force push, which is destructive and the operator's call."
+      },
+      {
+        "summary": "The PAN-4334 pack toggle is the only opt-in; uploads need a separate per-project sageox_upload flag, default disabled.",
+        "rationale": "Operator: off by default, per-project/issue enable, nothing uploads unless explicitly enabled."
+      },
+      {
+        "summary": "Claude Code only in v1; Codex launches exclude the sageox pack with a warning.",
+        "rationale": "Claude hooks can be injected through the existing --settings JSON; Codex hook injection without a committed .codex/hooks.json is unverified."
+      },
+      {
+        "summary": "Overdeck fails closed unless `ox host-contract --json` answers overdeck-host/1 and .sageox/ exists at the git root.",
+        "rationale": "The host has upstream ox 0.2.0 on PATH; wiring hooks to an upstream binary would reintroduce repo writes and attribution."
+      },
+      {
+        "summary": "Revision 1's agent_id storage and OX_EPHEMERAL split are dropped.",
+        "rationale": "ox agent ids must pass ox's own validator and Overdeck stores no derivable status; OX_EPHEMERAL disables the local ledger."
+      },
+      {
+        "summary": "The KnownPack integration kind is removed and a skillsRoot hint is added so the plain adapter reads extensions/skills.",
+        "rationale": "The ox repo has no root plugin.json or skills/ dir, so neither adapter finds skills today; with sageox flipped, the integration kind has no users."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Two-repo contract: the Overdeck launch wiring only has meaning against the fork's host-managed mode, and the operator scoped both halves to this issue. Fork paths (prefixed eltmon/ox:) inflate the subsystem and file counts; the Overdeck side alone is about 25 files across src/lib, src/cli, the dashboard frontend and docs.",
+      "canonicalFilename": "2026-09-29-PAN-2444-feat-agents-optional-sageox-re-integration-session-reasoning-capture-for-oss-projects-per-project-opt-in-v0-11-era-ox.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "fork-base",
+        "title": "Create the fork base branch and audit the old fork commits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git -C $HOME/Projects/ox-pan-2444 rev-parse origin/overdeck-base",
+            "grep -c '^## ' docs/SAGEOX-FORK.md"
+          ],
+          "expected_outputs": [
+            "overdeck-base SHA equals the v0.19.0 commit",
+            "docs/SAGEOX-FORK.md has at least 5 second-level headings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 F1. Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Steps: first run `git ls-remote origin main` and write that SHA under ## Branches in docs/SAGEOX-FORK.md (create the file); git fetch upstream --tags; git push origin 'v0.19.0^{commit}:refs/heads/overdeck-base'; git switch -c overdeck/host-managed origin/overdeck-base; git push -u origin overdeck/host-managed. Do not touch the fork's main. Audit fork commits 70e0f37a37, acdf05c9d0, cf00e21238 against overdeck-base (is each change already present upstream in another form, e.g. OX_PROJECT_ROOT in internal/config/env.go?). Create docs/SAGEOX-FORK.md in the overdeck workspace with sections ## Branches, ## Contract (copy the env contract from PRD §0/§5 FR-10..FR-15), ## Audit of old fork commits (one verdict line per commit), ## Changes, ## Building."
+        },
+        "items": [
+          {
+            "id": "fork-base.ac1",
+            "title": "Given the fork clone, when `git rev-parse origin/overdeck-base` runs, then it returns the same SHA as `git rev-parse 'v0.19.0^{commit}'`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-base.ac2",
+            "title": "Given the push, when `git ls-remote git@github.com:eltmon/ox.git main` runs, then it returns the SHA recorded under ## Branches before the push (fork main is preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-base.ac3",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then it contains the five headings and one verdict line for each of 70e0f37a37, acdf05c9d0 and cf00e21238.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-no-repo-writes",
+        "title": "Fork: OX_HOST_MANAGED=1 stops all ox repo writes and init nagging",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "eltmon/ox:internal/config/host.go",
+            "eltmon/ox:cmd/ox/agent_prime.go",
+            "eltmon/ox:cmd/ox/agent_hook.go",
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/ox-pan-2444 && go test ./cmd/ox/... ./internal/config/..."
+          ],
+          "expected_outputs": [
+            "go test exits 0 including the new host-managed tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-14",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "fork-network-gate",
+            "fork-no-attribution",
+            "fork-init-host-managed"
+          ],
+          "acJustification": "Five criteria: repo writes, init nag, login nag, upstream-behavior preservation and the fork ledger entry are separate observable outcomes."
+        },
+        "narrative": {
+          "Action": "PRD §8 F2 (FR-10, FR-14, NFR-4). Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Add internal/config/host.go: const EnvHostManaged = \"OX_HOST_MANAGED\"; func HostManaged() bool (true for 1|true|yes|on, case-insensitive). In cmd/ox/agent_prime.go skip EnsureOxPrimeMarker and ensureClaudeHooks (the '// anti-entropy' block near line 341) when HostManaged(); when .sageox/ is missing and HostManaged(), exit 0 with empty stdout instead of the 'Project not initialized' output (near line 331); under HostManaged() also suppress the \"Not logged in. Run 'ox login'\" message (agent_prime.go:485) so it never reaches the agent. Apply the same gates on the hook path (cmd/ox/agent_hook.go) and on the daemon skill repair and ox-cli-* inventory sync (locate with grep -rn \"skills.lock\\|SyncSkills\\|InstallProjectClaudeHooks\\|InstallProjectCodexHooks\\|EnsureOxPrimeMarker\" cmd internal). Add Go tests in the fork. Update docs/SAGEOX-FORK.md ## Changes."
+        },
+        "items": [
+          {
+            "id": "fork-no-repo-writes.ac1",
+            "title": "Given a temp git repo with .sageox/config.json and OX_HOST_MANAGED=1, when `ox agent prime` and `ox agent hook SessionStart` run, then `git status --porcelain` returns empty output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-repo-writes.ac2",
+            "title": "Given a temp git repo without .sageox/ and OX_HOST_MANAGED=1, when `ox agent prime` runs, then it exits 0 and prints nothing to stdout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-repo-writes.ac3",
+            "title": "Given OX_HOST_MANAGED=1 and no ox login credential, when `ox agent prime` runs in an initialized temp repo, then its output contains no 'ox login' text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-repo-writes.ac4",
+            "title": "Given OX_HOST_MANAGED unset, when `go test ./cmd/ox/... ./internal/config/...` runs in the fork clone, then it exits 0 (upstream behavior preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-repo-writes.ac5",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then ## Changes names the fork commit SHA for this item and the gated write sites.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-network-gate",
+        "title": "Fork: OX_HOST_NETWORK gate keeps host-managed ox offline by default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "eltmon/ox:internal/config/host.go",
+            "eltmon/ox:internal/config/session_recording.go",
+            "eltmon/ox:internal/telemetry/client.go",
+            "eltmon/ox:cmd/ox/friction.go",
+            "eltmon/ox:cmd/ox/agent_hook_cloud_query.go",
+            "docs/SAGEOX-FORK.md",
+            "eltmon/ox:cmd/ox/main.go",
+            "eltmon/ox:internal/trace/process.go"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/ox-pan-2444 && go test ./internal/config/... ./internal/telemetry/... ./cmd/ox/..."
+          ],
+          "expected_outputs": [
+            "go test exits 0 including the network-gate tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "acJustification": "Five criteria: publishing, the per-feature gates, the transport guard, the opt-in path and the CP-1 record are separate observable outcomes."
+        },
+        "narrative": {
+          "Action": "PRD §8 F3 (FR-12, CP-1). Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Add EnvHostNetwork = \"OX_HOST_NETWORK\" and HostNetworkAllowed() bool (true only for 'on') to internal/config/host.go. Under HostManaged() && !HostNetworkAllowed(): ResolveSessionPublishing (internal/config/session_recording.go:251) returns manual with a new source 'host' ahead of the env layer; telemetry (internal/telemetry/client.go:137) and friction (cmd/ox/friction.go:95, internal/daemon/friction.go:94) are disabled; ResolveGitHubSync* return off; PrepareCloudQuery (cmd/ox/agent_hook_cloud_query.go:63) returns ShouldQuery=false; OpenTelemetry export is not initialized; no daemon starts. Add InstallHostNetworkGuard() (internal/config/host.go or a new internal/netguard package) and call it as the first statement of main() in cmd/ox/main.go: under the gate it replaces http.DefaultTransport with a RoundTripper that returns an error for every request (most ox clients leave Transport nil and use it). Check every explicit transport with `grep -rn \"Transport:\" internal cmd | grep -v _test`; internal/trace/process.go:61 must be gated or shown loopback-only. Add an end-to-end Go test: an httptest.Server as SAGEOX_ENDPOINT, a fake auth credential written with the existing test helpers, then `ox agent prime`, `ox agent hook SessionStart` and `ox agent hook Stop` with the network off; the server must record zero requests. Run implementation checkpoint CP-1 from the PRD and record which branch was taken (offline recording works, or fallback: recording disabled when network is off) in docs/SAGEOX-FORK.md."
+        },
+        "items": [
+          {
+            "id": "fork-network-gate.ac1",
+            "title": "Given OX_HOST_MANAGED=1, OX_HOST_NETWORK unset and OX_SESSION_PUBLISHING=auto, when ResolveSessionPublishing runs, then it returns mode manual.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-network-gate.ac2",
+            "title": "Given OX_HOST_MANAGED=1 and OX_HOST_NETWORK=off, when the telemetry, friction, GitHub sync and cloud-query resolvers run, then each reports disabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-network-gate.ac3",
+            "title": "Given an httptest.Server as SAGEOX_ENDPOINT, a fake login credential and OX_HOST_MANAGED=1 with OX_HOST_NETWORK unset, when prime, hook SessionStart and hook Stop run, then the server records zero requests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-network-gate.ac4",
+            "title": "Given OX_HOST_MANAGED=1 and OX_HOST_NETWORK=on, when ResolveSessionPublishing runs with OX_SESSION_PUBLISHING=auto, then it returns auto.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-network-gate.ac5",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then it records the CP-1 outcome as either 'offline recording' or 'recording disabled when network off'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-no-attribution",
+        "title": "Fork: host-managed prime emits no attribution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "eltmon/ox:cmd/ox/agent_prime.go",
+            "eltmon/ox:internal/config/attribution.go",
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/ox-pan-2444 && go test ./cmd/ox/... -run Attribution"
+          ],
+          "expected_outputs": [
+            "attribution tests pass, including the host-managed case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 F4 (FR-11). Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Under HostManaged(), loadResolvedAttribution() (cmd/ox/agent_prime.go) returns a ResolvedAttribution with every string field empty, and prime skips withAttributionGuidance (agent_prime.go:674). Add a Go test named with 'Attribution' in cmd/ox."
+        },
+        "items": [
+          {
+            "id": "fork-no-attribution.ac1",
+            "title": "Given OX_HOST_MANAGED=1 in an initialized temp repo, when `ox agent prime` runs, then its output contains no 'Co-Authored-By' text and no plan footer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-attribution.ac2",
+            "title": "Given OX_HOST_MANAGED unset, when `go test ./cmd/ox/... -run Attribution` runs in the fork clone, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-no-attribution.ac3",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then ## Changes lists this item's fork commit SHA.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-host-contract",
+        "title": "Fork: add the `ox host-contract --json` probe command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "eltmon/ox:cmd/ox/host_contract.go",
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/ox-pan-2444 && go build -o bin/ox ./cmd/ox && bin/ox host-contract --json | jq -e '.contract==\"overdeck-host/1\"'"
+          ],
+          "expected_outputs": [
+            "jq prints true and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 F5 (FR-13). Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Add cmd/ox/host_contract.go registering `ox host-contract [--json]` that prints {\"contract\":\"overdeck-host/1\",\"hostManaged\":true,\"version\":<ox version>,\"commit\":<vcs.revision from runtime/debug.ReadBuildInfo, or empty>} and exits 0. Add a Go test for the JSON keys. Rebuild bin/ox."
+        },
+        "items": [
+          {
+            "id": "fork-host-contract.ac1",
+            "title": "Given the fork build, when `bin/ox host-contract --json` runs, then it exits 0 and `jq -e '.contract==\"overdeck-host/1\"'` succeeds on its output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-host-contract.ac2",
+            "title": "Given the JSON output, when parsed, then it has exactly the keys contract, hostManaged, version and commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-host-contract.ac3",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then ## Contract shows the probe command and a sample output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-init-host-managed",
+        "title": "Fork: host-managed `ox init` writes only .sageox/, then open the fork PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "eltmon/ox:cmd/ox/init.go",
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/ox-pan-2444 && go test ./cmd/ox/... -run Init",
+            "gh pr view --repo eltmon/ox overdeck/host-managed --json baseRefName,url"
+          ],
+          "expected_outputs": [
+            "init tests pass",
+            "PR JSON shows baseRefName overdeck-base"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 F6 (FR-15). Fork rules: work in the fork clone $HOME/Projects/ox-pan-2444 (clone git@github.com:eltmon/ox.git there once; add remote upstream https://github.com/sageox/ox.git for fetch only). Never push to upstream, never run gh pr create without --repo eltmon/ox, never run gh issue/gh pr against sageox/*. Never touch ~/Projects/sageox-ox and never overwrite /home/eltmon/.local/bin/ox; build to $HOME/Projects/ox-pan-2444/bin/ox with `go build -o bin/ox ./cmd/ox` (GOTOOLCHAIN=auto fetches go1.26). Commit fork changes on branch overdeck/host-managed and push it to origin (eltmon/ox). Then record the fork commit SHA and what changed in docs/SAGEOX-FORK.md in the overdeck workspace and commit that with the Item: trailer. If anything seems to need upstream contact, stop and run pan tell flywheel-orchestrator. Under HostManaged(), cmd/ox/init.go skips the ox:prime markers, Claude/Codex hook files and git hooks, and writes only .sageox/. Add a Go test on a temp repo using the existing init test helpers and their API mocking. Then open the fork PR exactly as: gh pr create --repo eltmon/ox --base overdeck-base --head overdeck/host-managed --title \"Host-managed mode for Overdeck\" --body-file <file>. Record the PR URL and the branch head SHA in docs/SAGEOX-FORK.md ## Branches."
+        },
+        "items": [
+          {
+            "id": "fork-init-host-managed.ac1",
+            "title": "Given a temp git repo and OX_HOST_MANAGED=1, when `ox init` runs in the Go test with API registration mocked, then the only new path in `git status --porcelain` is .sageox/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-init-host-managed.ac2",
+            "title": "Given the PR command, when `gh pr view --repo eltmon/ox overdeck/host-managed --json baseRefName` runs, then it returns baseRefName overdeck-base.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-init-host-managed.ac3",
+            "title": "Given docs/SAGEOX-FORK.md, when it is read, then ## Branches contains the eltmon/ox PR URL and the head SHA.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "known-pack-sageox",
+        "title": "Turn KNOWN_PACKS.sageox into a pack sourced from eltmon/ox",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/disclosure.ts",
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/lib/skill-packs/__tests__/sources.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O1 (FR-6, D9, D10) with the before/after in PRD §6. Create src/lib/sageox/disclosure.ts (a leaf module, no imports) exporting SAGEOX_DISCLOSURE with the exact text in PRD §7. In src/lib/skill-packs/adapters.ts: remove kind and note from KnownPack, add skillsRoot?: string and disclosure?: string, set the sageox entry per D9 (url https://github.com/eltmon/ox, adapter plain, skillsRoot extensions/skills, the nine optIn names, disclosure SAGEOX_DISCLOSURE), drop kind from mattpocock; readPackManifest opts gains skillsRoot and plain uses scanSkillDirs(root, opts.skillsRoot ?? 'skills'). In src/lib/skill-packs/sources.ts remove 'integration' from PackSourceErrorCode and the refusal at lines 349-350, and pass skillsRoot: KNOWN_PACKS[id]?.skillsRoot at line 326; same at src/lib/skill-overrides/catalog.ts:106. Tests: replace adapters.test.ts 'marks sageox as an integration' with the D9 entry test plus a skillsRoot fixture test; drop the sageox expectation from sources.test.ts:290 (keep reserved/invalid/registered cases); change skills.test.ts:343 to assert sageox is added like any pack."
+        },
+        "items": [
+          {
+            "id": "known-pack-sageox.ac1",
+            "title": "Given KNOWN_PACKS, when read, then sageox has url https://github.com/eltmon/ox, adapter plain, skillsRoot extensions/skills and the nine opt-in names from PRD D9.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-sageox.ac2",
+            "title": "Given a fixture repo with extensions/skills/a/SKILL.md, when readPackManifest(root, 'plain', { skillsRoot: 'extensions/skills' }) runs, then it returns skill a.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-sageox.ac3",
+            "title": "Given addPack({ id: 'sageox', url: <fixture>, ref: 'main' }), when it runs, then it proceeds to the git steps instead of rejecting with an integration error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-sageox.ac4",
+            "title": "Given the source tree, when `grep -rn \"'integration'\" src/lib/skill-packs` runs, then it returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sageox-upload-flag",
+        "title": "Per-project SageOx upload flag with `pan skills pack sageox` status/upload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/config.ts",
+            "src/lib/sageox/__tests__/config.test.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/sageox/__tests__/config.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O2 (FR-7, D14, D15). New src/lib/sageox/config.ts with readSageoxUpload(projectKey): Promise<boolean> and setSageoxUpload(projectKey, enabled: boolean): Promise<void>. Read like src/lib/skill-overrides/store.ts:138 findProject (listProjectsAsync); write with updateProjectsConfigAsync like the skill_pack_overrides writer at store.ts:634-645 (unknown project throws; unchanged value returns changed:false). Type: local `type ProjectWithSageox = ProjectConfig & { sageox_upload?: 'enabled' | 'disabled' }`; any other value reads as disabled. Do not edit src/lib/projects.ts (above the file-size ceiling). In src/cli/commands/skills.ts, under the existing `pack` command group (line 386), add `sageox` with subcommands `status [--project <key>] [--json]` (per project: pack toggle state and upload state) and `upload <on|off> --project <key>`. Tests: src/lib/sageox/__tests__/config.test.ts and new cases in src/cli/commands/__tests__/skills.test.ts."
+        },
+        "items": [
+          {
+            "id": "sageox-upload-flag.ac1",
+            "title": "Given project p without sageox_upload, when `pan skills pack sageox upload on --project p` runs, then projects.yaml has sageox_upload: enabled for p and every other key of p is preserved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sageox-upload-flag.ac2",
+            "title": "Given sageox_upload: bogus for p, when readSageoxUpload('p') runs, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sageox-upload-flag.ac3",
+            "title": "Given an unknown project key, when `pan skills pack sageox upload on --project nope` runs, then it exits 1 with an unknown-project message and writes nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sageox-upload-flag.ac4",
+            "title": "Given upload enabled for p, when `pan skills pack sageox status --project p --json` runs, then it prints JSON with upload true for p.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ox-probe",
+        "title": "Async host-contract probe for the ox binary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/probe.ts",
+            "src/lib/sageox/__tests__/probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/sageox/__tests__/probe.test.ts"
+          ],
+          "expected_outputs": [
+            "probe.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O3 (D7, NFR-1). New src/lib/sageox/probe.ts: probeOxHostContract(opts?: { bin?: string; timeoutMs?: number }) returning { ok: true; version; commit } or { ok: false; reason: 'missing' | 'no-contract' | 'timeout' | 'bad-output' }. Use promisified execFile(bin ?? 'ox', ['host-contract', '--json'], { timeout: timeoutMs ?? 2000 }); never execSync. ENOENT ⇒ missing; non-zero exit ⇒ no-contract; killed by timeout ⇒ timeout; JSON without contract === 'overdeck-host/1' ⇒ bad-output. Tests in src/lib/sageox/__tests__/probe.test.ts use fake `ox` shell scripts written to a temp dir; the timeout case uses vi.useFakeTimers() with an injected exec function (fake timers do not drive real child processes)."
+        },
+        "items": [
+          {
+            "id": "ox-probe.ac1",
+            "title": "Given a fake binary printing valid contract JSON, when probeOxHostContract({ bin }) runs, then it returns ok true with that version and commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-probe.ac2",
+            "title": "Given a fake binary exiting 1 with 'unknown command', when the probe runs, then it returns ok false with reason no-contract.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-probe.ac3",
+            "title": "Given malformed JSON output, when the probe runs, then it returns reason bad-output; given a nonexistent path, it returns reason missing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-probe.ac4",
+            "title": "Given an injected exec that never settles and fake timers advanced past 2000 ms, when the probe runs, then it returns reason timeout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-launch-wiring",
+        "title": "Claude Code launch wiring for the sageox pack, fail-closed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/sageox/launch.ts",
+            "src/lib/sageox/__tests__/launch.test.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/sageox/__tests__/launch.test.ts src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both launch test files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "live-checkpoint",
+            "docs-sageox"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O4 (FR-5, FR-8, FR-9, D6, D7, D8, D11, D13, NFR-2, NFR-3, CP-2) with the snippets in PRD §6. New src/lib/sageox/launch.ts: resolveSageoxLaunch(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex', deps?) returning { active: boolean; settings?: { env: Record<string,string>; hooks: Record<string, unknown[]> }; warnings: string[] }. Get { projectKey, issueId } by exporting the existing private resolveLaunchScope from src/lib/skill-overrides/launch.ts:31 and calling it. Order: (1) layers via loadSkillOverrideLayers + resolvePackToggle('sageox', layers) or any sageox/<skill> override on; off ⇒ inactive, no warning. (2) harness codex ⇒ inactive + warning. (3) git root of ctx.cwd via async `git rev-parse --show-toplevel`; no .sageox/ directory there ⇒ inactive + warning. (4) probeOxHostContract fails ⇒ inactive + warning with the reason. (5) env per FR-8 with OX_HOST_NETWORK/OX_SESSION_PUBLISHING from readSageoxUpload(projectKey) (off/manual or on/auto); hooks for the six events in SAGEOX_CLAUDE_EVENTS, each command 'if command -v ox >/dev/null 2>&1; then <env assignments> AGENT_ENV=claude-code ox agent hook <Event> 2>&1 || true; fi' with the root single-quoted. Change src/lib/skill-overrides/launch.ts: claudeSkillSettingsJson(disabled, extra?) merges env and hooks; applyClaudePacks/applyCodexPacks accept exclude: ReadonlySet<string> and drop those pack ids from the selection. In src/cli/commands/skills.ts skillsLaunchSettingsCommand, call resolveSageoxLaunch for both harnesses, print its warnings to stderr, pass settings into the JSON, and pass new Set(['sageox']) as exclude whenever active is false. Any thrown error inside resolveSageoxLaunch is caught and treated as inactive + warning (NFR-3). Tests: src/lib/sageox/__tests__/launch.test.ts and extended src/lib/skill-overrides/__tests__/launch.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-launch-wiring.ac1",
+            "title": "Given the sageox pack off, when the Claude launch step runs, then the settings JSON has no env and no hooks keys and the mount selection has no sageox pack.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-wiring.ac2",
+            "title": "Given the pack on, a .sageox/ dir at the git root, a passing probe and upload disabled, when resolveSageoxLaunch runs, then env has OX_HOST_MANAGED=1, OX_HOST_NETWORK=off and OX_SESSION_PUBLISHING=manual, and hooks has six events whose commands start with 'if command -v ox' and contain OX_HOST_MANAGED=1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-wiring.ac3",
+            "title": "Given the same with upload enabled for the project, when resolveSageoxLaunch runs, then env has OX_HOST_NETWORK=on and OX_SESSION_PUBLISHING=auto.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-wiring.ac4",
+            "title": "Given the pack on but a missing .sageox/ dir or a failing probe, when the launch step runs, then it emits one stderr warning naming the failed condition, the JSON has no SageOx keys, and the sageox pack is excluded from the mount.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-wiring.ac5",
+            "title": "Given the pack on and harness codex, when the launch step runs, then the sageox pack is excluded from the Codex mount and one warning is emitted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-sageox",
+        "title": "`pan doctor` SageOx row, with checkKimi extracted to keep doctor.ts from growing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-sageox.ts",
+            "src/cli/commands/doctor-kimi.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-sageox.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-sageox.test.ts tests/integration/cli/doctor.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor tests pass",
+            "file-size lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O5 (FR-4, NFR-5). New src/cli/commands/doctor-sageox.ts: checkSageox(deps?) returns [] when no pack with id sageox is registered (listPacks from src/lib/skill-packs/sources.ts); otherwise one row named 'SageOx (ox)': ok with 'host contract overdeck-host/1, ox <version>' when probeOxHostContract passes and the probe commit equals the pack's trusted commit (or the probe commit is empty); warn 'commit <x> differs from pack <y>' when both are known and differ; warn with fix 'build ox from the eltmon/ox commit trusted by the sageox pack: go build -o ~/.local/bin/ox ./cmd/ox' when the probe reports missing or no-contract. Register it in doctorCommand (src/cli/commands/doctor.ts near line 770). Move checkKimi (doctor.ts:69-88) verbatim to new src/cli/commands/doctor-kimi.ts, add `export { checkKimi } from './doctor-kimi.js';` in doctor.ts, and drop imports that become unused, so doctor.ts ends no longer than on origin/main. Tests: src/cli/commands/__tests__/doctor-sageox.test.ts with injected deps."
+        },
+        "items": [
+          {
+            "id": "doctor-sageox.ac1",
+            "title": "Given no sageox pack registered, when checkSageox runs, then it returns an empty array.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-sageox.ac2",
+            "title": "Given a registered sageox pack and a probe returning ok with a matching commit, when checkSageox runs, then it returns one row with status ok.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-sageox.ac3",
+            "title": "Given a probe returning no-contract, when checkSageox runs, then it returns status warn with the go build fix text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-sageox.ac4",
+            "title": "Given the branch, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and doctor.ts line count is at or below its origin/main count; tests/integration/cli/doctor.test.ts still imports checkKimi from doctor.js.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-disclosure",
+        "title": "Show the SageOx disclosure on the Skills page pack row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/store.ts",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx",
+            "src/lib/skill-overrides/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O6 (FR-16). In src/lib/skill-overrides/store.ts add disclosure: string | null to PackState (line 234) and set it from KNOWN_PACKS[id]?.disclosure ?? null where notApplied is set (line 304). In src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx add disclosure: string | null to the frontend PackState and render, below the 'Not applied' paragraph, <p className=\"pl-5 text-xs text-muted-foreground\" data-testid=\"pack-disclosure\">{pack.disclosure}</p> only when disclosure is non-null. Extend SkillPacksSection.test.tsx and the store test fixture if it constructs PackState."
+        },
+        "items": [
+          {
+            "id": "ui-disclosure.ac1",
+            "title": "Given a sageox pack row with a disclosure, when SkillPacksSection renders, then an element with data-testid pack-disclosure shows the disclosure text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-disclosure.ac2",
+            "title": "Given a pack row with disclosure null, when SkillPacksSection renders, then no pack-disclosure element exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-disclosure.ac3",
+            "title": "Given listSkillStates for a registered sageox pack, when it returns packs, then the sageox entry carries disclosure equal to SAGEOX_DISCLOSURE.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-sageox",
+        "title": "Document the SageOx pack in features/skills.mdx and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### SageOx' features/skills.mdx",
+            "grep -n 'src/lib/sageox' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "grep prints the SageOx heading line",
+            "grep prints the architecture bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O7 (FR-16, D12). Replace the `### SageOx and Deft are not plain packs` section of features/skills.mdx (line 364) with `### SageOx` and `### Deft`. SageOx section: pack from https://github.com/eltmon/ox, off by default, Claude Code only; the SAGEOX_DISCLOSURE text verbatim; `pan skills pack add sageox https://github.com/eltmon/ox --ref overdeck/host-managed`; turning it on per project or issue with `pan skills set --pack sageox on`; `pan skills pack sageox upload on --project <key>` and `status`; building ox from the trusted commit (`go build -o ~/.local/bin/ox ./cmd/ox`); the one-time operator steps `ox login` and `OX_HOST_MANAGED=1 ox init` in a project the operator chose; what `pan doctor` checks; the fail-closed behavior. Deft section keeps the existing Deft sentence and #3943 link. Add one SageOx bullet to .overdeck/context/codebase/architecture.md next to the skill-overrides line (line 166) naming src/lib/sageox/ and the launch-settings wiring, and update its last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-sageox.ac1",
+            "title": "Given features/skills.mdx, when searched, then it contains a `### SageOx` heading, the SAGEOX_DISCLOSURE text, `pan skills pack sageox upload`, and `go build -o ~/.local/bin/ox ./cmd/ox`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sageox.ac2",
+            "title": "Given features/skills.mdx, when searched for 'refuses', then no sentence says `pan skills pack add sageox` refuses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sageox.ac3",
+            "title": "Given .overdeck/context/codebase/architecture.md, when read, then it names src/lib/sageox/ and ends with a last-verified comment dated on or after 2026-09-29.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-checkpoint",
+        "title": "End-to-end local checkpoint with the fork build under an isolated OVERDECK_HOME",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2444",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-2444-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s .pan/drafts/PAN-2444-live-checkpoint.md",
+            "grep -c OX_HOST_MANAGED .pan/drafts/PAN-2444-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "checkpoint file exists and is non-empty",
+            "grep count is at least 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §8 O8. Build this branch (npm run build) and use node dist/cli/index.js as pan. Use a scratch OVERDECK_HOME and a throwaway project whose git root has a hand-made .sageox/ dir; never register the pack in the real ~/.overdeck/config.yaml and never touch /home/eltmon/.local/bin/ox. With PATH=$HOME/Projects/ox-pan-2444/bin:$PATH for the commands only: `pan skills pack add sageox https://github.com/eltmon/ox --ref overdeck/host-managed --yes`, `pan skills set --pack sageox on` at project level, `pan skills launch-settings --harness claude-code --cwd <repo>` (capture JSON), `pan doctor` (capture SageOx row). Repeat launch-settings and doctor with the host PATH (upstream ox 0.2.0) and capture the warning. Run `OX_HOST_MANAGED=1 $HOME/Projects/ox-pan-2444/bin/ox agent hook SessionStart` in an uninitialized throwaway repo and capture `git status --porcelain`. Write everything to .pan/drafts/PAN-2444-live-checkpoint.md with a pass/fail line per step."
+        },
+        "items": [
+          {
+            "id": "live-checkpoint.ac1",
+            "title": "Given the fork build on PATH, when launch-settings runs, then the captured JSON in the checkpoint file contains OX_HOST_MANAGED and six hook events.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac2",
+            "title": "Given upstream ox 0.2.0 on PATH, when launch-settings runs, then the checkpoint file shows the fail-closed warning and JSON without SageOx keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac3",
+            "title": "Given the uninitialized throwaway repo, when the fork hook runs under OX_HOST_MANAGED=1, then the checkpoint file shows empty `git status --porcelain` output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac4",
+            "title": "Given both PATH setups, when pan doctor runs, then the checkpoint file shows an ok SageOx row and a warn SageOx row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fork-base",
+        "to": "fork-no-repo-writes",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-repo-writes",
+        "to": "fork-network-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-network-gate",
+        "to": "fork-no-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-attribution",
+        "to": "fork-host-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-host-contract",
+        "to": "fork-init-host-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-sageox",
+        "to": "sageox-upload-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "sageox-upload-flag",
+        "to": "claude-launch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-probe",
+        "to": "claude-launch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-sageox",
+        "to": "claude-launch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-probe",
+        "to": "doctor-sageox",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-sageox",
+        "to": "ui-disclosure",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-launch-wiring",
+        "to": "docs-sageox",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-init-host-managed",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-launch-wiring",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-sageox",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-disclosure",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-sageox",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-base",
+        "to": "fork-network-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-base",
+        "to": "fork-no-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-base",
+        "to": "fork-host-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-base",
+        "to": "fork-init-host-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-repo-writes",
+        "to": "fork-no-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-repo-writes",
+        "to": "fork-host-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-repo-writes",
+        "to": "fork-init-host-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-network-gate",
+        "to": "fork-host-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-network-gate",
+        "to": "fork-init-host-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-no-attribution",
+        "to": "fork-init-host-managed",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

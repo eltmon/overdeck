@@ -44,6 +44,7 @@ export interface PackState {
   license: string | null;
   cached: boolean;
   notApplied: string[];
+  disclosure: string | null;
   duplicatePluginInstall: boolean;
   updateAvailable?: string | null;
   global: boolean | null;
@@ -66,7 +67,7 @@ export interface SkillPacksSectionProps {
 }
 
 const ENDPOINT = '/api/skills/overrides';
-const ADD_COMMAND = 'pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3';
+const ADD_COMMAND = 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3';
 const short = (commit: string) => commit.slice(0, 7);
 
 const SOURCE_LABELS: Record<PackSkillSource, string> = {
@@ -168,6 +169,9 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
                     <p className="pl-5 text-xs text-muted-foreground">
                       {[pack.license ?? 'license unknown', `${pack.skills.length} skills, ${optInCount} opt-in`, `Not applied: ${pack.notApplied.length ? pack.notApplied.join(', ') : 'none'}`].join(' · ')}
                     </p>
+                    {pack.disclosure && (
+                      <p className="pl-5 text-xs text-muted-foreground" data-testid="pack-disclosure">{pack.disclosure}</p>
+                    )}
                     {!pack.cached && (
                       <p className="pl-5 text-xs text-muted-foreground">
                         Not cached; run <code className="font-mono">pan skills pack sync {pack.id}</code>

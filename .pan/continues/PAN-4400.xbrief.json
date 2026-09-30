@@ -1,0 +1,228 @@
+{
+  "version": "1",
+  "issueId": "PAN-4400",
+  "created": "2026-09-29T14:25:17.551Z",
+  "updated": "2026-09-29T17:11:47.961Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T16:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-09-29T16:17:16.966Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-09-29T17:11:47.961Z"
+    }
+  ],
+  "items": {
+    "preset-data": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T14:25:17.551Z",
+      "doneAt": "2026-09-29T14:38:08.627Z"
+    },
+    "preset-plan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T14:38:31.009Z",
+      "doneAt": "2026-09-29T14:57:02.996Z"
+    },
+    "docs-presets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T14:57:08.692Z",
+      "doneAt": "2026-09-29T14:57:36.170Z"
+    },
+    "preset-apply": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T14:57:43.003Z",
+      "doneAt": "2026-09-29T15:14:27.147Z"
+    },
+    "preset-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T15:14:34.218Z",
+      "doneAt": "2026-09-29T15:16:50.583Z"
+    },
+    "preset-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T15:16:56.706Z",
+      "doneAt": "2026-09-29T15:21:02.612Z"
+    },
+    "ui-preset-buttons": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T15:21:11.216Z",
+      "doneAt": "2026-09-29T15:24:40.229Z"
+    },
+    "ui-preset-undo-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T15:24:46.046Z",
+      "doneAt": "2026-09-29T15:26:36.267Z"
+    },
+    "settings-formdata-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4400",
+      "claimedAt": "2026-09-29T15:26:44.185Z",
+      "doneAt": "2026-09-29T15:28:41.111Z"
+    },
+    "preset-data.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:45:28.769Z"
+    },
+    "preset-data.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:45:49.194Z"
+    },
+    "preset-data.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:46:06.667Z"
+    },
+    "preset-data.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:46:21.486Z"
+    },
+    "preset-plan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:46:37.852Z"
+    },
+    "preset-plan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:46:52.893Z"
+    },
+    "preset-plan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:47:07.383Z"
+    },
+    "preset-plan.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:47:21.488Z"
+    },
+    "preset-plan.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:47:36.193Z"
+    },
+    "preset-apply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:47:51.499Z"
+    },
+    "preset-apply.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:06.150Z"
+    },
+    "preset-apply.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:20.782Z"
+    },
+    "preset-apply.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:35.925Z"
+    },
+    "preset-apply.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:48:53.061Z"
+    },
+    "preset-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:49:07.723Z"
+    },
+    "preset-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:49:22.730Z"
+    },
+    "preset-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:49:37.179Z"
+    },
+    "preset-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:49:52.658Z"
+    },
+    "preset-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:50:07.791Z"
+    },
+    "preset-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:50:24.037Z"
+    },
+    "preset-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:50:37.967Z"
+    },
+    "preset-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:50:52.060Z"
+    },
+    "ui-preset-buttons.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:51:05.948Z"
+    },
+    "ui-preset-buttons.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:51:21.777Z"
+    },
+    "ui-preset-buttons.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:51:37.349Z"
+    },
+    "ui-preset-buttons.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:51:55.431Z"
+    },
+    "ui-preset-buttons.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:52:12.551Z"
+    },
+    "ui-preset-undo-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:52:30.138Z"
+    },
+    "ui-preset-undo-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:52:46.895Z"
+    },
+    "ui-preset-undo-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:04.293Z"
+    },
+    "ui-preset-undo-notice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:21.229Z"
+    },
+    "settings-formdata-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:37.065Z"
+    },
+    "settings-formdata-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:51.714Z"
+    },
+    "docs-presets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:05.396Z"
+    },
+    "docs-presets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:20.473Z"
+    },
+    "docs-presets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:36.784Z"
+    },
+    "docs-presets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:51.681Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

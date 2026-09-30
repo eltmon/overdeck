@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import { loadConfigSync } from './config-yaml/load.js';
 import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
 import { getSupervisorPort, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
 
@@ -25,6 +26,8 @@ export interface RenderSupervisorUnitOptions {
   restartSec?: number;
   startLimitIntervalSec?: number;
   startLimitBurst?: number;
+  /** PAN-4311: systemd CPUWeight; defaults to resources.dashboard_cpu_weight. */
+  cpuWeight?: number;
 }
 
 export interface InstallSupervisorUnitOptions extends RenderSupervisorUnitOptions {
@@ -75,6 +78,7 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
   const restartSec = options.restartSec ?? DEFAULT_RESTART_SEC;
   const startLimitIntervalSec = options.startLimitIntervalSec ?? DEFAULT_START_LIMIT_INTERVAL_SEC;
   const startLimitBurst = options.startLimitBurst ?? DEFAULT_START_LIMIT_BURST;
+  const cpuWeight = options.cpuWeight ?? loadConfigSync().config.resources.dashboardCpuWeight;
 
   const environment = [
     `OVERDECK_SUPERVISOR_PORT=${supervisorPort}`,
@@ -89,6 +93,8 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
     '',
     '[Service]',
     'Type=simple',
+    // PAN-4311: same weight as the dashboard — both are the control plane.
+    `CPUWeight=${cpuWeight}`,
     // WorkingDirectory= takes a single path that systemd does NOT unquote —
     // a quoted value is read literally and rejected as "not absolute" (its
     // first char is `"`, not `/`). ExecStart= (a command line) and Environment=

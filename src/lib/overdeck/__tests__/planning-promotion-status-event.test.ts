@@ -18,6 +18,8 @@ const testState = vi.hoisted(() => ({
   // disk at specPath, 'phantom' reports success without a file, 'fail' throws.
   specWrite: 'write' as 'write' | 'phantom' | 'fail',
   specPath: '',
+  // PAN-4341: the plan critique gate's verdict; null passes as not-required.
+  critiqueRefusal: null as null | string,
 }));
 
 vi.mock('../../../dashboard/server/routes/agents.js', () => ({
@@ -63,6 +65,11 @@ vi.mock('../../pan-dir/index.js', () => ({
     });
   },
 }));
+vi.mock('../../planning/plan-critique-io.js', () => ({
+  applyCritiqueGateForPromotion: vi.fn(async () => (testState.critiqueRefusal
+    ? { ok: false, message: testState.critiqueRefusal, result: { ok: false, kind: 'missing', nextRound: 1, reason: testState.critiqueRefusal } }
+    : { ok: true, result: { ok: true, kind: 'not-required' } })),
+}));
 vi.mock('../../planning/spawn-planning-session.js', () => ({
   resolveAutoSpawnOnFinalize: async (requested: unknown) => requested === true,
 }));
@@ -95,6 +102,7 @@ vi.mock('../issue-reads.js', () => ({
 
 import { getAgentState } from '../../agents.js';
 import { saveAgentStateAndEmitEvent } from '../../../dashboard/server/services/agent-projection.js';
+import { readPipelineJournal } from '../../cloister/pipeline-journal.js';
 import { completePlanningForIssue } from '../planning-promotion.js';
 
 const roots: string[] = [];
@@ -177,6 +185,7 @@ beforeEach(() => {
   testState.prdGateOk = true;
   testState.specWrite = 'write';
   testState.specPath = '';
+  testState.critiqueRefusal = null;
 });
 
 afterEach(() => {
@@ -242,6 +251,21 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     expect(saveAgentStateAndEmitEvent).not.toHaveBeenCalled();
   });
 
+  it('returns 422 before writing the spec when the plan critique gate refuses (PAN-4341)', async () => {
+    createWorkspace();
+    testState.critiqueRefusal = 'no critique for round 1; pan plan finalize dispatches the critic';
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(422);
+    const payload = responseJson(response);
+    expect(String(payload.error)).toMatch(/^Plan critique gate: /);
+    expect(payload.critiqueGate).toMatchObject({ kind: 'missing' });
+    expect(existsSync(testState.specPath)).toBe(false);
+    expect(saveAgentStateAndEmitEvent).not.toHaveBeenCalled();
+  });
+
   /**
    * [correctness] review finding — sampling sessionExists() before the
    * auto-spawn/kill decision recorded a pre-kill snapshot that went stale the
@@ -269,6 +293,37 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
           payload: expect.objectContaining({ status: 'stopped', hasLiveTmuxSession: false }),
         }),
       );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  // PAN-4399: an accepted auto-start journals handoff.started so the
+  // dashboard's derived work-start state can tell "spawn requested" from
+  // "nothing ever ran" without polling the terminal backend.
+  it('journals handoff.started when the auto-start is accepted', async () => {
+    const { workspacePath } = createWorkspace();
+    testState.sessionAlive = true;
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3230' }), { status: 200 })) as unknown as typeof fetch;
+    try {
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
+
+      const response = await completePlanningForIssue(deps);
+
+      expect(response.status).toBe(200);
+      const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.started',
+        issueId: 'PAN-3230',
+        source: 'complete-planning',
+        data: { agentId: 'agent-pan-3230' },
+      });
+      // PAN-4399 review fix: requestedAt is stamped before the spawn POST,
+      // so deriveWorkStart can tell a real start apart from a never-started one.
+      expect(typeof entries[0]!.data!['requestedAt']).toBe('string');
     } finally {
       global.fetch = originalFetch;
     }

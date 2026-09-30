@@ -43,6 +43,9 @@ function config(overrides: Partial<LaneConfig> = {}): LaneConfig {
   };
 }
 
+const CPU_CALM = { saturated: false, signal: 'psi-some-avg60' as const, reading: 10, threshold: 50, psiSomeAvg10: 8 };
+const CPU_SATURATED = { saturated: true, signal: 'psi-some-avg60' as const, reading: 55, threshold: 50, psiSomeAvg10: 60 };
+
 function harness(laneConfig: LaneConfig = config()) {
   const live = new Set<string>();
   const git = {
@@ -66,6 +69,7 @@ function harness(laneConfig: LaneConfig = config()) {
     sleep: vi.fn(async () => undefined),
     homeDir: () => TEST_HOME,
     tmpRoot: TMP_ROOT,
+    cpuPressure: vi.fn(async () => CPU_CALM),
   } satisfies Deps;
   return { deps, git, live, stop };
 }
@@ -297,6 +301,36 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     expect(rejected).toHaveLength(1);
     expect(rejected[0]?.reason).toMatchObject({ status: 409 });
+  });
+});
+
+describe('launchLane under CPU pressure (PAN-4311)', () => {
+  it('refuses with 429 cpu-saturated while the host is CPU-saturated', async () => {
+    const { deps } = harness();
+    deps.cpuPressure.mockResolvedValue(CPU_SATURATED);
+    const error = await rejection(launchLane(request(root(), { key: 'cpu-held' }), deps));
+
+    expect(error.status).toBe(429);
+    expect(error.message).toMatch(/^cpu-saturated: psi-some-avg60 55 is at or above 50/);
+    expect(error.message).toContain('--force');
+    expect(deps.start).not.toHaveBeenCalled();
+  });
+
+  it('launches anyway with force, without reading CPU pressure', async () => {
+    const { deps } = harness();
+    deps.cpuPressure.mockResolvedValue(CPU_SATURATED);
+    await launchLane(request(root(), { key: 'cpu-forced', force: true }), deps);
+
+    expect(deps.start).toHaveBeenCalledTimes(1);
+    expect(deps.cpuPressure).not.toHaveBeenCalled();
+  });
+
+  it('launches when CPU pressure is below the hold threshold', async () => {
+    const { deps } = harness();
+    await launchLane(request(root(), { key: 'cpu-calm' }), deps);
+
+    expect(deps.cpuPressure).toHaveBeenCalledTimes(1);
+    expect(deps.start).toHaveBeenCalledTimes(1);
   });
 });
 

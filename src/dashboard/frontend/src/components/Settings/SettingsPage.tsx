@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Loader2,
 } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
+import { ModelPresetsBar } from './ModelPresetsBar';
 import { RolesPanel } from './RolesPanel';
 import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
 import { ConversationSearchSection } from './sections/ConversationSearchSection';
@@ -298,6 +300,17 @@ export function SettingsPage() {
     flushAutosave,
   });
 
+  // A preset writes config.yaml outside the autosave pipeline (PAN-4400), so
+  // formData is stale afterwards. Replace it with the fresh document, or the
+  // next autosave's whole-document PUT reverts the preset's paths.
+  const handlePresetChanged = useCallback(() => {
+    void queryClient.fetchQuery({ queryKey: ['settings'], queryFn: fetchSettings, staleTime: 0 })
+      .then((fresh) => { setFormData(fresh); })
+      .catch((err: unknown) => {
+        toast.error(`Reload Settings before editing: ${err instanceof Error ? err.message : String(err)}`);
+      });
+  }, [queryClient]);
+
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
     // Two problems to handle: (1) on a fresh navigation the section may not be
@@ -487,6 +500,7 @@ export function SettingsPage() {
           Model Routing
         </h2>
 
+        <ModelPresetsBar onPresetChanged={handlePresetChanged} beforePreview={flushAutosave} />
         <WorkhorsePanel />
         <RolesPanel />
       </section>

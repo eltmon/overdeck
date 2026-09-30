@@ -19,6 +19,17 @@ vi.mock('../../../dashboard/server/event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: emitOnlyMock })),
 }));
 
+// PAN-4311 FR-18: conversations are never gated on CPU. The check reports
+// saturated for this whole file; every start below must still spawn.
+const assessCpuPressureMock = vi.fn(async () => ({
+  saturated: true,
+  signal: 'psi-some-avg60' as const,
+  reading: 90,
+  threshold: 50,
+  psiSomeAvg10: 95,
+}));
+vi.mock('../../cloister/cpu-pressure.js', () => ({ assessCpuPressure: assessCpuPressureMock }));
+
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation, getConversationByName } = await import('../conversations.js');
 const { startConversationRuntime } = await import('../conversation-runtime.js');
@@ -45,6 +56,25 @@ function fakes() {
 }
 
 describe('startConversationRuntime (PAN-4223 WI-2)', () => {
+  it('spawns while CPU pressure is saturated: conversations are never gated (PAN-4311 FR-18)', async () => {
+    const conv = createConversation({ name: 'rt-start-cpu', tmuxSession: 'conv-rt-start-cpu', cwd: TEST_HOME, harness: 'claude-code', workspaceId: null });
+    const deps = fakes();
+
+    await startConversationRuntime({
+      conv,
+      tmuxSession: 'conv-rt-start-cpu',
+      cwd: TEST_HOME,
+      claudeSessionId: 'sess-cpu',
+      model: 'opus',
+      harness: 'claude-code',
+      launchContext: { bareContext: false, skipClaudeMd: false },
+      message: 'hello',
+    }, deps as never);
+
+    expect(deps.spawn).toHaveBeenCalledTimes(1);
+    expect(assessCpuPressureMock).not.toHaveBeenCalled();
+  });
+
   it('spawns, waits for readiness and delivers the initial message once', async () => {
     const conv = createConversation({ name: 'rt-start-ok', tmuxSession: 'conv-rt-start-ok', cwd: TEST_HOME, harness: 'claude-code', workspaceId: null });
     const deps = fakes();

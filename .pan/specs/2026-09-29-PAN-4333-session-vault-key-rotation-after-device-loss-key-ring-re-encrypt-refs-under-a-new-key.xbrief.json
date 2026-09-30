@@ -1,0 +1,903 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T14:04:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4333: Session Vault: key rotation after device loss (key ring, re-encrypt refs under a new key)",
+    "updated": "2026-09-29T14:11:41.878Z"
+  },
+  "plan": {
+    "id": "pan-4333",
+    "title": "Session Vault: key rotation after device loss (key ring, re-encrypt refs under a new key)",
+    "status": "running",
+    "uid": "6f1ab125-6440-4307-a7c4-517af471e286",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T14:04:40Z",
+    "updated": "2026-09-29T14:11:41.878Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4333",
+        "label": "PAN-4333",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4333.md",
+        "label": "PRD draft (.pan/drafts/PAN-4333.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/anywhere-accounts.md",
+        "label": "anywhere-accounts design §6.5",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "security",
+      "crypto",
+      "cli",
+      "vault-store"
+    ],
+    "metadata": {
+      "sizeJustification": "Rotation is one security feature whose parts cannot ship separately without harm: a rotation verb without the key-guarded store would let stale machines keep writing under the retired key (or mint truncated records), and without the tolerant readers every sync after a rotation throws on the retired-ref markers. The surface is 26 files because each production module carries its own named test file; every file sits inside the standalone Session Vault (src/lib/vault, src/cli/commands/vault, their tests) plus two doc pages and one skill.",
+      "canonicalFilename": "2026-09-29-PAN-4333-session-vault-key-rotation-after-device-loss-key-ring-re-encrypt-refs-under-a-new-key.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Revoking or losing a device stops it syncing, but it still holds the vault key K in ${OVERDECK_HOME}/vault/key, so anyone holding it can decrypt any vault ciphertext they obtain, including everything written after the loss. The vault key has never been rotatable: record and machine ref names are HMACs under K, VaultStore has only single-ref CAS, readers throw on any ref sealed under another key, and the docs state that the key never changes.",
+      "Proposal": "Add pan vault rotate-key. It saves a new key K' to vault/key.next, then in ONE atomic VaultStore.casRefs batch writes every record and machine ref re-sealed under K' at its new name, overwrites every old name with a retired-ref marker sealed under the old key, and swaps the header to K' carrying a key ring of retired keys. Chunks and WIP parts are not rewritten; decodeChunk/decodeWipParts fall back through VaultSubkeys.previous loaded from the header ring. openVault builds a KeyGuardedStore that asserts the verified header version on every ref write and re-checks it after refresh, so a machine holding a retired key is refused with a re-join instruction. The keywrap is re-wrapped or removed, a new recovery phrase is printed, re-join replaces the key in place and discards unpublished objects, sync/status skip refs they cannot open, and the docs describe rotation. Full design, decisions D-1..D-18 and requirements FR-1..FR-13 / NFR-1..NFR-5 are in .pan/drafts/PAN-4333.md.",
+      "NonGoals": "- Re-encrypting existing chunks, settlement-archive chunks or WIP parts under the new key\n- Deleting refs or objects from any backend, or garbage-collecting retired-ref markers and orphan objects\n- Adding a ref-delete operation to VaultStore\n- Implementing the hosted overdeck:// store, device revocation, pan account, or editing configuration/anywhere-sign-in.mdx (PAN-4297, PAN-4330)\n- Automatic rotation (on revoke or on a schedule) or any dashboard UI for rotation\n- Rotating the user's git credentials\n- Removing keys from the key ring\n- Approve-from-another-device key transfer\n- Any change to the chunk, WIP-part or keywrap/v1 wire formats"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Store the key ring (retired keys, newest first) inside the encrypted h/header value, not in a local file.",
+        "rationale": "Only holders of the current key can read it, and any machine that obtains the current key by phrase or passphrase gets the ring on its next header read with no extra transfer step."
+      },
+      {
+        "summary": "Re-encrypt refs only; old chunks and WIP parts stay under their original key and are read through VaultSubkeys.previous.",
+        "rationale": "The issue asks to keep older chunks readable through a key ring so history need not be re-encrypted in one pass; refs are small and must be re-encrypted because their names derive from K."
+      },
+      {
+        "summary": "Overwrite each old ref name with a retired-ref marker sealed under the old key instead of deleting it.",
+        "rationale": "settle.ts mints a truncated record when an owned record's ref is absent; a non-session value makes it return excluded instead, and VaultStore has no delete."
+      },
+      {
+        "summary": "Add VaultStore.casRefs (all-or-nothing multi-ref CAS with assert-only ops) and commit the whole rotation in one call.",
+        "rationale": "The git backend pushes once per casRef, so a per-ref rotation would expose a long half-rotated window; one batch is one commit, and the same primitive lets every write assert the header version."
+      },
+      {
+        "summary": "Guard every CLI write with a KeyGuardedStore built in openVault that asserts the verified header version.",
+        "rationale": "A stale machine must never publish new data under a retired key; one entry point guards every verb without editing each one."
+      },
+      {
+        "summary": "Add VaultStore.discardUnpublished and call it before the rotation batch and when a re-join replaces the key.",
+        "rationale": "The git backend publishes every untracked object with the next ref write, so objects a stale machine sealed under the retired key would otherwise be pushed after it re-joins."
+      },
+      {
+        "summary": "Verb name pan vault rotate-key with --yes, --passphrase-file, --generate-passphrase, --no-passphrase; TTY confirmation, --yes required off a TTY.",
+        "rationale": "Mirrors pan vault setup's passphrase flags; rotation forces every other machine to re-join, so it deserves an explicit confirmation."
+      },
+      {
+        "summary": "Rotation is resumable from vault/key.next; the new phrase prints before key.next is removed; batch conflicts retry up to 5 times.",
+        "rationale": "Matches setup.ts's rule that the key is saved before the backend changes, and no verb can show a phrase later."
+      },
+      {
+        "summary": "Do not wait for PAN-4330 or PAN-4297 and do not edit configuration/anywhere-sign-in.mdx (it does not exist).",
+        "rationale": "Rotation uses only VaultStore methods, so it works on git and dir now and on a hosted store that passes the shared contract suite; PAN-4330's revocation note can link to the new session-vault section."
+      },
+      {
+        "summary": "Readers (sync, status) skip refs they cannot open and report retired/unreadable counts.",
+        "rationale": "Retired-ref markers are permanently unreadable under the current key, and a junk ref from a revoked device with write access must not break every sync."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-cas-refs",
+        "title": "VaultStore.casRefs and discardUnpublished on the dir and git backends",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "keyring-guard",
+            "rotate-core",
+            "rejoin-after-rotation"
+          ],
+          "files_scope": [
+            "src/lib/vault/store/types.ts",
+            "src/lib/vault/store/dir.ts",
+            "src/lib/vault/store/git.ts",
+            "tests/unit/lib/vault/store/contract.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/store/dir.test.ts tests/unit/lib/vault/store/git.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dir.test.ts and git.test.ts pass, including casRefs.ac1-ac4 and discardUnpublished.ac1 on both backends",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only the store layer; no other item edits these four files.",
+          "traces": [
+            "FR-4",
+            "FR-11",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD section 7 and work item WI-1. In src/lib/vault/store/types.ts add `export interface RefOp { name: string; expectedVersion: string | null; value?: Uint8Array }` and two VaultStore methods with doc comments: `casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult>` (all-or-nothing: when every op's ref is at expectedVersion, write every op that carries a value and publish them together; otherwise write nothing and return 'conflict'; throw Error for duplicate names; an op without value only asserts) and `discardUnpublished(): Promise<void>` (drop objects no ref write has published; a backend that publishes on write resolves at once). GitVaultStore: generalize casRefSerialized into a casRefs cycle under the existing casQueue + clone lock: refreshUnlocked, compare remoteBlobSha for every op, return 'conflict' on any mismatch, writeAtomic every valued op, `add -A -- .`, commit with message 'vault: settle' when exactly one valued op else 'vault: batch', push; keep the existing non-fast-forward retry (3) and offline reset/clean rules; make casRef call casRefs([{ name, expectedVersion, value }]). discardUnpublished on git: under the clone lock, `reset --hard origin/main` when origin/main exists, then `git clean -fdq -- objects refs`. DirVaultStore: casRefs inside casQueue nests withFileLock on each op's `<ref>.lock` in ascending name order, compares every refVersion, then writeAtomic every valued op; casRef delegates; discardUnpublished resolves without doing anything. Add contract cases in tests/unit/lib/vault/store/contract.ts: 'casRefs.ac1: writes every valued op when all versions match', 'casRefs.ac2: one stale version writes nothing and returns conflict', 'casRefs.ac3: an assert-only op gates the batch and is never written', 'casRefs.ac4: duplicate names throw', 'discardUnpublished.ac1: an object put but never published is gone after discardUnpublished on git and still present on dir' (branch on the backend name the suite receives; never skipIf). Add to the git suite: 'a batch of three valued ops adds exactly one commit to origin/main'. No execSync, no git stash."
+        },
+        "items": [
+          {
+            "id": "store-cas-refs.ac1",
+            "title": "Given refs a, b, c at known versions, when casRefs writes all three with matching versions, then it returns ok and readRef returns each new value on both dir and git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-cas-refs.ac2",
+            "title": "When one op's expectedVersion is stale, casRefs returns conflict and readRef returns the old value for every ref in the batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-cas-refs.ac3",
+            "title": "An assert-only op (no value) blocks the batch when its ref moved and is never written when the batch succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-cas-refs.ac4",
+            "title": "On the git backend a successful three-op casRefs produces exactly one new commit on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-cas-refs.ac5",
+            "title": "On git, discardUnpublished deletes an object written with putObjects but never published, so hasObjects no longer contains it; on dir the object survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyring-format",
+        "title": "Header key ring fields, retired-ref marker, and ring fallback in decodeChunk/decodeWipParts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "keyring-guard",
+            "tolerant-readers",
+            "rotate-core"
+          ],
+          "files_scope": [
+            "src/lib/vault/format.ts",
+            "src/lib/vault/identity.ts",
+            "tests/unit/lib/vault/format.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/format.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "format.test.ts passes, including ring.ac1-ac5",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD section 6 and WI-2. In src/lib/vault/identity.ts add the optional field `previous?: VaultSubkeys[]` (doc: sub-keys of retired keys, newest first; only chunk and WIP-part decoding reads them) to VaultSubkeys; change nothing else there. In src/lib/vault/format.ts: add optional `rotatedAt?: string` and `keyRing?: string[]` to VaultHeader; add `export interface RetiredRefMarker { v: 1; type: 'retired'; at: string }` and widen encryptRef's value union to include it; add `export function parseKeyRing(header: VaultHeader): Buffer[]` that returns [] when keyRing is absent and throws Error('Vault header key ring is malformed') unless every entry is a string whose base64 decodes to exactly 32 bytes and re-encodes identically. Split decodeChunk into a private single-key helper (existing body: unseal with K_enc, zstd, id check with the same key's K_id, shape check) and an exported loop that tries `keys` then each `keys.previous` entry, rethrowing non-VaultAuthenticationError errors immediately and throwing the first VaultAuthenticationError when no key authenticates. Do the same per part in decodeWipParts. encodeChunk/encodeWipParts/encryptRef/decryptRef/readVaultHeader keep using only the current keys. Update the module header comment to mention the ring. Tests in tests/unit/lib/vault/format.test.ts: 'ring.ac1: a chunk encoded under K decodes with keys(K').previous=[keys(K)]', 'ring.ac2: a WIP part encoded under K decodes through the ring', 'ring.ac3: with no key matching, decodeChunk throws VaultAuthenticationError', 'ring.ac4: parseKeyRing rejects a 31-byte entry', 'ring.ac5: a header without keyRing parses to an empty ring'."
+        },
+        "items": [
+          {
+            "id": "keyring-format.ac1",
+            "title": "decodeChunk returns the original lines for a chunk sealed under K when called with keys of K' whose previous contains keys of K",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-format.ac2",
+            "title": "decodeWipParts returns the original bundle bytes for parts sealed under a retired key present in keys.previous",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-format.ac3",
+            "title": "decodeChunk throws VaultAuthenticationError when neither the current key nor any previous key authenticates the chunk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-format.ac4",
+            "title": "parseKeyRing returns [] for a header without keyRing and throws 'Vault header key ring is malformed' for an entry that decodes to 31 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyring-guard",
+        "title": "openKeyring and KeyGuardedStore: header-verified keys with ring, header-version-guarded writes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "guarded-open-vault",
+            "rotate-core",
+            "e2e-rotation"
+          ],
+          "files_scope": [
+            "src/lib/vault/keyring.ts",
+            "tests/unit/lib/vault/keyring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/keyring.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "keyring.test.ts passes guard.ac1-ac5 and import-graph.test.ts stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "New module and new test file; depends only on the store contract and format items through blocks edges.",
+          "traces": [
+            "FR-6",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement decision D-7 and WI-3 in a new module src/lib/vault/keyring.ts that imports only Node built-ins and sibling vault modules. Export: `class VaultKeyMismatchError extends Error` (the header is absent or does not open with the key); `class VaultKeyRetiredError extends Error` whose message is `This machine's vault key was retired by a key rotation. Run: pan vault join ${backend} with the new recovery phrase or passphrase.` (backend passed in, default '<backend>'); `async function openKeyring(store: VaultStore, key: Uint8Array, options?: { backend?: string }): Promise<{ keys: VaultSubkeys; store: VaultStore; headerVersion: string; rotatedAt: string | null }>` which readRefs HEADER_REF_NAME, throws VaultKeyMismatchError when absent or when readVaultHeader returns null or throws VaultAuthenticationError, derives subkeys of `key`, sets `keys.previous = parseKeyRing(header).map(deriveSubkeys)`, and returns a KeyGuardedStore; and `class KeyGuardedStore implements VaultStore` wrapping the inner store: casRef(name, expected, value) = casRefs([{ name, expectedVersion: expected, value }]); casRefs(ops) = inner.casRefs([...ops, { name: HEADER_REF_NAME, expectedVersion: headerVersion }]) and on 'conflict' re-read the header: if its version differs and it does not open with the key, throw VaultKeyRetiredError, else return 'conflict'; refresh() = inner.refresh() then re-read the header: same version returns, a different version that still opens with the key adopts the new version and reloads keys.previous in place, otherwise throw VaultKeyRetiredError; putSlot(name, bytes) = this.refresh() then inner.putSlot; putObjects/getObject/hasObjects/readRef/listRefs/discardUnpublished pass through. Tests in tests/unit/lib/vault/keyring.test.ts with a DirVaultStore in a temp dir: 'guard.ac1: a casRef after the header changed under another key throws VaultKeyRetiredError and writes nothing', 'guard.ac2: refresh throws VaultKeyRetiredError once the header no longer opens', 'guard.ac3: putSlot on a retired key throws and leaves keywrap/v1 unchanged', 'guard.ac4: openKeyring loads keyRing entries into keys.previous', 'guard.ac5: casRef on a current header writes normally'."
+        },
+        "items": [
+          {
+            "id": "keyring-guard.ac1",
+            "title": "Given the header was rewritten under another key, when KeyGuardedStore.casRef writes a record, then it throws VaultKeyRetiredError and readRef returns the record's previous value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-guard.ac2",
+            "title": "KeyGuardedStore.refresh throws VaultKeyRetiredError once h/header no longer opens with the guarded key, and putSlot on that store throws without changing keywrap/v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-guard.ac3",
+            "title": "openKeyring returns keys whose previous array contains the sub-keys of every keyRing entry in header order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-guard.ac4",
+            "title": "openKeyring throws VaultKeyMismatchError when h/header is absent or does not open with the given key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyring-guard.ac5",
+            "title": "With an unchanged header, KeyGuardedStore.casRef returns ok and readRef returns the written value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tolerant-readers",
+        "title": "Sync and status skip refs sealed under retired or unknown keys and count them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/sync.ts",
+            "tests/unit/lib/vault/sync.test.ts",
+            "src/cli/commands/vault/status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync.test.ts passes tolerant.ac1-ac2 and the existing sync cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement decision D-6 and WI-4. In src/lib/vault/sync.ts add `retired: number` and `unreadable: number` to SyncReport (initialized 0). In the r/ pull loop and the m/ machine loop, wrap the decrypt in try/catch: on VaultAuthenticationError (imported from format.js) try `decryptRef(name, ref.value, previousKeys)` for each entry of `keys.previous ?? []`; if one opens, increment report.retired, else increment report.unreadable; continue the loop in both cases; rethrow any other error. Export a small helper from sync.ts, `classifyRefValue`, only if it keeps both loops shorter; otherwise inline. In src/cli/commands/vault/status.ts wrap the readMachineRecord call in the m/ loop the same way so an unreadable machine ref is skipped instead of throwing (no new output line in this item). Tests in tests/unit/lib/vault/sync.test.ts: 'tolerant.ac1: a ref sealed under an unknown key is counted unreadable and sync completes' (write r/<40 hex> sealed with deriveSubkeys(createVaultKey())), 'tolerant.ac2: a retired-ref marker under a ring key is counted retired, not listed' (seal { v:1, type:'retired', at } under K and sync with keys of K' whose previous = [keys(K)])."
+        },
+        "items": [
+          {
+            "id": "tolerant-readers.ac1",
+            "title": "When the backend holds an r/ ref sealed under an unknown key, syncOnce resolves, returns unreadable: 1, and lists every readable record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tolerant-readers.ac2",
+            "title": "When an r/ ref holds a retired marker sealed under a key in keys.previous, syncOnce returns retired: 1 and the list cache contains no row for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guarded-open-vault",
+        "title": "openVault verifies the key against the header and hands every verb a KeyGuardedStore",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/shared.ts",
+            "src/cli/commands/vault/sync.ts",
+            "src/cli/commands/vault/status.ts",
+            "tests/unit/cli/vault/open-vault-keyring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/open-vault-keyring.test.ts tests/unit/cli/vault/save-sync.test.ts tests/unit/cli/vault/passphrase.test.ts tests/unit/cli/vault/setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-vault-keyring.test.ts passes open.ac1-ac3 and the existing save-sync, passphrase and setup tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement decisions D-7, D-18 and WI-5. In src/cli/commands/vault/shared.ts: openVault first checks for `${vaultDir()}/key.next` (use the same path rotate.ts will export, but compute it locally as join(vaultDir(), 'key.next') so this item does not depend on rotate-core) and, when it exists, prints to io.err `A vault key rotation started on this machine has not finished. Run: pan vault rotate-key` and calls io.exit(1) — except with options.quiet (save --hook), where it returns null silently, so a Stop hook firing on the rotating machine never fails the harness. After loading the key it builds the store with storeForBackend and calls openKeyring(store, key, { backend: config.backend }); on VaultKeyMismatchError it prints `This machine's vault key does not open ${config.backend}. If the key was rotated on another machine, run: pan vault join ${config.backend}` and calls io.exit(1) (with options.quiet it returns null silently, which keeps save --hook silent). OpenVault gains `rotatedAt: string | null`; keys and store come from openKeyring. In src/cli/commands/vault/sync.ts catch VaultKeyRetiredError from syncOnce, print its message with io.err and io.exit(1); append `; N ref(s) under retired keys` and `; N unreadable ref(s)` to the summary line when report.retired / report.unreadable are non-zero. In src/cli/commands/vault/status.ts add `Key rotated:    <rotatedAt | never>` after the Backend line and `keyRotatedAt` to the JSON summary. pan vault save needs no edit: its per-transcript catch already prints `<file>: error: <message>` and exits 1, and hook mode stays silent. New tests in tests/unit/cli/vault/open-vault-keyring.test.ts using the helpers in tests/unit/cli/vault/helpers.ts: 'open.ac1: openVault on a machine whose key no longer opens the header exits 1 with the join hint', 'open.ac2: key.next present exits 1 with the unfinished-rotation message, and save --hook exits 0 with no output', 'open.ac3: on a git fixture, a stale machine whose clone predates the header change runs pan vault save, exits 1 with the retired-key message, and the bare remote gains no commit' (produce the header change by writing a new header under another key through a second clone; do not depend on rotate.ts), and 'open.ac4: status prints Key rotated and exits 0 with an m/ ref sealed under an unknown key present'."
+        },
+        "items": [
+          {
+            "id": "guarded-open-vault.ac1",
+            "title": "When the local key no longer opens h/header, any pan vault verb exits 1 and prints \"This machine's vault key does not open <backend>. If the key was rotated on another machine, run: pan vault join <backend>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guarded-open-vault.ac2",
+            "title": "When vault/key.next exists, pan vault status exits 1 and prints 'A vault key rotation started on this machine has not finished. Run: pan vault rotate-key', while pan vault save --hook exits 0 and prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guarded-open-vault.ac3",
+            "title": "Given a git clone that predates a header change, pan vault save exits 1, prints the retired-key message, and the bare remote's commit count is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guarded-open-vault.ac4",
+            "title": "pan vault status prints 'Key rotated:' with the header's rotatedAt, or 'never' before any rotation, --json contains keyRotatedAt, and status exits 0 while one m/ ref cannot be decrypted with the current key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rotate-core",
+        "title": "rotateVaultKey: resumable one-batch rotation with retired markers and key ring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vault/rotate.ts",
+            "tests/unit/lib/vault/rotate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/rotate.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rotate.test.ts passes rotate.ac1-ac6 and import-graph.test.ts stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "New module and new test file; consumes the store, format and keyring items only through blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD section 8 and decisions D-4, D-5, D-9, D-11, D-14 in a new module src/lib/vault/rotate.ts that imports only Node built-ins and sibling vault modules and never imports store/dir.js or store/git.js. Export nextKeyPath() = join(vaultDir(), 'key.next'), loadNextKey(): Promise<Buffer | null> (null on ENOENT, throws on wrong length), saveNextKey(key) (0600, temp file + rename like saveVaultKey), clearNextKey() (unlink, ignore ENOENT), `class VaultRotationConflictError extends Error` with message 'Another machine kept writing to the vault. Stop pan vault on your other machines and run pan vault rotate-key again.', and `rotateVaultKey(options: { store: VaultStore; currentKey: Buffer; keywrap?: Uint8Array | null; now?: () => Date; maxAttempts?: number }): Promise<{ newKey: Buffer; records: number; machines: number; resumed: boolean; committed: 'now' | 'earlier' }>`. Steps: (1) K' = loadNextKey() ?? createVaultKey() then saveNextKey; resumed = key.next already existed. (2) loop up to maxAttempts (default 5): store.refresh(); read h/header; if it opens with K' set committed='earlier' and leave the loop; if it opens with currentKey continue, else throw Error('The vault key on this machine does not open the vault; nothing was rotated.'). (3) store.discardUnpublished(). (4) for every listRefs('r/') and listRefs('m/') entry: readRef, decrypt with keys(currentKey), skip on VaultAuthenticationError, skip values whose type is neither 'session' nor 'machine'; newName = refName('record', value.vaultId, keys(K').K_ref) or refName('machine', value.environmentId, ...); push op { name: newName, expectedVersion: (await store.readRef(newName))?.version ?? null, value: encryptRef(newName, value, keys(K')) } and op { name: oldName, expectedVersion: ref.version, value: encryptRef(oldName, { v:1, type:'retired', at }, keys(currentKey)) }; push header op { name: HEADER_REF_NAME, expectedVersion: header.version, value: encryptRef(HEADER_REF_NAME, { ...oldHeader, rotatedAt: at, keyRing: [currentKey base64, ...(oldHeader.keyRing ?? [])] }, keys(K')) }. (5) casRefs(ops): ok → committed='now', leave the loop; conflict → next attempt; after maxAttempts throw VaultRotationConflictError; VaultOfflineError propagates with key.next kept. (6) keywrap undefined → nothing; Uint8Array → store.putSlot(KEYWRAP_OBJECT_NAME, bytes); null → store.putSlot(KEYWRAP_OBJECT_NAME, null). (7) saveVaultKey(K'). Do NOT clear key.next here; the CLI clears it after printing the phrase. encryptRef needs the RetiredRefMarker union from keyring-format. Tests in tests/unit/lib/vault/rotate.test.ts (temp OVERDECK_HOME, DirVaultStore; settle real transcripts with settle() to create records): 'rotate.ac1: after rotation every record and machine is readable under K' at its new name with identical content', 'rotate.ac2: every old name holds a retired marker sealed under K', 'rotate.ac3: a pre-rotation chunk decodes via the ring loaded by openKeyring', 'rotate.ac4: a crash after the commit (throwing from the keywrap putSlot) resumes with the same K' and committed: earlier', 'rotate.ac5: a conflicting write between read and commit is retried and the final vault includes it' (wrap the store so the first casRefs first performs a concurrent casRef then returns conflict), git: 'rotate.ac6: the rotation adds exactly one commit to the bare remote'. No sleeps in the retry loop."
+        },
+        "items": [
+          {
+            "id": "rotate-core.ac1",
+            "title": "After rotateVaultKey, h/header opens with the returned newKey, vault/key holds newKey, and every record and machine decrypts under newKey at its new ref name with content identical to before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rotate-core.ac2",
+            "title": "After rotation every old r/ and m/ name contains a { v:1, type:'retired' } value sealed under the retired key, and the header's keyRing starts with the retired key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rotate-core.ac3",
+            "title": "When the keywrap putSlot throws after the commit, a second rotateVaultKey call reuses the key in key.next and returns committed: 'earlier'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rotate-core.ac4",
+            "title": "When the first casRefs returns conflict because another write landed, rotation retries and the rotated vault preserves that write under the new key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rotate-core.ac5",
+            "title": "On the git backend a completed rotation produces exactly one new commit on the bare remote for the ref batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-rotate-key",
+        "title": "pan vault rotate-key verb with passphrase flags, confirmation, new recovery phrase, and skill text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/rotate-key.ts",
+            "src/cli/commands/vault/index.ts",
+            "sync-sources/skills/pan-vault/SKILL.md",
+            "tests/unit/cli/vault/rotate-key.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/rotate-key.test.ts tests/unit/cli/startup-lazy-load.test.ts",
+            "bash scripts/lint-skills.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rotate-key.test.ts passes cli.ac1-ac5 and startup-lazy-load.test.ts stays green",
+            "lint-skills.sh reports no mismatch between SKILL.md and pan vault rotate-key --help",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement decisions D-11, D-12, D-13, D-15 and WI-7. Register in src/cli/commands/vault/index.ts: `vault.command('rotate-key').description('Replace the vault key after losing a device: re-encrypt refs under a new key, keep old chunks readable, print a new recovery phrase').option('--yes', 'Rotate without the confirmation prompt').option('--passphrase-file <path>', 'Re-wrap passphrase unlock under the new key with the passphrase in this file').option('--generate-passphrase', 'Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once').option('--no-passphrase', 'Turn passphrase unlock off').action(lazyAction(() => import('./rotate-key.js'), 'rotateKeyCommand'))`, and change the passphrase group description to 'Turn passphrase unlock for new machines on (set) or off (remove); the vault key stays the same'. New src/cli/commands/vault/rotate-key.ts exporting `rotateKeyCommand(options, io = defaultIo)`: readVaultConfig (no backend → print VAULT_OFF_MESSAGE, return); loadVaultKey (missing → io.err join hint, exit 1); store = storeForBackend(config.backend) (do NOT use openVault: it refuses while key.next exists); refuse --passphrase-file with --generate-passphrase; resumed = (await loadNextKey()) !== null; unless resumed or --yes: off a TTY print 'Pass --yes to rotate the vault key without a prompt.' and exit 1; on a TTY ask 'Rotate the vault key? Every other machine must re-join with the new recovery phrase or passphrase. [y/N] ' and stop (exit 0, print 'Nothing was changed.') unless the answer is y or yes. Keywrap choice, all decided BEFORE rotateVaultKey: hasWrap = (await store.getObject(KEYWRAP_OBJECT_NAME)) !== null; --no-passphrase → keywrap null when hasWrap else undefined; --passphrase-file → read, checkPassphraseStrength (fail → print message, exit 1); --generate-passphrase → generatePassphrase(); no flag and hasWrap and TTY → choosePassphrase(io, {}); no flag and hasWrap and not TTY → print 'This vault has a passphrase. Pass --passphrase-file <path>, --generate-passphrase or --no-passphrase.' and exit 1; no flag and no wrap → keywrap undefined. Every refusal above (flag conflict, confirmation declined, strength failure, missing flag) happens BEFORE key.next exists, so a refused run leaves no pending rotation. Only after the passphrase choice is settled compute K' via loadNextKey() ?? (createVaultKey() then saveNextKey()), wrap with wrapVaultKey(K', passphrase) when a passphrase was chosen, and pass the bytes to rotateVaultKey, which reuses the same key.next. Call rotateVaultKey; on VaultOfflineError print `Backend ${backend} is unreachable; nothing was rotated. Run pan vault rotate-key again.` and exit 1; on VaultRotationConflictError print its message and exit 1. On success print in order: `Vault key rotated for ${backend}: ${records} conversation(s) and ${machines} machine(s) re-encrypted.`, '', 'Write down your NEW recovery phrase. It is shown only now:', '', `  ${keyToPhrase(newKey)}`, '', `The old recovery phrase no longer opens this vault. On every other machine run: pan vault join ${backend}`, then 'Passphrase unlock now uses the new key.' (plus GENERATED_PASSPHRASE_PREFIX + passphrase when generated) or 'Passphrase unlock is off.' or PASSPHRASE_LATER_HINT; then clearNextKey(). Update sync-sources/skills/pan-vault/SKILL.md: add a '## Key rotation (lost device)' section with the four flag lines and one paragraph on what rotation protects and that other machines re-join; replace 'and the vault key never changes' with 'and setting or removing a passphrase does not change the vault key'. Tests in tests/unit/cli/vault/rotate-key.test.ts (dir backend fixture): 'cli.ac1: --yes --no-passphrase rotates, prints 24 words that decode to the new key file, and deletes keywrap/v1', 'cli.ac2: non-TTY without --yes exits 1 and the backend refs are unchanged', 'cli.ac3: a vault with a keywrap and no passphrase flag off a TTY exits 1 before any write', 'cli.ac4: --generate-passphrase publishes a keywrap that unwraps to the new key with the printed passphrase', 'cli.ac5: key.next is gone after a successful run'."
+        },
+        "items": [
+          {
+            "id": "cli-rotate-key.ac1",
+            "title": "pan vault rotate-key --yes --no-passphrase exits 0, prints 24 words whose phraseToKey equals the new vault/key file, and deletes keywrap/v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rotate-key.ac2",
+            "title": "Off a TTY without --yes the command exits 1 with 'Pass --yes to rotate the vault key without a prompt.' and every backend ref keeps its version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rotate-key.ac3",
+            "title": "When keywrap/v1 exists and no passphrase flag is given off a TTY, the command refuses with the passphrase-flag message before writing any ref or slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rotate-key.ac4",
+            "title": "With --generate-passphrase, unwrapVaultKey on the new keywrap/v1 with the printed passphrase returns the new vault key, and the run deletes vault/key.next",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rotate-key.ac5",
+            "title": "pan vault rotate-key --help lists --yes, --passphrase-file, --generate-passphrase and --no-passphrase, and scripts/lint-skills.sh passes against SKILL.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rejoin-after-rotation",
+        "title": "pan vault join replaces a retired key in place and discards unpublished objects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/vault/join.ts",
+            "tests/unit/cli/vault/join-passphrase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/join-passphrase.test.ts tests/unit/cli/vault/setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "join-passphrase.test.ts passes rejoin.ac1-ac3 and the existing join cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement decision D-10, FR-12 and WI-8 in src/cli/commands/vault/join.ts. (1) When an existing git clone is opened (not createdClone) refresh it before reading anything on every path, not only the passphrase path; VaultOfflineError keeps the local view as today. (2) Track whether the key came from the passphrase. On a header miss print, for the phrase path, 'The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.' (update PHRASE_MISMATCH_MESSAGE to this text) and, for the passphrase path, 'The passphrase unlocked a key this vault no longer uses. The vault key was rotated; use the new recovery phrase, or finish the rotation with pan vault rotate-key on the machine that started it.' (3) After the key verifies and before saveVaultKey, call store.discardUnpublished(). The local index and list cache are kept unchanged. Tests, in a new describe('join after rotation') block in tests/unit/cli/vault/join-passphrase.test.ts on the existing git fixture, rotating with rotateVaultKey from src/lib/vault/rotate.ts on machine A: 'rejoin.ac1: a stale machine joins with the new phrase file, keeps its local index, and its next save appends to the renamed record', 'rejoin.ac2: the old phrase prints the FR-12 message and writes nothing', 'rejoin.ac3: an untracked object left in the stale clone is gone after join and is never pushed'."
+        },
+        "items": [
+          {
+            "id": "rejoin-after-rotation.ac1",
+            "title": "Given machine A rotated, when stale machine B runs pan vault join with the new phrase file, then B's key file equals A's new key and B's next pan vault save appends to the record under its new ref name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rejoin-after-rotation.ac2",
+            "title": "Joining with the old recovery phrase after a rotation exits 1, prints the rotation-aware mismatch message, and leaves vault/key unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rejoin-after-rotation.ac3",
+            "title": "An untracked object file left in B's clone before re-join no longer exists after join, and no commit on the bare remote contains it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-rotation",
+        "title": "Two-machine end-to-end: rotate on A, stale B refused, B re-joins and resumes pre-rotation history",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/lib/vault/two-machine.e2e.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/two-machine.e2e.test.ts tests/unit/lib/vault/import-graph.test.ts"
+          ],
+          "expected_outputs": [
+            "two-machine.e2e.test.ts passes both the existing flow and the new rotation case; import-graph.test.ts stays green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-9: add `it('rotation: A rotates, B is refused, B re-joins and resumes pre-rotation history')` to tests/unit/lib/vault/two-machine.e2e.test.ts reusing the file's existing bare-remote and two-home fixtures. Flow: setup on A and join on B; save one transcript on each; count commits on the bare remote; on A run rotateKeyCommand({ yes: true, passphrase: false }) and capture the 24 printed words; on B run saveCommand for a grown transcript and assert exit 1, the retired-key message, and that the bare remote gained no commit beyond A's rotation; write the new phrase to a file and run joinCommand on B with --phrase-file; run resumeCommand on B for the record A saved before the rotation with --no-launch and assert the materialized native file contains every original line; rerun the existing plaintext scan over every object in the bare repository and assert no transcript text appears."
+        },
+        "items": [
+          {
+            "id": "e2e-rotation.ac1",
+            "title": "After A rotates, B's pan vault save exits 1 with the retired-key message and the bare remote gains no commit from B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-rotation.ac2",
+            "title": "After B joins with the new phrase, pan vault resume --no-launch on B materializes a pre-rotation record whose native file contains every original line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-rotation.ac3",
+            "title": "The plaintext scan over every object in the bare repository passes after the rotation and finds no transcript text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-rotation",
+        "title": "Document key rotation, the key ring and the batch store contract in session-vault.mdx and SESSION-VAULT.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:04:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4333",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/session-vault.mdx",
+            "docs/SESSION-VAULT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'rotate-key' configuration/session-vault.mdx docs/SESSION-VAULT.md",
+            "grep -n 'never changes' configuration/session-vault.mdx docs/SESSION-VAULT.md sync-sources/skills/pan-vault/SKILL.md src/cli/commands/vault/index.ts || true"
+          ],
+          "expected_outputs": [
+            "rotate-key appears in both doc files",
+            "no line claims the vault key never changes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-8",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement WI-10. configuration/session-vault.mdx: add '## Lost a device? Rotate the key' after 'Passphrase unlock' explaining that a lost or revoked machine can still read everything written before the rotation and nothing after it; the command `pan vault rotate-key` with --yes, --passphrase-file, --generate-passphrase and --no-passphrase; the confirmation; the new recovery phrase printed once; that every other machine then refuses with the retired-key message and re-joins with `pan vault join <backend>`; that on the git backend the user must also rotate or revoke the git credentials the lost machine had; and 'upgrade Overdeck on every machine before rotating' (older versions cannot read pre-rotation chunks through the ring). Change the <Warning> sentence 'the vault key never changes' to 'setting or removing a passphrase never changes the vault key'. Add a `~/.overdeck/vault/key.next` row to 'Where things live' (a rotation in progress; finish it with pan vault rotate-key). docs/SESSION-VAULT.md: add a 'Key rotation and the key ring' subsection under 'Encryption and the key' covering the header keyRing and rotatedAt fields, the retired-ref marker, that only chunks and WIP parts fall back through the ring, the crash-safe order (key.next, one casRefs batch, keywrap, key, phrase, key.next removed), the KeyGuardedStore header-version guard, and the residual dir-backend window (an unreferenced object sealed under the retired key in a millisecond race; never on git because join discards unpublished objects); extend the Model table Backend row with casRefs and discardUnpublished and state that a hosted store (PAN-4297) must pass the shared contract suite including them; replace '`K` never changes' in 'Passphrase unlock' with 'setting or removing a passphrase does not change `K`; only `pan vault rotate-key` does'; list rotate-key under Commands; add the retired-key, unfinished-rotation and rotation-aware mismatch messages to Troubleshooting; add keyring.ts and rotate.ts to the module map."
+        },
+        "items": [
+          {
+            "id": "docs-rotation.ac1",
+            "title": "configuration/session-vault.mdx contains a 'Lost a device? Rotate the key' section that shows pan vault rotate-key with its four flags and the pan vault join step for other machines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rotation.ac2",
+            "title": "docs/SESSION-VAULT.md contains a 'Key rotation and the key ring' subsection naming keyRing, rotatedAt, the retired-ref marker, casRefs and discardUnpublished, and its module map lists keyring.ts and rotate.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rotation.ac3",
+            "title": "grep for 'never changes' across session-vault.mdx, SESSION-VAULT.md, the pan-vault SKILL.md and vault/index.ts returns no sentence claiming the vault key never changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-cas-refs",
+        "to": "keyring-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "keyring-format",
+        "to": "keyring-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "keyring-format",
+        "to": "tolerant-readers",
+        "type": "blocks"
+      },
+      {
+        "from": "keyring-guard",
+        "to": "guarded-open-vault",
+        "type": "blocks"
+      },
+      {
+        "from": "tolerant-readers",
+        "to": "guarded-open-vault",
+        "type": "blocks"
+      },
+      {
+        "from": "store-cas-refs",
+        "to": "rotate-core",
+        "type": "blocks"
+      },
+      {
+        "from": "keyring-format",
+        "to": "rotate-core",
+        "type": "blocks"
+      },
+      {
+        "from": "keyring-guard",
+        "to": "rotate-core",
+        "type": "blocks"
+      },
+      {
+        "from": "rotate-core",
+        "to": "cli-rotate-key",
+        "type": "blocks"
+      },
+      {
+        "from": "rotate-core",
+        "to": "rejoin-after-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "store-cas-refs",
+        "to": "rejoin-after-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-rotate-key",
+        "to": "e2e-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "rejoin-after-rotation",
+        "to": "e2e-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "guarded-open-vault",
+        "to": "e2e-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-rotate-key",
+        "to": "docs-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "rejoin-after-rotation",
+        "to": "docs-rotation",
+        "type": "blocks"
+      },
+      {
+        "from": "guarded-open-vault",
+        "to": "docs-rotation",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

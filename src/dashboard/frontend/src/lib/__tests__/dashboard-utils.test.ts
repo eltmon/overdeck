@@ -13,4 +13,9 @@ describe('getFriendlyModelName', () => {
     expect(getFriendlyModelName('claude-sonnet-5-5')).toBe('Sonnet 5.5');
     expect(getFriendlyModelName('claude-sonnet-5')).toBe('Sonnet 5');
   });
+
+  it('keeps GPT-6.1 Sol and GPT-6 Sol distinct (PAN-4422)', () => {
+    expect(getFriendlyModelName('gpt-6.1-sol')).toBe('GPT-6.1 Sol');
+    expect(getFriendlyModelName('gpt-6-sol')).toBe('GPT-6 Sol');
+  });
 });

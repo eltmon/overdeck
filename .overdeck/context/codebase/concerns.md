@@ -184,6 +184,25 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
   header collector (`system-health/darwin.ts`) measured available memory with
   different formulas until PAN-4267 unified them.
+- **Agent-memory RAG (not the RAM governor) needs a credentialed provider**
+  (PAN-4370) — `memory.extraction.provider: anthropic` uses the Anthropic SDK,
+  which needs `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` in the dashboard and hook
+  env; a subscription-only host fails every extraction and query expansion (see
+  `health.json` `last_failure_detail` under `~/.overdeck/memory/<project>/<ws>/`).
+  `searchMemory` ANDs every quoted term (`buildMatchQuery`, `search.ts`), so a
+  raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
+  must search in OR mode. Expansion calls share `recordHealth` with extraction, so
+  `extractions_attempted` also counts expansion calls.
+
+- **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
+  — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
+  `dashboard/server/deacon-main.ts` starts (a separate Node process). A module
+  cache written by a hygiene routine (e.g. `setCachedMemoryVerdict`) is
+  invisible to `/api/*` routes in the main process and to `pan` CLI processes;
+  `getCachedMemoryVerdict()` is null there. Samplers that feed `/api/resources`
+  must run in main (`main.ts` next to `startResourcesSnapshotService`), and
+  gates must use a stateless read (PAN-4311). Likewise the runtime mirror behind
+  `getAgentRuntimeStateSync`/`isIdle` is populated only in the main process.
 
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
@@ -268,6 +287,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Origin checks never authenticate** — `validateOriginHeaders` passes a GET
+  (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
+  are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
+  (`isLoopbackPeer`, incl. Docker-bridge Traefik) belongs only in the session
+  mint. PAN-1166 routes all `/ws/*` upgrades through `ws-auth.ts`.
 - **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
   `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
   handles, never agent ids. Six server sites joined by `terminalId ?? id` and
@@ -303,5 +327,19 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   index/worktree/stash (temp `GIT_INDEX_FILE` seeded from a *copy* of the real index —
   an empty one drops force-added ignored files), async `execFile` only, and skip when the
   (base, tree) pair is unchanged.
+- **Vault git `casRefs` publishes every untracked object in the clone** — `casRefsSerialized`
+  (`src/lib/vault/store/git.ts`) runs `git add -A -- .`, so objects left untracked by an
+  earlier failed settle ride along with the next successful ref write. Anything that must
+  not publish stale objects (key rotation, re-join after rotation, PAN-4333) has to drop
+  them first with `discardUnpublished()`. Also: vault ref names are HMACs under the vault key, so a new key renames
+  every ref, and `settle` mints a truncated record when an owned record's ref is absent.
+
+- **The whole-document settings save is lossy** — `saveSettingsApi` →
+  `writeYamlConfigPreservingComments` (`src/lib/settings-api.ts`) replaces
+  `workhorses`/`roles` wholesale, writes env-derived `api_keys` back in plaintext
+  (there is no server-side key masking), drops `tts.summarizer.batch_window_seconds`
+  and `memory.features.knowledge_index`, and copies project `.pan.yaml` values into the
+  global file. Writers that must touch only named keys use a path-scoped
+  `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
 
 <!-- last-verified: 2026-09-29 -->

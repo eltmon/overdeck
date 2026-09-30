@@ -1,0 +1,699 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T14:00:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4331: Spike: `npx @overdeck/core` and Session Vault resume on native Windows",
+    "updated": "2026-09-29T14:06:06.411Z"
+  },
+  "plan": {
+    "id": "pan-4331",
+    "title": "Spike: `npx @overdeck/core` and Session Vault resume on native Windows",
+    "status": "running",
+    "uid": "df728e05-9dad-4d3b-bc0b-db4626756731",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T14:00:04Z",
+    "updated": "2026-09-29T14:06:06.411Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4331",
+        "label": "PAN-4331",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4331.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/anywhere-accounts.md",
+        "label": "Design §6.8",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "spike",
+      "windows",
+      "session-vault",
+      "ci",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Nobody has verified that npx @overdeck/core or the standalone pan vault B-flow (join → list → resume, with PAN-4329 code apply) works on native Windows or WSL2, yet the operator's case is to continue a Linux conversation after dual-booting into Windows. pan vault is not in the published 0.63.0, and Herdr likely does not run on Windows.",
+      "Proposal": "Build a reproducible windows-smoke GitHub Actions workflow: pack the branch-HEAD tarball exactly as release.yml does, build a Linux fixture vault (saved Claude Code conversation plus uncommitted/unpushed code), run a probe on windows-2022 under pwsh and Git Bash (steps 1a-4f) and in WSL2 (5a plus the B-flow), and summarize the per-step results into a markdown table with verbatim errors. Post the table on #4331, file one issue per blocking root cause, update PAN-3762 NFR-9, and add Windows sections to docs/SESSION-VAULT.md and configuration/session-vault.mdx that state only what the run verified.",
+      "NonGoals": "- Fixing any failure the spike finds (vault, dashboard, Herdr, resume spawn, command quoting); no changes under src/.\n- Making Herdr or tmux run on Windows.\n- Testing on Windows 11, on a local VM, or a real dual-boot.\n- Adding windows-smoke to ci.yml or making it a required check.\n- Using any Claude or Anthropic credentials in CI.\n- Testing a WSL cwd under /mnt/c, the Electron desktop app (#531), Codex resume on Windows, or the PAN-4293 sign-in flow.\n- Creating configuration/anywhere-sign-in.mdx (owned by PAN-4293)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Run the spike on GitHub-hosted windows-2022 runners instead of a Windows 11 VM.",
+        "rationale": "The only local VM (win11-snapcam) has no disk image (~/VMs is empty) and auto mode has no operator to drive a VM; the repo is public so hosted minutes are free, and release.yml already uses Windows runners. Docs name the real environment and never claim Windows 11."
+      },
+      {
+        "summary": "Test the npm-packed branch-HEAD tarball, plus two rows against published @overdeck/core@latest.",
+        "rationale": "pan vault (PAN-2609) and code apply (PAN-4329) landed after v0.63.0, so the published package cannot run the B-flow; packing with bun install --frozen-lockfile, bun run build, npm pack --ignore-scripts reproduces release.yml."
+      },
+      {
+        "summary": "Run the native probe under both pwsh and Git Bash.",
+        "rationale": "pwsh has no HOME (USERPROFILE path) while Git Bash exports a POSIX-style HOME; the issue asks specifically about USERPROFILE/HOME resolution."
+      },
+      {
+        "summary": "Put the user-facing Windows section in configuration/session-vault.mdx instead of configuration/anywhere-sign-in.mdx.",
+        "rationale": "anywhere-sign-in.mdx does not exist; PAN-4293 owns creating it, and session-vault.mdx is the existing user page for the B-flow."
+      },
+      {
+        "summary": "Keep windows-smoke as a workflow_dispatch plus paths-filtered push workflow after the spike.",
+        "rationale": "Filed blocker issues need a way to prove their fix; the paths filter keeps it off normal CI."
+      },
+      {
+        "summary": "Join the fixture vault with a fixed test passphrase and a local bare git repo backend.",
+        "rationale": "Avoids parsing the recovery phrase from stdout, exercises a real git backend with a Windows path, and needs no secrets because the vault is throwaway."
+      }
+    ],
+    "items": [
+      {
+        "id": "fixture-script",
+        "title": "Add the Linux fixture builder scripts/windows-smoke/make-fixture.sh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "scripts/windows-smoke/make-fixture.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/windows-smoke/make-fixture.sh",
+            "gh run view <windows-smoke run id> --log (job fixture)"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "the fixture job exits 0 and uploads the \"fixture\" artifact with origin.git, vault.git, passphrase.txt and fixture.json"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4331.md work item W1 exactly: a bash script (set -euo pipefail) taking one output dir OUT, using an isolated HOME=$OUT/home and OVERDECK_HOME=$OUT/home/.overdeck, that builds a bare origin.git with one pushed commit (README.md, lf.txt), a clone carrying an unpushed commit \"fixture: unpushed commit\", a modified lf.txt, a CRLF crlf.txt, an executable run.sh (100755), a symlink link-to-lf and an untracked notes-untracked.txt; writes a 4-line Claude Code transcript for session 11111111-2222-4333-8444-555555555555 under $HOME/.claude/projects/<slug>/ with the line shape of tests/unit/lib/vault/materialize.test.ts line 19-21; writes passphrase.txt (\"windows smoke fixture passphrase 42\"); runs `npx --yes \"$SUBJECT_TGZ\" vault setup \"$OUT/vault.git\" --passphrase-file \"$OUT/passphrase.txt\"` and `vault save <session>` (must print \"appended\"), then `vault sync` so the list cache holds the record (save does not refresh it); writes fixture.json { sessionId, originBranch, expected: { \"lf.txt\", unpushedSubject, changedPaths } }."
+        },
+        "items": [
+          {
+            "id": "fixture-script.ac1",
+            "title": "Given a packed subject tarball in SUBJECT_TGZ, when make-fixture.sh runs on Linux with a fresh output dir, then it exits 0 and creates origin.git, vault.git, passphrase.txt and fixture.json there.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-script.ac2",
+            "title": "Given the fixture was built, when `vault list --json` runs with the fixture OVERDECK_HOME, then its output contains session id 11111111-2222-4333-8444-555555555555.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-script.ac3",
+            "title": "When `vault save` does not print \"appended\", then make-fixture.sh exits non-zero and prints the save output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-script.ac4",
+            "title": "When make-fixture.sh runs, then it creates files only under OUT and preserves the runner user's real ~/.overdeck and ~/.claude unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "probe-windows",
+        "title": "Add the native Windows probe scripts/windows-smoke/probe.ps1",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "test",
+          "files_scope": [
+            "scripts/windows-smoke/probe.ps1"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh run view <windows-smoke run id> --log (job windows, both matrix legs)"
+          ],
+          "expected_outputs": [
+            "each leg uploads results-windows-<shell> containing one JSON file with every catalogue step id exactly once"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W2: a PowerShell 7 script with params -Env -Subject -Fixture -Out that clones the fixture origin.git into $env:RUNNER_TEMP\\w\\proj, then runs step ids 1a,1b,1c,1d,2a,2b,3a,3b,3c,3d,3e,3f,3g,4a,4b,4c,4d,4e,4f,5a exactly as the PRD \"Step catalogue\" table defines (5a emitted as not-run with note \"native env\"), via an Invoke-Step helper that wraps each step in try/catch, captures combined output (last 4000 chars), exit code and status (pass|fail|partial|not-run). 1c starts `serve --port 3011` with Start-Process and OVERDECK_INTERNAL_TOKEN set, polls 90 s; 2b POSTs /api/conversations with Origin http://localhost:3011 and x-overdeck-internal-token; after 2b kill the server tree with taskkill /T /F. 3e follows checkpoint CP-2 (two claude --resume runs, compare outputs). Writes the Results JSON schema from the PRD as UTF-8 without BOM."
+        },
+        "items": [
+          {
+            "id": "probe-windows.ac1",
+            "title": "When a step throws or exits non-zero, then the probe records it as fail with its verbatim output and still runs every later step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-windows.ac2",
+            "title": "The probe produces a results file that contains each step id from the PRD step catalogue exactly once, with status one of pass, fail, partial or not-run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-windows.ac3",
+            "title": "Step 2b sends the Origin and x-overdeck-internal-token headers, so its recorded response is never the validateOrigin 403.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-windows.ac4",
+            "title": "Step 3e records both `claude --resume` outputs (materialized id and the all-zero UUID) and applies the CP-2 rule for pass versus partial.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-windows.ac5",
+            "title": "The probe emits the runner, node and git versions and the subject tarball name in the top-level JSON fields.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "probe-wsl",
+        "title": "Add the WSL probe scripts/windows-smoke/probe-wsl.sh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "scripts/windows-smoke/probe-wsl.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/windows-smoke/probe-wsl.sh",
+            "gh run view <windows-smoke run id> --log (job wsl)"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "the wsl job uploads results-wsl2 (or results-wsl1-fallback) with every step id exactly once"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W3: a bash script run inside the Ubuntu-24.04 WSL distro that installs Node 22 into ~/node and `npm i -g @anthropic-ai/claude-code` (needed by 3e/3g), copies the fixture from /mnt/<drive> into ~/fx, clones origin.git to ~/w/proj, runs step ids 3a-4f with the same semantics as the Windows probe but with Linux paths, embeds the wsl status file passed as --wsl-status as the evidence of step 5a, emits 1a-2b as not-run with note \"dashboard not in scope for WSL row\", and writes the Results JSON (built with node -e for escaping) to the /mnt path given by --out. A `step` function with set +e inside ensures a failure never aborts later steps."
+        },
+        "items": [
+          {
+            "id": "probe-wsl.ac1",
+            "title": "When run inside WSL with the fixture and subject tarball, then it writes a results file whose env is wsl2 (or wsl1-fallback when passed --env wsl1-fallback) with every catalogue step id exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-wsl.ac2",
+            "title": "The WSL results file records steps 1a through 2b as not-run with the note \"dashboard not in scope for WSL row\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-wsl.ac3",
+            "title": "When a step fails, then the script records fail with verbatim evidence and continues with the next step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "probe-wsl.ac4",
+            "title": "When the WSL probe runs the B-flow, then its cwd is the Linux-filesystem path ~/w/proj, never a /mnt/c path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summarize",
+        "title": "Add the results summarizer scripts/windows-smoke/summarize.mjs with a unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "test",
+          "files_scope": [
+            "scripts/windows-smoke/summarize.mjs",
+            "tests/unit/scripts/windows-smoke-summarize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/windows-smoke-summarize.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "windows-smoke-summarize.test.ts passes",
+            "lint and typecheck complete without errors"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W4: a dependency-free Node ESM script exporting renderTable(results) and, when run as main, reading every *.json in the given dir and printing markdown: a header (run URL from GITHUB_SERVER_URL/GITHUB_REPOSITORY/GITHUB_RUN_ID when set, subject, per-env runner/node/git), the table (rows = step ids with short titles, columns in order windows-pwsh, windows-gitbash, wsl2 then any other env; cells \"✅ pass\", \"❌ fail: <first evidence line ≤120 chars, | escaped>\", \"⚠️ partial: <note>\", \"— not-run\", \"missing\"), then \"## Details\" with a <details> block per non-pass cell holding command, exit code and fenced verbatim evidence. Add the unit test named in files_scope."
+        },
+        "items": [
+          {
+            "id": "summarize.ac1",
+            "title": "Given a results object with a fail whose evidence contains \"|\", when renderTable runs, then the cell text contains \"\\|\" and the table keeps one column per env.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summarize.ac2",
+            "title": "Given a results file missing step 3c, when renderTable runs, then the 3c cell for that env renders \"missing\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summarize.ac3",
+            "title": "Given a pass and a fail, when renderTable runs, then only the fail produces a <details> block containing its verbatim evidence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workflow",
+        "title": "Add the windows-smoke GitHub Actions workflow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "infra",
+          "files_scope": [
+            ".github/workflows/windows-smoke.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/windows-smoke.yml','utf8'))\"",
+            "gh run list --workflow windows-smoke.yml --branch feature/pan-4331"
+          ],
+          "expected_outputs": [
+            "the YAML parses without error",
+            "a windows-smoke run appears for the branch push"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W5: .github/workflows/windows-smoke.yml with triggers workflow_dispatch and push (paths: the workflow file and scripts/windows-smoke/**), permissions contents: read, and jobs pack (ubuntu-latest: setup-node 22, setup-bun, bun install --frozen-lockfile, bun run build, CP-1 tarball check `tar tzf | grep dist/dashboard/server.js`, npm pack --ignore-scripts, upload \"subject\"), fixture (needs pack; make-fixture.sh; upload origin.git, vault.git, passphrase.txt, fixture.json as \"fixture\"), windows (windows-2022, needs pack+fixture, matrix shell [pwsh, gitbash], fail-fast false, npm i -g @anthropic-ai/claude-code, probe with continue-on-error, upload results-windows-<shell>), wsl (windows-2022, Vampire/setup-wsl@v7 Ubuntu-24.04 wsl-version 2, record wsl --status and wsl -l -v, CP-3 fallback to wsl-version 1 with env wsl1-fallback, run probe-wsl.sh, upload results-wsl2), summary (ubuntu-latest, needs windows+wsl, if: always(), summarize.mjs to $GITHUB_STEP_SUMMARY and artifact windows-smoke-table). timeout-minutes: pack 20, fixture 10, windows 25, wsl 30, summary 5. Actions: checkout@v4, setup-node@v4, setup-bun@v2, upload/download-artifact@v4."
+        },
+        "items": [
+          {
+            "id": "workflow.ac1",
+            "title": "When the workflow file is read, then it contains triggers workflow_dispatch and on push only when the workflow file or scripts/windows-smoke/** changes; it is not referenced from ci.yml.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow.ac2",
+            "title": "The workflow contains timeout-minutes on every job, and the windows matrix runs both pwsh and gitbash legs with fail-fast false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow.ac3",
+            "title": "The summary job runs with if: always() and uploads an artifact named windows-smoke-table even when a probe job fails.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workflow.ac4",
+            "title": "The pack job fails before upload when the tarball lacks package/dist/dashboard/server.js.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-matrix",
+        "title": "Run windows-smoke and post the results table on #4331",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "spike",
+          "files_scope": [
+            ".pan/drafts/pan-4331.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 4331 --comments",
+            "grep -n \"^## Results\" .pan/drafts/PAN-4331.md"
+          ],
+          "expected_outputs": [
+            "a #4331 comment contains the results table and a windows-smoke run URL",
+            "the PRD contains a ## Results section with the same table"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W6: push the branch (hazard H-1 fallback for workflow-scope rejection), wait for the whole windows-smoke run with one `gh run watch <id> --exit-status`, fix and re-push only harness errors (a job that fails before its probe writes results), then download windows-smoke-table, post it with `gh issue comment 4331 --body-file`, and append it to .pan/drafts/PAN-4331.md as \"## Results (run <id>, <sha>)\". The tracked PRD may be .pan/drafts/pan-4331.md or .pan/drafts/PAN-4331.md after promotion: edit the file `git ls-files .pan/drafts | grep -i 'pan-4331.md'` prints and never create the other case. Runs triggered before all five harness items are pushed are expected to fail; only a run on a commit containing all five counts."
+        },
+        "items": [
+          {
+            "id": "run-matrix.ac1",
+            "title": "A windows-smoke run for the branch produces all five job results, and its windows-smoke-table artifact contains columns for windows-pwsh, windows-gitbash and wsl2 (or wsl1-fallback).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-matrix.ac2",
+            "title": "Issue #4331 shows a comment that contains the table and the run URL, and every non-pass cell in it carries a verbatim error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-matrix.ac3",
+            "title": "The tracked PRD draft for PAN-4331 contains a \"## Results\" section naming the run id and subject commit with the same table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-blockers",
+        "title": "File one issue per blocking failure and link them on #4331",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "spike",
+          "files_scope": [
+            ".pan/drafts/pan-4331.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh issue view 4331 --comments",
+            "gh search issues \"Found by PAN-4331\" --repo eltmon/overdeck"
+          ],
+          "expected_outputs": [
+            "a #4331 comment lists every filed blocker as \"- #<n> — step <id> (<envs>)\" or states none were blocking"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W7: apply the FR-7 blocking definition (fail in 1c, 3a, 3b, 3c, 3d, 3g, 4a, 4b, 4c in any env — 5a is NOT blocking because a WSL2 start failure on a hosted runner is a GitHub environment limit — plus 2b when the error does not name the missing Herdr backend and its fix) to the results; group failures with one root cause across envs; for each, `gh issue create --repo eltmon/overdeck` with the body shape in W7 (Found by PAN-4331 + run URL, Part of PAN-2350, envs, command, exact error fenced, suspected code location, ## Acceptance criteria with \"windows-smoke shows step <id> as pass\"). Comment on #4331 with the list; append the same list under the PRD Results section. The tracked PRD may be .pan/drafts/pan-4331.md or .pan/drafts/PAN-4331.md after promotion: edit the file `git ls-files .pan/drafts | grep -i 'pan-4331.md'` prints and never create the other case."
+        },
+        "items": [
+          {
+            "id": "file-blockers.ac1",
+            "title": "Each distinct FR-7 blocking root cause produces exactly one new issue whose body contains \"Found by PAN-4331\", the exact error in a fenced block and an ## Acceptance criteria section.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-blockers.ac2",
+            "title": "Issue #4331 shows a comment that contains every filed issue as \"- #<n> — step <id> (<envs>)\", or stating that no step was blocking.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-blockers.ac3",
+            "title": "When failures share a root cause across environments, then W7 produces one issue that names all affected environments.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nfr9-update",
+        "title": "Record the Windows outcome in PAN-3762 NFR-9",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "docs",
+          "files_scope": [
+            ".pan/drafts/pan-3762.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"NFR-9\" .pan/drafts/pan-3762.md",
+            "gh issue view 3762 --comments"
+          ],
+          "expected_outputs": [
+            "the NFR-9 line contains \"PAN-4331\"",
+            "a #3762 comment carries the same outcome sentence"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W8: in .pan/drafts/pan-3762.md, on the line starting \"- **NFR-9 — Platform scope.**\", keep the existing text and append one sentence naming which Windows paths continue a vault conversation per the run (native standalone, WSL2, both or neither), with the run link and blocker issue numbers. Post the same sentence with `gh issue comment 3762`. Renumber nothing."
+        },
+        "items": [
+          {
+            "id": "nfr9-update.ac1",
+            "title": "The NFR-9 line in .pan/drafts/pan-3762.md preserves its original text and contains a sentence that names PAN-4331, the verified Windows path(s) and the run link.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nfr9-update.ac2",
+            "title": "Issue #3762 shows a comment that contains the same sentence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-windows",
+        "title": "Add the verified Windows sections to the Session Vault docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:00:04Z",
+        "metadata": {
+          "issueLabel": "pan-4331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"^## Windows\" docs/SESSION-VAULT.md configuration/session-vault.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both files contain a ## Windows heading",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W9: append \"## Windows\" at the end of docs/SESSION-VAULT.md and insert \"## Windows\" immediately before \"## Where things live\" in configuration/session-vault.mdx. Apply the W9 decision rule: native standalone is \"supported\" only if 3a, 3b, 3c, 3d, 4a, 4b, 4c pass in windows-pwsh (\"supported with --no-launch\" when only 3g fails, linking its issue); WSL2 is \"supported\" only if 5a and 3a-4c pass in wsl2; one sentence each for what 1c and 2b showed on the dashboard; name the exact environment (Windows Server 2022, GitHub windows-2022 runner, Node and Git versions), the date and run link; list observed 4d-4f line-ending/exec-bit/symlink behavior; mention Windows 11 and dual-boot only as not verified."
+        },
+        "items": [
+          {
+            "id": "docs-windows.ac1",
+            "title": "Each of docs/SESSION-VAULT.md and configuration/session-vault.mdx contains a \"## Windows\" section that names the GitHub windows-2022 runner with Node and Git versions and links the run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-windows.ac2",
+            "title": "Each Windows section contains native standalone and WSL2 support exactly as the W9 decision rule yields from the Results table, and links every filed blocker issue it mentions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-windows.ac3",
+            "title": "Neither section contains a claim of Windows 11 or dual-boot support; both describe them as not verified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-windows.ac4",
+            "title": "Each Windows section contains the observed line-ending, exec-bit and symlink results from steps 4d, 4e and 4f.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fixture-script",
+        "to": "run-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "probe-windows",
+        "to": "run-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "probe-wsl",
+        "to": "run-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "summarize",
+        "to": "run-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "workflow",
+        "to": "run-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "run-matrix",
+        "to": "file-blockers",
+        "type": "blocks"
+      },
+      {
+        "from": "file-blockers",
+        "to": "nfr9-update",
+        "type": "blocks"
+      },
+      {
+        "from": "file-blockers",
+        "to": "docs-windows",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4331-spike-npx-overdeck-core-and-session-vault-resume-on-native-windows.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

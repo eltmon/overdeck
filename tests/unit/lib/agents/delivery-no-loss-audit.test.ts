@@ -69,6 +69,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/review-convoy.ts|const resumeResult = await resumeAgent(reviewerAgent, prompt);',
   'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(',
   'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(target.agentId, message, \'internal\', {',
+  'lib/cloister/conflict-repair.ts|return await messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true, dedupKey });',
+  'lib/cloister/conflict-repair.ts|return messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true });',
   'lib/cloister/service-reactive.ts|await (await import(\'../agents/messaging.js\')).messageAgent(',
   'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',

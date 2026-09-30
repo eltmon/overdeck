@@ -87,11 +87,24 @@ What it does:
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `.pan/specs/` in the project repo (or the configured plan-home repo for polyrepo projects), commit and push the feature branch, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
 5. Returns a summary of finalized xBRIEF tasks and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs xBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs xBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues. Use `--critic` to require a plan critique (see "Plan critic" below) on an issue that has no critic label.
 
 ### PRD-first gate
 
 Finalize and complete-planning refuse to promote a plan unless a **PRD draft** of at least 20 lines exists for the issue. `roles/plan.md` has always required the PRD as the first artifact; this gate makes it mechanical. The gate searches, in order, for `<ISSUE-ID>.md` (uppercase then lowercase) under `<projectRoot>/.pan/drafts/` then `<workspace>/.pan/drafts/`; the first existing file with ≥20 lines satisfies it. A found-but-thinner draft fails with its line count; a fully missing draft fails naming the canonical path to write. `pan start <id> --auto` is structurally exempt (it synthesizes a minimal xBRIEF and never POSTs complete-planning, so the gate cannot block it). Use `--no-prd` (on `finalize` or `done`) only for a genuinely trivial issue that went through interactive planning anyway — it prints a yellow `⚠ PRD gate SKIPPED` warning and tells the endpoint to skip the check too.
+
+### Plan critic
+
+A flagged plan gets one independent critique before finalize promotes it (PAN-4341). A plan is flagged when its issue carries the label `architecture`, `substrate-improvement` or `security`, or when finalize runs with `--critic`. There is no bypass flag; the operator's bypass is removing the label. If the labels cannot be read, finalize warns and treats the plan as not flagged.
+
+- **Config.** Set `roles.plan.sub.critic.model` in `~/.overdeck/config.yaml` to a model from a different family than the planner (for example a GPT model under a Claude planner). There is no default. When it is unset or in the planner's family, finalize refuses.
+- **Dispatch.** On a missing or stale critique, finalize starts one read-only worker named `plan-critic-r<N>` on that model, waits up to 540 s for its report, and writes `.pan/drafts/<ISSUE>-critique.md` (round 2: `<ISSUE>-critique-2.md`) next to the PRD. Line 1 is `plan-digest: <sha256>` of the draft without lifecycle and finalize-stamp fields.
+- **Findings.** Each finding is a heading `## blocks-the-design: <title>`, `## sharpens-framing: <title>` or `## footnote: <title>`. Only `blocks-the-design` findings block.
+- **Answering.** Answer each `blocks-the-design` finding with a `### <title>` heading under `## Critique response` in the PRD, then re-run finalize. Change the draft only when the finding requires it; a changed draft makes the critique stale and starts the next round. Never edit the critique file.
+- **Cap.** After two rounds finalize proceeds, and complete-planning lists unanswered titles under `### Unresolved after two critic rounds` in the PRD.
+- **Exit code.** Any critique-gate refusal exits 5. With `--json` it prints `{ "success": false, "error": "Plan critique gate failed", "message", "critiqueGate" }`. The Done button and `pan plan done` verify the same gate and return 422 when a required critique is missing; they never start a critic.
+
+When the issue is flagged, run `pan plan finalize` with a 600 s Bash timeout or `run_in_background: true`; a finalize killed mid-wait leaves the critic running, and the next run waits on it.
 
 ## Completing planning (`pan plan done`)
 

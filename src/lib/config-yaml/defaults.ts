@@ -247,6 +247,13 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorPsiCalmWindowMs: 600_000,
     governorCpuSoftLoadPerCore: 1.5,
     governorCpuRecoveryLoadPerCore: 1,
+    dashboardCpuWeight: 1000,
+    verificationCpuWeight: 20,
+    agentNice: 10,
+    laneNice: 15,
+    governorCpuPsiHoldAvg60: 50,
+    governorCpuPsiRecoveryAvg60: 25,
+    governorCpuHoldDispatch: false,
   },
   issues: {
     closedWindowDays: 14,

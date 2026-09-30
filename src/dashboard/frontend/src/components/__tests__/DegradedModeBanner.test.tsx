@@ -17,6 +17,7 @@ const LIVE: ConnectionInputs = {
   serverReachable: true,
   streamLive: true,
   restarting: false,
+  sessionAuthFailed: false,
   hasSnapshot: true,
   lastLiveAt: LAST_LIVE_AT,
 };
@@ -109,6 +110,15 @@ describe('DegradedModeBanner', () => {
     expect(el?.textContent).toContain('PAN-4279');
     expect(el?.textContent).toContain('(post-merge deploy)');
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('reports an unauthorized session with a Retry and no Force Restart', () => {
+    renderAfterLive({ sessionAuthFailed: true });
+    const el = banner();
+    expect(el?.dataset.phase).toBe('unauthorized');
+    expect(el?.textContent).toContain('docs/DASHBOARD-AUTH.md');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Force Restart' })).toBeNull();
   });
 
   it('confirms recovery for 2.5 s after an outage, then hides', () => {

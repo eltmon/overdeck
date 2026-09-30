@@ -9,14 +9,7 @@ import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
-import {
-  OVERDECK_HOME,
-  SKILLS_DIR,
-  COMMANDS_DIR,
-  AGENTS_DIR,
-  CLAUDE_DIR,
-  ohmypiExtensionCandidates,
-} from '../../lib/paths.js';
+import { OVERDECK_HOME, SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, CLAUDE_DIR, ohmypiExtensionCandidates } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentState } from '../../lib/agents.js';
 import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
@@ -25,11 +18,8 @@ import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
-import {
-  checkSystemPrerequisite,
-  type PrerequisiteProbe,
-  type PrerequisiteResolver,
-} from '../../lib/system-prerequisites.js';
+import { checkKimi } from './doctor-kimi.js';
+import { checkSageox } from './doctor-sageox.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
@@ -42,6 +32,7 @@ import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
+import { checkMemoryExtraction } from './doctor-memory-provider.js';
 import { checkOllama } from './doctor-ollama.js';
 import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
@@ -57,6 +48,7 @@ import {
   readDockerDaemonPools,
 } from '../../lib/docker-bridge-pool.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
+export { checkKimi };
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 const execAsync = promisify(exec);
@@ -70,27 +62,6 @@ function compareSemver(a: string, b: string): number {
     if (da !== db) return da - db;
   }
   return 0;
-}
-
-export async function checkKimi(
-  probe?: PrerequisiteProbe,
-  resolver?: PrerequisiteResolver,
-): Promise<CheckResult[]> {
-  const kimi = await checkSystemPrerequisite('kimi', probe, resolver);
-  if (!kimi.found) {
-    return [{
-      name: kimi.name,
-      status: 'warn',
-      message: 'Not installed (optional ACP harness)',
-      fix: `Install: ${kimi.install.linux}`,
-    }];
-  }
-
-  return [{
-    name: kimi.name,
-    status: 'ok',
-    message: kimi.version ?? 'Installed (version unknown)',
-  }];
 }
 
 export function checkCodex(): CheckResult[] {
@@ -772,6 +743,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  for (const c of await checkSageox()) checks.push(c); // PAN-2444: ox host contract + pack commit
   for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons
   for (const c of await checkClaudeCode()) checks.push(c); // PAN-4359: version vs model minimums + shadows
 
@@ -825,7 +797,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     });
   }
 
-  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout()); // PAN-3327, PAN-3881
+  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout(), (await import('./doctor-okf-skill.js')).checkOkfSkillVersion()); // PAN-3327, PAN-3881, PAN-4408
   checks.push(await checkCliGenerationLink());
 
   // Check environment variables
@@ -885,6 +857,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }));
   checks.push(checkOrphanProposedSpecs());
   checks.push(checkTierFitnessConfig()); // PAN-3842
+  checks.push(await checkMemoryExtraction()); // PAN-4370
   checks.push(...await checkMainDivergence());
   checks.push(await checkPlanHomePanIgnore()); // PAN-3996
   try {

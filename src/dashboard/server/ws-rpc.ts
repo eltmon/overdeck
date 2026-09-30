@@ -8,10 +8,10 @@ import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agen
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
+import { Deferred, Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
 import { existsSync, watch as fsWatch } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
@@ -46,7 +46,9 @@ import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
 import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
-import { validateOrigin } from './routes/origin-validation.js';
+import { authorizeDashboardUpgrade } from './ws-auth.js';
+import { registerDeviceConnection } from './device-connections.js';
+import type { HeaderMap } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
@@ -1178,6 +1180,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
  * The transport layer (WsRpcLayer + RpcSerialization.layerJson) is
  * provided inline so only ServerConfig leaks into the outer composition.
  */
+export function rejectUnauthorizedRpcUpgrade(
+  request: HttpServerRequest.HttpServerRequest,
+): HttpServerResponse.HttpServerResponse | null {
+  const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+  return auth.ok ? null : jsonResponse({ error: auth.message }, { status: auth.status });
+}
+
 export const websocketRpcRouteLayer = Layer.unwrap(
   Effect.gen(function* () {
     const rpcWebSocketHttp = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(
@@ -1191,15 +1200,20 @@ export const websocketRpcRouteLayer = Layer.unwrap(
 
     return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      // Hotfix for #1166: PAN-457's cookie-auth gate is removed here for the
-      // same reason as ws-terminal — origin validation is the security
-      // boundary for browser callers, and the cookie can't be minted without
-      // the URL-hash bootstrap that only `pan up` injects.
-      const originCheck = validateOrigin(request);
-      if (!originCheck.ok) {
-        return jsonResponse({ error: originCheck.error }, { status: 403 });
-      }
-      return yield* rpcWebSocketHttp;
+      const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+      if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
+      if (auth.credential.kind !== 'device') return yield* rpcWebSocketHttp;
+      // PAN-3762: revoking the device interrupts this socket's handler, which
+      // closes the socket (Effect's release closes it without a code, so this
+      // one cannot send 4401). The client's reconnect then gets 401.
+      const revoked = Deferred.makeUnsafe<void>();
+      const unregister = registerDeviceConnection(auth.credential.deviceId, () => {
+        Deferred.doneUnsafe(revoked, Effect.void);
+      });
+      return yield* Effect.raceFirst(
+        rpcWebSocketHttp,
+        Deferred.await(revoked).pipe(Effect.as(HttpServerResponse.empty())),
+      ).pipe(Effect.ensuring(Effect.sync(unregister)));
     }));
   }),
 );

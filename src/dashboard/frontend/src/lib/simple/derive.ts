@@ -34,6 +34,8 @@ export interface SimpleIssueDerivation {
   expectation: string | null;
   /** Newest agent activity — for the Finished section. */
   activityAt: string | null;
+  /** PAN-4399: the recorded error for a gave-up post-planning auto-start, or null. */
+  workStartError: string | null;
 }
 
 function formatDuration(mins: number): string {
@@ -170,6 +172,7 @@ export function deriveSimpleIssue(
     expectation: deriveExpectation(primaryAgent, issue.taskCounts ?? null),
     prUrl: derived?.pr?.url ?? null,
     activityAt: lastAgentActivity ?? null,
+    workStartError: derived?.workStart?.status === 'not-started' ? derived.workStart.error ?? null : null,
   };
 }
 

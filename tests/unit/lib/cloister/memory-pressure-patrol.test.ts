@@ -399,7 +399,107 @@ describe('memory-pressure-patrol', () => {
       });
 
       expect(emitted[0].message).not.toContain('admits nothing');
-      expect(emitted[0].message).toContain('conversations, pan start, and dashboard Start are not blocked');
+      expect(emitted[0].message).toContain('Conversations, operator pan start, and dashboard Start are never blocked');
+    });
+
+    describe('CPU pressure (PAN-4311)', () => {
+      const cpuTrigger = {
+        kind: 'cpu' as const,
+        readingBytes: 0,
+        thresholdBytes: 0,
+        at: Date.UTC(2026, 8, 28, 14, 5),
+        cpuSignal: 'psi-some-avg60' as const,
+        cpuReading: 55,
+        cpuThreshold: 50,
+      };
+      const baseDeps = (emitted: any[], assess: () => Promise<MemoryVerdict>, extra: object = {}) => ({
+        assess,
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        readCpuRecovery: () => ({ psiAvg60: 25, loadPerCore: 1 }),
+        readNewKernelJournal: async () => '',
+        census: async () => ({ processAvailable: false }) as any,
+        logCalibration: () => {},
+        emit: (entry: any) => emitted.push(entry),
+        ...extra,
+      });
+
+      it('names CPU pressure and the CPU recovery threshold for a cpu trigger', async () => {
+        const emitted: any[] = [];
+        await patrolMemoryPressure(baseDeps(emitted, async () => ({
+          band: 'soft',
+          availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
+          trigger: cpuTrigger,
+        })));
+
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0].message).toContain('CPU pressure (PSI some avg60) reached 55.0%');
+        expect(emitted[0].message).toContain('falls below the 25% (PSI some avg60) recovery threshold');
+        expect(emitted[0].message).not.toContain('before trigger details were available');
+      });
+
+      it('emits a fresh entry when a memory hold becomes a CPU hold', async () => {
+        const emitted: any[] = [];
+        let verdict: MemoryVerdict = {
+          band: 'soft',
+          availableBytes: 7 * GIB,
+          thresholds: THRESHOLDS,
+          trigger: { kind: 'soft-dip', readingBytes: 7 * GIB, thresholdBytes: 8 * GIB, at: cpuTrigger.at },
+        };
+        const deps = baseDeps(emitted, async () => verdict);
+
+        await patrolMemoryPressure(deps);
+        await patrolMemoryPressure(deps);
+        verdict = { band: 'soft', availableBytes: 20 * GIB, thresholds: THRESHOLDS, trigger: cpuTrigger };
+        await patrolMemoryPressure(deps);
+        await patrolMemoryPressure(deps);
+
+        expect(emitted).toHaveLength(2);
+        expect(emitted[0].message).toContain('available memory dipped');
+        expect(emitted[1].message).toContain('CPU pressure (PSI some avg60)');
+      });
+
+      it('logs one calibration line per 5 minutes', async () => {
+        const lines: string[] = [];
+        let now = 1_000_000;
+        const deps = baseDeps([], async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
+          psiCpuSomeAvg10: 12.5,
+          psiCpuSomeAvg60: 40,
+          loadPerCore: 0.75,
+        }), { now: () => now, logCalibration: (line: string) => lines.push(line) });
+
+        await patrolMemoryPressure(deps);
+        now += 4 * 60_000;
+        await patrolMemoryPressure(deps);
+        now += 60_000;
+        await patrolMemoryPressure(deps);
+
+        expect(lines).toEqual([
+          '[deacon] cpu-pressure sample psi_some_avg10=12.50 psi_some_avg60=40.00 load_per_core=0.75',
+          '[deacon] cpu-pressure sample psi_some_avg10=12.50 psi_some_avg60=40.00 load_per_core=0.75',
+        ]);
+      });
+
+      it('prints n/a for CPU PSI when it is unavailable', async () => {
+        const lines: string[] = [];
+        await patrolMemoryPressure(baseDeps([], async () => ({
+          band: 'ok',
+          availableBytes: 20 * GIB,
+          thresholds: THRESHOLDS,
+          psiCpuSomeAvg10: null,
+          psiCpuSomeAvg60: null,
+          loadPerCore: 1.2,
+        }), { now: () => 0, logCalibration: (line: string) => lines.push(line) }));
+
+        expect(lines).toEqual(['[deacon] cpu-pressure sample psi_some_avg10=n/a psi_some_avg60=n/a load_per_core=1.20']);
+      });
     });
 
     it('reports macOS critical memory pressure by name and in the details block', async () => {

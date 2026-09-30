@@ -19,6 +19,12 @@
  * associated data, so a value cannot be moved between refs. Every decrypted ref
  * value carries `type`; readers return null for a type they do not know (P-19).
  *
+ * Key ring (PAN-4333): a rotation re-seals every ref under the new key and
+ * keeps the retired keys in the header's `keyRing`. Chunks and WIP parts keep
+ * the key they were sealed under, so `decodeChunk` and `decodeWipParts` try the
+ * current sub-keys and then each `keys.previous` entry. Encoding and ref
+ * reads use only the current key.
+ *
  * node:crypto and node:zlib only (NFR-9). Imports only Node built-ins and
  * sibling vault modules.
  */
@@ -192,6 +198,17 @@ export interface VaultHeader {
   type: 'header';
   check: typeof HEADER_CHECK;
   createdAt: string;
+  /** PAN-4333: when the key was last rotated. Absent before the first rotation. */
+  rotatedAt?: string;
+  /** PAN-4333: retired vault keys, base64 of 32 raw bytes each, newest first. */
+  keyRing?: string[];
+}
+
+/** PAN-4333: written at a ref's old name when a rotation moved the ref; sealed under the retired key. */
+export interface RetiredRefMarker {
+  v: 1;
+  type: 'retired';
+  at: string;
 }
 
 export type RefKind = 'record' | 'machine' | 'header';
@@ -294,8 +311,7 @@ function isChunkPlaintext(value: unknown): value is ChunkPlaintext {
   );
 }
 
-/** Decrypt and verify a chunk. Any authentication failure or id mismatch rejects. */
-export async function decodeChunk(bytes: Uint8Array, id: string, keys: VaultSubkeys): Promise<DecodedChunk> {
+async function decodeChunkWith(bytes: Uint8Array, id: string, keys: VaultSubkeys): Promise<DecodedChunk> {
   const compressed = unseal(keys.K_enc, id, bytes);
   const plaintext = await zstdDecompressAsync(compressed);
   if (chunkIdFor(plaintext, keys.K_id) !== id) {
@@ -304,6 +320,32 @@ export async function decodeChunk(bytes: Uint8Array, id: string, keys: VaultSubk
   const parsed: unknown = JSON.parse(plaintext.toString('utf8'));
   if (!isChunkPlaintext(parsed)) throw new Error(`Chunk ${id} has an unexpected plaintext shape`);
   return { lines: parsed.lines, lineHashes: parsed.lineHashes };
+}
+
+/**
+ * Run `decode` with the current sub-keys, then with each retired key's
+ * (`keys.previous`, newest first). Throws the current key's
+ * VaultAuthenticationError when none authenticates; any other error at once.
+ */
+async function withKeyRing<T>(keys: VaultSubkeys, decode: (candidate: VaultSubkeys) => Promise<T>): Promise<T> {
+  let first: unknown;
+  for (const candidate of [keys, ...(keys.previous ?? [])]) {
+    try {
+      return await decode(candidate);
+    } catch (error) {
+      if (!(error instanceof VaultAuthenticationError)) throw error;
+      first ??= error;
+    }
+  }
+  throw first;
+}
+
+/**
+ * Decrypt and verify a chunk, falling back through the key ring. Any
+ * authentication failure or id mismatch under every key rejects.
+ */
+export function decodeChunk(bytes: Uint8Array, id: string, keys: VaultSubkeys): Promise<DecodedChunk> {
+  return withKeyRing(keys, (candidate) => decodeChunkWith(bytes, id, candidate));
 }
 
 /**
@@ -358,22 +400,29 @@ export async function encodeWipParts(bundle: Uint8Array, keys: VaultSubkeys): Pr
   return parts;
 }
 
-/** Decrypt, decompress and id-check each part in order; concatenate. Any failure throws VaultAuthenticationError. */
+async function decodeWipPartWith(part: EncodedWipPart, keys: VaultSubkeys): Promise<Buffer> {
+  const compressed = unseal(keys.K_enc, part.id, part.bytes);
+  let slice: Buffer;
+  try {
+    slice = await zstdDecompressAsync(compressed);
+  } catch (error) {
+    throw new VaultAuthenticationError(`WIP part ${part.id} does not decompress: ${(error as Error).message}`);
+  }
+  if (wipPartIdFor(slice, keys.K_id) !== part.id) {
+    throw new VaultAuthenticationError(`WIP part ${part.id} does not match its content id`);
+  }
+  return slice;
+}
+
+/**
+ * Decrypt, decompress and id-check each part in order, each through the key
+ * ring; concatenate. Any failure throws VaultAuthenticationError.
+ */
 export async function decodeWipParts(parts: ReadonlyArray<EncodedWipPart>, keys: VaultSubkeys): Promise<Buffer> {
   if (parts.length === 0) throw new VaultAuthenticationError('A WIP snapshot has no parts');
   const slices: Buffer[] = [];
   for (const part of parts) {
-    const compressed = unseal(keys.K_enc, part.id, part.bytes);
-    let slice: Buffer;
-    try {
-      slice = await zstdDecompressAsync(compressed);
-    } catch (error) {
-      throw new VaultAuthenticationError(`WIP part ${part.id} does not decompress: ${(error as Error).message}`);
-    }
-    if (wipPartIdFor(slice, keys.K_id) !== part.id) {
-      throw new VaultAuthenticationError(`WIP part ${part.id} does not match its content id`);
-    }
-    slices.push(slice);
+    slices.push(await withKeyRing(keys, (candidate) => decodeWipPartWith(part, candidate)));
   }
   return Buffer.concat(slices);
 }
@@ -382,8 +431,12 @@ export async function decodeWipParts(parts: ReadonlyArray<EncodedWipPart>, keys:
 // Refs
 // ---------------------------------------------------------------------------
 
-/** Encrypt a ref value (record, machine or header) bound to its ref name. */
-export function encryptRef(name: string, value: SessionRecordValue | MachineRecord | VaultHeader, keys: VaultSubkeys): Promise<Uint8Array> {
+/** Encrypt a ref value (record, machine, header or retired marker) bound to its ref name. */
+export function encryptRef(
+  name: string,
+  value: SessionRecordValue | MachineRecord | VaultHeader | RetiredRefMarker,
+  keys: VaultSubkeys,
+): Promise<Uint8Array> {
   return sealJson(keys.K_enc, name, value);
 }
 
@@ -420,6 +473,23 @@ export async function readVaultHeader(bytes: Uint8Array, keys: VaultSubkeys): Pr
   const value = await decryptRef(HEADER_REF_NAME, bytes, keys);
   if (!hasType(value, 'header')) return null;
   return (value as VaultHeader).check === HEADER_CHECK ? (value as VaultHeader) : null;
+}
+
+const KEY_RING_ENTRY_BYTES = 32;
+
+/** The header's retired keys, newest first; [] before the first rotation. Throws on a malformed ring. */
+export function parseKeyRing(header: VaultHeader): Buffer[] {
+  const ring: unknown = header.keyRing;
+  if (ring === undefined) return [];
+  if (!Array.isArray(ring)) throw new Error('Vault header key ring is malformed');
+  return ring.map((entry: unknown) => {
+    if (typeof entry !== 'string') throw new Error('Vault header key ring is malformed');
+    const key = Buffer.from(entry, 'base64');
+    if (key.length !== KEY_RING_ENTRY_BYTES || key.toString('base64') !== entry) {
+      throw new Error('Vault header key ring is malformed');
+    }
+    return key;
+  });
 }
 
 export function isTombstone(value: SessionRecordValue): value is SessionTombstone {

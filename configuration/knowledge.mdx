@@ -18,6 +18,14 @@ remote: git@github.com:example/my-project-knowledge.git
 
 Resolution checks the registered project's `knowledge_repo` first, then `.okf.yml`. If neither points to a readable bundle, run `/okf init` to create or connect one.
 
+## Where the skill lives
+
+[eltmon/okf](https://github.com/eltmon/okf) is the canonical repo for the `/okf` skill itself (not your project's knowledge bundle). Overdeck vendors one release tag into `sync-sources/skills/okf/`, recorded in `.okf-skill-version`, using `scripts/vendor-okf-skill.sh <tag>`. The `okf-vendor-pin` CI workflow fails when that vendored tree differs from the pinned tag, so the skill is never edited in place inside Overdeck.
+
+`pan sync` installs the vendored skill into `~/.claude/skills/okf` (Claude Code) and `~/.agents/skills/okf` (Codex, Pi), and replaces local edits found in real, non-symlinked copies there — it does not touch a copy you've symlinked to your own `eltmon/okf` checkout. `pan doctor`'s "OKF Skill Version" check warns when an installed copy's version differs from what's currently vendored.
+
+To change the skill: open a PR in eltmon/okf, tag a release, re-vendor with `scripts/vendor-okf-skill.sh <tag>` in this repo, and open an Overdeck PR.
+
 ## Open the viewer
 
 Use either command from the project repository:

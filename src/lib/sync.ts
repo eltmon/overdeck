@@ -16,6 +16,7 @@ import {
 } from './manifest.js';
 import { listProjectsSync } from './projects.js';
 import { planHooksSync, syncHooks, type HookItem, type HooksSyncResult } from './sync-hooks.js';
+import { convergesVendoredSkillFile } from './vendored-skills.js';
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
@@ -366,7 +367,7 @@ export function planSync(): SyncPlan {
       if (status.action === 'update') {
         syncStatus = 'symlink'; // 'symlink' here means "managed, safe to update"
       } else if (status.action === 'modified') {
-        syncStatus = 'conflict';
+        syncStatus = convergesVendoredSkillFile(targetBase, file.relativePath) ? 'symlink' : 'conflict';
       } else if (status.action === 'user-owned') {
         // Identical content sitting at the target from a previous Overdeck
         // era is not a conflict — it would simply be adopted on the real run.
@@ -397,7 +398,7 @@ export interface SyncOptions {
 export interface SyncResult {
   created: string[]; updated: string[];
   adopted: string[]; skipped: string[];
-  conflicts: string[];
+  conflicts: string[]; replacedVendored: string[];
   pruned: string[]; keptModified: string[];
   diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
 }
@@ -423,7 +424,7 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
     created: [], updated: [],
     adopted: [], skipped: [],
-    conflicts: [],
+    conflicts: [], replacedVendored: [],
     pruned: [],
     keptModified: [],
     diffs: [],
@@ -474,12 +475,12 @@ export function executeSync(options: SyncOptions = {}): SyncResult {
           });
         }
 
-        if (options.force) {
+        if (options.force || convergesVendoredSkillFile(targetBase, file.relativePath)) {
           mkdirSync(dirname(targetFile), { recursive: true });
           copyFileSync(file.absolutePath, targetFile);
           const hash = hashFile(targetFile);
           setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
-          result.updated.push(file.relativePath);
+          (options.force ? result.updated : result.replacedVendored).push(file.relativePath);
         } else {
           result.conflicts.push(file.relativePath);
         }
