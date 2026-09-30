@@ -3,14 +3,22 @@
  * the browse-row door, and the readers that must never see a browse row.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 // OVERDECK_HOME is captured when the path helpers load, so set it before the
 // first dynamic import of the infra and conversation modules.
 const TEST_HOME = join(tmpdir(), `vault-browse-rows-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 process.env.OVERDECK_HOME = TEST_HOME;
+
+vi.mock('../../../dashboard/server/event-store.js', () => ({ getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })) }));
+vi.mock('../../../dashboard/server/services/dashboard-poll-snapshots.js', () => ({ getConversationLedgerCostsSnapshot: vi.fn(async () => []) }));
+vi.mock('../conversation-liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../conversation-liveness.js')>()),
+  listLiveConversationSessions: vi.fn(async () => new Set<string>()),
+  conversationHarnessAlive: vi.fn(async () => false),
+}));
 
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../infra.js');
 const { OVERDECK_MIGRATION_PATH } = await import('../paths.js');
@@ -26,6 +34,10 @@ const {
 const { removeVaultBrowseRow, upsertVaultBrowseRow, vaultBrowseReadOnlyMessage } = await import('../conversation-vault-rows.js');
 const { listConversationsForPullRequestSync } = await import('../conversation-pull-requests.js');
 const { listSessionsFeed } = await import('../sessions-feed.js');
+const { getConversationListWithVaultCopies, getEnrichedConversationList, invalidateConversationListEnrichmentCache } = await import('../conversation-list.js');
+const { getConversationMessagesRead, resolveSessionFile } = await import('../conversation-reads.js');
+const { getConversationLedgerCosts } = await import('../conversation-ledger-costs.js');
+const { vaultBrowseFilePath } = await import('../../vault/browse.js');
 
 const CWD = join(TEST_HOME, 'projects', 'lexerra');
 
@@ -167,6 +179,81 @@ describe('raw readers skip browse rows (PAN-4436 WI-4)', () => {
     const names = listSessionsFeed({ source: 'managed-archived', limit: 200 }).rows.map((row) => row.conversationName);
     expect(names).toContain('local-archived-9');
     expect(names).not.toContain(`vault-${id}`);
+  });
+});
+
+describe('browse rows in the list, transcript and cost (PAN-4436 WI-5)', () => {
+  const id = vaultId(10);
+  const name = `vault-${id}`;
+
+  beforeAll(() => {
+    upsertVaultBrowseRow(input(id));
+    const path = vaultBrowseFilePath(id, 'claude-code');
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, [
+      JSON.stringify({ type: 'user', uuid: 'u-1', timestamp: '2026-09-02T09:00:00.000Z', message: { role: 'user', content: 'hello from the laptop' } }),
+      JSON.stringify({
+        type: 'assistant', uuid: 'a-1', timestamp: '2026-09-02T09:00:05.000Z',
+        message: {
+          id: 'msg_1', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'text', text: 'hello back from the laptop' }],
+          usage: { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+    createConversation({ name: 'local-list-10', tmuxSession: 'conv-local-list-10', cwd: CWD, workspaceId: null });
+  });
+
+  it('GET /api/conversations adds browse rows after local rows on the first page only', async () => {
+    invalidateConversationListEnrichmentCache();
+    const rows = await getConversationListWithVaultCopies(500, 0) as Array<Record<string, unknown>>;
+    const localIndex = rows.findIndex((row) => row.name === 'local-list-10');
+    const browseIndex = rows.findIndex((row) => row.name === name);
+    expect(localIndex).toBeGreaterThanOrEqual(0);
+    expect(browseIndex).toBeGreaterThan(localIndex);
+    expect(rows[browseIndex]).toMatchObject({
+      origin: 'vault', vaultOwnerLabel: 'laptop', sessionAlive: false, isWorking: false, totalCost: 0, totalTokens: 0,
+      pendingInputCount: 0, pendingInputKinds: [], transcriptMissing: false, needsTerminal: false, pullRequest: null,
+    });
+    expect(rows[browseIndex]!.lastActivityAt).toBe(rows[browseIndex]!.endedAt);
+    const later = await getConversationListWithVaultCopies(500, 10) as Array<Record<string, unknown>>;
+    expect(later.some((row) => row.origin === 'vault')).toBe(false);
+  });
+
+  it('the Agents Directory and lanes source never sees a browse row', async () => {
+    invalidateConversationListEnrichmentCache();
+    const rows = await getEnrichedConversationList(500, 0) as Array<Record<string, unknown>>;
+    expect(rows.some((row) => row.origin === 'vault')).toBe(false);
+  });
+
+  it('resolveSessionFile returns the browse cache file, with the rollout- prefix for Codex', async () => {
+    expect(await resolveSessionFile(getConversationByName(name)!)).toBe(vaultBrowseFilePath(id, 'claude-code'));
+    const codexId = vaultId(11);
+    upsertVaultBrowseRow(input(codexId, { harness: 'codex' }));
+    const codexPath = await resolveSessionFile(getConversationByName(`vault-${codexId}`)!);
+    expect(codexPath).toBe(vaultBrowseFilePath(codexId, 'codex'));
+    expect(codexPath).toMatch(/rollout-/);
+  });
+
+  it('reading the messages returns the transcript at zero cost and writes no cost', async () => {
+    const db = getOverdeckDatabase();
+    const costEventsBefore = (db.prepare('SELECT COUNT(*) AS n FROM cost_events').get() as { n: number }).n;
+    const read = await getConversationMessagesRead(name, { resolveSessionFile, shouldReportUnresolvedLiveSession: () => false });
+    expect(read.status ?? 200).toBe(200);
+    const body = read.body as { messages: unknown[]; totalCost: number; totalTokens: number };
+    expect(JSON.stringify(body.messages)).toContain('hello from the laptop');
+    expect(JSON.stringify(body.messages)).toContain('hello back from the laptop');
+    expect(body.totalCost).toBe(0);
+    expect(body.totalTokens).toBe(0);
+    expect(getConversationByName(name)).toMatchObject({ totalCost: 0, totalTokens: 0 });
+    expect((db.prepare('SELECT COUNT(*) AS n FROM cost_events').get() as { n: number }).n).toBe(costEventsBefore);
+  });
+
+  it('the conversation ledger costs never key a browse row', () => {
+    getOverdeckDatabase()
+      .prepare('INSERT INTO cost_events (ts, session_id, cost, input, output, cache_read, cache_write) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(Date.now(), id, 1.5, 10, 10, 0, 0);
+    const row = getConversationByName(name)!;
+    expect(getConversationLedgerCosts().has(String(row.id))).toBe(false);
   });
 });
 
