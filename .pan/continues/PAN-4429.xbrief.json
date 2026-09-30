@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:24:53.599Z",
+  "updated": "2026-09-30T02:25:06.603Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "retire-tldr-hooks.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T02:24:53.599Z"
+    },
+    "retire-tldr-hooks.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:25:06.602Z"
     }
   }
 }
