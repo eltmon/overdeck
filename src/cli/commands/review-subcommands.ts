@@ -13,6 +13,12 @@ export function registerReviewCommands(program: Command): void {
     .action(lazyAction(() => import('./request-review.js'), 'requestReviewCommand'));
 
   review
+    .command('waive-test-removal <id>')
+    .description('Operator-only: let a net test removal past the test-skip gate at the current head')
+    .requiredOption('--reason <text>', 'Why the removed tests are gone and nothing replaces them')
+    .action(lazyAction(() => import('./review-waive-test-removal.js'), 'waiveTestRemovalCommand'));
+
+  review
     .command('abort <id>')
     .description('Kill all running reviewer sessions and leave the worker idle')
     .action(lazyAction(() => import('./abort-review.js'), 'abortReviewCommand'));

@@ -27,6 +27,7 @@ changes) — there is no separate pipeline status to list, reset, or resync;
 pan review request <id>                            # Re-request review after fixing feedback
 pan review abort <id>                               # Kill all running reviewers, leave worker idle
 pan review restart <id> [--model <m>] [--role <r>]  # Resume review and re-dispatch reviewers missing a report
+pan review waive-test-removal <id> --reason "<text>"  # Operator-only: waive a net test removal at the current head
 ```
 
 Review mode (`quick` vs `full`) has no per-issue override (PAN-3917: the
@@ -56,6 +57,13 @@ change it. See `docs/REVIEW-AGENT-ARCHITECTURE.md` "Review modes".
     misbehaved and you want to retry with a different one.
   - `--role <role>` — restart only one reviewer role (`correctness`,
     `security`, `performance`, `requirements`) instead of the whole convoy.
+- **`waive-test-removal <id>`** — Operator-only. Grants a test-skip gate
+  waiver pinned to the workspace's current head, for a diff whose net test
+  removal you've reviewed and approved. Refuses any agent caller, including
+  the Flywheel. Stored untracked at
+  `<workspace>/.overdeck/test-removal-waiver.json`; it expires the moment the
+  head moves, and never waives an added `.skip`/`.only`. Follow with
+  `pan review request <id>` to re-run verification.
 
 ## When to use each
 
@@ -68,6 +76,7 @@ change it. See `docs/REVIEW-AGENT-ARCHITECTURE.md` "Review modes".
 | Reviewer is hung, just kill it | `pan review abort <id>` |
 | Reviewer crashed, resume the convoy with a different model | `pan review restart <id> --model gpt-5.4` |
 | Only the security reviewer is broken | `pan review restart <id> --role security` |
+| Operator approved deleting tests; test-skip gate fails | `pan review waive-test-removal <id> --reason "…"`, then `pan review request <id>` |
 
 ## Merging is NOT here
 
