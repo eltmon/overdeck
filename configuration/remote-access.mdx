@@ -96,11 +96,66 @@ Device sessions are stored in `~/.overdeck/access-tokens.json` (mode `0600`).
 The file keeps only a SHA-256 hash of each token. If the file is corrupt, the
 dashboard accepts no device session and logs an error naming the file.
 
+## Scoped API tokens
+
+A paired device can do everything the dashboard can. A program that needs only
+part of that (an event sidecar, Hermes, a script that sends messages to agents)
+should hold a **scoped API token** instead. A leaked scoped token exposes only
+the routes its scopes name, and it can never create a session, a pairing
+credential or another token.
+
+Create one on the machine:
+
+```bash
+pan token create sidecar --scopes read:events
+pan token create notifier --scopes read:state,tell --json   # { id, name, scopes, token }
+```
+
+`pan token create` prints the token (`odk_…`) once. Store it right away; it
+cannot be shown again. A running dashboard accepts a new token within 5 seconds.
+
+The scopes:
+
+| Scope | Allows |
+| --- | --- |
+| `read:events` | The live event stream (`GET /events/stream`) and `GET /events/version`. |
+| `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
+| `read:conversations` | Conversation lists, one conversation, its messages and its summary. |
+| `tell` | Sending a message to an agent or a conversation. |
+| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`). |
+| `admin` | Everything, like a paired device. |
+
+Anything not in the table needs `admin`. A request whose token lacks the scope
+gets `403` with `{ "error": "insufficient_scope", "missingScope": "<scope>" }`.
+
+Send the token on every request as `Authorization: Bearer odk_…`. It works over
+HTTP, the event stream and WebSocket upgrades. It does not work as a cookie or a
+URL parameter, and a request carrying it needs no `Origin` header or CSRF token.
+
+```bash
+curl -N -H "Authorization: Bearer odk_…" https://desk.tailnet.ts.net/events/stream
+```
+
+List and revoke tokens:
+
+```bash
+pan token list              # id, name, scopes, created, last used, revoked
+pan token revoke <id>
+```
+
+Revoking a token stops its next request and closes its open WebSocket and
+event-stream connections at once. If the dashboard is not running,
+`pan token revoke` writes the revocation into the registry, and a dashboard that
+starts later never accepts the token. Only this machine's internal token or root
+session can create or revoke tokens. The dashboard API is
+`GET`/`POST /api/access-tokens` and `DELETE /api/access-tokens/:id`.
+
 ## What the LAN can reach
 
 The dashboard binds every interface. Every `/api/*` and `/events/*` request that
 does not come from this machine must carry a credential (the root session, a
-device session, or the internal token), or it gets `401`. "From this machine"
+device session, a scoped API token, or the internal token), or it gets `401`.
+A scoped token is always judged by its scopes, even from this machine. "From this machine"
 means a loopback address, or the host-local Traefik and Docker networks that
 front `overdeck.localhost`.
 
@@ -116,7 +171,7 @@ These routes answer without a credential:
 
 `GET /events/stream` also accepts its `OVERDECK_EVENTS_TOKEN` bearer token when
 that variable is set, so an external consumer such as a TTS sidecar keeps
-working. The dashboard's static page files stay public.
+working. A `read:events` scoped token works there too, set or not. The dashboard's static page files stay public.
 
 ## Local reverse proxies: `require_token_mint`
 
@@ -160,5 +215,7 @@ startup, so restart the dashboard after changing it.
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
-- Scoped API tokens, `pan token` and a Settings toggle for
-  `require_token_mint`: [PAN-2351](https://github.com/eltmon/overdeck/issues/2351).
+- A Settings section for scoped tokens and a Settings toggle for
+  `require_token_mint`: [PAN-4435](https://github.com/eltmon/overdeck/issues/4435).
+- A heartbeat on terminal WebSockets, so idle terminals survive proxies with
+  short idle timeouts: [PAN-4434](https://github.com/eltmon/overdeck/issues/4434).

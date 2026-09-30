@@ -3,7 +3,8 @@
  *
  * - `POST /api/pairing/credentials` issues a one-time `odp_` credential. Only
  *   the internal token or the root session may call it (plus CSRF for the
- *   cookie); a paired device gets 403, so a device cannot mint more devices.
+ *   cookie); a paired device or an access token gets 403, so neither can mint
+ *   more devices (PAN-2351 D-11).
  * - `POST /api/pairing/exchange` trades the credential for the caller's own
  *   revocable `odk_` device token, delivered as the `overdeck_device` cookie
  *   (browsers) or in the body (`delivery: 'bearer'`, desktop clients). It is
@@ -11,8 +12,9 @@
  *
  * - `GET /api/devices` lists paired devices (never their token hashes).
  * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket and
- *   SSE connections. A device may revoke itself but not another device; the
- *   internal token and root session may revoke any.
+ *   SSE connections. A device may revoke itself but not another device, an
+ *   access token may revoke none, and the internal token and root session may
+ *   revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
  */
