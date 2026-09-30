@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T20:32:40.197Z",
+  "updated": "2026-09-30T20:32:48.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4435",
       "claimedAt": "2026-09-30T20:14:33.871Z",
       "doneAt": "2026-09-30T20:32:40.197Z"
+    },
+    "require-token-mint-toggle": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:32:48.006Z"
     }
   }
 }
