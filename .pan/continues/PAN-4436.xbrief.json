@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:36:46.188Z",
+  "updated": "2026-09-30T20:36:58.531Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "browse-rows-list-and-read.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T20:36:46.187Z"
+    },
+    "browse-resume-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:36:58.530Z"
     }
   }
 }
