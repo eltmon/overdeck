@@ -65,7 +65,6 @@
 
 ## Small But Sharp
 
-- **TLDR:** large-file Reads auto-summarize via a PreToolUse hook; for exploration use `.venv/bin/tldr context|extract` via Bash. The `tldr_*` MCP tools are not registered — don't call them (PAN-3534).
 - **RTK:** when `agents.rtk.enabled`, Bash output may be compressed; re-run with `OVERDECK_RTK_ENABLED=0` for raw output.
 - **Issue creation from PRDs:** reference the PRD at the top of the issue body (`**PRD:** [link]`); summarize, don't duplicate — canonical PRD is `.pan/drafts/<issue>.md` in the project repo.
 - **Task enforcement:** work agents need a readable xBRIEF (start returns 422 otherwise); completion is gated on the checklist via `pan task`.
