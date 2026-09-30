@@ -184,6 +184,7 @@ describe('cross-process revocation (PAN-2351 FR-4)', () => {
     expect((await send('GET', '/events/version', bearer(token))).status).toBe(200);
 
     await vi.advanceTimersByTimeAsync(5_000);
-    await vi.waitFor(async () => expect((await send('GET', '/events/version', bearer(token))).status).toBe(401));
+    // The gate refuses the revoked token before the route opens a stream.
+    await vi.waitFor(async () => expect((await send('GET', STREAM_PATH, bearer(token))).status).toBe(401));
   });
 });
