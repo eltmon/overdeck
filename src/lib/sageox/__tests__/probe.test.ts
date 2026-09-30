@@ -33,6 +33,13 @@ describe('probeOxHostContract', () => {
     expect(await probeOxHostContract({ bin })).toEqual({ ok: true, version: '0.19.0', commit: 'abc123' });
   });
 
+  it('runs ox host-managed with the network off', async () => {
+    const bin = fakeOx(
+      `echo "{\\"contract\\":\\"overdeck-host/1\\",\\"version\\":\\"$OX_HOST_MANAGED/$OX_HOST_NETWORK\\",\\"commit\\":\\"\\"}"`,
+    );
+    expect(await probeOxHostContract({ bin })).toEqual({ ok: true, version: '1/off', commit: '' });
+  });
+
   it('reports no-contract when the command is unknown (exit 1)', async () => {
     const bin = fakeOx(`echo 'Error: unknown command "host-contract" for "ox"' >&2; exit 1`);
     expect(await probeOxHostContract({ bin })).toEqual({ ok: false, reason: 'no-contract' });

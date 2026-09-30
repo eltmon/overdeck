@@ -4,6 +4,9 @@
  * `ox host-contract --json` with contract `overdeck-host/1`. Upstream `ox` has
  * no such command, so the probe fails there and Overdeck fails closed.
  *
+ * The probe runs with `OX_HOST_MANAGED=1` and `OX_HOST_NETWORK=off`, so the
+ * fork keeps even this call offline (no OpenTelemetry export, no daemon).
+ *
  * The timeout is our own timer plus an AbortSignal (not execFile's `timeout`
  * option) so tests can drive it with fake timers.
  */
@@ -27,6 +30,7 @@ export async function probeOxHostContract(opts: { bin?: string; timeoutMs?: numb
     ({ stdout } = await execFileAsync(opts.bin ?? 'ox', ['host-contract', '--json'], {
       signal: controller.signal,
       encoding: 'utf8',
+      env: { ...process.env, OX_HOST_MANAGED: '1', OX_HOST_NETWORK: 'off' },
     }));
   } catch (error) {
     if (controller.signal.aborted) return { ok: false, reason: 'timeout' };
