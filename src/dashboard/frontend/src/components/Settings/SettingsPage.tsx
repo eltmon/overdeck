@@ -240,7 +240,6 @@ export function SettingsPage() {
   const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
-  const [reloadingTldr, setReloadingTldr] = useState(false);
   const [claudeAuth, setClaudeAuth] = useState<{
     installed: boolean;
     loggedIn: boolean;
@@ -653,10 +652,7 @@ export function SettingsPage() {
 
       <ExperimentalSection
         formData={formData}
-        queryClient={queryClient}
-        reloadingTldr={reloadingTldr}
         saveStatus={saveStatus}
-        setReloadingTldr={setReloadingTldr}
         onSettingsChange={applySettings}
       />
 
