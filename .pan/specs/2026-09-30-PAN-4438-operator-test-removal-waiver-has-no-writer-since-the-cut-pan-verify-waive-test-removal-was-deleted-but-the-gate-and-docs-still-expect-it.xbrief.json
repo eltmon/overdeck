@@ -4,17 +4,17 @@
     "created": "2026-09-30T16:35:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4438: Operator test-removal waiver has no writer since the Cut: pan verify waive-test-removal was deleted but the gate and docs still expect it",
-    "updated": "2026-09-30T16:39:52.625Z"
+    "updated": "2026-09-30T16:41:16.459Z"
   },
   "plan": {
     "id": "pan-4438",
     "title": "Operator test-removal waiver has no writer since the Cut: pan verify waive-test-removal was deleted but the gate and docs still expect it",
-    "status": "proposed",
+    "status": "running",
     "uid": "d479b128-daf9-424d-b394-6808c601e04b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T16:35:21Z",
-    "updated": "2026-09-30T16:39:52.625Z",
+    "updated": "2026-09-30T16:41:16.459Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4438",
@@ -518,5 +518,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
