@@ -4,17 +4,17 @@
     "created": "2026-09-30T16:29:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4432: CI test-failure relay never fires: red test shards stall PRs with no route back to the agent",
-    "updated": "2026-09-30T16:32:39.267Z"
+    "updated": "2026-09-30T16:33:33.799Z"
   },
   "plan": {
     "id": "pan-4432",
     "title": "CI test-failure relay never fires: red test shards stall PRs with no route back to the agent",
-    "status": "proposed",
+    "status": "running",
     "uid": "aeb4e0e6-1743-42e4-8800-5237452ac3a8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T16:29:41Z",
-    "updated": "2026-09-30T16:32:39.267Z",
+    "updated": "2026-09-30T16:33:33.799Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4432",
@@ -482,5 +482,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
