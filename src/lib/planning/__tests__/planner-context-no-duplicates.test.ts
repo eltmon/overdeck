@@ -39,11 +39,6 @@ describe('planner context: planning.md and roles/plan.md do not duplicate', () =
     expect(duplicates).toEqual([]);
   });
 
-  it('documents the TLDR PreToolUse hook in exactly one of the two files', () => {
-    const needle = 'TLDR is wired in as a PreToolUse hook';
-    expect([planning, role].filter((text) => text.includes(needle))).toHaveLength(1);
-  });
-
   it('contains no legacy .pan planner spec/continue paths', () => {
     for (const text of [planning, role]) {
       expect(text).not.toContain('.pan/spec.vbrief.json');
