@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:31:56.525Z",
+  "updated": "2026-09-30T02:32:11.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,10 @@
     "legacy-tldr-cleanup.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T02:31:56.525Z"
+    },
+    "legacy-tldr-cleanup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:32:11.203Z"
     }
   }
 }
