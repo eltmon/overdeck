@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:47:43.766Z",
+  "updated": "2026-09-30T17:47:56.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "scope-acceptance-test.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T17:47:43.766Z"
+    },
+    "scope-acceptance-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:56.679Z"
     }
   }
 }
