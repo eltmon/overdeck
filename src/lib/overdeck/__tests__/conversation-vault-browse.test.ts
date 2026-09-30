@@ -24,6 +24,8 @@ const {
   setConversationProjectKey,
 } = await import('../conversations.js');
 const { removeVaultBrowseRow, upsertVaultBrowseRow, vaultBrowseReadOnlyMessage } = await import('../conversation-vault-rows.js');
+const { listConversationsForPullRequestSync } = await import('../conversation-pull-requests.js');
+const { listSessionsFeed } = await import('../sessions-feed.js');
 
 const CWD = join(TEST_HOME, 'projects', 'lexerra');
 
@@ -143,6 +145,28 @@ describe('browse-row door (PAN-4436 WI-3)', () => {
     expect(getConversationByName(`vault-${id}`)).toBeNull();
     expect(getConversationByName('fork-of-7')?.parentConversationId).toBeNull();
     expect(removeVaultBrowseRow(id)).toBe(false);
+  });
+});
+
+describe('raw readers skip browse rows (PAN-4436 WI-4)', () => {
+  it('the pull-request sweep never lists an unarchived browse row', () => {
+    const id = vaultId(8);
+    upsertVaultBrowseRow(input(id));
+    createConversation({ name: 'local-pr-8', tmuxSession: 'conv-local-pr-8', cwd: CWD, workspaceId: null });
+    const names = listConversationsForPullRequestSync().map((row) => row.name);
+    expect(names).toContain('local-pr-8');
+    expect(names).not.toContain(`vault-${id}`);
+  });
+
+  it('the managed-archived feed omits an archived browse row and keeps an archived local row', () => {
+    const id = vaultId(9);
+    upsertVaultBrowseRow(input(id));
+    archiveConversation(`vault-${id}`);
+    createConversation({ name: 'local-archived-9', tmuxSession: 'conv-local-archived-9', cwd: CWD, workspaceId: null });
+    archiveConversation('local-archived-9');
+    const names = listSessionsFeed({ source: 'managed-archived', limit: 200 }).rows.map((row) => row.conversationName);
+    expect(names).toContain('local-archived-9');
+    expect(names).not.toContain(`vault-${id}`);
   });
 });
 
