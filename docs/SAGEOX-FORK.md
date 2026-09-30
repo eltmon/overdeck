@@ -15,6 +15,7 @@ No agent contacts upstream. Upstreaming any of this is the operator's call.
 | fork `main` (before this work) | `cf00e2123875efe7b0a8e6a729f818eb50fe4ac9` | Recorded with `git ls-remote origin main` before any push. Left untouched: no force push, no rewrite. |
 | `overdeck-base` | `201c0a56650d5a698c391aafca815a8371adbe04` | Upstream tag `v0.19.0^{commit}` ("release: prep v0.19.0 (#1085)", 2026-09-28). Fork PRs target this branch. |
 | `overdeck/host-managed` | cut from `overdeck-base` | Work branch for the host-managed mode. Each fork item adds commits here; see "Changes". |
+| Fork PR | [eltmon/ox#1](https://github.com/eltmon/ox/pull/1) | `overdeck/host-managed` → `overdeck-base`, head `de597179542aca4a4815e0b6ab49f75809fa3be7`. Build `ox` from this commit; the `sageox` pack should trust it. |
 
 Fork clone used by the work agent: `$HOME/Projects/ox-pan-2444` (remote `origin` =
 `git@github.com:eltmon/ox.git`; remote `upstream` = `https://github.com/sageox/ox.git`,
@@ -34,6 +35,20 @@ The fork adds a **host-managed mode**. It is additive and env-gated: with
 | `OX_PROJECT_ROOT` | absolute path | Existing upstream override of project-root discovery. Overdeck sets it to the launch's git root. |
 | `OX_SESSION_PUBLISHING` | `manual` \| `auto` | Existing upstream override. Overdeck sets `manual` when uploads are off, `auto` when on. |
 | `SAGEOX_TELEMETRY=false`, `SAGEOX_FRICTION=false`, `SAGEOX_DAEMON=false`, `OX_NO_DAEMON=1` | fixed | Existing upstream switches. Overdeck always sets them. |
+
+Probe command and sample output (fork build at `de59717`):
+
+```bash
+$ OX_HOST_MANAGED=1 OX_HOST_NETWORK=off ox host-contract --json
+{
+  "contract": "overdeck-host/1",
+  "hostManaged": true,
+  "version": "0.19.0",
+  "commit": "de597179542aca4a4815e0b6ab49f75809fa3be7"
+}
+```
+
+Upstream `ox` exits 1 with `unknown command "host-contract"`, which Overdeck reads as "no host contract".
 
 Requirements the fork meets under `OX_HOST_MANAGED=1` (PRD §5):
 
