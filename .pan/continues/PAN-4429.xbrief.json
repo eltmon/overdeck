@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:55:05.081Z",
+  "updated": "2026-09-30T02:23:55.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
       "claimedBy": "agent-pan-4429",
       "claimedAt": "2026-09-30T01:54:18.209Z",
       "doneAt": "2026-09-30T01:55:05.081Z"
+    },
+    "workspace-disk-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:23:55.086Z"
     }
   }
 }
