@@ -4,17 +4,17 @@
     "created": "2026-09-29T22:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2444: SageOx as an off-by-default skill pack, fork-first host-managed ox",
-    "updated": "2026-09-29T22:29:33.084Z"
+    "updated": "2026-09-29T22:30:42.590Z"
   },
   "plan": {
     "id": "pan-2444",
     "title": "feat(agents): optional SageOx re-integration — session-reasoning capture for OSS projects (per-project opt-in, v0.11-era ox)",
-    "status": "proposed",
+    "status": "running",
     "uid": "d9dc47d2-ac96-4b1a-a9fe-2a5ef7676474",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T22:40:00Z",
-    "updated": "2026-09-29T22:29:33.084Z",
+    "updated": "2026-09-29T22:30:42.590Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2444",
@@ -1184,5 +1184,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
