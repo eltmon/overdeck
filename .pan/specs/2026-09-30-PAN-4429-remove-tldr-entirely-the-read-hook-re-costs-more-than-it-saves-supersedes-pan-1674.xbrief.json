@@ -4,17 +4,17 @@
     "created": "2026-09-30T00:31:25Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4429: Remove TLDR entirely: the read hook re-costs more than it saves (supersedes PAN-1674)",
-    "updated": "2026-09-30T00:39:04.755Z"
+    "updated": "2026-09-30T00:39:53.704Z"
   },
   "plan": {
     "id": "pan-4429",
     "title": "Remove TLDR entirely: the read hook re-costs more than it saves (supersedes PAN-1674)",
-    "status": "proposed",
+    "status": "running",
     "uid": "9e118638-d9e2-4122-92f1-ae0f5606c28f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T00:31:25Z",
-    "updated": "2026-09-30T00:39:04.755Z",
+    "updated": "2026-09-30T00:39:53.704Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4429",
@@ -1392,5 +1392,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
