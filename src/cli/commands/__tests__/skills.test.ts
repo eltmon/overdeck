@@ -477,8 +477,8 @@ describe('pan skills pack sageox (PAN-2444)', () => {
     expect(JSON.parse(logs.join('\n'))).toEqual({
       registered: true,
       projects: [
-        { project: 'oss', pack: 'on', packSource: 'project', upload: 'enabled' },
-        { project: 'work', pack: 'off', packSource: 'default', upload: 'disabled' },
+        { project: 'oss', pack: 'on', packSource: 'project', upload: true },
+        { project: 'work', pack: 'off', packSource: 'default', upload: false },
       ],
     });
   });

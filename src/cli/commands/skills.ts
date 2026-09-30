@@ -395,7 +395,7 @@ export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions
   const registered = (await getPack('sageox')) !== null;
   const projects = await Promise.all(selected.map(async ({ projectKey, upload }) => {
     const pack = resolvePackToggle('sageox', await loadSkillOverrideLayers({ projectKey }));
-    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload: upload ? 'enabled' : 'disabled' };
+    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload };
   }));
   if (options.json) {
     console.log(JSON.stringify({ registered, projects }, null, 2));
@@ -405,7 +405,7 @@ export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions
   const width = Math.max(7, ...projects.map(row => row.project.length));
   console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  UPLOAD`));
   for (const row of projects) {
-    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload}`);
+    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload ? 'enabled' : 'disabled'}`);
   }
 }
 
