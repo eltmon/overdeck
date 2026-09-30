@@ -30,8 +30,11 @@ import {
 } from '../../../lib/vault/evict.js';
 import { VaultKeyRetiredError } from '../../../lib/vault/keyring.js';
 import { openVaultContext as openVaultContextDefault, type OpenVault, type VaultOpenResult } from '../../../lib/vault/open.js';
+import { settle as settleDefault } from '../../../lib/vault/settle.js';
 import { createSyncLoop as createSyncLoopDefault, syncOnce as syncOnceDefault, type SyncLoop, type SyncReport } from '../../../lib/vault/sync.js';
+import type { WipMode } from '../../../lib/vault/wip-capture.js';
 import { createVaultIsLive } from './vault-liveness.js';
+import { createVaultSettlePoller as createVaultSettlePollerDefault, type VaultSettlePoller } from './vault-settle-poller.js';
 
 /** First cycle this long after `startVaultService()`; subsequent cycles at `syncIntervalSec`. */
 export const VAULT_BOOT_DELAY_MS = 5_000;
@@ -45,6 +48,8 @@ export interface VaultServiceDeps {
   confirmEviction?: typeof confirmEvictionDefault;
   isLive?: (nativePath: string) => Promise<boolean>;
   now?: () => Date;
+  settle?: typeof settleDefault;
+  createVaultSettlePoller?: typeof createVaultSettlePollerDefault;
 }
 
 type ResolvedDeps = Required<VaultServiceDeps>;
@@ -59,6 +64,8 @@ function resolveDeps(deps: VaultServiceDeps): ResolvedDeps {
     confirmEviction: deps.confirmEviction ?? confirmEvictionDefault,
     isLive: deps.isLive ?? createVaultIsLive(),
     now: deps.now ?? (() => new Date()),
+    settle: deps.settle ?? settleDefault,
+    createVaultSettlePoller: deps.createVaultSettlePoller ?? createVaultSettlePollerDefault,
   };
 }
 
@@ -115,6 +122,7 @@ let deps: ResolvedDeps = resolveDeps({});
 let bootTimer: ReturnType<typeof setTimeout> | null = null;
 let loop: SyncLoop | null = null;
 let currentIntervalSec: number | null = null;
+let poller: VaultSettlePoller | null = null;
 let queueTail: Promise<unknown> = Promise.resolve();
 let snapshot: VaultSnapshotState = initialSnapshot();
 const listeners = new Set<(report: SyncReport, vault: OpenVault) => void | Promise<void>>();
@@ -221,6 +229,20 @@ async function cycle(): Promise<{ offline: boolean }> {
 }
 
 /** Idempotent: a second call while already started does nothing. */
+/** A failing settle logs once per distinct message and never throws out of the poller's timers (NFR-6). */
+async function queuedSettle(path: string, harness: string, wip: WipMode): Promise<void> {
+  return enqueueVaultOperation('settle', async () => {
+    const opened = await deps.openVaultContext();
+    if (opened.status !== 'open') return;
+    const config = await deps.readVaultConfig();
+    try {
+      await deps.settle({ nativePath: path, harness, store: opened.vault.store, keys: opened.vault.keys, config, wip });
+    } catch (error) {
+      console.warn(`[vault] settle failed for ${path}:`, error);
+    }
+  });
+}
+
 export function startVaultService(overrides: VaultServiceDeps = {}): void {
   if (started) return;
   started = true;
@@ -238,9 +260,11 @@ export function startVaultService(overrides: VaultServiceDeps = {}): void {
     })();
   }, VAULT_BOOT_DELAY_MS);
   if (typeof bootTimer.unref === 'function') bootTimer.unref();
+  poller = deps.createVaultSettlePoller({ settle: queuedSettle });
+  poller.start();
 }
 
-/** Stops the loop and awaits the queue draining. */
+/** Stops the poller (flushing pending settles) and the loop, and awaits the queue draining. */
 export async function stopVaultService(): Promise<void> {
   if (!started) return;
   started = false;
@@ -253,6 +277,12 @@ export async function stopVaultService(): Promise<void> {
     loop = null;
   }
   currentIntervalSec = null;
+  if (poller) {
+    const current = poller;
+    poller = null;
+    current.stop();
+    await current.flush(10_000).catch((error) => console.warn('[vault] shutdown flush failed:', error));
+  }
   await queueTail.catch(() => undefined);
 }
 

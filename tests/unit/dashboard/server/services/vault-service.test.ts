@@ -42,6 +42,9 @@ function offReport(): SyncReport {
   return { offline: false, settled: [], records: 0, skipped: 0, machines: [], retired: 0, unreadable: 0, errors: [] };
 }
 
+/** These tests exercise the sync cycle and eviction ops only; the poller has its own test file. */
+const noopPoller = () => ({ start: () => undefined, stop: () => undefined, flush: async () => undefined });
+
 describe('vault-service (PAN-4307 WI-4)', () => {
   let root: string;
   let originalHome: string | undefined;
@@ -66,7 +69,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, syncIntervalSec: 60 });
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
     const syncOnce = vi.fn();
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
 
     await vi.advanceTimersByTimeAsync(4999);
     expect(openVaultContext).not.toHaveBeenCalled();
@@ -87,7 +90,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
     const syncOnce = vi.fn();
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
     await vi.advanceTimersByTimeAsync(5000);
     expect(syncOnce).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
@@ -98,7 +101,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, syncIntervalSec: 15 });
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult);
     const syncOnce = vi.fn().mockResolvedValue({ ...offReport(), offline: true });
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
 
     await vi.advanceTimersByTimeAsync(5000); // boot cycle @5000
     expect(syncOnce).toHaveBeenCalledTimes(1);
@@ -122,7 +125,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
       await options.afterSettle?.(offReport());
       return offReport();
     });
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce, scanEligible, isLive });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, scanEligible, isLive, createVaultSettlePoller: noopPoller });
     await vi.advanceTimersByTimeAsync(5000);
     expect(scanEligible).toHaveBeenCalledTimes(1);
     expect(scanEligible.mock.calls[0]![0]).toMatchObject({ isLive });
@@ -140,7 +143,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const unregister = onVaultSyncReport(() => {
       throw new Error('listener boom');
     });
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
     await vi.advanceTimersByTimeAsync(5000);
     expect(syncOnce).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('[vault] sync-report listener failed:', expect.any(Error));
@@ -161,7 +164,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
       ],
     };
     const syncOnce = vi.fn().mockResolvedValue(report);
-    startVaultService({ readVaultConfig, openVaultContext, syncOnce });
+    startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
     await vi.advanceTimersByTimeAsync(5000);
     const snapshot = await getVaultServiceSnapshot();
     expect(snapshot.state).toBe('ready');
@@ -192,7 +195,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult);
     const confirmEviction = vi.fn().mockResolvedValue({ refused: false, deleted: [], skipped: [], bytesFreed: 0, fingerprint: 'abc' });
-    const deps: VaultServiceDeps = { readVaultConfig, openVaultContext, confirmEviction, isLive };
+    const deps: VaultServiceDeps = { readVaultConfig, openVaultContext, confirmEviction, isLive, createVaultSettlePoller: noopPoller };
     startVaultService(deps);
     const result = await confirmEvictionBatch('fp-1');
     expect(confirmEviction).toHaveBeenCalledWith('fp-1', expect.objectContaining({ skipFailed: true, isLive }));
@@ -203,7 +206,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
     const confirmEviction = vi.fn();
-    startVaultService({ readVaultConfig, openVaultContext, confirmEviction });
+    startVaultService({ readVaultConfig, openVaultContext, confirmEviction, createVaultSettlePoller: noopPoller });
     const result = await confirmEvictionBatch('fp-1');
     expect(confirmEviction).not.toHaveBeenCalled();
     expect(result).toEqual({ unavailable: 'Session Vault is off. Run: pan vault setup <git-url>' });
@@ -212,7 +215,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
   it('reviewEvictionBatch computes the FR-9 shape from the local batch without opening the vault', async () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, evict: true });
     const openVaultContext = vi.fn();
-    startVaultService({ readVaultConfig, openVaultContext });
+    startVaultService({ readVaultConfig, openVaultContext, createVaultSettlePoller: noopPoller });
     const response = await reviewEvictionBatch();
     expect(openVaultContext).not.toHaveBeenCalled();
     expect(response).toEqual({ evict: true, fingerprint: expect.any(String), entries: [], declined: [], totalBytes: 0, deletableCount: 0, deletableBytes: 0 });
@@ -237,7 +240,7 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const HOUR = 60 * 60 * 1000;
     utimesSync(nativePath, new Date(Date.now() - HOUR), new Date(Date.now() - HOUR));
 
-    startVaultService();
+    startVaultService({ createVaultSettlePoller: noopPoller });
     await vi.advanceTimersByTimeAsync(5000); // boot cycle
     await vi.advanceTimersByTimeAsync(10000); // interval 1
     await vi.advanceTimersByTimeAsync(10000); // interval 2
