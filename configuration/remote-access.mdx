@@ -207,6 +207,12 @@ starts later never accepts the token. Only this machine's internal token or root
 session can create or revoke tokens. The dashboard API is
 `GET`/`POST /api/access-tokens` and `DELETE /api/access-tokens/:id`.
 
+You can also manage tokens in **Settings → Access Tokens**: the table shows
+each token's name, scopes, created, last used and revoked times; **Create
+token** shows the plaintext once with a Copy button; **Revoke** asks for
+confirmation. A browser signed in as a paired device can see the list but
+cannot create or revoke tokens; the section explains why.
+
 ## What the LAN can reach
 
 The dashboard binds every interface. Every `/api/*` and `/events/*` request that
@@ -251,8 +257,11 @@ With it on:
   `X-Forwarded-Host` or `Forwarded`) counts as remote, so it needs a credential.
 
 A browser that already holds a session keeps working. A new browser behind the
-proxy needs the `#overdeck_token=` fragment or pairing. The setting is read once at
-startup, so restart the dashboard after changing it.
+proxy needs the `#overdeck_token=` fragment or pairing. You can also turn it on
+in **Settings → Access Tokens → Require a token to sign in**. A Settings change
+applies at once. A hand edit of `config.yaml` needs a dashboard restart. The key
+is read only from the global `~/.overdeck/config.yaml`, never from a project
+`.pan.yaml`.
 
 ## What pairing is not
 
@@ -272,7 +281,5 @@ startup, so restart the dashboard after changing it.
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
-- A Settings section for scoped tokens and a Settings toggle for
-  `require_token_mint`: [PAN-4435](https://github.com/eltmon/overdeck/issues/4435).
 - A heartbeat on terminal WebSockets, so idle terminals survive proxies with
   short idle timeouts: [PAN-4434](https://github.com/eltmon/overdeck/issues/4434).

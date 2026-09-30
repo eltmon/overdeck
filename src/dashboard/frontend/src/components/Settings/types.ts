@@ -298,5 +298,6 @@ export interface SettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  dashboard?: { require_token_mint?: boolean };
   tiered_execution?: TieredExecutionConfig;
 }

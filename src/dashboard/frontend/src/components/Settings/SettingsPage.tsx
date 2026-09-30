@@ -25,6 +25,7 @@ import { CloseOutSection } from './sections/CloseOutSection';
 import { SessionVaultSection } from './sections/SessionVaultSection';
 import { AnywhereSection } from './sections/AnywhereSection';
 import { RemoteSection } from './sections/RemoteSection';
+import { AccessTokensSection } from './sections/AccessTokensSection';
 import { MemorySection } from './sections/MemorySection';
 import { BackgroundAiSection } from './sections/BackgroundAiSection';
 import { TerminalSection } from './sections/TerminalSection';
@@ -556,6 +557,11 @@ export function SettingsPage() {
       <AnywhereSection />
 
       <RemoteSection
+        formData={formData}
+        onSettingsChange={applySettings}
+      />
+
+      <AccessTokensSection
         formData={formData}
         onSettingsChange={applySettings}
       />
