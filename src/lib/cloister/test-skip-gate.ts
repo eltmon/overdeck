@@ -16,9 +16,9 @@
  * Two escapes exist for a genuine net removal:
  *   - Structural: a test file deleted whole whose subject module is deleted in
  *     the same diff is exempt — the tests went away because the code did.
- *   - Operator waiver: `pan verify waive-test-removal <id> --reason "…"` pins a
- *     waiver to one HEAD; see `test-skip-waiver.ts`. It waives `removed-test`
- *     only, never `skip`/`only`.
+ *   - Operator waiver: `pan review waive-test-removal <id> --reason "…"` (or
+ *     the dashboard Test/Lint panel) pins a waiver to one HEAD; see
+ *     `test-skip-waiver.ts`. It waives `removed-test` only, never `skip`/`only`.
  */
 import { execFile } from 'child_process';
 import { promisify } from 'util';
