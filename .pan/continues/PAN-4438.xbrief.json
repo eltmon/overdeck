@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4438",
   "created": "2026-09-30T16:41:39.289Z",
-  "updated": "2026-09-30T18:00:08.220Z",
+  "updated": "2026-09-30T18:00:24.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "gate-integration-test.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T18:00:08.220Z"
+    },
+    "waiver-control.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T18:00:24.297Z"
     }
   }
 }
