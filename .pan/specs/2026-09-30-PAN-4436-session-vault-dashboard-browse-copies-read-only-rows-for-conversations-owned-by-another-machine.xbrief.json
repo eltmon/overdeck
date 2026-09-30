@@ -1,0 +1,951 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T20:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4436: Session Vault: dashboard browse copies (read-only rows for conversations owned by another machine)",
+    "updated": "2026-09-30T19:36:13.784Z"
+  },
+  "plan": {
+    "id": "pan-4436",
+    "title": "Session Vault: dashboard browse copies (read-only rows for conversations owned by another machine)",
+    "status": "proposed",
+    "uid": "3bc2ad1e-260e-4ee5-83ef-19b2009aabc2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T20:30:00Z",
+    "updated": "2026-09-30T19:36:13.784Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4436",
+        "label": "PAN-4436",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4307",
+        "label": "PAN-4307 (blocked by)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4437",
+        "label": "PAN-4437 (blocks)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "dashboard",
+      "conversations",
+      "browse-copies"
+    ],
+    "narratives": {
+      "Problem": "PAN-2609 saves every conversation to the Session Vault and PAN-4307 makes the primary dashboard pull every record each sync cycle, but a conversation saved on another machine is still invisible in the dashboard; the only way to read it is `pan vault show` in a terminal. PAN-2609 FR-4 asks for browse copies: full transcript through the existing conversation UI, an owner badge, a read-only composer, and no presence in cost totals or agent/runtime views.",
+      "Proposal": "After each successful sync cycle, a new engine module (src/lib/vault/browse.ts) decrypts the LOG of every non-owned Claude Code or Codex record into ${OVERDECK_HOME}/vault/browse/ (0600, append-only by manifest), and a new dashboard service (vault-browse-service.ts, subscribed through PAN-4307's onVaultSyncReport) upserts `vault-<vaultId>` rows through a new conversations door (conversation-vault-rows.ts) with origin 'vault', status 'ended', and no conversation_files row, and removes rows and files for tombstoned, owned-here or vanished records. listConversations and two raw readers exclude them; GET /api/conversations appends them through getConversationListWithVaultCopies while the Agents Directory and lanes keep getEnrichedConversationList. resolveSessionFile serves the cache file, reading writes no cost, resume returns 409. The frontend shows `from <machine>` and replaces the composer with a read-only notice carrying `pan vault resume <vaultId>`. getConversationLedgerCosts is extracted first to make room under the conversations.ts file-size cap. Full design: .pan/drafts/PAN-4436.md.",
+      "NonGoals": "- \"Continue here\" in the dashboard, the drift dialog, WIP apply, clone-and-register, project matching by git origin, and \"continued on <machine>\" states (PAN-4437).\n- Browse copies for harnesses other than Claude Code and Codex.\n- Rendering the VIEW instead of the LOG.\n- Refusing fork or summary-fork of a browse row.\n- Removing browse rows when the vault is turned off or its key is missing.\n- A \"Sync now\" button or route; the refresh runs only inside the sync cycle.\n- Excluding browse rows from conversation title search.\n- Any change to cost ingestion (reconciler and Codex collector roots).\n- Any change to the PAN-4307 sync loop, settle poller, eviction or routes other than the main.ts start block.\n- CSS module changes, new design tokens, or new per-row actions for browse rows.\n- Calling the transcript deletion door from any browse code.\n- Editing scripts/file-size-allowlist.txt or CLAUDE.md.\n- Changing Delete or Archive for browse rows: delete archives the row and the upsert never touches archived_at, so it stays hidden until its record goes away."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Browse copies cover claude-code and codex records only (D-1).",
+        "rationale": "The dashboard parses only these two and the vault discovers/settles only these two (src/lib/vault/discover.ts)."
+      },
+      {
+        "summary": "The browse cache holds the LOG, not the VIEW (D-2).",
+        "rationale": "Browsing shows the full saved transcript; the VIEW is the resume selection and belongs to PAN-4437."
+      },
+      {
+        "summary": "The cache refresh lives in the vault engine and the row writes in a new dashboard service joined through onVaultSyncReport (D-3, D-4).",
+        "rationale": "The vault import graph forbids the engine from importing the conversations door; PAN-4307 FR-13 exports the hook for exactly this."
+      },
+      {
+        "summary": "LegacyConversation gains origin and vaultOwnerLabel (D-5).",
+        "rationale": "Every reader that spreads the row carries both fields to the frontend with no per-route code; reads and runtime alias LegacyConversation as Conversation."
+      },
+      {
+        "summary": "The notice and the resume refusal print the full vaultId instead of an 8-character prefix (D-7).",
+        "rationale": "resolveVaultId resolves an exact id without ambiguity, so the copied command always works; the PAN-4307 sibling note suggested id8."
+      },
+      {
+        "summary": "Forks of a browse row are allowed; removal nulls the four self-referencing foreign keys (D-8).",
+        "rationale": "A fork is a new local conversation and leaves the copy untouched; one detach step covers every referencing column instead of a guard per entry point."
+      },
+      {
+        "summary": "ComposerFooter becomes a wrapper around a renamed ComposerFooterInput (D-9).",
+        "rationale": "ComposerFooter calls hooks from its first line, and ConversationPanel.tsx is at its file-size cap."
+      },
+      {
+        "summary": "Browse rows keep project_key NULL and group by cwd; foreign cwds land in 'No project' (D-11).",
+        "rationale": "Project matching by git origin is PAN-4437's scope; the existing grouping rule stays the single source of truth."
+      },
+      {
+        "summary": "OVERDECK_VAULT_IN_PEER=1 starts the vault and browse services in a peer dashboard (D-12).",
+        "rationale": "The isolated Playwright fixture is always a peer, so without an override no browse row could appear for the required UAT; the fixture already spreads process.env so it needs no change."
+      },
+      {
+        "summary": "One conversation.created event per refresh with changes (D-13).",
+        "rationale": "A first sync can create hundreds of rows; the reducer only bumps a revision counter."
+      },
+      {
+        "summary": "Browse rows persist while the vault is off (D-14).",
+        "rationale": "PAN-4307's cycle calls listeners only when the vault opens; cleanup on vault shutdown is out of scope."
+      },
+      {
+        "summary": "Extract getConversationLedgerCosts before growing conversations.ts (D-15).",
+        "rationale": "conversations.ts is at its 1222-line cap and agents never raise caps."
+      },
+      {
+        "summary": "drizzle init SQL gets the two columns alongside the top-ups.",
+        "rationale": "Matches the PAN-4185 and PAN-4223 pattern; tests that apply the init SQL by hand would otherwise fail with no such column."
+      }
+    ],
+    "items": [
+      {
+        "id": "ledger-costs-extract",
+        "title": "Extract getConversationLedgerCosts to conversation-ledger-costs.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "refactor",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-ledger-costs.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-costs.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-list-costs.test.ts passes with no edits",
+            "lint-file-size.sh exits 0",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Move the doc comment and getConversationLedgerCosts (conversations.ts anchor `export function getConversationLedgerCosts(): Map<string, { cost: number; tokens: number }> {`, lines 572-604) verbatim into the new src/lib/overdeck/conversation-ledger-costs.ts, replacing overdeckDb() with getOverdeckDatabase() from ./infra.js. Leave a one-line `export { getConversationLedgerCosts } from './conversation-ledger-costs.js';` in conversations.ts. dashboard-db-worker.ts keeps importing from conversations.js. This frees ~32 lines under the 1222 cap for browse-rows-door."
+        },
+        "items": [
+          {
+            "id": "ledger-costs-extract.ac1",
+            "title": "Given the extraction, when `wc -l src/lib/overdeck/conversations.ts` runs, then it prints 1190 or fewer lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ledger-costs-extract.ac2",
+            "title": "conversations.ts contains a re-export of getConversationLedgerCosts from conversation-ledger-costs.ts, and typecheck passes with dashboard-db-worker.ts importing it from conversations.js unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ledger-costs-extract.ac3",
+            "title": "conversation-list-costs.test.ts passes unchanged against the moved function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-browse-cache",
+        "title": "Add src/lib/vault/browse.ts: decrypted browse cache of non-owned records",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "difficulty": "medium",
+          "kind": "backend",
+          "foundationFor": [
+            "browse-rows-list-and-read",
+            "vault-browse-service"
+          ],
+          "files_scope": [
+            "src/lib/vault/browse.ts",
+            "tests/unit/lib/vault/browse.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/browse.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "browse.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (FR-1, FR-2, FR-5 cache half, NFR-2..NFR-4, D-1, D-2). New engine module exporting BROWSE_DIRNAME, BROWSE_HARNESSES, vaultBrowseDir, isBrowsableVaultId (UUID regex), vaultBrowseFilePath (codex -> rollout-<id>.jsonl, else <id>.jsonl), BrowseCopy, BrowseRefreshResult, refreshBrowseCache({store, keys, rows?}). Manifest browse/manifest.json (0600, temp+rename). Wanted = !ownerIsHere && !tombstone && harness in claude-code/codex && valid id. Per row: skip when manifest updatedAt/harness/bytes match; else load record via refName+readRef+readSessionRecord; append only record.log.slice(entry.chunks) when size matches; else rewrite whole file via temp+rename; per-row try, errors -> failed (file kept). Remove files+entries not kept and not failed using rm under a relative() containment check. NEVER import transcript-deletion-door. Imports only Node built-ins and ./config.js, ./format.js, ./local-index.js, ./identity.js and ./store/types.js (import-graph test); it does NOT import ./materialize.js and defines its own one-line browseFileContent equivalent of nativeFileContent so the conversation-reads -> vault/browse edge adds no import cycle. Tests in tests/unit/lib/vault/browse.test.ts per PRD WI-2 step 7."
+        },
+        "items": [
+          {
+            "id": "vault-browse-cache.ac1",
+            "title": "Given a non-owned Claude record, when refreshBrowseCache runs, then it creates browse/<vaultId>.jsonl byte-equal to the LOG lines joined by newlines with a trailing newline with file mode 0600 and directory mode 0700",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-cache.ac2",
+            "title": "Given one more settlement, when refreshBrowseCache runs again, then store.getObject is called once and the file contains the full LOG; an unchanged row triggers zero store.readRef calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-cache.ac3",
+            "title": "Given rows that are tombstoned, ownerIsHere, absent from the list cache, harness pi, or with vaultId ../x, when refreshBrowseCache runs, then it creates no file for them, deletes an existing file for such an id, and returns the id in removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-cache.ac4",
+            "title": "A record with a missing chunk is returned in failed and its previous cache file survives unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-cache.ac5",
+            "title": "The transcript-deletion-door spy records zero calls across every refresh and import-graph.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browse-rows-door",
+        "title": "Add origin columns and the conversation-vault-rows door; listConversations excludes browse rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "difficulty": "complex",
+          "kind": "backend",
+          "readinessReason": "Runs in its own slot once ledger-costs-extract lands; it is the only item that edits conversations.ts after the extraction, and later items consume its exports through blocks edges.",
+          "foundationFor": [
+            "browse-rows-raw-readers",
+            "browse-rows-list-and-read",
+            "browse-resume-guard",
+            "vault-browse-service"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-vault-rows.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts src/lib/overdeck/__tests__/conversation-lane-columns.test.ts tests/unit/lib/overdeck/conversations.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-browse, conversation-lane-columns and conversations tests pass",
+            "lint-file-size.sh exits 0 with conversations.ts at or under 1222 lines",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (FR-3..FR-6, D-5, D-6, D-8). infra.ts ensureRuntimeIndexesSync: top-ups `origin text NOT NULL DEFAULT 'local'` and `vault_owner_label text`; same two columns in drizzle/overdeck/0000_overdeck_init.sql. conversations.ts: LegacyConversation gains origin and vaultOwnerLabel (row interface, LEGACY_CONVERSATION_SELECT, rowToLegacyConversation); listConversations adds `AND c.origin <> 'vault'`; new listVaultBrowseConversations(); createConversation throws on names starting with `vault-`. New src/lib/overdeck/conversation-vault-rows.ts: VAULT_BROWSE_PREFIX, vaultBrowseConversationName, vaultIdFromBrowseName, isVaultBrowseConversation, vaultBrowseReadOnlyMessage, upsertVaultBrowseRow (INSERT ... ON CONFLICT(name) DO UPDATE ... WHERE conversations.origin = 'vault'; conflict with a local row writes nothing; ended_at never null; never touches archived_at/project_key; no conversation_files row; never createConversation) and removeVaultBrowseRow (one transaction: null the four self-referencing FK columns, delete the favorites row, delete the row). conversations.ts must stay <= 1222 lines. Tests in src/lib/overdeck/__tests__/conversation-vault-browse.test.ts per PRD WI-3 step 5."
+        },
+        "items": [
+          {
+            "id": "browse-rows-door.ac1",
+            "title": "Given a DB created without the two columns, when it is opened through getOverdeckDatabase, then the top-ups add origin (default 'local') and vault_owner_label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-door.ac2",
+            "title": "upsertVaultBrowseRow creates a row that getConversationByName returns with origin 'vault', status 'ended', a non-null endedAt, vaultOwnerLabel, and no conversation_files row; identical input returns 'unchanged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-door.ac3",
+            "title": "Given the browse row was archived and moved to a project, when it is upserted again with a new title, then archivedAt and projectKey are preserved and the title updates; a local row holding the name returns 'conflict' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-door.ac4",
+            "title": "listConversations() omits the browse row while listVaultBrowseConversations() returns it, and createConversation throws for a name starting with vault-",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-door.ac5",
+            "title": "Given a local fork whose parentName is the browse row, when removeVaultBrowseRow runs, then it returns true and the fork's parentConversationId becomes null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browse-rows-raw-readers",
+        "title": "Exclude browse rows from the PR sync sweep and the managed-archived sessions feed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/overdeck/conversation-pull-requests.ts",
+            "src/lib/overdeck/sessions-feed.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-browse test passes including the raw-reader cases",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (FR-6). conversation-pull-requests.ts listConversationsForPullRequestSync: append ` AND origin <> 'vault'` to the SQL on the same line (anchor `SELECT id, name, cwd, issue_id FROM conversations WHERE archived_at IS NULL`). sessions-feed.ts managed-archived branch: append ` AND c.origin <> 'vault'` to `WHERE c.archived_at IS NOT NULL` at line 314 (the one after `LEFT JOIN discovered_sessions ds ON ds.session_id = cf.locator`, not line 235). Tests appended to the shared conversation-vault-browse test file using listSessionsFeed({ source: 'managed-archived' })."
+        },
+        "items": [
+          {
+            "id": "browse-rows-raw-readers.ac1",
+            "title": "Given an unarchived browse row, when listConversationsForPullRequestSync() runs, then it returns no row named vault-<id> while still returning a local row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-raw-readers.ac2",
+            "title": "Given an archived browse row and an archived local row, when listSessionsFeed({ source: 'managed-archived' }) runs, then it returns the local row and not the browse row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browse-rows-list-and-read",
+        "title": "Serve browse rows in GET /api/conversations and render their transcript at zero cost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/overdeck/conversation-list.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts tests/unit/lib/overdeck/conversation-reads-session-file.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "lint-file-size.sh exits 0 with routes/conversations.ts at 1072 lines",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (FR-7..FR-9). conversation-list.ts: add getConversationListWithVaultCopies(limit, offset) that returns getEnrichedConversationList then, on offset 0 only, listVaultBrowseConversations() mapped with sessionAlive false, totalCost/totalTokens 0, lastActivityAt = endedAt, isFavorited from getCachedFavoritedIds, and the other default fields listed in the PRD. routes/conversations.ts: swap the name on the import line and the call line only (file stays 1072). conversation-reads.ts: resolveSessionFile returns vaultBrowseFilePath for origin 'vault' as its first statement (null for an invalid id); getConversationMessagesRead skips updateConversationCost and returns totalCost/totalTokens 0 for browse rows. Tests appended to the shared test file, mocking dashboard services the way conversation-list-costs.test.ts does."
+        },
+        "items": [
+          {
+            "id": "browse-rows-list-and-read.ac1",
+            "title": "Given a browse row, when getConversationListWithVaultCopies(500, 0) runs, then it returns local rows followed by the browse row with origin 'vault', vaultOwnerLabel, sessionAlive false and totalCost 0; with offset 10 it contains no browse row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-list-and-read.ac2",
+            "title": "getEnrichedConversationList(500, 0), the Agents Directory and lanes source, returns no browse row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-list-and-read.ac3",
+            "title": "resolveSessionFile returns the browse cache path for a Claude browse row and the rollout- path for a Codex browse row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-list-and-read.ac4",
+            "title": "When getConversationMessagesRead('vault-<id>') runs, then it returns both fixture messages with totalCost 0, the row's stored totalCost stays 0, and the cost_events row count is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-rows-list-and-read.ac5",
+            "title": "Given a cost_events row whose session_id equals the vaultId, when getConversationLedgerCosts() runs, then it contains no key for the browse row's id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browse-resume-guard",
+        "title": "Resume refuses a browse row with a 409 and the pan vault resume command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-browse test passes including resume cases",
+            "lint-file-size.sh exits 0 with conversation-runtime.ts at or under 1252 lines",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "traces": [
+            "FR-10",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (FR-10). In conversation-runtime.ts handleConversationResume, right after the 404 guard, return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 }) when isVaultBrowseConversation(conv). One import line from ./conversation-vault-rows.js. Net +2 lines; file must stay <= 1252. Tests appended to the shared test file with spawnConversationSession mocked."
+        },
+        "items": [
+          {
+            "id": "browse-resume-guard.ac1",
+            "title": "Given a browse row, when handleConversationResume runs, then it returns 409 with code 'vault-browse-copy' and an error containing `pan vault resume <full vaultId>`, and the spawn mock records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browse-resume-guard.ac2",
+            "title": "Given a browse row, when handleConversationMessage sends 'hi', then it returns 422 from the existing ended-row guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-browse-service",
+        "title": "Refresh browse copies after each sync cycle and start the service from main.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "src/dashboard/server/services/vault-browse-service.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server/services/vault-browse-service.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-browse-service.test.ts tests/unit/dashboard/server/services/vault-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "vault-browse-service and vault-service tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-13",
+            "FR-14",
+            "NFR-4",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (FR-1..FR-5, FR-13, FR-14, D-3, D-4, D-12, D-13). New src/dashboard/server/services/vault-browse-service.ts exporting startVaultBrowseService (idempotent onVaultSyncReport subscription), stopVaultBrowseService, refreshVaultBrowseCopies(vault, deps): refreshBrowseCache -> upsertVaultBrowseRow per copy (warn once on 'conflict') -> removeVaultBrowseRow for every browse row whose id is not in copies or failed and for every removed id -> one conversation.created emit when anything changed -> one warn per distinct failure message. main.ts: split PAN-4307's `if (!isPeerDashboard) {` block so startVaultBrowseService() then startVaultService() run under `if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1')`, exactly as the PRD's after-snippet. Tests in tests/unit/dashboard/server/services/vault-browse-service.test.ts with a deletion-door spy."
+        },
+        "items": [
+          {
+            "id": "vault-browse-service.ac1",
+            "title": "Given one non-owned Claude record on a temp home, when refreshVaultBrowseCopies runs, then it creates row vault-<id> and its cache file and emits exactly one conversation.created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-service.ac2",
+            "title": "Given nothing changed since the last refresh, when refreshVaultBrowseCopies runs, then it emits zero events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-service.ac3",
+            "title": "Given the list cache now marks the record tombstoned or ownerIsHere, when refreshVaultBrowseCopies runs, then it deletes the row and the cache file and emits once, while a row whose id is in failed is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-service.ac4",
+            "title": "When startVaultBrowseService is called twice, then exactly one onVaultSyncReport listener is registered and one refresh runs per sync report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-browse-service.ac5",
+            "title": "The transcript-deletion-door spy records zero calls across every case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-owner-badge",
+        "title": "Show 'from <machine>' on browse rows in the conversation list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "VaultBrowseCopy.test.tsx and ConversationRow.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (FR-11, D-10). ConversationList.tsx `export interface Conversation {`: add origin?: 'local' | 'vault' and vaultOwnerLabel?: string | null with PAN-4436 comments. ConversationRow.tsx: build ownerBadge next to pullRequestBadge using styles.conversationBranchChip / conversationBranchChipText, a lucide MonitorSmartphone icon size 10, title and aria-label `Read-only copy from <label>`, data-testid vault-owner-badge, text `from <label>` (fallback 'another machine'); render it before {pullRequestBadge} in both the nested and flat variants. No CSS module change. New test file VaultBrowseCopy.test.tsx copying the harness from CommandDeck/__tests__/ConversationRow.test.tsx."
+        },
+        "items": [
+          {
+            "id": "frontend-owner-badge.ac1",
+            "title": "Given a conversation with origin 'vault' and vaultOwnerLabel 'laptop-a', when ConversationRow renders in the flat variant, then vault-owner-badge shows `from laptop-a`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-owner-badge.ac2",
+            "title": "Given the same conversation, when ConversationRow renders in the nested project-tree variant, then vault-owner-badge shows `from laptop-a`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-owner-badge.ac3",
+            "title": "Given a local conversation, when ConversationRow renders, then no vault-owner-badge element exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-read-only-composer",
+        "title": "Replace the composer with a read-only notice and hide Resume for browse rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "VaultBrowseCopy, ComposerFooter and ConversationPanel tests pass",
+            "lint-file-size.sh exits 0 with ConversationPanel.tsx at 1531 lines",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-12",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (FR-12, D-9). ComposerFooter.tsx: rename `export function ComposerFooter({` to `function ComposerFooterInput({`, add the VaultReadOnlyNotice component and a new exported `ComposerFooter(props)` wrapper exactly as the PRD snippet (reuses styles.composerFooter / styles.composerBox; role status; data-testid vault-read-only-notice; text `Read-only copy from <label>.` and `To continue it here, run: pan vault resume <full vaultId>`). ConversationPanel.tsx line 1058: prefix the onResume expression with `conversation.origin === 'vault' ? undefined : ` on the same line (file stays 1531). Tests appended to VaultBrowseCopy.test.tsx using the harness from chat/__tests__/ComposerFooter.test.tsx."
+        },
+        "items": [
+          {
+            "id": "frontend-read-only-composer.ac1",
+            "title": "Given a browse conversation owned by laptop-a, when ComposerFooter renders, then vault-read-only-notice shows `Read-only copy from laptop-a.` and `pan vault resume <full vaultId>` and no textbox renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-read-only-composer.ac2",
+            "title": "Given a local conversation, when ComposerFooter renders, then the composer input renders as before and the existing ComposerFooter tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-read-only-composer.ac3",
+            "title": "Given an ended browse conversation, when ConversationPanel renders, then ConversationView receives no onResume so no Resume control renders, and ConversationPanel.tsx stays at 1531 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-vault-browse",
+        "title": "Playwright UAT: a browse row and its read-only panel in an isolated dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4436-vault-browse.spec.ts"
+          ],
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4436-vault-browse.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the spec passes and writes test-results/pan-4436/browse-row.png and browse-panel.png"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "FR-8",
+            "FR-11",
+            "FR-12",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Build first (npm run build). New spec src/dashboard/frontend/tests/pan-4436-vault-browse.spec.ts: temp dirs HA, HB, V, F; write HA/environment-id.json with label uat-laptop-a; write a two-line Claude fixture transcript whose cwd is F/uat-project; with the built CLI run (HA) `vault setup dir:<V> --no-passphrase` capturing the 24-word phrase, `vault save <T>`, `vault sync`, then (HB) `vault join dir:<V> --phrase-file <F>/phrase.txt`; read vaultId from HA/vault/index.json; set process.env.OVERDECK_VAULT_IN_PEER='1'; startIsolatedDashboard({ home: HB }). In a fresh browser context poll /api/conversations up to 30 s for vault-<vaultId>, select the 'No project' bucket (implementation checkpoint and fallback in PRD WI-10), assert and screenshot the row and the panel to test-results/pan-4436/. Inspect both PNGs against /pan-style-guide and say so in the PR. afterEach stops the dashboard, deletes the env var and removes the temp dirs."
+        },
+        "items": [
+          {
+            "id": "uat-vault-browse.ac1",
+            "title": "Given a record saved and synced by home A labelled uat-laptop-a, when home B's isolated dashboard runs its first sync cycle, then GET /api/conversations returns vault-<vaultId> with origin 'vault' within 30 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-vault-browse.ac2",
+            "title": "The conversation list shows `from uat-laptop-a` and the spec saves test-results/pan-4436/browse-row.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-vault-browse.ac3",
+            "title": "When the row opens, then the panel renders `UAT browse fixture question` and `UAT browse fixture answer`, the read-only notice contains `pan vault resume <vaultId>`, no button named Resume exists, and the spec saves test-results/pan-4436/browse-panel.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-vault-browse.ac4",
+            "title": "The PR records that the implementing agent opened both screenshots and checked them against the style guide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-browse-copies",
+        "title": "Document browse copies in the Session Vault docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T20:30:00Z",
+        "metadata": {
+          "issueLabel": "pan-4436",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "verify_commands": [
+            "grep -n 'vault/browse' docs/SESSION-VAULT.md",
+            "grep -n 'OVERDECK_VAULT_IN_PEER' docs/SESSION-VAULT.md",
+            "grep -n 'pan vault resume' configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-10",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. docs/SESSION-VAULT.md: in `## Dashboard (Overdeck mode)` amend the Sync cycle bullet's 'never starts this background service' sentence to add 'unless OVERDECK_VAULT_IN_PEER=1 is set'; replace the bullet beginning `- Browsing another machine's vaulted conversations from the dashboard` with a Browse copies bullet (cache dir and 0600 files, vault-<vaultId> rows with `from <machine>`, read-only panel with `pan vault resume <vaultId>`, resume 409, excluded from costs/Agents Directory/lanes/lifecycle poller, removal at next sync for tombstoned/owned-here/gone records, cache never goes through the deletion door, Continue here = PAN-4437); add the OVERDECK_VAULT_IN_PEER sentence; add the three browse paths to `## Files`; add the three new modules to `## Module map`. configuration/session-vault.mdx `## Continue on another machine`: one paragraph on where browse copies appear and that the panel shows the pan vault resume command. Do not edit CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "docs-browse-copies.ac1",
+            "title": "docs/SESSION-VAULT.md contains a Browse copies bullet under `## Dashboard (Overdeck mode)` naming `${OVERDECK_HOME}/vault/browse/`, the `from <machine>` badge, the 409 resume refusal and PAN-4437",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-browse-copies.ac2",
+            "title": "docs/SESSION-VAULT.md contains OVERDECK_VAULT_IN_PEER in the Sync cycle bullet and the Browse copies bullet with the warning that a peer sharing the primary's home must never set it, the three browse paths in `## Files`, and the three new modules in `## Module map`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-browse-copies.ac3",
+            "title": "configuration/session-vault.mdx `## Continue on another machine` tells the reader that conversations from other machines show `from <machine>` in the list and that the panel shows the `pan vault resume <id>` command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ledger-costs-extract",
+        "to": "browse-rows-door",
+        "type": "blocks"
+      },
+      {
+        "from": "browse-rows-door",
+        "to": "browse-rows-raw-readers",
+        "type": "blocks"
+      },
+      {
+        "from": "browse-rows-raw-readers",
+        "to": "browse-rows-list-and-read",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-browse-cache",
+        "to": "browse-rows-list-and-read",
+        "type": "blocks"
+      },
+      {
+        "from": "browse-rows-list-and-read",
+        "to": "browse-resume-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-browse-cache",
+        "to": "vault-browse-service",
+        "type": "blocks"
+      },
+      {
+        "from": "browse-rows-door",
+        "to": "vault-browse-service",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-owner-badge",
+        "to": "frontend-read-only-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-browse-service",
+        "to": "uat-vault-browse",
+        "type": "blocks"
+      },
+      {
+        "from": "browse-resume-guard",
+        "to": "uat-vault-browse",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-read-only-composer",
+        "to": "uat-vault-browse",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-30-PAN-4436-session-vault-dashboard-browse-copies-read-only-rows-for-conversations-owned-by-another-machine.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
