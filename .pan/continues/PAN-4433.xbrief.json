@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4433",
   "created": "2026-09-30T16:40:45.395Z",
-  "updated": "2026-09-30T17:39:35.378Z",
+  "updated": "2026-09-30T17:39:54.223Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "journal-types-show.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T17:39:35.378Z"
+    },
+    "journal-types-show.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:54.222Z"
     }
   }
 }
