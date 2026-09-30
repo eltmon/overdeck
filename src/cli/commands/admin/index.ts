@@ -121,7 +121,7 @@ export async function registerAdminCommands(
   // pan admin tldr — TLDR daemon management
   admin
     .command('tldr [action] [workspace]')
-    .description('TLDR daemon: status, start, stop, warm')
+    .description('TLDR daemon: status, start, stop, warm, install')
     .option('--json', 'Output as JSON')
     .action(async (action, workspace, options) => {
       (await import('./tldr-handler.js')).tldrCommand(action || 'status', workspace, options);

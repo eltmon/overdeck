@@ -1,8 +1,13 @@
 import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { getTldrDaemonService, listTldrDaemonServices } from '../../../lib/tldr-daemon.js';
+import { PYTHON_PROJECT_MARKERS, installTldrVenv } from '../../../lib/workspace-manager/tldr-venv.js';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { join, basename, dirname, isAbsolute, resolve } from 'path';
+
+const execFileAsync = promisify(execFile);
 
 interface TldrOptions {
   json?: boolean;
@@ -24,6 +29,9 @@ export async function tldrCommand(action: string, workspace?: string, options: T
       break;
     case 'warm':
       await warmCommand(workspace, options);
+      break;
+    case 'install':
+      await installCommand(options);
       break;
     case 'help':
     default:
@@ -342,6 +350,63 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
   }
 }
 
+/**
+ * Build the one project-root TLDR venv, once. Workspaces link to it instead
+ * of copying or building their own (PAN-1674). Refuses to run from a linked
+ * worktree (a workspace) because two workspaces created at the same time
+ * would otherwise race to build it.
+ */
+async function installCommand(options: TldrOptions): Promise<void> {
+  const projectRoot = process.cwd();
+  const gitPath = join(projectRoot, '.git');
+
+  if (existsSync(gitPath) && statSync(gitPath).isFile()) {
+    let primaryCheckoutHint = '';
+    try {
+      const { stdout } = await execFileAsync('git', ['rev-parse', '--git-common-dir'], { cwd: projectRoot });
+      const commonDir = stdout.trim();
+      const absCommonDir = isAbsolute(commonDir) ? commonDir : resolve(projectRoot, commonDir);
+      primaryCheckoutHint = ` Run it in ${dirname(absCommonDir)} instead.`;
+    } catch {
+      // Best-effort hint only — the refusal below stands regardless.
+    }
+    console.error(
+      chalk.red(`Error: \`pan admin tldr install\` must run in the primary checkout, not a linked worktree.${primaryCheckoutHint}`)
+    );
+    return exitCli(1);
+  }
+
+  const venvPath = join(projectRoot, '.venv');
+  const tldrBin = join(venvPath, 'bin', 'tldr');
+
+  if (existsSync(tldrBin)) {
+    if (!options.json) {
+      console.log(chalk.green(`TLDR venv already installed at ${venvPath}`));
+    }
+    return;
+  }
+
+  const hasPythonProjectMarker = PYTHON_PROJECT_MARKERS.some((marker) => existsSync(join(projectRoot, marker)));
+  if (hasPythonProjectMarker) {
+    console.error(chalk.red(`Error: ${projectRoot} is a Python project and owns .venv; refusing to overwrite it.`));
+    return exitCli(1);
+  }
+
+  if (existsSync(venvPath)) {
+    console.error(chalk.red(`Error: ${venvPath} already exists without a tldr binary; refusing to overwrite it.`));
+    return exitCli(1);
+  }
+
+  const steps = await installTldrVenv(venvPath);
+  if (!options.json) {
+    for (const step of steps) {
+      console.log(chalk.dim(step));
+    }
+    console.log(chalk.green(`✓ TLDR venv installed at ${venvPath}`));
+    console.log('New workspaces will link to this venv. Run `pan admin tldr dedupe` to convert existing workspace copies.');
+  }
+}
+
 function showHelp(): void {
   console.log(chalk.bold('pan admin tldr - TLDR daemon management\n'));
   console.log('Commands:');
@@ -349,6 +414,7 @@ function showHelp(): void {
   console.log('  ' + chalk.cyan('start [workspace]') + '   Start TLDR daemon (main or workspace)');
   console.log('  ' + chalk.cyan('stop [workspace]') + '    Stop TLDR daemon (main or workspace)');
   console.log('  ' + chalk.cyan('warm [workspace]') + '    Manually trigger index warm (all layers + embeddings)');
+  console.log('  ' + chalk.cyan('install') + '             Build the project-root TLDR venv once');
   console.log('  ' + chalk.cyan('help') + '                Show this help\n');
   console.log('Options:');
   console.log('  ' + chalk.cyan('--json') + '              Output as JSON\n');
@@ -357,5 +423,6 @@ function showHelp(): void {
   console.log('  pan admin tldr start');
   console.log('  pan admin tldr start feature-pan-123');
   console.log('  pan admin tldr warm feature-pan-123');
+  console.log('  pan admin tldr install');
   console.log('  pan admin tldr stop\n');
 }
