@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:30:05.043Z",
+  "updated": "2026-09-30T02:30:20.819Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,10 @@
     "roles-tldr-guidance.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T02:30:05.043Z"
+    },
+    "roles-tldr-guidance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:30:20.819Z"
     }
   }
 }
