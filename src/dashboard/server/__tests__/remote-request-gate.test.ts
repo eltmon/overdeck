@@ -3,7 +3,8 @@
  * credential gets 401 on every gated surface except the allowlist; a device
  * credential or a loopback peer passes; `dashboard.require_token_mint` turns a
  * forwarded loopback peer (a local reverse proxy) into a remote one, for the
- * gate and for the session mint.
+ * gate and for the session mint. PAN-2351 W3: a registry credential passes only
+ * when its scopes satisfy the route-scope table, from any peer, else 403.
  *
  * The gate is composed with a catch-all route the same way makeRoutesLayer
  * merges it beside the real route layers. The route inventory is the no-loss
@@ -37,13 +38,18 @@ function makeRequest(method: string, path: string, opts: { peer?: string; header
     .modify({ remoteAddress: opts.peer ? Option.some(opts.peer) : Option.none() });
 }
 
-async function send(method: string, path: string, opts: { peer?: string; headers?: Record<string, string> } = {}) {
+async function sendFull(method: string, path: string, opts: { peer?: string; headers?: Record<string, string> } = {}) {
   const request = makeRequest(method, path, opts);
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
     HttpRouter.toHttpEffect(app),
     (handler) => Effect.provideService(handler, HttpServerRequest.HttpServerRequest, request),
   )));
-  return (response as { status: number }).status;
+  const raw = response as { status: number; body: { body?: Uint8Array } };
+  return { status: raw.status, text: raw.body?.body ? new TextDecoder().decode(raw.body.body) : '' };
+}
+
+async function send(method: string, path: string, opts: { peer?: string; headers?: Record<string, string> } = {}) {
+  return (await sendFull(method, path, opts)).status;
 }
 
 async function setRequireTokenMint(value: boolean): Promise<void> {
@@ -167,5 +173,42 @@ describe('remote request gate (PAN-3762)', () => {
   it('keeps the loopback session mint when require_token_mint is off', async () => {
     await setRequireTokenMint(false);
     expect(rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }))).toBeNull();
+  });
+});
+
+describe('remote request gate scopes (PAN-2351)', () => {
+  async function bearer(scopes: Parameters<typeof createAccessToken>[0]['scopes']) {
+    const { token } = await createAccessToken({ name: scopes.join('+'), scopes, kind: 'token' });
+    return { authorization: `Bearer ${token}` };
+  }
+
+  it('lets a read:events token reach its routes and 403s it elsewhere with the missing scope', async () => {
+    const headers = await bearer(['read:events']);
+    expect(await send('GET', '/events/stream', { peer: LAN_PEER, headers })).toBe(200);
+
+    const tell = await sendFull('POST', '/api/agents/x/tell', { peer: LAN_PEER, headers });
+    expect(tell.status).toBe(403);
+    expect(JSON.parse(tell.text)).toEqual({ error: 'insufficient_scope', missingScope: 'tell' });
+
+    const settings = await sendFull('GET', '/api/settings', { peer: LAN_PEER, headers });
+    expect(settings.status).toBe(403);
+    expect(JSON.parse(settings.text)).toEqual({ error: 'insufficient_scope', missingScope: 'admin' });
+  });
+
+  it('lets a tell token reach tell routes and an operate token reach them too', async () => {
+    expect(await send('POST', '/api/agents/x/tell', { peer: LAN_PEER, headers: await bearer(['tell']) })).toBe(200);
+    expect(await send('POST', '/api/conversations/x/message', { peer: LAN_PEER, headers: await bearer(['operate']) })).toBe(200);
+  });
+
+  it('judges a narrow token by its scopes even from a loopback peer', async () => {
+    const headers = await bearer(['read:events']);
+    expect(await send('GET', '/api/settings', { peer: '127.0.0.1', headers })).toBe(403);
+    expect(await send('GET', '/api/settings', { peer: '127.0.0.1' })).toBe(200);
+  });
+
+  it('still passes an admin device everywhere and 401s an unknown odk_ bearer', async () => {
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect(await send('GET', '/api/settings', { peer: LAN_PEER, headers: { authorization: `Bearer ${token}` } })).toBe(200);
+    expect(await send('GET', '/api/settings', { peer: LAN_PEER, headers: { authorization: 'Bearer odk_unknown' } })).toBe(401);
   });
 });

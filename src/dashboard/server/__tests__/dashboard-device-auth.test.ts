@@ -29,8 +29,8 @@ const INTERNAL_TOKEN = 'device-auth-internal-token';
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
 
-function fakeRequest(headers: Record<string, string>) {
-  return { headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
+function fakeRequest(headers: Record<string, string>, route: { method: string; url: string } = { method: 'GET', url: '/api/settings' }) {
+  return { ...route, headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
 }
 
 async function mint(headers: Record<string, string>) {
@@ -142,9 +142,10 @@ describe('token credentials (PAN-2351)', () => {
     const { token } = await createAccessToken({ name: 'teller', scopes: ['tell'], kind: 'token' });
     const device = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
     const json = { 'content-type': 'application/json' };
-    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${token}` }))).toBeNull();
-    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, cookie: `overdeck_device=${device.token}` }))?.status).toBe(403);
-    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${device.token}` }))?.status).toBe(403);
+    const tell = { method: 'POST', url: '/api/agents/pan-1/tell' };
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${token}` }, tell))).toBeNull();
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, cookie: `overdeck_device=${device.token}` }, tell))?.status).toBe(403);
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${device.token}` }, tell))?.status).toBe(403);
   });
 
   it('revocableCredentialId returns the record id for device and token, null for root credentials', () => {

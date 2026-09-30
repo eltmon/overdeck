@@ -5,10 +5,11 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { verifyAccessToken, type AccessTokenScope } from '../../../lib/access-tokens.js';
+import { scopeSatisfies, verifyAccessToken, type AccessTokenScope } from '../../../lib/access-tokens.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { jsonResponse } from '../http-helpers.js';
+import { gatePathname, requiredScopeFor } from '../route-scopes.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
 export const DASHBOARD_SESSION_COOKIE = 'overdeck_session';
@@ -378,8 +379,18 @@ export function rejectUnauthorizedDashboardRequest(
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
-  if (!hasDashboardAuth(request)) {
+  const credential = resolveDashboardCredential(request.headers as HeaderMap);
+  if (!credential) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+  }
+  // Defense in depth behind the remote request gate (PAN-2351 D-6): the same
+  // route-scope table, derived from the request's own method and path.
+  const scopes = credentialScopes(credential);
+  if (scopeSatisfies(scopes, 'admin')) return null;
+  const pathname = gatePathname(request.url);
+  const required = pathname === null ? 'admin' : requiredScopeFor(request.method, pathname);
+  if (!scopeSatisfies(scopes, required)) {
+    return jsonResponse({ error: 'insufficient_scope', missingScope: required }, { status: 403 });
   }
   return null;
 }
