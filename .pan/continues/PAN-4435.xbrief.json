@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:13:08.505Z",
+  "updated": "2026-09-30T21:13:21.583Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "settings-api-mapping.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T21:13:08.505Z"
+    },
+    "settings-api-mapping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:21.583Z"
     }
   }
 }
