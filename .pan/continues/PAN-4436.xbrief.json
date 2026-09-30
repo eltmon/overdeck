@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:34:12.892Z",
+  "updated": "2026-09-30T20:34:25.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "vault-browse-cache.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T20:34:12.892Z"
+    },
+    "browse-rows-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:34:25.545Z"
     }
   }
 }
