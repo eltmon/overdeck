@@ -22,6 +22,7 @@ import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { CloseOutSection } from './sections/CloseOutSection';
+import { SessionVaultSection } from './sections/SessionVaultSection';
 import { RemoteSection } from './sections/RemoteSection';
 import { MemorySection } from './sections/MemorySection';
 import { BackgroundAiSection } from './sections/BackgroundAiSection';
@@ -548,6 +549,8 @@ export function SettingsPage() {
         markSaved={markSaved}
         setSaveStatus={setSaveStatus}
       />
+
+      <SessionVaultSection />
 
       <RemoteSection
         formData={formData}

@@ -1,0 +1,804 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T16:29:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4307: Session Vault: dashboard consumer (automatic settlement, sync loop, Settings → Session Vault)",
+    "updated": "2026-09-30T16:34:53.222Z"
+  },
+  "plan": {
+    "id": "pan-4307",
+    "title": "Session Vault: dashboard consumer (auto-settle, sync loop, Settings → Session Vault eviction review)",
+    "status": "running",
+    "uid": "591f2a1b-0656-4787-89b4-e1a1f19d55a9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-30T16:29:21Z",
+    "updated": "2026-09-30T16:34:53.222Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4307",
+        "label": "PAN-4307",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4436",
+        "label": "PAN-4436 (browse copies sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4437",
+        "label": "PAN-4437 (Continue here sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2609",
+        "label": "PAN-2609 (vault engine)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "dashboard",
+      "anywhere",
+      "eviction"
+    ],
+    "narratives": {
+      "Problem": "PAN-2609 shipped the Session Vault as a standalone CLI. In Overdeck mode nothing saves dashboard conversations unless the operator runs pan vault by hand, nothing pulls records on a timer, and the pending-deletion batch can only be reviewed in a terminal. The existing transcript watch runs only while a browser views a conversation, and confirmEviction would delete an entry the panel showed as failed if it now passed.",
+      "Proposal": "Add a dashboard vault service (primary dashboard only) that serializes every vault operation through one queue, runs a sync cycle 5 s after boot and every syncIntervalSec with offline backoff, refreshes the eviction batch with an Overdeck-mode isLive check, and exposes a status snapshot and a sync-report hook. A 15 s poller settles active managed conversations 30 s after they go quiet, force-settles (WIP snapshot) on session end and at shutdown within 10 s. Six /api/vault/* routes and a Settings → Session Vault panel show state, machines with last-synced time, and the batch with 'Yes, delete these' (skipFailed), decline, clear and re-offer. Vault resolution moves to src/lib/vault/open.ts. Browse copies (PAN-4436) and Continue here (PAN-4437) are sibling issues whose designs live in the PRD.",
+      "NonGoals": "- Browse copies, origin:'vault' conversation rows, owner badges or read-only composers (PAN-4436)\n- Continue here, the drift dialog, dashboard WIP apply, clone-and-register, 'continued on' or 'local turns saved as a fork' states (PAN-4437)\n- The first-run 'Continue from another machine' card and any dashboard setup, join or passphrase entry (PAN-4330)\n- Automatic settlement of work-agent, planning or specialist transcripts (CLI save --all; PAN-4308 for Fly)\n- Any automatic deletion of a transcript, or any change to the CLAUDE.md 'JSONL session files are sacred' rule\n- Per-entry selection checkboxes in the batch panel\n- Changes to ~/.overdeck/config.yaml or the dashboard settings schema for vault keys\n- Cross-process locking between a terminal pan vault command and the dashboard\n- Background vault work in peer dashboards"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the filed scope three ways: PAN-4307 keeps automatic settlement, the sync loop, eviction liveness, the machine list and Settings → Session Vault; browse copies moved to PAN-4436 and Continue here (with clone-and-register, WIP apply, continued-on states) to PAN-4437.",
+        "rationale": "The full scope counts about 50 files over 8 subsystems; pan plan finalize refuses more than 25 files or 6 subsystems and the planning contract prefers independently shippable siblings. The PAN-2609 planner split the same PRD the same way."
+      },
+      {
+        "summary": "The first-run 'Continue from another machine' card stays with PAN-4330.",
+        "rationale": "PAN-4330's own body lists the card and its git-remote half is a secret-carrying join route that belongs with the sign-in client."
+      },
+      {
+        "summary": "Growth detection uses a dedicated 15 s poller over active managed conversations, not watchConversation.",
+        "rationale": "watchConversation runs only while a browser subscribes to a conversation (ws-rpc.ts streamClaudeTranscript), so it cannot trigger background settlement."
+      },
+      {
+        "summary": "Overdeck-mode liveness uses conversation-liveness.ts for conversations and agents/liveness.ts for agent directories; a probe error counts as live.",
+        "rationale": "conversation-liveness.ts is the documented single liveness door for conversations (Herdr and tmux); never delete on uncertainty."
+      },
+      {
+        "summary": "confirmEviction gains skipFailed; the dashboard always passes it, the CLI never does.",
+        "rationale": "FR-22 says failed entries cannot be selected and the button deletes exactly the displayed entries; without the option a failed entry that now passes would be deleted."
+      },
+      {
+        "summary": "'Yes, delete these' is a single click with no second modal, and there are no per-entry checkboxes.",
+        "rationale": "FR-22 names the click as the confirmation; the fingerprint 409 prevents deleting anything not displayed; decline already removes single entries."
+      },
+      {
+        "summary": "Vault resolution moves from the CLI into src/lib/vault/open.ts openVaultContext(); CLI output is unchanged.",
+        "rationale": "The dashboard needs the same key/rotation/keyring checks without CLI I/O, and one resolver avoids drift."
+      },
+      {
+        "summary": "Background vault work runs only in the primary dashboard; routes run in every dashboard.",
+        "rationale": "Two dashboards settling the same transcripts would race; the UAT fixture is a peer dashboard and still needs the routes."
+      },
+      {
+        "summary": "No dashboard setup, join or passphrase entry; the off state points to pan vault setup.",
+        "rationale": "Secret entry over local HTTP belongs with PAN-4330; the PRD's FR-1 dashboard mention is optional."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-30-PAN-4307-session-vault-dashboard-consumer-auto-settle-sync-loop-settings-session-vault-eviction-review.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "vault-open-context",
+        "title": "Move vault resolution into src/lib/vault/open.ts (openVaultContext)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/open.ts",
+            "src/cli/commands/vault/shared.ts",
+            "tests/unit/lib/vault/open.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/open.test.ts tests/unit/cli/vault tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open.test.ts, every tests/unit/cli/vault suite and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4307.md WI-1 (decision D-5). Create src/lib/vault/open.ts exporting OpenVault, VaultOpenResult (off | rotation-pending | key-missing | key-mismatch | open), DIR_BACKEND_PREFIX, storeForBackend and openVaultContext(), moving the resolution code from src/cli/commands/vault/shared.ts lines 57-114 unchanged. openVaultContext prints nothing and catches only VaultKeyMismatchError. Rewrite the CLI openVault as a switch over openVaultContext that prints exactly today's messages and exit codes, and re-export the moved symbols from shared.ts so no other CLI file changes. Add tests/unit/lib/vault/open.test.ts covering all five statuses with a temp OVERDECK_HOME and a dir: backend."
+        },
+        "items": [
+          {
+            "id": "vault-open-context.ac1",
+            "title": "Given each of the five fixture states (no backend, key.next present, key file missing, wrong key, valid key), openVaultContext() returns the matching status and prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-open-context.ac2",
+            "title": "Given a valid key, the returned store refuses a ref write after a simulated rotation by throwing VaultKeyRetiredError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-open-context.ac3",
+            "title": "Every tests/unit/cli/vault/*.test.ts file passes with no edits to those test files, so CLI messages and exit codes are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-open-context.ac4",
+            "title": "tests/unit/lib/vault/import-graph.test.ts passes, showing open.ts imports nothing from src/dashboard, src/lib/overdeck, src/lib/terminal-backends, effect or node-pty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evict-live-skip-failed",
+        "title": "Add isLive and skipFailed options to src/lib/vault/evict.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/evict.ts",
+            "tests/unit/lib/vault/evict-live.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/evict-live.test.ts tests/unit/lib/vault/evict-batch.test.ts tests/unit/lib/vault/evict-confirm.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "evict-live.test.ts, evict-batch.test.ts, evict-confirm.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 (decisions D-4, D-6). Add an optional last parameter isLive to checkEligibility, checked right after the mtime check; a true result or a thrown error returns ok:false with reason 'session is live in Overdeck'. Add isLive to ScanOptions and ConfirmOptions and pass it through. Add ConfirmOptions.skipFailed: when true, confirmEviction keeps every entry whose stored verification is 'failed' untouched in the batch, neither re-checked nor deleted nor reported as skipped. Update the module header comment. evict.ts must stay free of dashboard and terminal-backend imports."
+        },
+        "items": [
+          {
+            "id": "evict-live-skip-failed.ac1",
+            "title": "Given isLive returns true, scanEligible adds no entry and the transcript file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evict-live-skip-failed.ac2",
+            "title": "Given isLive throws, scanEligible adds no entry (uncertainty counts as live)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evict-live-skip-failed.ac3",
+            "title": "Given a batch with one verified and one failed entry whose file would now pass every check, confirmEviction with skipFailed:true deletes only the verified file and returns the failed entry unchanged in the remaining batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evict-live-skip-failed.ac4",
+            "title": "Without the new options, evict-batch.test.ts and evict-confirm.test.ts each passes with no edits, which preserves the CLI path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-liveness",
+        "title": "Add Overdeck-mode isLive(nativePath) in services/vault-liveness.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-liveness.ts",
+            "tests/unit/dashboard/server/services/vault-liveness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-liveness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-liveness.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 (decision D-3). Create createVaultIsLive(deps) returning (nativePath) => Promise<boolean>. Rule order: a path under AGENTS_DIR resolves its first segment as agent id and returns (await isAlive(agentId)).alive from src/lib/agents/liveness.ts; a UUID-named .jsonl looks up getConversationByClaudeSessionId and returns conversationHarnessAlive(row.tmuxSession) from src/lib/overdeck/conversation-liveness.ts; anything else returns false; any thrown error returns true. All four collaborators and agentsDir are injectable for tests."
+        },
+        "items": [
+          {
+            "id": "vault-liveness.ac1",
+            "title": "Given a Claude transcript whose session id belongs to a conversation with a live harness, isLive returns true, and returns false when the harness is dead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-liveness.ac2",
+            "title": "Given a path <agentsDir>/conv-x/codex-home/sessions/rollout-1.jsonl, isLive resolves agent id conv-x and returns its isAlive verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-liveness.ac3",
+            "title": "Given a path matching neither rule, isLive returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-liveness.ac4",
+            "title": "Given any probe that throws, isLive returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-service",
+        "title": "Add vault-service.ts: operation queue, sync loop, snapshot, eviction operations, boot wiring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4307",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-service.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server/services/vault-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "vault-service.test.ts passes under fake timers",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-13",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "vault-settle-poller",
+            "vault-routes"
+          ],
+          "parallelSafeReason": "touches only new service files plus a two-line main.ts wiring no other item edits"
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly: module singletons like services/conversation-rescan-scheduler.ts exporting startVaultService, stopVaultService, enqueueVaultOperation (one-at-a-time promise queue), getVaultServiceSnapshot (VaultStatusResponse shape from the PRD wire contract), onVaultSyncReport, reviewEvictionBatch, confirmEvictionBatch (skipFailed:true plus isLive from createVaultIsLive), declineEvictionEntry, clearEvictionBatch, reofferEvictionEntry. Each cycle calls openVaultContext and readVaultConfig afresh; a vault that is not open is a silent no-op recorded in the snapshot. The first cycle runs VAULT_BOOT_DELAY_MS (5000) after start, then createSyncLoop with the configured interval, recreated when syncIntervalSec changes (stop the old loop first). afterSettle runs scanEligible with isLive when evict is true, then each listener with errors caught. Wire start and stop into main.ts inside the existing !isPeerDashboard block after startPullRequestSyncService and after stopConversationRescanScheduler in handleShutdownSignal."
+        },
+        "items": [
+          {
+            "id": "vault-service.ac1",
+            "title": "Given fake timers, the first sync cycle runs at 5 s and not before, and each following cycle runs after syncIntervalSec; offline cycles back off and cap at the interval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service.ac2",
+            "title": "Given no backend configured, no cycle calls syncOnce and nothing logs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service.ac3",
+            "title": "Given evict:true, scanEligible receives the isLive function, and across boot plus three intervals the mocked transcript-deletion-door spy records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service.ac4",
+            "title": "Given two operations enqueued together with the first held on a deferred promise, the second does not start until the first resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service.ac5",
+            "title": "getVaultServiceSnapshot returns the machine list from the last SyncReport with isThisMachine marked and lastSyncedAt equal to MachineRecord.updatedAt, and confirmEvictionBatch passes skipFailed:true to confirmEviction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-settle-poller",
+        "title": "Add vault-settle-poller.ts: debounced, session-end and shutdown settles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-settle-poller.ts",
+            "src/dashboard/server/services/vault-service.ts",
+            "tests/unit/dashboard/server/services/vault-settle-poller.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-settle-poller.test.ts tests/unit/dashboard/server/services/vault-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-settle-poller.test.ts and vault-service.test.ts pass under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 exactly. createVaultSettlePoller(deps) returns start, stop and flush(budgetMs). Every VAULT_POLL_MS (15000) it lists active claude-code and codex managed conversations, resolves each transcript path once through resolveSessionFile (cache non-null results), stats it, and on a size change re-arms a debounceSec timer that settles with wip 'auto' through the vault-service queue. A tracked conversation that leaves the active list gets one settle with wip 'force' and is forgotten. flush cancels timers and force-settles every tracked path within the budget, logging how many were skipped when it expires. vault-service creates the poller in startVaultService and calls flush(10000) then stop in stopVaultService."
+        },
+        "items": [
+          {
+            "id": "vault-settle-poller.ac1",
+            "title": "Given a transcript that grows and then stays the same size for debounceSec, the poller calls settle exactly once with wip 'auto'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle-poller.ac2",
+            "title": "Given a transcript that keeps growing on every poll, no settle runs until it stays quiet for debounceSec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle-poller.ac3",
+            "title": "Given a tracked conversation whose status changes from active to ended, the poller calls settle once with wip 'force'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle-poller.ac4",
+            "title": "Given a settle that never resolves, flush(10000) returns after the budget and logs the skipped count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-settle-poller.ac5",
+            "title": "Given a conversation with a resolved path across ten polls, resolvePath is called once, and the mocked transcript-deletion-door spy records zero calls with evict:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-routes",
+        "title": "Add six /api/vault/* routes with no-loss-matrix rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/vault.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/vault.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/vault.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 and the wire contract. Create src/dashboard/server/routes/vault.ts in the style of routes/model-presets.ts with GET /api/vault/status, GET /api/vault/eviction-batch, POST /api/vault/eviction-batch/confirm, POST /api/vault/eviction-batch/decline, POST /api/vault/eviction-batch/clear, POST /api/vault/eviction-batch/reoffer. GETs call rejectUnauthorizedDashboardRequest; POSTs call rejectUnsafeDashboardMutationRequest. Each route calls only vault-service functions, never evict.ts or the deletion door. Register vaultRouteLayer in server.ts makeRoutesLayer beside modelPresetsRouteLayer and add six NO_LOSS_MATRIX rows after the model-presets rows."
+        },
+        "items": [
+          {
+            "id": "vault-routes.ac1",
+            "title": "Given a stale fingerprint, POST /api/vault/eviction-batch/confirm returns 409 with code batch-changed and the current fingerprint, and the service reports no deletion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac2",
+            "title": "Given a missing fingerprint or vaultId, the POST routes return 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac3",
+            "title": "Given a POST without the dashboard CSRF header, the route refuses it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac4",
+            "title": "Given the six new routes, no-loss-matrix.test.ts passes because each has a NO_LOSS_MATRIX row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-session-vault-panel",
+        "title": "Add Settings → Session Vault panel (status, machines, pending-deletion batch)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "SessionVaultSection.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 and the wire contract. Add the nav item { id: 'session-vault', label: 'Session Vault', icon: Archive } after close-out, mount SessionVaultSection after CloseOutSection in SettingsPage.tsx, and build the section with react-query and raw fetch like sections/CloseOutSection.tsx, sending dashboardMutationJsonHeaders on POSTs. Render the status block, the machines table and the pending-deletion list with Decline, Clear batch, the Declined list with Re-offer, and the button 'Yes, delete these (<deletableCount> files, <bytes>)' that POSTs the displayed fingerprint, disabled when no entry is verified. A 409 batch-changed shows the PRD toast and refetches. Follow the pan-style-guide skill."
+        },
+        "items": [
+          {
+            "id": "settings-session-vault-panel.ac1",
+            "title": "Given status state off, the section renders the sentence 'Session Vault is off. Run: pan vault setup <git-url>' and no batch controls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-session-vault-panel.ac2",
+            "title": "Given a batch with one verified and one failed entry, the section renders each entry's native path, size and status, and the delete button label counts only the verified entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-session-vault-panel.ac3",
+            "title": "When the delete button is clicked, the section sends a POST to /api/vault/eviction-batch/confirm carrying the displayed fingerprint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-session-vault-panel.ac4",
+            "title": "Given the confirm POST returns 409, the section refetches the batch and shows no success toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-session-vault-panel.ac5",
+            "title": "Given a machine list, the machines table marks the entry with isThisMachine as '(this machine)' and shows its last-synced time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-session-vault-panel",
+        "title": "Playwright UAT: Settings → Session Vault deletes only the verified entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4307-session-vault.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4307-session-vault.spec.ts"
+          ],
+          "expected_outputs": [
+            "pan-4307-session-vault.spec.ts passes and writes test-results/pan-4307/session-vault-before.png and session-vault-after.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. After npm run build, the spec seeds a temp OVERDECK_HOME with the built CLI (vault setup dir:<tmp> --no-passphrase, vault save of two fixture transcripts whose mtime is set two hours back, evict:true in vault/config.json, vault sync), then marks the second entry failed in eviction-batch.json, starts startIsolatedDashboard({ home }), opens /settings at #session-vault, screenshots, clicks 'Yes, delete these', and screenshots again. Use an isolated browser context per test; stop the dashboard and remove temp dirs in afterEach. The implementing agent opens both PNGs and checks them against the style guide."
+        },
+        "items": [
+          {
+            "id": "uat-session-vault-panel.ac1",
+            "title": "Given the seeded batch, the panel displays both transcript paths with sizes and statuses, and the delete button reads (1 files, …)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-session-vault-panel.ac2",
+            "title": "When 'Yes, delete these' is clicked, the verified transcript file no longer exists and the failed one still exists on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-session-vault-panel.ac3",
+            "title": "The spec saves session-vault-before.png and session-vault-after.png under test-results/pan-4307/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-session-vault-dashboard",
+        "title": "Document the dashboard consumer in SESSION-VAULT.md and session-vault.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4307",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Dashboard (Overdeck mode)' docs/SESSION-VAULT.md",
+            "grep -n 'Settings → Session Vault' configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "grep finds the new Dashboard section in docs/SESSION-VAULT.md",
+            "grep finds the Settings → Session Vault flow in configuration/session-vault.mdx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. In docs/SESSION-VAULT.md add a '## Dashboard (Overdeck mode)' section after '## Commands' covering the settled transcripts, the 15 s poll, the debounceSec debounce, forced WIP capture on session end and shutdown with the 10 s budget, the 5 s boot delay and syncIntervalSec loop in the primary dashboard only, Overdeck-mode eviction liveness, the six /api/vault/* routes, skipFailed, and pointers to PAN-4436 and PAN-4437; add open.ts and the three dashboard service files to the Module map; add step 5 to the Eviction list. In configuration/session-vault.mdx add the automatic-saving paragraph to Save and sync and the Settings → Session Vault deletion flow to Free local disk space. Do not edit CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "docs-session-vault-dashboard.ac1",
+            "title": "docs/SESSION-VAULT.md contains a '## Dashboard (Overdeck mode)' section that states the 15 s poll, the 30 s default debounce, the 5 s boot delay, the 10 s shutdown budget and all six /api/vault/* route paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-session-vault-dashboard.ac2",
+            "title": "docs/SESSION-VAULT.md Module map contains src/lib/vault/open.ts, vault-service.ts, vault-settle-poller.ts and vault-liveness.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-session-vault-dashboard.ac3",
+            "title": "configuration/session-vault.mdx describes that conversations started from the dashboard are saved automatically and that Settings → Session Vault deletes only entries shown as verified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vault-open-context",
+        "to": "vault-service",
+        "type": "blocks"
+      },
+      {
+        "from": "evict-live-skip-failed",
+        "to": "vault-service",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-liveness",
+        "to": "vault-service",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-service",
+        "to": "vault-settle-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-service",
+        "to": "vault-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-routes",
+        "to": "uat-session-vault-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-session-vault-panel",
+        "to": "uat-session-vault-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-settle-poller",
+        "to": "docs-session-vault-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-routes",
+        "to": "docs-session-vault-dashboard",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

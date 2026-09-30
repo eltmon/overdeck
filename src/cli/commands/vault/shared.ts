@@ -10,16 +10,13 @@
  * machine's key was retired by a rotation.
  */
 import { createInterface } from 'node:readline';
-import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { exitCli } from '../../exit.js';
-import { VAULT_OFF_MESSAGE, readVaultConfig, vaultDir, type VaultConfig } from '../../../lib/vault/config.js';
-import { loadVaultKey, type VaultSubkeys } from '../../../lib/vault/identity.js';
-import { VaultKeyMismatchError, openKeyring } from '../../../lib/vault/keyring.js';
+import { VAULT_OFF_MESSAGE } from '../../../lib/vault/config.js';
 import { checkPassphraseStrength, generatePassphrase } from '../../../lib/vault/keywrap.js';
-import { DirVaultStore } from '../../../lib/vault/store/dir.js';
-import { GitVaultStore, gitVaultCloneDir } from '../../../lib/vault/store/git.js';
-import type { VaultStore } from '../../../lib/vault/store/types.js';
+import { DIR_BACKEND_PREFIX, openVaultContext, storeForBackend, type OpenVault } from '../../../lib/vault/open.js';
+
+export { DIR_BACKEND_PREFIX, storeForBackend, type OpenVault };
 
 export interface CliIo {
   out(line: string): void;
@@ -44,35 +41,7 @@ export const defaultIo: CliIo = {
   isTTY: Boolean(process.stdin.isTTY),
 };
 
-export interface OpenVault {
-  config: VaultConfig;
-  /** Sub-keys of the verified key; `previous` holds the key ring. */
-  keys: VaultSubkeys;
-  /** Guarded: every ref write asserts the header version the key was verified against. */
-  store: VaultStore;
-  /** When the vault key was last rotated; null before the first rotation. */
-  rotatedAt: string | null;
-}
-
 export const ROTATION_UNFINISHED_MESSAGE = 'A vault key rotation started on this machine has not finished. Run: pan vault rotate-key';
-
-async function rotationPending(): Promise<boolean> {
-  try {
-    await stat(join(vaultDir(), 'key.next'));
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
-  }
-}
-
-/** Backends prefixed `dir:` are local directories (tests, NAS); anything else is a git remote. */
-export const DIR_BACKEND_PREFIX = 'dir:';
-
-export async function storeForBackend(backend: string, cloneDir = gitVaultCloneDir()): Promise<VaultStore> {
-  if (backend.startsWith(DIR_BACKEND_PREFIX)) return DirVaultStore.open(backend.slice(DIR_BACKEND_PREFIX.length));
-  return GitVaultStore.open(cloneDir);
-}
 
 /**
  * Resolve config, key and store. Returns null (after printing
@@ -83,30 +52,24 @@ export async function storeForBackend(backend: string, cloneDir = gitVaultCloneD
  * null without output instead.
  */
 export async function openVault(io: CliIo, options: { quiet?: boolean } = {}): Promise<OpenVault | null> {
-  const config = await readVaultConfig();
-  if (!config.backend) {
-    if (!options.quiet) io.out(VAULT_OFF_MESSAGE);
-    return null;
-  }
-  if (await rotationPending()) {
-    if (options.quiet) return null;
-    io.err(ROTATION_UNFINISHED_MESSAGE);
-    return io.exit(1);
-  }
-  const key = await loadVaultKey();
-  if (!key) {
-    if (!options.quiet) io.err(`Session Vault backend is set to ${config.backend} but the key file is missing. Run: pan vault join ${config.backend}`);
-    return null;
-  }
-  const store = await storeForBackend(config.backend);
-  try {
-    const opened = await openKeyring(store, key, { backend: config.backend });
-    return { config, keys: opened.keys, store: opened.store, rotatedAt: opened.rotatedAt };
-  } catch (error) {
-    if (!(error instanceof VaultKeyMismatchError)) throw error;
-    if (options.quiet) return null;
-    io.err(`This machine's vault key does not open ${config.backend}. If the key was rotated on another machine, run: pan vault join ${config.backend}`);
-    return io.exit(1);
+  const opened = await openVaultContext();
+  switch (opened.status) {
+    case 'open':
+      return opened.vault;
+    case 'off':
+      if (!options.quiet) io.out(VAULT_OFF_MESSAGE);
+      return null;
+    case 'rotation-pending':
+      if (options.quiet) return null;
+      io.err(ROTATION_UNFINISHED_MESSAGE);
+      return io.exit(1);
+    case 'key-missing':
+      if (!options.quiet) io.err(`Session Vault backend is set to ${opened.backend} but the key file is missing. Run: pan vault join ${opened.backend}`);
+      return null;
+    case 'key-mismatch':
+      if (options.quiet) return null;
+      io.err(`This machine's vault key does not open ${opened.backend}. If the key was rotated on another machine, run: pan vault join ${opened.backend}`);
+      return io.exit(1);
   }
 }
 
