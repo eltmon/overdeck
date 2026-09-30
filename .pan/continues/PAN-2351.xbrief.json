@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:42:37.673Z",
+  "updated": "2026-09-30T17:42:53.279Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "gate-scope-enforcement.ac6": {
       "status": "completed",
       "doneAt": "2026-09-30T17:42:37.673Z"
+    },
+    "ws-upgrade-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:53.279Z"
     }
   }
 }
