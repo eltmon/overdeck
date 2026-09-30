@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4429",
+  "created": "2026-09-30T00:40:13.741Z",
+  "updated": "2026-09-30T00:40:13.741Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "workspace-disk-floor": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4429",
+      "claimedAt": "2026-09-30T00:40:13.741Z"
+    }
+  }
+}
