@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1674",
   "created": "2026-09-29T23:41:57.389Z",
-  "updated": "2026-09-30T00:01:12.389Z",
+  "updated": "2026-09-30T00:01:37.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-30T00:01:07.800Z"
     },
     "gitignore-venv-symlink": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1674",
-      "claimedAt": "2026-09-30T00:01:12.389Z"
+      "claimedAt": "2026-09-30T00:01:12.389Z",
+      "doneAt": "2026-09-30T00:01:37.369Z"
     }
   }
 }
