@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:18:47.054Z",
+  "updated": "2026-09-30T20:32:09.834Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4436",
       "claimedAt": "2026-09-30T20:15:06.124Z",
       "doneAt": "2026-09-30T20:18:47.054Z"
+    },
+    "ledger-costs-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:32:09.834Z"
     }
   }
 }
