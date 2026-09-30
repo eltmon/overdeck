@@ -9,6 +9,12 @@
  * `liveQuietMinutes`. The operator reviews the batch and confirms it by
  * fingerprint (`confirmEviction`, the only caller of the transcript deletion
  * door in this directory); anything that changed since review is skipped.
+ *
+ * `isLive` (PAN-4307 D-3, D-4) is an optional injected liveness probe: when
+ * given, both `scanEligible` and `confirmEviction` treat a transcript with a
+ * live Overdeck conversation or agent as ineligible, whatever its mtime says.
+ * `skipFailed` (D-6) leaves every `failed` entry in the batch untouched on
+ * confirm, instead of re-checking and reporting it as skipped again.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
@@ -142,6 +148,7 @@ export async function checkEligibility(
   config: VaultConfig,
   now: () => Date,
   environmentId: string,
+  isLive?: (nativePath: string) => Promise<boolean>,
 ): Promise<EligibilityCheck> {
   let info;
   try {
@@ -152,6 +159,15 @@ export async function checkEligibility(
   const quietMs = config.liveQuietMinutes * 60_000;
   if (now().getTime() - info.mtimeMs < quietMs) {
     return { ok: false, reason: `modified less than ${config.liveQuietMinutes} minutes ago (live)`, sizeBytes: info.size, settlementChunk: null };
+  }
+  if (isLive) {
+    let live = true;
+    try {
+      live = await isLive(nativePath);
+    } catch {
+      live = true;
+    }
+    if (live) return { ok: false, reason: 'session is live in Overdeck', sizeBytes: info.size, settlementChunk: null };
   }
   if (!record) return { ok: false, reason: 'record not readable', sizeBytes: info.size, settlementChunk: null };
   if (record.owner.environmentId !== environmentId) {
@@ -215,6 +231,7 @@ export interface ScanOptions {
   keys: VaultSubkeys;
   config?: VaultConfig;
   now?: () => Date;
+  isLive?: (nativePath: string) => Promise<boolean>;
 }
 
 /** Add every newly eligible owned transcript to the batch. Deletes nothing. */
@@ -228,7 +245,7 @@ export async function scanEligible(options: ScanOptions): Promise<EvictionBatch>
   for (const [nativePath, entry] of Object.entries(owned)) {
     if (batch.declined.some((declined) => declined.vaultId === entry.vaultId && declined.nativePath === nativePath)) continue;
     const record = await readOwnedRecord(store, keys, entry.vaultId);
-    const check = await checkEligibility(nativePath, entry, record, store, keys, config, now, me.environmentId);
+    const check = await checkEligibility(nativePath, entry, record, store, keys, config, now, me.environmentId, options.isLive);
     const existing = batch.entries.findIndex((candidate) => candidate.nativePath === nativePath);
     if (!check.ok || !record || !check.settlementChunk) {
       if (existing >= 0) batch.entries.splice(existing, 1);
@@ -289,6 +306,9 @@ export interface ConfirmOptions {
   keys: VaultSubkeys;
   config?: VaultConfig;
   now?: () => Date;
+  isLive?: (nativePath: string) => Promise<boolean>;
+  /** Leave every `failed` entry in the batch untouched instead of re-checking and re-reporting it (D-6). */
+  skipFailed?: boolean;
 }
 
 export type ConfirmResult =
@@ -327,11 +347,15 @@ export async function confirmEviction(fingerprint: string, options: ConfirmOptio
   let bytesFreed = 0;
   const remaining: EvictionEntry[] = [];
   for (const entry of batch.entries) {
+    if (options.skipFailed && entry.verification === 'failed') {
+      remaining.push(entry);
+      continue;
+    }
     const at = now().toISOString();
     const ownedEntry = owned[entry.nativePath];
     const record = ownedEntry ? await readOwnedRecord(store, keys, ownedEntry.vaultId) : null;
     const check = ownedEntry
-      ? await checkEligibility(entry.nativePath, ownedEntry, record, store, keys, config, now, me.environmentId)
+      ? await checkEligibility(entry.nativePath, ownedEntry, record, store, keys, config, now, me.environmentId, options.isLive)
       : { ok: false, reason: 'transcript is no longer in the local index', sizeBytes: 0, settlementChunk: null };
     let reason = check.ok ? undefined : check.reason;
     if (check.ok && check.sizeBytes !== entry.sizeBytes) reason = `file size changed since review (${entry.sizeBytes} -> ${check.sizeBytes} bytes)`;

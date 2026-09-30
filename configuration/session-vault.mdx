@@ -137,6 +137,9 @@ If a new line contains something that looks like a credential, the save is block
 output names the line number and pattern, never the value. Rotate the secret if it is real,
 then run `pan vault allow-secret <id> <line>` or `pan vault exclude --session <id>`.
 
+With the dashboard running, conversations started from it are saved automatically 30 seconds
+after they go quiet, and synced every 5 minutes; no hook is needed.
+
 ## Continue on another machine
 
 ```bash
@@ -200,6 +203,9 @@ anything on its own. To use it:
 
 `pan vault evict --decline <id>` keeps a transcript out of future lists; `--clear` empties the
 list without deleting anything.
+
+With the dashboard running, open Settings → Session Vault, review the list, and click "Yes,
+delete these". Entries marked failed are never deleted.
 
 ## Windows
 
