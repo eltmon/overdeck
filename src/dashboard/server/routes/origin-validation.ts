@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { HttpServerRequest } from 'effect/unstable/http';
 
 import { ACCESS_TOKEN_PREFIX } from '../../../lib/access-tokens.js';
+import { readSavedTrustedOriginsSync } from '../../../lib/remote-access/trusted-origins.js';
 
 export type HeaderMap = Record<string, string | string[] | undefined>;
 
@@ -80,6 +81,11 @@ export function getTrustedOrigins(): string[] {
     if (fromYaml?.enabled) {
       addTrustedOrigin(origins, `https://${fromYaml.domain}`);
     }
+  }
+
+  // PAN-4445 D-4: origins saved from Settings → Anywhere apply in every launch mode.
+  for (const origin of readSavedTrustedOriginsSync()) {
+    addTrustedOrigin(origins, origin);
   }
 
   if (process.env['NODE_ENV'] === 'development') {
@@ -163,8 +169,13 @@ export function validateOrigin(
   return validateOriginHeaders(request.headers as HeaderMap, request.method);
 }
 
-export function _resetTrustedOriginsForTests(): void {
+/** Drop the cached list so the next call re-reads the saved origins (PAN-4445 FR-3). */
+export function invalidateTrustedOriginsCache(): void {
   cachedTrustedOrigins = undefined;
+}
+
+export function _resetTrustedOriginsForTests(): void {
+  invalidateTrustedOriginsCache();
 }
 
 /**
