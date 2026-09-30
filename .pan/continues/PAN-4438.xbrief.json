@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4438",
   "created": "2026-09-30T16:41:39.289Z",
-  "updated": "2026-09-30T17:15:53.141Z",
+  "updated": "2026-09-30T17:26:43.508Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-30T17:15:47.400Z"
     },
     "waiver-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4438",
-      "claimedAt": "2026-09-30T17:15:53.141Z"
+      "claimedAt": "2026-09-30T17:15:53.141Z",
+      "doneAt": "2026-09-30T17:26:43.507Z"
     }
   }
 }
