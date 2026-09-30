@@ -301,6 +301,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full' && roleConfig.mode !== 'none') {
     throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
   }
+  if (roleConfig.stallMinutes !== undefined && (!Number.isInteger(roleConfig.stallMinutes) || roleConfig.stallMinutes < 1)) {
+    throw new Error(`config.yaml: roles.${role}.stallMinutes must be a positive integer`);
+  }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
   }
@@ -317,6 +320,13 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.scope !== undefined && roleConfig.scope !== 'pan-only' && roleConfig.scope !== 'all-tracked-projects') {
     throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
   }
+}
+
+export const DEFAULT_REVIEW_STALL_MINUTES = 15;
+
+/** PAN-4433: the silent-reviewer threshold in ms, from roles.review.stallMinutes. */
+export function reviewStallMs(config: { roles?: RolesConfig }): number {
+  return (config.roles?.review?.stallMinutes ?? DEFAULT_REVIEW_STALL_MINUTES) * 60_000;
 }
 
 export function validateRoleModelRefs(config: NormalizedConfig): void {

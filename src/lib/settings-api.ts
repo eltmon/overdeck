@@ -528,6 +528,12 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (mode !== undefined && mode !== 'quick' && mode !== 'full' && mode !== 'none') {
     errors.push(`${fieldPath}.mode must be quick, full, or none`);
   }
+
+  // PAN-4433: silent-reviewer threshold (review role only reads it).
+  const stallMinutes = roleConfig.stallMinutes;
+  if (stallMinutes !== undefined && (typeof stallMinutes !== 'number' || !Number.isInteger(stallMinutes) || stallMinutes < 1)) {
+    errors.push(`${fieldPath}.stallMinutes must be a positive integer`);
+  }
 }
 
 /** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */

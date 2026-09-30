@@ -556,6 +556,31 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
     });
 
+    it('round-trips roles.review.stallMinutes through save (PAN-4433)', async () => {
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+        },
+        api_keys: {},
+        roles: { review: { model: 'claude-sonnet-4-6', stallMinutes: 5 } },
+      } as ApiSettingsConfig;
+      await saveSettingsApi(settings);
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('stallMinutes: 5');
+    });
+
     it('persists provider default harnesses in object-form provider config', async () => {
       const { writeFile } = await import('fs/promises');
       const settings: ApiSettingsConfig = {
@@ -994,6 +1019,24 @@ describe('OpenRouter favorites', () => {
         },
       } as ApiSettingsConfig);
       expect(result.errors.some((e) => /distribution not allowed here/.test(e))).toBe(true);
+    });
+
+    it('rejects a roles.review.stallMinutes that is not a positive integer (PAN-4433)', () => {
+      for (const stallMinutes of [0, -1, 1.5, '5']) {
+        const result = validateSettingsApi({
+          ...baseProviders,
+          roles: { review: { model: 'claude-sonnet-4-6', stallMinutes } },
+        } as unknown as ApiSettingsConfig);
+        expect(result.errors).toContain('roles.review.stallMinutes must be a positive integer');
+      }
+    });
+
+    it('accepts a positive integer roles.review.stallMinutes (PAN-4433)', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: { review: { model: 'claude-sonnet-4-6', stallMinutes: 5 } },
+      } as ApiSettingsConfig);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('scalar role model still validates correctly (back-compat)', () => {

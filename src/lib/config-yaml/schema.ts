@@ -396,6 +396,8 @@ export interface RoleConfig {
   harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
   effort?: RoleEffort;
   mode?: ReviewMode;
+  /** PAN-4433: minutes a dispatched reviewer may stay silent before recovery (review role only; default 15). */
+  stallMinutes?: number;
   /**
    * Target minimum concurrent agents the role should keep launched. The
    * orchestrator MUST be aggressive about reaching this number — if the active
