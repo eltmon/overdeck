@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:37:50.867Z",
+  "updated": "2026-09-30T20:38:02.511Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "device-scopes.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T20:37:50.867Z"
+    },
+    "device-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:02.511Z"
     }
   }
 }
