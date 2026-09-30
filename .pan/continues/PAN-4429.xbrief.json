@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:33:37.028Z",
+  "updated": "2026-09-30T02:33:51.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -308,6 +308,10 @@
     "no-loss-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T02:33:37.028Z"
+    },
+    "tldr-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:33:51.533Z"
     }
   }
 }
