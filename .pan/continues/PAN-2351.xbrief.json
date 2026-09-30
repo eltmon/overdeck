@@ -1,0 +1,245 @@
+{
+  "version": "1",
+  "issueId": "PAN-2351",
+  "created": "2026-09-30T16:29:39.203Z",
+  "updated": "2026-09-30T17:49:18.689Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "scope-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T16:29:39.203Z",
+      "doneAt": "2026-09-30T16:43:16.487Z"
+    },
+    "credential-scopes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T16:43:28.608Z",
+      "doneAt": "2026-09-30T16:52:17.842Z"
+    },
+    "gate-scope-enforcement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T16:52:23.601Z",
+      "doneAt": "2026-09-30T16:56:56.989Z"
+    },
+    "ws-upgrade-scopes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T16:57:02.845Z",
+      "doneAt": "2026-09-30T17:04:56.372Z"
+    },
+    "mint-pairing-hardening": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:05:02.528Z",
+      "doneAt": "2026-09-30T17:08:24.614Z"
+    },
+    "origin-bearer-exemption": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:08:26.953Z",
+      "doneAt": "2026-09-30T17:11:38.543Z"
+    },
+    "access-token-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:11:43.814Z",
+      "doneAt": "2026-09-30T17:15:05.280Z"
+    },
+    "pan-token-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:15:10.213Z",
+      "doneAt": "2026-09-30T17:18:36.477Z"
+    },
+    "scope-acceptance-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:18:41.694Z",
+      "doneAt": "2026-09-30T17:26:19.175Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:26:25.645Z",
+      "doneAt": "2026-09-30T17:28:01.627Z"
+    },
+    "scope-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:37.067Z"
+    },
+    "scope-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:57.725Z"
+    },
+    "scope-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:18.170Z"
+    },
+    "scope-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:39.673Z"
+    },
+    "credential-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:59.438Z"
+    },
+    "credential-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:21.138Z"
+    },
+    "credential-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:41.945Z"
+    },
+    "credential-scopes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:56.438Z"
+    },
+    "credential-scopes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:11.072Z"
+    },
+    "gate-scope-enforcement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:25.081Z"
+    },
+    "gate-scope-enforcement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:41.226Z"
+    },
+    "gate-scope-enforcement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:55.444Z"
+    },
+    "gate-scope-enforcement.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:09.423Z"
+    },
+    "gate-scope-enforcement.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:23.796Z"
+    },
+    "gate-scope-enforcement.ac6": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:37.673Z"
+    },
+    "ws-upgrade-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:53.279Z"
+    },
+    "ws-upgrade-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:09.118Z"
+    },
+    "ws-upgrade-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:24.397Z"
+    },
+    "ws-upgrade-scopes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:39.636Z"
+    },
+    "mint-pairing-hardening.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:54.201Z"
+    },
+    "mint-pairing-hardening.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:44:08.535Z"
+    },
+    "mint-pairing-hardening.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:44:24.432Z"
+    },
+    "mint-pairing-hardening.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:44:39.837Z"
+    },
+    "origin-bearer-exemption.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:44:54.706Z"
+    },
+    "origin-bearer-exemption.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:45:08.881Z"
+    },
+    "origin-bearer-exemption.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:45:23.974Z"
+    },
+    "access-token-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:45:39.352Z"
+    },
+    "access-token-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:45:53.316Z"
+    },
+    "access-token-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:46:08.664Z"
+    },
+    "access-token-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:46:22.647Z"
+    },
+    "access-token-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:46:36.046Z"
+    },
+    "pan-token-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:46:49.733Z"
+    },
+    "pan-token-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:05.117Z"
+    },
+    "pan-token-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:17.675Z"
+    },
+    "pan-token-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:30.675Z"
+    },
+    "scope-acceptance-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:43.766Z"
+    },
+    "scope-acceptance-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:47:56.679Z"
+    },
+    "scope-acceptance-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:48:10.250Z"
+    },
+    "scope-acceptance-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:48:23.460Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:48:36.441Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:48:50.542Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:49:05.492Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:49:18.688Z"
+    }
+  }
+}

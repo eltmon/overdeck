@@ -7,7 +7,8 @@
  *     .agents/plugins/marketplace.json          Codex local marketplace
  *     plugins/<pack>/.claude-plugin/plugin.json
  *     plugins/<pack>/.codex-plugin/plugin.json
- *     plugins/<pack>/skills/<skill>/…           verbatim copies, never symlinks
+ *     plugins/<pack>/skills/<skill>/…           copies, never symlinks; verbatim unless
+ *                                               the pack has a transform (PAN-3943)
  *
  * The wrapper holds only skill directories, so upstream hooks, MCP servers
  * and commands are left out by construction. Mounts are derived and immutable
@@ -17,9 +18,10 @@ import { createHash } from 'node:crypto';
 import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
+import { applyDeftHostNotice, DEFT_HOST_NOTICE_VERSION } from './deft.js';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
 
-export const MOUNT_FORMAT_VERSION = 1;
+export const MOUNT_FORMAT_VERSION = 2;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
 export const CODEX_PACK_BLOCK_BEGIN = '# overdeck:skill-packs:begin';
 export const CODEX_PACK_BLOCK_END = '# overdeck:skill-packs:end';
@@ -29,11 +31,15 @@ export const CLAUDE_PLUGIN_LINK_NAME = 'skill-packs';
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 
+/** `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice. */
+export type MountTransform = 'deft-readonly';
+
 export interface MountPack {
   id: string;
   commit: string;
   /** Extraction dir of the pack at `commit`. */
   root: string;
+  transform?: MountTransform;
   skills: Array<{ name: string; dir: string }>;
 }
 
@@ -53,7 +59,12 @@ export function mountsDir(): string {
 
 export function mountHash(selection: MountSelection): string {
   const entries = selection.packs
-    .flatMap((pack) => pack.skills.map((skill) => `${pack.id}@${pack.commit}:${skill.name}`))
+    .flatMap((pack) =>
+      pack.skills.map(
+        (skill) =>
+          `${pack.id}@${pack.commit}:${skill.name}:${pack.transform ? `${pack.transform}.${DEFT_HOST_NOTICE_VERSION}` : ''}`,
+      ),
+    )
     .sort();
   return createHash('sha256').update(JSON.stringify({ v: MOUNT_FORMAT_VERSION, s: entries })).digest('hex');
 }
@@ -61,6 +72,9 @@ export function mountHash(selection: MountSelection): string {
 function assertMountPack(pack: MountPack): void {
   if (!PACK_ID_PATTERN.test(pack.id)) throw new Error(`invalid pack id: ${JSON.stringify(pack.id)}`);
   if (!COMMIT_PATTERN.test(pack.commit)) throw new Error(`invalid pack commit: ${JSON.stringify(pack.commit)}`);
+  if (pack.transform !== undefined && pack.transform !== 'deft-readonly') {
+    throw new Error(`invalid pack transform: ${JSON.stringify(pack.transform)}`);
+  }
   for (const skill of pack.skills) {
     if (!SKILL_NAME_PATTERN.test(skill.name)) throw new Error(`invalid skill name: ${JSON.stringify(skill.name)}`);
     const normalized = posix.normalize(skill.dir);
@@ -119,7 +133,12 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
       skills: './skills/',
     });
     for (const skill of skills) {
-      await copyWithoutSymlinks(join(pack.root, skill.dir), join(pluginDir, 'skills', skill.name));
+      const dst = join(pluginDir, 'skills', skill.name);
+      await copyWithoutSymlinks(join(pack.root, skill.dir), dst);
+      if (pack.transform === 'deft-readonly') {
+        const skillMd = join(dst, 'SKILL.md');
+        await writeFile(skillMd, applyDeftHostNotice(await readFile(skillMd, 'utf8'), skill.name), 'utf8');
+      }
     }
   }
 }

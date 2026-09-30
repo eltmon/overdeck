@@ -5,9 +5,12 @@
  *   Receives GitHub webhook events via smee.io relay.
  *   Verifies X-Hub-Signature-256 HMAC-SHA256 signature.
  *   Dispatches to per-event-type handlers.
+ *
+ *   Handlers run detached after the 200 response; a failed dispatch logs
+ *   `[webhook] Dispatch failed`.
  */
 
-import { Effect, Exit, Fiber, Option } from 'effect';
+import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -166,19 +169,11 @@ export function runWebhookHandler(
       return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }
 
-    // Dispatch handlers asynchronously so DB work (deferred via setImmediate)
-    // does not block the HTTP response or the Node event loop.
-    const fiber = yield* Effect.forkChild(
-      Effect.promise(() => dispatchWebhook(eventType, payload)),
-    );
-    yield* Effect.forkChild(
-      Effect.gen(function* () {
-        const exit = yield* Fiber.await(fiber);
-        if (Exit.isFailure(exit)) {
-          console.error(`[webhook] Forked dispatch failed for ${eventType}:`, exit.cause);
-        }
-      }),
-    );
+    // Dispatch handlers detached from this request: they run after the 200
+    // response is sent, and a failed dispatch logs `[webhook] Dispatch failed`.
+    void dispatchWebhook(eventType, payload).catch((err: unknown) => {
+      console.error(`[webhook] Dispatch failed for ${eventType}:`, err);
+    });
 
     console.log(`[webhook] Received ${eventType} event from ${repoFullName}`);
     return jsonResponse({ received: true, event: eventType });

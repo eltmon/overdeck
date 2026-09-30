@@ -348,4 +348,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   global file. Writers that must touch only named keys use a path-scoped
   `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
 
+- **`Effect.forkChild` inside a request handler never runs** (PAN-4432) — in Effect
+  4 (`4.0.0-beta.73`) a `forkChild` child is scheduled, not started, and is
+  interrupted when its parent fiber exits. A route handler that forks work and then
+  returns its response kills that work before it starts, silently: no exit, no log.
+  `routes/webhooks.ts` did this from the Effect 4 upgrade until PAN-4432, so no
+  GitHub webhook handler ran (CI relay, review auto-start, post-merge, CI chip).
+  Background work from a route uses `void work().catch((err) => console.error(...))`
+  (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
+  where the work must stay inside the Effect runtime.
 <!-- last-verified: 2026-09-30 -->

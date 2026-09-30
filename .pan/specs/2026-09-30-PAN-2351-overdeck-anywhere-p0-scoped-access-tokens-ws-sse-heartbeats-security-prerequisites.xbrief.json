@@ -1,0 +1,940 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T16:24:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2351: Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
+    "updated": "2026-09-30T16:29:19.966Z"
+  },
+  "plan": {
+    "id": "pan-2351",
+    "title": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
+    "status": "running",
+    "uid": "239f84e5-4582-4898-a4c0-83c7c7ad80ed",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-30T16:24:34Z",
+    "updated": "2026-09-30T16:29:19.966Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2351",
+        "label": "PAN-2351",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2351/.pan/drafts/pan-2351.md",
+        "label": "PRD draft (.pan/drafts/pan-2351.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4434",
+        "label": "PAN-4434 (sibling: /ws/terminal heartbeat)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4435",
+        "label": "PAN-4435 (sibling: Settings token UI + require_token_mint toggle)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "security",
+      "auth",
+      "access-tokens",
+      "dashboard-server",
+      "cli",
+      "overdeck-anywhere"
+    ],
+    "metadata": {
+      "sizeJustification": "One security boundary that must land together: once a kind 'token' record can be created (W7 routes, W8 CLI), every call site that assumes 'registry credential = admin device' or 'any credential = root' becomes an escalation path (root-session mint, pairing issuance, device revocation, both gates). The scope model, credential resolution, both gate checks and the mint/pairing hardening therefore ship in one PR. The surface is 34 files, but 15 are tests or test fixtures beside the code they cover and 4 are docs; the subsystem count is inflated because the lint counts each doc file as its own subsystem. The separable parts were already split out: /ws/terminal heartbeat to PAN-4434 and the Settings UI + require_token_mint toggle to PAN-4435.",
+      "canonicalFilename": "2026-09-30-PAN-2351-overdeck-anywhere-p0-scoped-access-tokens-ws-sse-heartbeats-security-prerequisites.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Every registry credential is an admin device today: AccessTokenScope is only 'admin' and both the remote request gate and the WebSocket upgrade gate pass any credential. Remote consumers in epic PAN-2350 (phone, Hermes, SSE sidecars) would all hold root, so a leaked sidecar credential equals a leaked machine. Adding a narrower token also exposes four call sites (session mint, pairing issuance, device revocation, the two gates) that would let a token escalate to root.",
+      "Proposal": "Extend the PAN-3762 registry (src/lib/access-tokens.ts) with six scopes and scopeSatisfies; resolve Bearer-only kind 'token' credentials carrying scopes; enforce one route-scope table (route-scopes.ts, default admin) in the remote request gate and authorizeDashboardUpgrade (/ws/terminal needs operate); refuse session mint, pairing issuance and device revocation to tokens; let Bearer odk_ requests skip CSRF and the missing-Origin rule; add GET/POST/DELETE /api/access-tokens and pan token create|list|revoke; prove the read:events acceptance line end to end; document it. The /ws/terminal heartbeat moved to PAN-4434 and the Settings UI/toggle to PAN-4435; /ws/rpc and /events/stream already send 15 s heartbeats.",
+      "NonGoals": "- No /ws/terminal heartbeat or XTerminal.tsx change (PAN-4434).\n- No Settings UI section and no config-yaml schema entry or Settings toggle for require_token_mint (PAN-4435).\n- No ?token= query-parameter authentication on WebSocket upgrades or HTTP routes.\n- No session cookie minted for any token credential, and no browser session for non-admin identities.\n- No token expiry, rotation or per-token rate limits.\n- No removal or change of OVERDECK_EVENTS_TOKEN, the internal token, the root session cookie, or device pairing behavior for devices.\n- No route-scope table rows beyond the PRD table; everything else stays admin.\n- No change to loopback peer trust for requests that present no credential.\n- No raise of any cap in scripts/file-size-allowlist.txt.\n- No new heartbeat on /ws/rpc or /events/stream (both already send 15 s heartbeats).\n- No change to GET /a/:slug host-gated public artifact serving."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the /ws/terminal heartbeat into PAN-4434 and the Settings token UI plus require_token_mint schema entry/toggle into PAN-4435; PAN-2351 keeps the scope model, enforcement, routes, CLI and docs.",
+        "rationale": "The combined plan exceeded the finalize plan-size lint, and both split parts ship and verify independently (heartbeat needs its own idle-proxy check; the UI needs Playwright UAT). The remaining core is one security boundary."
+      },
+      {
+        "summary": "Enforce scopes at the two gates (remote request gate, authorizeDashboardUpgrade) from one route-scope table with default admin, instead of an optional requiredScope parameter on every route helper.",
+        "rationale": "The global gate already sees every /api and /events request and the upgrade gate every /ws socket, so one table cannot drift between call sites, and unlisted routes fail closed."
+      },
+      {
+        "summary": "Tokens authenticate only via Authorization: Bearer; drop the planned ?token= query parameter.",
+        "rationale": "Query tokens leak into proxy and access logs; programmatic WebSocket clients can set headers; header-only tokens make the CSRF/Origin relaxation safe."
+      },
+      {
+        "summary": "Only root credentials may create access tokens, issue pairing credentials or revoke other devices; a token never mints a session.",
+        "rationale": "Extends PAN-3762's rule that a device cannot mint devices and prevents a revocable credential from turning into the unrevocable root session."
+      },
+      {
+        "summary": "Start the route-scope table minimal: read:events on the event stream, five non-secret state reads, four conversation reads, three message routes for tell, /ws/terminal for operate.",
+        "rationale": "Default-deny is the safe posture; each future consumer widens the table in its own issue with review."
+      },
+      {
+        "summary": "pan token revoke goes through DELETE /api/access-tokens/:id and falls back to a direct registry write only when the dashboard is unreachable; create and list use the registry directly.",
+        "rationale": "Copies the pan devices revoke precedent, closes live connections at once, and needs no new cross-process notification machinery."
+      },
+      {
+        "summary": "Treat a registry record with no kind as a device and carry scopes on device credentials too.",
+        "rationale": "PAN-3762 always writes kind 'device'; honoring the stored scopes means a hand-edited narrow record is never silently widened."
+      },
+      {
+        "summary": "The per-route helpers rejectUnauthorizedDashboardRequest/rejectUnsafeDashboardMutationRequest read the same route-scope table; DELETE /api/access-tokens/:id is root-only (no token self-revoke).",
+        "rationale": "GET /knowledge-viewer/* sits outside the gate's /api and /events prefixes and relies on the helper, so the helper must enforce scope too; reading the same table keeps one source of truth, and root-only revocation keeps the token surface consistent with D-11."
+      }
+    ],
+    "items": [
+      {
+        "id": "scope-model",
+        "title": "Add the six-scope model and scopeSatisfies to the access-token registry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/access-tokens.ts",
+            "tests/unit/lib/access-tokens.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/access-tokens.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/access-tokens.test.ts passes including the scopeSatisfies matrix",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "credential-scopes",
+            "gate-scope-enforcement",
+            "ws-upgrade-scopes",
+            "access-token-routes",
+            "pan-token-cli"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/access-tokens.ts replace `export type AccessTokenScope = 'admin';` (:35) with the exported ACCESS_TOKEN_SCOPES tuple ['read:events','read:state','read:conversations','tell','operate','admin'] and the derived union type. Add exported scopeSatisfies(granted: readonly string[], required): true when granted includes 'admin' or required, or required === 'tell' and granted includes 'operate'. Add exported parseAccessTokenScopes(input: string | readonly string[]) that splits a comma list, trims, deduplicates, throws an Error naming the first unknown scope, and throws on an empty set. createAccessToken (:206-224) validates: name trimmed non-empty and <= 200 chars; scopes pass parseAccessTokenScopes; errors name the bad field. Keep isRecord accepting any string scopes (unknown scopes simply satisfy nothing). Update the module header to describe scopes and kinds. Add the named tests from PRD W1 to tests/unit/lib/access-tokens.test.ts."
+        },
+        "items": [
+          {
+            "id": "scope-model.ac1",
+            "title": "scopeSatisfies returns true for ['admin'] against all six scopes, true for ['operate'] against 'tell', and false for ['operate'] against 'read:events' and for ['tell'] against 'operate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-model.ac2",
+            "title": "scopeSatisfies returns false for a granted list containing only an unknown string such as 'read:bogus' against every scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-model.ac3",
+            "title": "parseAccessTokenScopes('read:events, tell') returns ['read:events','tell'] and parseAccessTokenScopes('write:all') throws an error whose message names write:all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-model.ac4",
+            "title": "createAccessToken rejects an empty name and an empty scopes array, and persists no record for either",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "credential-scopes",
+        "title": "Resolve token credentials with scopes in resolveDashboardCredential",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/device-connections.ts",
+            "src/dashboard/server/__tests__/dashboard-device-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/dashboard-device-auth.test.ts src/dashboard/server/__tests__/device-revocation-connections.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dashboard-device-auth.test.ts passes with the new token-credential block",
+            "device-revocation-connections.test.ts still passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "gate-scope-enforcement",
+            "ws-upgrade-scopes",
+            "mint-pairing-hardening",
+            "access-token-routes"
+          ],
+          "readinessReason": "Runs in its own slot once scope-model lands; it is the only item editing dashboard-auth.ts resolution and device-connections.ts, and later items that touch dashboard-auth.ts are ordered after it by blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD W2. In routes/dashboard-auth.ts extend DashboardCredential (:140-144): device gains scopes, and add { kind: 'token'; tokenId; scopes }. In resolveDashboardCredential (:151-159) read the device cookie and the Bearer separately; verify the presented value; a record with kind 'token' resolves to a token credential only when it came from the Bearer header (cookie ⇒ null); any other record (kind 'device' or no kind) resolves to a device credential carrying the record's scopes. Add exported credentialScopes(credential) returning ['admin'] for internal-token and root-session. In rejectUnsafeDashboardMutationRequest replace the internal-token-only CSRF skip at :198 with a skip for credential kinds 'internal-token' and 'token'; device and root-session keep Origin and CSRF checks. In device-connections.ts add exported revocableCredentialId(credential) (device ⇒ deviceId, token ⇒ tokenId, else null) and use it in endStreamOnDeviceRevocation instead of the kind check at :55; update the header comment. Add the named PRD W2 tests."
+        },
+        "items": [
+          {
+            "id": "credential-scopes.ac1",
+            "title": "Given a kind 'token' record, when its plaintext is sent as Authorization: Bearer, resolveDashboardCredential returns { kind: 'token', tokenId, scopes } with the record's scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "credential-scopes.ac2",
+            "title": "Given the same token plaintext in the overdeck_device cookie, resolveDashboardCredential returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "credential-scopes.ac3",
+            "title": "resolveDashboardCredential returns { kind: 'device', deviceId, scopes: ['admin'] } for a device record and for a record with no kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "credential-scopes.ac4",
+            "title": "rejectUnsafeDashboardMutationRequest returns null for a token-authenticated JSON POST without a CSRF header, and returns 403 for a device-cookie POST without CSRF",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "credential-scopes.ac5",
+            "title": "revocableCredentialId returns the record id for device and token credentials and null for internal-token and root-session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-scope-enforcement",
+        "title": "Enforce the route-scope table in the remote request gate and route auth helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts src/dashboard/server/routes/__tests__/dashboard-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "route-scopes.test.ts, remote-request-gate.test.ts and dashboard-auth.test.ts pass",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "ws-upgrade-scopes",
+            "scope-acceptance-test"
+          ],
+          "acJustification": "Six criteria because this item owns both HTTP enforcement points (the global gate and the per-route helpers) that share one table; splitting them would let one land without the other.",
+          "readinessReason": "Runs in its own slot after credential-scopes; its new files (route-scopes.ts, route-scopes.test.ts) are unique to it, and its dashboard-auth.ts edit is ordered after credential-scopes by a blocks edge."
+        },
+        "narrative": {
+          "Action": "PRD W3. Create src/dashboard/server/route-scopes.ts importing only from ../../lib/access-tokens.js. Move the pure gatePathname function (remote-request-gate.ts:54-76) into it unchanged and re-export it from remote-request-gate.ts (`export { gatePathname } from './route-scopes.js';`). In route-scopes.ts export ROUTE_SCOPES with exactly the HTTP rows of the PRD route-scope table, WS_TERMINAL_SCOPE = 'operate', and requiredScopeFor(method, pathname) that matches exact case-sensitive paths where a ':param' segment matches one non-empty segment, returning 'admin' when nothing matches. In remote-request-gate.ts change remoteGateRejection (:99-109) to return { status: 401 } | { status: 403; missingScope } | null: when resolveDashboardCredential returns a credential, return null only if scopeSatisfies(credentialScopes(credential), requiredScopeFor(request.method, pathname)), else { status: 403, missingScope } — never fall back to loopback trust for a credentialed request. The middleware (:115) answers 403 with { error: 'insufficient_scope', missingScope } and keeps 401 { error: 'unauthorized' }. Update the module header rule list. Add the named PRD W3 tests; route-scopes.test.ts imports NO_LOSS_MATRIX and never reads source files. Defense in depth (D-6): in routes/dashboard-auth.ts rejectUnauthorizedDashboardRequest (:353-364), after the 401 check, compute the required scope with requiredScopeFor(request.method, gatePathname(request.url)) (a null pathname means 'admin') and return 403 { error: 'insufficient_scope', missingScope } when the credential's scopes do not satisfy it; rejectUnsafeDashboardMutationRequest inherits this. This covers GET /knowledge-viewer/* (routes/knowledge-viewer.ts:272-277), which is outside the gate's prefixes. GET /a/:slug (host-gated public artifacts) is unchanged."
+        },
+        "items": [
+          {
+            "id": "gate-scope-enforcement.ac1",
+            "title": "From a LAN peer, a read:events token reaches GET /events/stream and receives 403 { error: 'insufficient_scope', missingScope: 'tell' } on POST /api/agents/x/tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-scope-enforcement.ac2",
+            "title": "The gate passes a tell token through to POST /api/agents/x/tell and passes an operate token through to POST /api/conversations/x/message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-scope-enforcement.ac3",
+            "title": "A read:events token sent from peer 127.0.0.1 to GET /api/settings receives 403 with missingScope 'admin' (no loopback fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-scope-enforcement.ac4",
+            "title": "Every ROUTE_SCOPES row is present as a surface in NO_LOSS_MATRIX, and requiredScopeFor returns 'admin' for GET /api/settings and for GET /api/agents/pan-1/tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-scope-enforcement.ac5",
+            "title": "A device credential still reaches every gated surface and an unknown odk_ bearer from a LAN peer still receives 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-scope-enforcement.ac6",
+            "title": "rejectUnauthorizedDashboardRequest returns 403 with missingScope 'admin' for a read:events token on GET /knowledge-viewer/x and returns null for the same token on GET /events/stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-upgrade-scopes",
+        "title": "Require scopes on WebSocket upgrades (operate for /ws/terminal, admin elsewhere)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-auth.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/__tests__/ws-auth.test.ts",
+            "src/dashboard/server/__tests__/ws-terminal-auth.test.ts",
+            "src/dashboard/server/__tests__/ws-rpc-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-auth.test.ts src/dashboard/server/__tests__/ws-terminal-auth.test.ts src/dashboard/server/__tests__/ws-rpc-auth.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three ws auth test files pass",
+            "file-size guard passes with ws-rpc.ts at or under 1221 lines",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. authorizeDashboardUpgrade(headers, method, requiredScope: AccessTokenScope = 'admin') returns { ok: false, status: 403, message: `Forbidden: missing scope ${requiredScope}` } when scopeSatisfies(credentialScopes(credential), requiredScope) is false. Delete the '?token=' comment at ws-auth.ts:34 and replace it with one line stating tokens travel only in Authorization: Bearer (D-10). trackDeviceSocket uses revocableCredentialId so token sockets close with 4401 on revocation. ws-terminal.ts:244 passes WS_TERMINAL_SCOPE from route-scopes.ts. In ws-rpc.ts keep the admin default and make a line-neutral change: replace the `auth.credential.kind !== 'device'` early return at :1205 with a revocableCredentialId lookup that returns early on null, use that id at :1210, and add revocableCredentialId to the existing device-connections import on :50; total growth at most 2 lines. ws-voice.ts and ws-autopreso.ts stay unchanged. Add the named PRD W4 tests."
+        },
+        "items": [
+          {
+            "id": "ws-upgrade-scopes.ac1",
+            "title": "authorizeDashboardUpgrade returns status 403 for a read:events token with the default scope and with 'operate', and ok for an admin token and for root credentials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-upgrade-scopes.ac2",
+            "title": "/ws/terminal accepts an operate-scoped Bearer token upgrade and rejects a read:events token with 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-upgrade-scopes.ac3",
+            "title": "/ws/rpc rejects an operate token with 403 and accepts an admin token upgrade",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-upgrade-scopes.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 and ws-auth.ts no longer contains the text '?token='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mint-pairing-hardening",
+        "title": "Refuse session mint, pairing issuance and device revocation for token credentials",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-session.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/__tests__/dashboard-device-auth.test.ts",
+            "src/dashboard/server/__tests__/pairing.test.ts",
+            "src/dashboard/server/__tests__/devices-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/dashboard-device-auth.test.ts src/dashboard/server/__tests__/pairing.test.ts src/dashboard/server/__tests__/devices-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. dashboard-session.ts (:85-89): resolve the credential once; a kind 'token' credential returns 403 { error: 'an access token cannot mint a dashboard session; send it as Authorization: Bearer on each request' } with Cache-Control: no-store and no Set-Cookie, before the device branch and before any peer-trust check. pairing.ts issuance (:71): any credential that is not internal-token or root-session gets 403 { error: 'only the internal token or the root session can issue pairing credentials' }. pairing.ts device revoke (:173-176): a kind 'token' credential gets 403 { error: 'an access token cannot revoke devices' } before the existing device-self rule. Add the named PRD W5 tests."
+        },
+        "items": [
+          {
+            "id": "mint-pairing-hardening.ac1",
+            "title": "POST /api/dashboard/session with an admin-scoped token Bearer returns 403 with no set-cookie header, from both a LAN peer and peer 127.0.0.1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-pairing-hardening.ac2",
+            "title": "An internal-token mint still returns a Set-Cookie for overdeck_session, and a device mint returns only a refreshed overdeck_device cookie",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-pairing-hardening.ac3",
+            "title": "POST /api/pairing/credentials with an admin-scoped token returns 403 and issues no credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-pairing-hardening.ac4",
+            "title": "DELETE /api/devices/:id with an admin-scoped token returns 403 and the device record keeps no revokedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "origin-bearer-exemption",
+        "title": "Let Bearer odk_ requests without Origin pass origin validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/origin-validation.ts",
+            "src/dashboard/server/routes/__tests__/origin-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/origin-validation.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "origin-validation.test.ts passes",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In validateOriginHeaders (:121-127), when neither Origin nor Referer is present and the headers carry Authorization: Bearer <token> (scheme case-insensitive) where the token starts with ACCESS_TOKEN_PREFIX from src/lib/access-tokens.ts, return { ok: true } for any method. Add a comment explaining that a browser cannot attach Authorization cross-site without a CORS preflight the server does not grant, and that the remote request gate has already authenticated the token. Do not import dashboard-auth.ts. A present untrusted Origin is still rejected. Add the three named PRD W6 tests."
+        },
+        "items": [
+          {
+            "id": "origin-bearer-exemption.ac1",
+            "title": "A POST with Authorization: Bearer odk_abc and no Origin or Referer returns { ok: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-bearer-exemption.ac2",
+            "title": "A POST with Authorization: Bearer not-an-odk-token and no Origin returns { ok: false, error: 'Missing origin' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "origin-bearer-exemption.ac3",
+            "title": "A POST with Authorization: Bearer odk_abc and Origin https://evil.example returns { ok: false, error: 'Invalid origin' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "access-token-routes",
+        "title": "Add GET/POST/DELETE /api/access-tokens routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/access-tokens.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/access-tokens-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/access-tokens-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "access-tokens-routes.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. New routes/access-tokens.ts modeled on routes/pairing.ts. GET /api/access-tokens: rejectUnauthorizedDashboardRequest, returns { tokens } filtered to kind 'token', no tokenHash, Cache-Control: no-store. POST /api/access-tokens: rejectUnsafeDashboardMutationRequest, credential must be internal-token or root-session else 403; body { name, scopes } validated through parseAccessTokenScopes (400 naming the problem); createAccessToken({ name, scopes, kind: 'token' }); returns { token, record } no-store; emits an activity entry without the plaintext. DELETE /api/access-tokens/:id: rejectUnsafeDashboardMutationRequest; root credentials only, any device or token credential gets 403; unknown id or non-token record ⇒ 404; revokeAccessToken then closeDeviceConnections(id); returns { ok, token, closedConnections }; emits an activity entry. Export accessTokensRouteLayer; import in server.ts beside pairingRouteLayer (:57) and add it after pairingRouteLayer (:329), before staticRouteLayer. Add three NO_LOSS_MATRIX rows beside the device rows (no-loss-matrix.ts:409-412). Add the named PRD W7 tests."
+        },
+        "items": [
+          {
+            "id": "access-token-routes.ac1",
+            "title": "POST /api/access-tokens with the internal token returns 200 with a token starting 'odk_' and a record without tokenHash, and the following GET response contains neither the plaintext nor tokenHash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-routes.ac2",
+            "title": "POST with scopes ['write:all'] returns 400, and POST with a device cookie or with an admin-scoped token Bearer returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-routes.ac3",
+            "title": "DELETE of a token with one registered live connection returns closedConnections 1 and verifyAccessToken for that token returns ok false immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-routes.ac4",
+            "title": "DELETE of a device id returns 404, and DELETE with an admin-scoped token Bearer returns 403 and leaves the target token active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-token-routes.ac5",
+            "title": "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts exits 0 with the three new rows present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-token-cli",
+        "title": "Add pan token create|list|revoke",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/token.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/token.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/cli/token.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. New src/cli/commands/token.ts following src/cli/commands/pair.ts: static imports only chalk and Commander types; registry functions and callDashboard/isDashboardUnreachable (exported from ./pair.js at :50 and :64) load inside handlers. `pan token create <name> --scopes <list> [--json]` parses scopes (unknown ⇒ non-zero exit listing valid scopes), calls createAccessToken({ name, scopes, kind: 'token' }) directly, prints id/name/scopes and the plaintext once with 'This token is shown once. A running dashboard accepts it within 5 seconds.'; --json prints { id, name, scopes, token }. `pan token list [--json]` prints kind 'token' records as a table ID NAME SCOPES CREATED LAST USED REVOKED. `pan token revoke <id>` calls DELETE /api/access-tokens/<id> through callDashboard; 404 ⇒ 'No access token with id <id>.' exit 1; when isDashboardUnreachable(error), check the record is kind 'token' and call revokeAccessToken directly, printing the no-live-connections message. Register registerTokenCommands beside registerPairCommands in src/cli/index.ts (:45 import, :225 call); descriptions point at configuration/remote-access.mdx. Add the named PRD W8 tests."
+        },
+        "items": [
+          {
+            "id": "pan-token-cli.ac1",
+            "title": "pan token create sidecar --scopes read:events persists a kind 'token' record with scopes ['read:events'] and prints a string starting 'odk_' exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-token-cli.ac2",
+            "title": "pan token create x --scopes write:all exits non-zero and persists no record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-token-cli.ac3",
+            "title": "pan token list --json prints only kind 'token' records and omits a device record stored in the same registry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-token-cli.ac4",
+            "title": "With the dashboard unreachable, pan token revoke <id> sets revokedAt on the token record, and revoke of a device id exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-acceptance-test",
+        "title": "Prove the read:events acceptance line end to end",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/__tests__/scoped-token-acceptance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/scoped-token-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "scoped-token-acceptance.test.ts passes with no real-time waits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. New test composing Layer.mergeAll(remoteRequestGateLayer, eventsRouteLayer, a stub POST /api/agents/:id/tell route, accessTokensRouteLayer) with the harness style of remote-request-gate.test.ts, plus a direct authorizeDashboardUpgrade call with WS_TERMINAL_SCOPE. Case 1 (LAN peer, read:events token): SSE 200 text/event-stream; tell 403 insufficient_scope/missingScope 'tell'; terminal upgrade 403; then DELETE /api/access-tokens/:id with the internal token ends the open SSE stream and a new GET /events/stream returns 401. Case 2: write revokedAt straight into access-tokens.json (simulating pan token revoke with no dashboard), run startAccessTokenRefresh() under vi.useFakeTimers({ toFake: ['setInterval','clearInterval','Date'] }), advance 5000 ms, flush, and assert the next GET /events/stream returns 401. No real setTimeout waits. Implementation checkpoint: no existing test mounts eventsRouteLayer (it calls getEventStore() and retainAllAgentOutputInterest()). Try the real layer with a temporary OVERDECK_HOME first; if the event store cannot initialize in a unit test, fall back to a stub GET /events/stream that returns a text/event-stream body wrapped in endStreamOnDeviceRevocation(stream, resolveDashboardCredential(headers)) behind the real gate, and say so in the test header comment."
+        },
+        "items": [
+          {
+            "id": "scope-acceptance-test.ac1",
+            "title": "Given a read:events token from a LAN peer, GET /events/stream returns 200 with Content-Type text/event-stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-acceptance-test.ac2",
+            "title": "The same token receives 403 { error: 'insufficient_scope', missingScope: 'tell' } on POST /api/agents/x/tell and status 403 from authorizeDashboardUpgrade with WS_TERMINAL_SCOPE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-acceptance-test.ac3",
+            "title": "After DELETE /api/access-tokens/:id the open SSE stream ends and a new GET /events/stream returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-acceptance-test.ac4",
+            "title": "After a direct registry revocation and 5000 ms of fake time with the refresh timer running, GET /events/stream returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document scoped access tokens in the auth, remote-access, event-stream and skills docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:24:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2351",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/remote-access.mdx",
+            "docs/EXTERNAL-EVENT-STREAM.md",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'read:conversations' docs/DASHBOARD-AUTH.md",
+            "grep -c 'pan token create' configuration/remote-access.mdx",
+            "grep -c 'read:events' docs/EXTERNAL-EVENT-STREAM.md",
+            "grep -c 'pan token' docs/SKILLS-CONVENTION.md"
+          ],
+          "expected_outputs": [
+            "each grep prints a count of 1 or more",
+            "grep -c '?token=' docs/DASHBOARD-AUTH.md prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. docs/DASHBOARD-AUTH.md: add PAN-2351 to the title; an Access token bullet under Credentials (kind 'token', Bearer only, scopes); the token kind and cookie rule in the resolveDashboardCredential paragraph; a new Scopes section with the hierarchy, the full route-scope table naming route-scopes.ts, default admin (D-6), the peer rule (D-7) and the 403 body; D-12 in Session mint; replace the ?token= paragraph in WebSocket gate with D-10 and the per-socket scopes; D-11 in Pairing/Device sessions; the scope check in Remote request gate rule 3; a Heartbeats paragraph (/ws/rpc 15 s system.heartbeat, /events/stream 15 s keepalive, /ws/terminal tracked by PAN-4434). configuration/remote-access.mdx: new 'Scoped API tokens' section after 'List and revoke devices' with pan token create/list/revoke, the scopes in plain words, Authorization: Bearer usage, shown-once and revocation; replace the PAN-2351 'What comes next' bullet with PAN-4435 and PAN-4434 bullets. docs/EXTERNAL-EVENT-STREAM.md: replace the stale 127.0.0.1-only binding bullet with the remote-request-gate rule and add read:events tokens as a Bearer credential alongside OVERDECK_EVENTS_TOKEN. docs/SKILLS-CONVENTION.md: extend the pan pair/pan devices exclusion row with pan token."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-AUTH.md contains a Scopes section listing all six scopes with the route-scope table rows and contains no '?token=' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/remote-access.mdx contains a 'Scoped API tokens' section showing `pan token create` with --scopes and the Authorization: Bearer header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/EXTERNAL-EVENT-STREAM.md contains a statement that /events/stream accepts a read:events access token as the Bearer credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/SKILLS-CONVENTION.md contains `pan token` in the exclusion table row with `pan pair` and `pan devices`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scope-model",
+        "to": "credential-scopes",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-model",
+        "to": "access-token-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-model",
+        "to": "pan-token-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "credential-scopes",
+        "to": "gate-scope-enforcement",
+        "type": "blocks"
+      },
+      {
+        "from": "credential-scopes",
+        "to": "ws-upgrade-scopes",
+        "type": "blocks"
+      },
+      {
+        "from": "credential-scopes",
+        "to": "mint-pairing-hardening",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-scope-enforcement",
+        "to": "ws-upgrade-scopes",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-scope-enforcement",
+        "to": "access-token-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-upgrade-scopes",
+        "to": "access-token-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "mint-pairing-hardening",
+        "to": "access-token-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "access-token-routes",
+        "to": "pan-token-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "access-token-routes",
+        "to": "scope-acceptance-test",
+        "type": "blocks"
+      },
+      {
+        "from": "access-token-routes",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-token-cli",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

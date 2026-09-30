@@ -77,8 +77,8 @@ describe('revocation closes live device connections (PAN-3762)', () => {
     const b = await createAccessToken({ name: 'b', scopes: ['admin'], kind: 'device' });
     const wsA = new FakeSocket();
     const wsB = new FakeSocket();
-    trackDeviceSocket({ kind: 'device', deviceId: a.record.id }, wsA);
-    trackDeviceSocket({ kind: 'device', deviceId: b.record.id }, wsB);
+    trackDeviceSocket({ kind: 'device', deviceId: a.record.id, scopes: ['admin'] }, wsA);
+    trackDeviceSocket({ kind: 'device', deviceId: b.record.id, scopes: ['admin'] }, wsB);
 
     expect(await revokeThroughRoute(a.record.id)).toBe(200);
     expect(wsA.closedWith).toEqual({ code: 4401, reason: 'device revoked' });
@@ -97,7 +97,7 @@ describe('revocation closes live device connections (PAN-3762)', () => {
     const deviceWs = new FakeSocket();
     trackDeviceSocket({ kind: 'root-session' }, rootWs);
     trackDeviceSocket({ kind: 'internal-token' }, internalWs);
-    trackDeviceSocket({ kind: 'device', deviceId: device.record.id }, deviceWs);
+    trackDeviceSocket({ kind: 'device', deviceId: device.record.id, scopes: ['admin'] }, deviceWs);
     expect(_deviceConnectionCountForTests()).toBe(1);
 
     expect(await revokeThroughRoute(device.record.id)).toBe(200);
@@ -107,8 +107,8 @@ describe('revocation closes live device connections (PAN-3762)', () => {
   });
 
   it('ends the SSE stream of the revoked device only', async () => {
-    const streamA = endStreamOnDeviceRevocation(Stream.never, { kind: 'device', deviceId: 'device-a' });
-    const streamB = endStreamOnDeviceRevocation(Stream.never, { kind: 'device', deviceId: 'device-b' });
+    const streamA = endStreamOnDeviceRevocation(Stream.never, { kind: 'device', deviceId: 'device-a', scopes: ['admin'] });
+    const streamB = endStreamOnDeviceRevocation(Stream.never, { kind: 'device', deviceId: 'device-b', scopes: ['admin'] });
     const fiberA = Effect.runFork(Stream.runDrain(streamA));
     const fiberB = Effect.runFork(Stream.runDrain(streamB));
     await vi.waitFor(() => expect(_deviceConnectionCountForTests()).toBe(2));
@@ -119,6 +119,16 @@ describe('revocation closes live device connections (PAN-3762)', () => {
     expect(_deviceConnectionCountForTests('device-b')).toBe(1);
 
     await Effect.runPromise(Fiber.interrupt(fiberB));
+    expect(_deviceConnectionCountForTests()).toBe(0);
+  });
+
+  it('ends the SSE stream of a revoked access token (PAN-2351)', async () => {
+    const stream = endStreamOnDeviceRevocation(Stream.never, { kind: 'token', tokenId: 'token-a', scopes: ['read:events'] });
+    const fiber = Effect.runFork(Stream.runDrain(stream));
+    await vi.waitFor(() => expect(_deviceConnectionCountForTests('token-a')).toBe(1));
+
+    expect(closeDeviceConnections('token-a')).toBe(1);
+    await Effect.runPromise(Fiber.join(fiber));
     expect(_deviceConnectionCountForTests()).toBe(0);
   });
 

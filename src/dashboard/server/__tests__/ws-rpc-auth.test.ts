@@ -1,6 +1,11 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { HttpServerRequest } from 'effect/unstable/http';
 
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
@@ -51,5 +56,42 @@ describe('rejectUnauthorizedRpcUpgrade', () => {
     const rejected = rejectUnauthorizedRpcUpgrade(fakeRequest({ origin: 'https://evil.example' }));
     expect(rejected).not.toBeNull();
     expect(rejected?.status).toBe(403);
+  });
+});
+
+describe('rejectUnauthorizedRpcUpgrade scopes (PAN-2351)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-2351-ws-scope-'));
+    process.env.OVERDECK_HOME = home;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
+    _resetAccessTokensForTests();
+  });
+
+  afterEach(async () => {
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  async function bearer(scopes: Parameters<typeof createAccessToken>[0]['scopes']) {
+    const { token } = await createAccessToken({ name: scopes.join('+'), scopes, kind: 'token' });
+    return { authorization: `Bearer ${token}` };
+  }
+
+  it('rejects an operate token with 403 and upgrades an admin token', async () => {
+    expect(rejectUnauthorizedRpcUpgrade(fakeRequest(await bearer(['operate'])))?.status).toBe(403);
+    expect(rejectUnauthorizedRpcUpgrade(fakeRequest(await bearer(['admin'])))).toBeNull();
   });
 });

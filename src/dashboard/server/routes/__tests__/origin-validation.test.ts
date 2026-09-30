@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { _resetTrustedOriginsForTests, getTrustedOrigins } from '../origin-validation.js';
+import { _resetTrustedOriginsForTests, getTrustedOrigins, validateOriginHeaders } from '../origin-validation.js';
 
 const ORIGIN_ENV_KEYS = [
   'OVERDECK_TRAEFIK_ENABLED',
@@ -97,5 +97,25 @@ describe('getTrustedOrigins', () => {
     const origins = getTrustedOrigins();
     expect(origins).toContain('https://foo.example');
     expect(origins).not.toContain('https://overdeck.localhost');
+  });
+});
+
+describe('validateOriginHeaders with an odk_ Bearer (PAN-2351)', () => {
+  beforeEach(() => _resetTrustedOriginsForTests());
+  afterEach(() => _resetTrustedOriginsForTests());
+
+  it('lets a POST with Authorization: Bearer odk_ and no Origin or Referer through', () => {
+    expect(validateOriginHeaders({ authorization: 'Bearer odk_abc' }, 'POST')).toEqual({ ok: true });
+    expect(validateOriginHeaders({ Authorization: 'bearer odk_abc' }, 'DELETE')).toEqual({ ok: true });
+  });
+
+  it('still reports Missing origin for any other Bearer', () => {
+    expect(validateOriginHeaders({ authorization: 'Bearer something-else' }, 'POST')).toEqual({ ok: false, error: 'Missing origin' });
+    expect(validateOriginHeaders({}, 'POST')).toEqual({ ok: false, error: 'Missing origin' });
+  });
+
+  it('still rejects an untrusted Origin alongside an odk_ Bearer', () => {
+    expect(validateOriginHeaders({ authorization: 'Bearer odk_abc', origin: 'https://evil.example' }, 'POST'))
+      .toEqual({ ok: false, error: 'Invalid origin' });
   });
 });
