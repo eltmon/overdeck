@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4433",
   "created": "2026-09-30T16:40:45.395Z",
-  "updated": "2026-09-30T17:14:07.918Z",
+  "updated": "2026-09-30T17:30:35.071Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-30T17:14:02.798Z"
     },
     "silent-recovery-routine": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4433",
-      "claimedAt": "2026-09-30T17:14:07.917Z"
+      "claimedAt": "2026-09-30T17:14:07.917Z",
+      "doneAt": "2026-09-30T17:30:35.070Z"
     }
   }
 }
