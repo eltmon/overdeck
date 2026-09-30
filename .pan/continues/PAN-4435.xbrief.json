@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:15:54.893Z",
+  "updated": "2026-09-30T21:16:07.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "create-token-dialog.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T21:15:54.893Z"
+    },
+    "create-token-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:07.744Z"
     }
   }
 }
