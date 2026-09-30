@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-30T00:21:37.781Z",
+  "updated": "2026-09-30T00:35:54.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-2444",
       "claimedAt": "2026-09-30T00:18:19.836Z",
       "doneAt": "2026-09-30T00:21:37.780Z"
+    },
+    "ui-disclosure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:35:54.404Z"
     }
   }
 }
