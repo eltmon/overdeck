@@ -286,10 +286,10 @@ matches `//api/x` to `/api/x`. Routes keep their own checks (Origin, CSRF,
 internal-token-only routes); the gate adds a floor, it does not replace them.
 
 `dashboard.require_token_mint` (boolean, default `false`) is read from raw
-`~/.overdeck/config.yaml` by `src/lib/remote-access/config.ts` and cached for
-the process lifetime, so changing it needs a dashboard restart. Its schema entry
-and Settings toggle are tracked by
-[PAN-4435](https://github.com/eltmon/overdeck/issues/4435).
+`~/.overdeck/config.yaml` by `src/lib/remote-access/config.ts` and cached until
+a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
+(Access Tokens section) applies at once; a hand edit needs a restart.
+`GET /api/settings` reports the enforced value.
 
 ## Threat model
 
