@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T19:49:25.353Z",
+  "updated": "2026-09-30T19:50:02.124Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4435",
       "claimedAt": "2026-09-30T19:36:57.971Z",
       "doneAt": "2026-09-30T19:49:25.353Z"
+    },
+    "live-toggle-invalidation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T19:50:02.124Z"
     }
   }
 }
