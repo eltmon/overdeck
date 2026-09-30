@@ -83,9 +83,17 @@ export const dashboardSessionRouteLayer = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const headers = request.headers as HeaderMap;
-    const deviceToken = resolveDashboardCredential(headers)?.kind === 'device'
-      ? dashboardDeviceTokenFromHeaders(headers)
-      : undefined;
+    const credential = resolveDashboardCredential(headers);
+    // PAN-2351 D-12: a token never mints a session. This runs before the
+    // loopback mint check, so peer trust cannot turn a token into root.
+    if (credential?.kind === 'token') {
+      return HttpServerResponse.setHeader(
+        jsonResponse({ error: 'an access token cannot mint a dashboard session; send it as Authorization: Bearer on each request' }, { status: 403 }),
+        'Cache-Control',
+        'no-store',
+      );
+    }
+    const deviceToken = credential?.kind === 'device' ? dashboardDeviceTokenFromHeaders(headers) : undefined;
     if (deviceToken) {
       const response = HttpServerResponse.setHeader(
         jsonResponse({ ok: true, csrfToken: dashboardCsrfToken() }),

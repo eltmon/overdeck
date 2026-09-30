@@ -1,7 +1,7 @@
-# Dashboard Authentication (PAN-1166, PAN-3762)
+# Dashboard Authentication (PAN-1166, PAN-3762, PAN-2351)
 
-How the Overdeck dashboard authenticates browsers, paired devices and
-non-browser clients, what the `/ws/*` upgrade gate and the remote request gate
+How the Overdeck dashboard authenticates browsers, paired devices, scoped API
+tokens and non-browser clients, what the `/ws/*` upgrade gate and the remote request gate
 defend, and what they do not. User-facing guide:
 [configuration/remote-access.mdx](../configuration/remote-access.mdx).
 
@@ -21,6 +21,11 @@ defend, and what they do not. User-facing guide:
   sent as the cookie `overdeck_device` (`DASHBOARD_DEVICE_COOKIE`, same
   attributes as `overdeck_session`) or as `Authorization: Bearer odk_…`
   (desktop clients). Revocable one device at a time; see "Device sessions".
+- **Access token** (PAN-2351) — a scoped `odk_<64 hex>` token for a sidecar,
+  Hermes or a script: a `kind: 'token'` record in the same registry, created
+  with `pan token create` or `POST /api/access-tokens`. It authenticates only
+  from `Authorization: Bearer odk_…`, carries named scopes (see "Scopes"), and
+  is revocable one token at a time.
 - **CSRF token** — an HMAC token returned by the session mint and sent back on
   mutating requests as `x-overdeck-csrf-token`. Only checked for mutations
   (`rejectUnsafeDashboardMutationRequest`); WebSocket upgrades never carry it.
@@ -29,10 +34,66 @@ defend, and what they do not. User-facing guide:
 
 `resolveDashboardCredential(headers)` (`dashboard-auth.ts`) is THE credential
 check. It returns `{ kind: 'internal-token' }`, `{ kind: 'root-session' }`,
-`{ kind: 'device', deviceId }`, or `null`, in that precedence.
+`{ kind: 'device', deviceId, scopes }`, `{ kind: 'token', tokenId, scopes }`,
+or `null`, in that precedence. The `odk_` value is read from the
+`overdeck_device` cookie first, else the Bearer header. A `kind: 'token'`
+record authenticates only from the Bearer header: the same plaintext in the
+`overdeck_device` cookie resolves to `null` (D-9). A record with no `kind` is
+a device. `credentialScopes(credential)` is `['admin']` for the two root
+credentials and the record's scopes otherwise.
 `hasDashboardAuthHeaders(headers)` is `resolveDashboardCredential(headers) !==
 null`. Every gate in this document reuses it — there is no second credential
 check anywhere in the server.
+
+## Scopes
+
+Every registry credential (device or token) carries scopes from
+`ACCESS_TOKEN_SCOPES` (`src/lib/access-tokens.ts`):
+
+- `admin` satisfies every scope. Root credentials are `admin`.
+- `operate` satisfies `tell`.
+- `read:events`, `read:state`, `read:conversations` and `tell` are independent
+  grants; only `admin` implies them.
+- An unknown scope string in the registry file parses but satisfies nothing
+  (`scopeSatisfies`), so a hand-edited record fails closed.
+
+Pairing always grants a device `['admin']`; a hand-edited device record with
+narrower scopes is honored as narrower. The one table of which scope each route
+needs is `ROUTE_SCOPES` in `src/dashboard/server/route-scopes.ts`. Anything it
+does not list needs `admin` (D-6):
+
+| Scope | `METHOD path` |
+| --- | --- |
+| `read:events` | `GET /events/stream`, `GET /events/version` |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership` |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about` |
+| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message` |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`) |
+| `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
+
+A `:param` segment matches exactly one non-empty segment; matching is exact and
+case-sensitive on the normalized path, so any mismatch needs `admin`. Three
+places read the table: the remote request gate, `authorizeDashboardUpgrade`,
+and the per-route helper `rejectUnauthorizedDashboardRequest` (and so
+`rejectUnsafeDashboardMutationRequest`). The helper covers routes outside the
+gate's prefixes, such as `GET /knowledge-viewer/*`.
+
+A registry credential is judged by its scopes, never by its peer (D-7): a
+narrow token from `127.0.0.1` still gets 403 on an `admin` route. A credential
+without the required scope gets **403**
+`{ "error": "insufficient_scope", "missingScope": "<scope>" }` (HTTP) or a 403
+upgrade rejection. A missing or invalid credential stays **401**.
+
+Only root credentials may create or revoke access tokens, issue pairing
+credentials, or revoke a device other than the caller's own (D-11). A device or
+token credential gets 403 on those operations, even with `admin`.
+
+A Bearer-borne access token skips the CSRF check in
+`rejectUnsafeDashboardMutationRequest`, and a non-GET request carrying
+`Authorization: Bearer odk_…` with no `Origin` and no `Referer` passes origin
+validation (FR-9). A browser cannot attach an `Authorization` header to a
+cross-site request without a CORS preflight the server does not grant. Device
+and root-session requests keep both checks.
 
 ## Session mint
 
@@ -40,10 +101,13 @@ check anywhere in the server.
 `dashboardSessionRouteLayer`) is the only way a browser acquires the session
 cookie. It requires a trusted (or absent) `Origin`.
 
-A request that authenticates as a **device** gets the CSRF token and a
-refreshed `overdeck_device` cookie, and never `overdeck_session` (FR-16): a
-device must never be upgraded to the unrevocable root session. Otherwise the
-mint passes when any of these is true:
+A request that authenticates as an **access token** gets **403** and no
+`Set-Cookie` (D-12): token clients send the Bearer header on every request.
+This check runs before the loopback check, so peer trust cannot turn a token
+into a root session. A request that authenticates as a **device** gets the CSRF
+token and a refreshed `overdeck_device` cookie, and never `overdeck_session`
+(FR-16): a device must never be upgraded to the unrevocable root session.
+Otherwise the mint passes when any of these is true:
 
 - the internal token is present (header, Bearer, or the one-time
   `#overdeck_token` URL-hash bootstrap `pan up`/`pan dev` inject), or
@@ -69,9 +133,10 @@ each host needs its own mint.
 
 ## WebSocket gate
 
-`authorizeDashboardUpgrade(headers, method)` (`src/dashboard/server/ws-auth.ts`)
-is the single chokepoint all four raw upgrades route through — `/ws/terminal`,
-`/ws/rpc`, `/ws/voice`, `/ws/autopreso`. It runs three checks in order:
+`authorizeDashboardUpgrade(headers, method, requiredScope = 'admin')`
+(`src/dashboard/server/ws-auth.ts`) is the single chokepoint all four raw
+upgrades route through — `/ws/terminal`, `/ws/rpc`, `/ws/voice`,
+`/ws/autopreso`. It runs four checks in order:
 
 1. **Origin** (`validateOriginHeaders`) — a *present* `Origin` (or `Referer`)
    must be in `getTrustedOrigins()`, or the upgrade is rejected with **403**.
@@ -85,8 +150,14 @@ is the single chokepoint all four raw upgrades route through — `/ws/terminal`,
 3. **Credential** (`resolveDashboardCredential`) — the session cookie
    (browsers, attached automatically on same-site upgrades), a device cookie or
    bearer, or the internal token header (non-browser clients). None is a
-   **401**. On success `authorizeDashboardUpgrade` returns the credential, so
-   the handler can close a device's socket when it is revoked.
+   **401**.
+4. **Scope** — the credential's scopes must satisfy `requiredScope`, or the
+   upgrade is rejected with **403** (`Forbidden: missing scope <scope>`).
+   `/ws/terminal` passes `operate`; `/ws/rpc` (it carries `terminalWrite` and
+   `writeFileAtPath`), `/ws/voice` and `/ws/autopreso` keep `admin`.
+
+On success `authorizeDashboardUpgrade` returns the credential, so the handler
+can close a device's or token's socket when it is revoked.
 
 **Peer trust is deliberately NOT consulted here.** A loopback client with no
 cookie and no internal token gets 401 on upgrade, even though the same client
@@ -95,10 +166,16 @@ trust confined to one chokepoint — the mint — so the `require_token_mint`
 switch (PAN-3762, read from raw `config.yaml`) closes it everywhere at once by
 changing the mint alone, without touching four separate upgrade handlers.
 
-`// PAN-2351 adds scoped access tokens (?token=) here.` marks where a future
-`?token=` scoped-access check slots into `authorizeDashboardUpgrade` — no
-scoped tokens exist yet (PAN-2351 is open). `GET /api/environment` reports this
-gate as `capabilities.terminalAuth: true` (`WS_UPGRADE_REQUIRES_CREDENTIAL`).
+Tokens never travel in a URL query parameter (D-10): URLs land in proxy and
+access logs. Programmatic WebSocket clients (Node `ws`, Python `websockets`) set
+`Authorization: Bearer odk_…`; browsers use the session or device cookie.
+`GET /api/environment` reports this gate as `capabilities.terminalAuth: true`
+(`WS_UPGRADE_REQUIRES_CREDENTIAL`).
+
+**Heartbeats.** `/ws/rpc` emits a `system.heartbeat` every 15 s and
+`/events/stream` sends a `: keepalive` comment every 15 s, so both stay under a
+proxy's idle timeout. `/ws/terminal` has none yet; that is tracked by
+[PAN-4434](https://github.com/eltmon/overdeck/issues/4434).
 
 Rejected raw upgrades (`/ws/terminal`, `/ws/voice`, `/ws/autopreso`) write a
 plain `HTTP/1.1 <status> <message>` response and destroy the socket
@@ -114,9 +191,9 @@ The `reauth-*` terminal one-time token (`consumeReauthTerminalToken`,
 Registry: `src/lib/access-tokens.ts`, the single door for
 `~/.overdeck/access-tokens.json` (mode `0600`, atomic temp-file rename). Each
 record is `{ id, name, scopes, tokenHash, createdAt, lastUsedAt, revokedAt?,
-kind? }`; `kind: 'device'` marks a paired device. Only the SHA-256 hash of the
-`odk_` token is stored, and comparison is constant-time. PAN-2351 builds scoped
-API tokens (`kind: 'token'`) on the same registry.
+kind? }`; `kind: 'device'` marks a paired device and `kind: 'token'` a scoped
+access token (PAN-2351). Only the SHA-256 hash of the `odk_` token is stored,
+and comparison is constant-time.
 
 - **Verification is synchronous** against an in-memory snapshot, because
   `resolveDashboardCredential` is synchronous. `main.ts` loads the snapshot at
@@ -129,12 +206,24 @@ API tokens (`kind: 'token'`) on the same registry.
 
 Routes (`routes/pairing.ts`): `GET /api/devices` lists devices (never the
 hash). `DELETE /api/devices/:id` revokes one; a device may revoke only itself,
-while the internal token and root session may revoke any.
+an access token may revoke none (403), and the internal token and root session
+may revoke any.
+
+Access-token routes (`routes/access-tokens.ts`): `GET /api/access-tokens`
+lists `kind: 'token'` records (never the hash). `POST /api/access-tokens`
+takes `{ name, scopes }` and returns `{ token, record }`, the only time the
+plaintext is shown. `DELETE /api/access-tokens/:id` revokes one and closes its
+live connections; a device id there is 404. Create and revoke accept root
+credentials only. `pan token create|list|revoke` (`src/cli/commands/token.ts`)
+wraps them: create and list use the registry directly, and revoke calls the
+DELETE route, writing the registry only when the dashboard is unreachable
+(D-14).
 
 **Revocation closes live connections** (`src/dashboard/server/device-connections.ts`).
-Each device-authenticated connection registers a close callback under its
-device id, and `DELETE /api/devices/:id` calls `closeDeviceConnections(id)`
-right after revoking:
+Each connection opened by a device or token registers a close callback under
+its record id (`revocableCredentialId`), and `DELETE /api/devices/:id` and
+`DELETE /api/access-tokens/:id` call `closeDeviceConnections(id)` right after
+revoking:
 
 - `/ws/terminal`, `/ws/voice`, `/ws/autopreso` close with code `4401`, reason
   `device revoked` (`trackDeviceSocket`, `ws-auth.ts`).
@@ -147,9 +236,9 @@ right after revoking:
 ## Pairing
 
 `pan pair` (`src/cli/commands/pair.ts`) calls `POST /api/pairing/credentials`
-with the internal token. That route accepts the internal token or the root
-session (plus CSRF for the cookie); a device gets **403**, so a paired device
-cannot mint more devices. It returns an `odp_<64 hex>` credential
+with the internal token. That route accepts only the internal token or the root
+session (plus CSRF for the cookie); a device or an access token gets **403**,
+so neither can mint more devices (D-11). It returns an `odp_<64 hex>` credential
 (`src/dashboard/server/pairing-credentials.ts`) that:
 
 - is held only in the dashboard's memory, as a SHA-256 hash;
@@ -181,7 +270,9 @@ reach any route at all:
    `GET /api/health`, `GET /api/environment`, `OPTIONS` and
    `POST /api/dashboard/session`, `POST /api/pairing/exchange`, and
    `POST /api/webhooks/github` (HMAC-verified by its route).
-3. `resolveDashboardCredential` returns a credential: pass. `GET
+3. `resolveDashboardCredential` returns a credential: pass when its scopes
+   satisfy the route-scope table (see "Scopes"), else **403**
+   `insufficient_scope`. This rule never falls back to peer trust. `GET
    /events/stream` also accepts its own `OVERDECK_EVENTS_TOKEN` bearer when that
    variable is set, so remote SSE consumers keep working.
 4. The request is a trusted local caller (`isLoopbackPeer`, the same peer check
@@ -196,8 +287,9 @@ internal-token-only routes); the gate adds a floor, it does not replace them.
 
 `dashboard.require_token_mint` (boolean, default `false`) is read from raw
 `~/.overdeck/config.yaml` by `src/lib/remote-access/config.ts` and cached for
-the process lifetime, so changing it needs a dashboard restart. PAN-2351 adds
-the schema entry and the Settings toggle.
+the process lifetime, so changing it needs a dashboard restart. Its schema entry
+and Settings toggle are tracked by
+[PAN-4435](https://github.com/eltmon/overdeck/issues/4435).
 
 ## Threat model
 
@@ -213,6 +305,9 @@ the schema entry and the Settings toggle.
   credential (PAN-3762).
 - A lost or stolen paired device: revoking it ends its HTTP access and its
   open connections at once, and the root internal token was never on it.
+- A leaked access token: it reaches only the routes its scopes name, can never
+  mint a session, a pairing credential or another token, and revoking it ends
+  its access and open connections at once.
 
 **Does NOT defend:**
 - Any process running on this machine. It can mint a session as a loopback

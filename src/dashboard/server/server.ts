@@ -55,6 +55,7 @@ import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
+import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
@@ -327,6 +328,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   knowledgeViewerRouteLayer,
   environmentRouteLayer,
   pairingRouteLayer,
+  accessTokensRouteLayer,
   staticRouteLayer,
 );
 

@@ -24,6 +24,7 @@ import * as pty from '@lydell/node-pty';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
+import { WS_TERMINAL_SCOPE } from './route-scopes.js';
 import { authorizeDashboardUpgrade, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
@@ -241,7 +242,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
 
     if (url.pathname === '/ws/terminal') {
-      const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET');
+      const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET', WS_TERMINAL_SCOPE);
       if (!auth.ok) {
         rejectUpgrade(socket, auth.status, auth.message);
         return;

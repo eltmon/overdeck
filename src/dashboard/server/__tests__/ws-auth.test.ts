@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
@@ -99,5 +100,60 @@ describe('authorizeDashboardUpgrade', () => {
 
     const result = authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN, cookie }, 'GET');
     expect(result).toEqual({ ok: false, status: 401, message: 'Unauthorized' });
+  });
+});
+
+describe('authorizeDashboardUpgrade scopes (PAN-2351)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-2351-ws-scope-'));
+    process.env.OVERDECK_HOME = home;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
+    _resetAccessTokensForTests();
+  });
+
+  afterEach(async () => {
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  async function bearer(scopes: Parameters<typeof createAccessToken>[0]['scopes']) {
+    const { token } = await createAccessToken({ name: scopes.join('+'), scopes, kind: 'token' });
+    return { authorization: `Bearer ${token}` };
+  }
+
+  it('rejects a read:events token with 403 for the default scope and for operate', async () => {
+    const headers = await bearer(['read:events']);
+    expect(authorizeDashboardUpgrade(headers, 'GET')).toMatchObject({ ok: false, status: 403, message: 'Forbidden: missing scope admin' });
+    expect(authorizeDashboardUpgrade(headers, 'GET', 'operate')).toMatchObject({ ok: false, status: 403, message: 'Forbidden: missing scope operate' });
+  });
+
+  it('accepts an operate token for operate and rejects it for the admin default', async () => {
+    const headers = await bearer(['operate']);
+    expect(authorizeDashboardUpgrade(headers, 'GET', 'operate').ok).toBe(true);
+    expect(authorizeDashboardUpgrade(headers, 'GET')).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it('accepts an admin token and root credentials for both scopes', async () => {
+    const headers = await bearer(['admin']);
+    expect(authorizeDashboardUpgrade(headers, 'GET').ok).toBe(true);
+    expect(authorizeDashboardUpgrade(headers, 'GET', 'operate').ok).toBe(true);
+    const internal = { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' };
+    expect(authorizeDashboardUpgrade(internal, 'GET').ok).toBe(true);
+    expect(authorizeDashboardUpgrade(internal, 'GET', 'operate').ok).toBe(true);
+    const cookie = requestCookie(dashboardSessionCookieHeader());
+    expect(authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN, cookie }, 'GET', 'operate').ok).toBe(true);
   });
 });

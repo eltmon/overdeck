@@ -2,6 +2,8 @@
  * PAN-3762 W2.2: a paired device's `odk_` credential authenticates dashboard
  * requests until it is revoked, and the session mint refreshes the device
  * cookie without ever issuing the root `overdeck_session` cookie (FR-16).
+ * PAN-2351 W2: `kind: 'token'` records resolve only from the Bearer header,
+ * every registry credential carries its scopes, and a Bearer token skips CSRF.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,9 +15,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { revocableCredentialId } from '../device-connections.js';
 import {
   _resetDashboardSessionTokenForTests,
+  credentialScopes,
   rejectUnauthorizedDashboardRequest,
+  rejectUnsafeDashboardMutationRequest,
   resolveDashboardCredential,
 } from '../routes/dashboard-auth.js';
 import { dashboardSessionRouteLayer } from '../routes/dashboard-session.js';
@@ -24,15 +29,15 @@ const INTERNAL_TOKEN = 'device-auth-internal-token';
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
 
-function fakeRequest(headers: Record<string, string>) {
-  return { headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
+function fakeRequest(headers: Record<string, string>, route: { method: string; url: string } = { method: 'GET', url: '/api/settings' }) {
+  return { ...route, headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
 }
 
-async function mint(headers: Record<string, string>) {
+async function mint(headers: Record<string, string>, peer?: string) {
   const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/dashboard/session', {
     method: 'POST',
     headers: { Origin: 'http://localhost:3011', ...headers },
-  }));
+  })).modify({ remoteAddress: peer ? Option.some(peer) : Option.none() });
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
     HttpRouter.toHttpEffect(dashboardSessionRouteLayer),
     (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
@@ -67,7 +72,7 @@ describe('device credentials in dashboard auth (PAN-3762)', () => {
     const request = fakeRequest({ cookie: `overdeck_device=${token}` });
 
     expect(rejectUnauthorizedDashboardRequest(request)).toBeNull();
-    expect(resolveDashboardCredential(request.headers as Record<string, string>)).toEqual({ kind: 'device', deviceId: record.id });
+    expect(resolveDashboardCredential(request.headers as Record<string, string>)).toEqual({ kind: 'device', deviceId: record.id, scopes: ['admin'] });
 
     await revokeAccessToken(record.id);
     expect(rejectUnauthorizedDashboardRequest(request)?.status).toBe(401);
@@ -101,5 +106,64 @@ describe('device credentials in dashboard auth (PAN-3762)', () => {
     const res = await mint({ cookie: `overdeck_device=${token}` });
     expect(res.status).toBe(401);
     expect(res.setCookie).toBe('');
+  });
+});
+
+describe('token credentials (PAN-2351)', () => {
+  it('resolves a token record sent as Bearer to a token credential with its scopes', async () => {
+    const { token, record } = await createAccessToken({ name: 'sidecar', scopes: ['read:events', 'tell'], kind: 'token' });
+    const credential = resolveDashboardCredential({ authorization: `Bearer ${token}` });
+    expect(credential).toEqual({ kind: 'token', tokenId: record.id, scopes: ['read:events', 'tell'] });
+    expect(credential && credentialScopes(credential)).toEqual(['read:events', 'tell']);
+  });
+
+  it('resolves the same token plaintext in the overdeck_device cookie to nothing', async () => {
+    const { token } = await createAccessToken({ name: 'sidecar', scopes: ['admin'], kind: 'token' });
+    expect(resolveDashboardCredential({ cookie: `overdeck_device=${token}` })).toBeNull();
+    expect(resolveDashboardCredential({ cookie: `overdeck_device=${token}`, authorization: `Bearer ${token}` })).toBeNull();
+    expect(rejectUnauthorizedDashboardRequest(fakeRequest({ cookie: `overdeck_device=${token}` }))?.status).toBe(401);
+  });
+
+  it('resolves a device record, and a record with no kind, as a device carrying its scopes', async () => {
+    const device = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const legacy = await createAccessToken({ name: 'legacy', scopes: ['read:state'] });
+    expect(resolveDashboardCredential({ authorization: `Bearer ${device.token}` }))
+      .toEqual({ kind: 'device', deviceId: device.record.id, scopes: ['admin'] });
+    expect(resolveDashboardCredential({ cookie: `overdeck_device=${legacy.token}` }))
+      .toEqual({ kind: 'device', deviceId: legacy.record.id, scopes: ['read:state'] });
+  });
+
+  it('grants admin to root credentials', () => {
+    expect(credentialScopes({ kind: 'internal-token' })).toEqual(['admin']);
+    expect(credentialScopes({ kind: 'root-session' })).toEqual(['admin']);
+  });
+
+  it('lets a Bearer token POST skip CSRF while a device cookie POST without CSRF gets 403', async () => {
+    const { token } = await createAccessToken({ name: 'teller', scopes: ['tell'], kind: 'token' });
+    const device = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const json = { 'content-type': 'application/json' };
+    const tell = { method: 'POST', url: '/api/agents/pan-1/tell' };
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${token}` }, tell))).toBeNull();
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, cookie: `overdeck_device=${device.token}` }, tell))?.status).toBe(403);
+    expect(rejectUnsafeDashboardMutationRequest(fakeRequest({ ...json, authorization: `Bearer ${device.token}` }, tell))?.status).toBe(403);
+  });
+
+  it('revocableCredentialId returns the record id for device and token, null for root credentials', () => {
+    expect(revocableCredentialId({ kind: 'device', deviceId: 'd-1', scopes: ['admin'] })).toBe('d-1');
+    expect(revocableCredentialId({ kind: 'token', tokenId: 't-1', scopes: ['tell'] })).toBe('t-1');
+    expect(revocableCredentialId({ kind: 'internal-token' })).toBeNull();
+    expect(revocableCredentialId({ kind: 'root-session' })).toBeNull();
+    expect(revocableCredentialId(null)).toBeNull();
+  });
+});
+
+describe('session mint with an access token (PAN-2351)', () => {
+  it('refuses an admin token from a LAN peer and from loopback, setting no cookie', async () => {
+    const { token } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+    for (const peer of ['192.0.2.44', '127.0.0.1']) {
+      const res = await mint({ authorization: `Bearer ${token}` }, peer);
+      expect(res.status, peer).toBe(403);
+      expect(res.setCookie, peer).toBe('');
+    }
   });
 });
