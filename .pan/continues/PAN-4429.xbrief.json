@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:28:53.435Z",
+  "updated": "2026-09-30T02:29:07.347Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "frontend-health-metrics.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T02:28:53.434Z"
+    },
+    "frontend-settings-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:29:07.347Z"
     }
   }
 }
