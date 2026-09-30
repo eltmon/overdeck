@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:41:11.072Z",
+  "updated": "2026-09-30T17:41:25.081Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "credential-scopes.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T17:41:11.072Z"
+    },
+    "gate-scope-enforcement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:25.081Z"
     }
   }
 }
