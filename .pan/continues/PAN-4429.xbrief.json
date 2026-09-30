@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:19:34.328Z",
+  "updated": "2026-09-30T01:22:26.339Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-30T01:19:29.580Z"
     },
     "cli-sidecar-daemon": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4429",
-      "claimedAt": "2026-09-30T01:19:34.328Z"
+      "claimedAt": "2026-09-30T01:19:34.328Z",
+      "doneAt": "2026-09-30T01:22:26.338Z"
     }
   }
 }
