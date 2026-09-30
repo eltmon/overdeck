@@ -85,6 +85,15 @@ export interface VaultSettlePoller {
 
 async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Promise<void> {
   const config = await deps.readConfig();
+  if (!config.backend) {
+    // FR-7: the vault is off, so every operation is a no-op; drop any tracked
+    // state rather than statting files and arming timers for nothing.
+    for (const entry of state.values()) {
+      if (entry.timer) clearTimeout(entry.timer);
+    }
+    state.clear();
+    return;
+  }
   const debounceMs = config.debounceSec * 1000;
   const active = deps.listActive();
   const activeNames = new Set(active.map((conv) => conv.name));
@@ -112,7 +121,7 @@ async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Prom
     const harness = entry.harness;
     entry.timer = setTimeout(() => {
       entry!.timer = null;
-      void deps.settle(path, harness, 'auto');
+      void deps.settle(path, harness, 'auto').catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
     }, debounceMs);
     if (typeof entry.timer.unref === 'function') entry.timer.unref();
   }
@@ -120,7 +129,11 @@ async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Prom
   for (const [name, entry] of state) {
     if (activeNames.has(name)) continue;
     if (entry.timer) clearTimeout(entry.timer);
-    if (entry.path) void deps.settle(entry.path, entry.harness, 'force');
+    if (entry.path) {
+      const path = entry.path;
+      const harness = entry.harness;
+      void deps.settle(path, harness, 'force').catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
+    }
     state.delete(name);
   }
 }
@@ -169,10 +182,11 @@ export function createVaultSettlePoller(deps: VaultSettlePollerDeps = {}): Vault
   return {
     start() {
       if (intervalTimer) return;
-      void pollOnce(resolved, state);
-      intervalTimer = setInterval(() => {
-        void pollOnce(resolved, state);
-      }, resolved.pollMs);
+      const runPoll = (): void => {
+        void pollOnce(resolved, state).catch((error) => console.warn('[vault] poll failed:', error));
+      };
+      runPoll();
+      intervalTimer = setInterval(runPoll, resolved.pollMs);
       if (typeof intervalTimer.unref === 'function') intervalTimer.unref();
     },
     stop() {

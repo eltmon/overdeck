@@ -146,6 +146,47 @@ describe('SessionVaultSection', () => {
     expect(toastMocks.success).toHaveBeenCalled();
   });
 
+  it('the delete button POSTs the displayed verified vaultIds alongside the fingerprint', async () => {
+    let confirmedIds: string[] | null = null;
+    mockFetch({
+      onConfirm: (body) => {
+        confirmedIds = (body as { deletableVaultIds: string[] }).deletableVaultIds;
+        return { status: 200, body: { deleted: ['/a.jsonl'], skipped: [], bytesFreed: 1024, fingerprint: 'fp-2' } };
+      },
+    });
+    renderSection();
+
+    const deleteButton = await screen.findByRole('button', { name: /Yes, delete these/ });
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(confirmedIds).toEqual(['v1']));
+  });
+
+  it('a 403/500 response to decline shows an error toast and never overwrites the batch cache with the error body', async () => {
+    mockFetch({});
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/vault/status') return new Response(JSON.stringify(READY_STATUS), { status: 200 });
+      if (url === '/api/vault/eviction-batch' && (!init || init.method === undefined)) {
+        return new Response(JSON.stringify(MIXED_BATCH), { status: 200 });
+      }
+      if (url === '/api/vault/eviction-batch/decline') {
+        return new Response(JSON.stringify({ error: 'session expired' }), { status: 403 });
+      }
+      return new Response('not found', { status: 404 });
+    });
+    renderSection();
+
+    await waitFor(() => expect(screen.getByText('ok session')).toBeTruthy());
+    const declineButtons = screen.getAllByText('Decline');
+    fireEvent.click(declineButtons[0]!);
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('Failed to decline the transcript.'));
+    // The cache must still show the real batch, never the { error } body swapped in for it.
+    expect(screen.getByText('ok session')).toBeTruthy();
+    expect(screen.queryByText('Eviction is off. Set "evict": true in ~/.overdeck/vault/config.json to review transcripts the vault holds.')).toBeNull();
+  });
+
   it('a 409 batch-changed response triggers a refetch and shows no success toast', async () => {
     let confirmCalls = 0;
     mockFetch({
@@ -185,6 +226,23 @@ describe('SessionVaultSection', () => {
     fireEvent.click(declineButtons[0]!);
 
     await waitFor(() => expect(declinedVaultId).toBe('v1'));
+  });
+
+  it('a network failure on decline shows an error toast instead of an unhandled rejection', async () => {
+    mockFetch({});
+    const realFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString() === '/api/vault/eviction-batch/decline') throw new Error('network down');
+      return realFetch(input, init);
+    });
+    renderSection();
+
+    await waitFor(() => expect(screen.getByText('ok session')).toBeTruthy());
+    const declineButtons = screen.getAllByText('Decline');
+    fireEvent.click(declineButtons[0]!);
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith(expect.stringContaining('network down')));
+    expect(screen.getByText('ok session')).toBeTruthy();
   });
 
   it('the machines table marks this machine', async () => {

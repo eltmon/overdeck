@@ -14,6 +14,7 @@ vi.mock('../../../../../src/lib/cloister/transcript-deletion-door.js', async (im
 
 import { ensureEnvironmentIdentity } from '../../../../../src/lib/environment-identity.js';
 import { VAULT_CONFIG_DEFAULTS, writeVaultConfig, type VaultConfig } from '../../../../../src/lib/vault/config.js';
+import { writeEvictionBatch, type EvictionBatch } from '../../../../../src/lib/vault/evict.js';
 import { HEADER_REF_NAME, encryptRef, newVaultHeader } from '../../../../../src/lib/vault/format.js';
 import { createVaultKey, deriveSubkeys, saveVaultKey } from '../../../../../src/lib/vault/identity.js';
 import { settle } from '../../../../../src/lib/vault/settle.js';
@@ -95,6 +96,71 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     expect(syncOnce).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('NFR-6: a rejecting readVaultConfig at boot logs a warning instead of an unhandled rejection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const readVaultConfig = vi.fn().mockRejectedValue(new Error('vault/config.json is not valid JSON'));
+    startVaultService({ readVaultConfig, createVaultSettlePoller: noopPoller });
+    await vi.advanceTimersByTimeAsync(5000);
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('[vault] boot failed:', expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('NFR-6: a scheduled cycle that rejects is reported through createSyncLoop\'s onError, not an unhandled rejection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const readVaultConfig = vi.fn()
+      .mockResolvedValueOnce({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, syncIntervalSec: 60 })
+      .mockRejectedValue(new Error('vault/config.json is not valid JSON'));
+    const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
+    startVaultService({ readVaultConfig, openVaultContext, createVaultSettlePoller: noopPoller });
+    await vi.advanceTimersByTimeAsync(5000); // boot cycle succeeds (off)
+    await vi.advanceTimersByTimeAsync(60_000); // next scheduled cycle rejects
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('[vault] sync failed:', expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('NFR-6: queuedSettle (passed to the poller) logs a warning instead of throwing when openVaultContext rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
+    const openVaultContext = vi.fn().mockRejectedValue(new Error('key file is missing'));
+    let capturedSettle: ((path: string, harness: string, wip: 'auto' | 'force') => Promise<void>) | null = null;
+    const createVaultSettlePoller = (pollerDeps: { settle: typeof capturedSettle }) => {
+      capturedSettle = pollerDeps.settle;
+      return noopPoller();
+    };
+    startVaultService({ readVaultConfig, openVaultContext, createVaultSettlePoller });
+    await expect(capturedSettle!('/a.jsonl', 'claude-code', 'auto')).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith('[vault] settle failed for /a.jsonl:', expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('FR-3: stopVaultService bounds the total wait to the 10s shutdown budget when the queue is not done in time', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
+    const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
+    startVaultService({ readVaultConfig, openVaultContext, createVaultSettlePoller: noopPoller });
+    // Resolved after the assertions below, not left dangling: the queue is module-level
+    // state shared with every later test in this file, so an operation that never
+    // settles would wedge `enqueueVaultOperation` for the rest of the suite.
+    let resolveStuck: () => void = () => undefined;
+    enqueueVaultOperation('stuck', () => new Promise<void>((resolve) => { resolveStuck = resolve; }));
+
+    const stopPromise = stopVaultService();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await stopPromise;
+    expect(warn).toHaveBeenCalledWith('[vault] shutdown budget exhausted while the queue was still draining');
+    warn.mockRestore();
+    resolveStuck();
+    await Promise.resolve();
   });
 
   it('offline cycles back off and the delay caps at the configured interval', async () => {
@@ -197,7 +263,8 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const confirmEviction = vi.fn().mockResolvedValue({ refused: false, deleted: [], skipped: [], bytesFreed: 0, fingerprint: 'abc' });
     const deps: VaultServiceDeps = { readVaultConfig, openVaultContext, confirmEviction, isLive, createVaultSettlePoller: noopPoller };
     startVaultService(deps);
-    const result = await confirmEvictionBatch('fp-1');
+    // No eviction-batch.json on disk yet, so the current deletable (verified) set is empty.
+    const result = await confirmEvictionBatch('fp-1', []);
     expect(confirmEviction).toHaveBeenCalledWith('fp-1', expect.objectContaining({ skipFailed: true, isLive }));
     expect(result).toEqual({ refused: false, deleted: [], skipped: [], bytesFreed: 0, fingerprint: 'abc' });
   });
@@ -207,9 +274,31 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
     const confirmEviction = vi.fn();
     startVaultService({ readVaultConfig, openVaultContext, confirmEviction, createVaultSettlePoller: noopPoller });
-    const result = await confirmEvictionBatch('fp-1');
+    const result = await confirmEvictionBatch('fp-1', []);
     expect(confirmEviction).not.toHaveBeenCalled();
     expect(result).toEqual({ unavailable: 'Session Vault is off. Run: pan vault setup <git-url>' });
+  });
+
+  it('confirmEvictionBatch refuses when the displayed deletable set no longer matches the current one, without calling confirmEviction', async () => {
+    // A failed entry that became eligible again produces the same batchFingerprint
+    // (it hashes vaultId/nativePath/sizeBytes/settlementChunk, never verification),
+    // so this race is only caught by comparing the verified-vaultId sets themselves.
+    const batch: EvictionBatch = {
+      v: 1,
+      entries: [
+        { vaultId: 'v1', harness: 'claude-code', nativePath: '/a.jsonl', title: 't', sizeBytes: 10, settlementChunk: 'c1', verification: 'verified', checkedAt: 'x', addedAt: 'x' },
+      ],
+      declined: [],
+    };
+    await writeEvictionBatch(batch);
+    const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } });
+    const openVaultContext = vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult);
+    const confirmEviction = vi.fn();
+    startVaultService({ readVaultConfig, openVaultContext, confirmEviction, createVaultSettlePoller: noopPoller });
+    // The caller displayed an empty deletable set (e.g. v1 was shown as failed).
+    const result = await confirmEvictionBatch('fp-does-not-matter', []);
+    expect(confirmEviction).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ refused: true });
   });
 
   it('getVaultServiceSnapshot reflects the live config even when the sync cycle never ran (peer dashboard, NFR-4)', async () => {

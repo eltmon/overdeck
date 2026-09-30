@@ -177,9 +177,22 @@ export function SessionVaultSection() {
 
   const refetchBatch = () => void queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEY });
 
+  /** Runs a batch-mutating POST, reporting a toast on rejection instead of an unhandled promise. */
+  async function postVaultBatch(path: string, body: Record<string, unknown> | undefined, failureMessage: string): Promise<{ status: number; body: unknown } | null> {
+    try {
+      return await postVault(path, body);
+    } catch (error) {
+      toast.error(`${failureMessage}: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
   const handleConfirm = async () => {
     if (!batch) return;
-    const { status: httpStatus, body } = await postVault('eviction-batch/confirm', { fingerprint: batch.fingerprint });
+    const deletableVaultIds = batch.entries.filter((entry) => entry.verification === 'verified').map((entry) => entry.vaultId);
+    const result = await postVaultBatch('eviction-batch/confirm', { fingerprint: batch.fingerprint, deletableVaultIds }, 'Failed to delete the pending transcripts');
+    if (!result) return;
+    const { status: httpStatus, body } = result;
     if (httpStatus === 409) {
       const refused = body as ConfirmRefused;
       if (refused.code === 'batch-changed') {
@@ -194,26 +207,41 @@ export function SessionVaultSection() {
       toast.error('Failed to delete the pending transcripts.');
       return;
     }
-    const result = body as ConfirmSuccess;
-    const lines = [`Deleted ${result.deleted.length} transcript(s), freed ${formatBytes(result.bytesFreed)}`];
-    for (const skipped of result.skipped) lines.push(`Skipped ${skipped.nativePath}: ${skipped.reason}`);
+    const success = body as ConfirmSuccess;
+    const lines = [`Deleted ${success.deleted.length} transcript(s), freed ${formatBytes(success.bytesFreed)}`];
+    for (const skipped of success.skipped) lines.push(`Skipped ${skipped.nativePath}: ${skipped.reason}`);
     toast.success(lines.join('\n'));
     refetchBatch();
   };
 
   const handleDecline = async (vaultId: string) => {
-    const { body } = await postVault('eviction-batch/decline', { vaultId });
-    if (body) queryClient.setQueryData(BATCH_QUERY_KEY, body);
+    const result = await postVaultBatch('eviction-batch/decline', { vaultId }, 'Failed to decline the transcript');
+    if (!result) return;
+    if (result.status !== 200) {
+      toast.error('Failed to decline the transcript.');
+      return;
+    }
+    if (result.body) queryClient.setQueryData(BATCH_QUERY_KEY, result.body);
   };
 
   const handleClear = async () => {
-    const { body } = await postVault('eviction-batch/clear');
-    if (body) queryClient.setQueryData(BATCH_QUERY_KEY, body);
+    const result = await postVaultBatch('eviction-batch/clear', undefined, 'Failed to clear the batch');
+    if (!result) return;
+    if (result.status !== 200) {
+      toast.error('Failed to clear the batch.');
+      return;
+    }
+    if (result.body) queryClient.setQueryData(BATCH_QUERY_KEY, result.body);
   };
 
   const handleReoffer = async (vaultId: string) => {
-    const { body } = await postVault('eviction-batch/reoffer', { vaultId });
-    if (body) queryClient.setQueryData(BATCH_QUERY_KEY, body);
+    const result = await postVaultBatch('eviction-batch/reoffer', { vaultId }, 'Failed to re-offer the transcript');
+    if (!result) return;
+    if (result.status !== 200) {
+      toast.error('Failed to re-offer the transcript.');
+      return;
+    }
+    if (result.body) queryClient.setQueryData(BATCH_QUERY_KEY, result.body);
   };
 
   return (

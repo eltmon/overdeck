@@ -26,19 +26,27 @@ import { jsonResponse } from '../http-helpers.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 
+const MALFORMED_JSON = Symbol('malformed-json');
+
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
+  if (!text) return {};
   try {
-    return text ? (JSON.parse(text) as unknown) : {};
+    return JSON.parse(text) as unknown;
   } catch {
-    return {};
+    return MALFORMED_JSON;
   }
 });
 
 function stringField(body: unknown, field: string): string | null {
   const value = (body as Record<string, unknown> | null)?.[field];
   return typeof value === 'string' && value !== '' ? value : null;
+}
+
+function stringArrayField(body: unknown, field: string): string[] {
+  const value = (body as Record<string, unknown> | null)?.[field];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
 const getVaultStatusRoute = HttpRouter.add(
@@ -71,10 +79,12 @@ const confirmVaultEvictionBatchRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
     const body = yield* readJsonBody;
+    if (body === MALFORMED_JSON) return jsonResponse({ error: 'request body is not valid JSON' }, { status: 400 });
     const fingerprint = stringField(body, 'fingerprint');
     if (fingerprint === null) return jsonResponse({ error: 'fingerprint is required' }, { status: 400 });
+    const deletableVaultIds = stringArrayField(body, 'deletableVaultIds');
     return yield* Effect.promise(async () => {
-      const result = await confirmEvictionBatch(fingerprint);
+      const result = await confirmEvictionBatch(fingerprint, deletableVaultIds);
       if ('unavailable' in result) return jsonResponse({ error: result.unavailable, code: 'vault-unavailable' }, { status: 409 });
       if (result.refused) return jsonResponse({ error: 'The pending-deletion batch changed since it was displayed.', code: 'batch-changed', fingerprint: result.fingerprint }, { status: 409 });
       const { deleted, skipped, bytesFreed, fingerprint: nextFingerprint } = result;
@@ -91,6 +101,7 @@ const declineVaultEvictionEntryRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
     const body = yield* readJsonBody;
+    if (body === MALFORMED_JSON) return jsonResponse({ error: 'request body is not valid JSON' }, { status: 400 });
     const vaultId = stringField(body, 'vaultId');
     if (vaultId === null) return jsonResponse({ error: 'vaultId is required' }, { status: 400 });
     return yield* Effect.promise(async () => jsonResponse(await declineEvictionEntry(vaultId)));
@@ -116,6 +127,7 @@ const reofferVaultEvictionEntryRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
     const body = yield* readJsonBody;
+    if (body === MALFORMED_JSON) return jsonResponse({ error: 'request body is not valid JSON' }, { status: 400 });
     const vaultId = stringField(body, 'vaultId');
     if (vaultId === null) return jsonResponse({ error: 'vaultId is required' }, { status: 400 });
     return yield* Effect.promise(async () => jsonResponse(await reofferEvictionEntry(vaultId)));

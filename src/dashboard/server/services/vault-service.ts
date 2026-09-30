@@ -184,11 +184,12 @@ function maybeRecreateLoop(intervalSec: number): void {
   if (currentIntervalSec === intervalSec) return;
   currentIntervalSec = intervalSec;
   if (loop) loop.stop();
-  loop = deps.createSyncLoop({ intervalSec, run: () => enqueueVaultOperation('sync', cycle) });
+  loop = deps.createSyncLoop({ intervalSec, run: () => enqueueVaultOperation('sync', cycle), onError: (error) => console.warn('[vault] sync failed:', error) });
   loop.start();
 }
 
 async function cycle(): Promise<{ offline: boolean }> {
+  if (!started) return { offline: false };
   const config = await deps.readVaultConfig();
   maybeRecreateLoop(config.syncIntervalSec);
   const opened = await deps.openVaultContext();
@@ -232,10 +233,10 @@ async function cycle(): Promise<{ offline: boolean }> {
 /** A failing settle logs once per distinct message and never throws out of the poller's timers (NFR-6). */
 async function queuedSettle(path: string, harness: string, wip: WipMode): Promise<void> {
   return enqueueVaultOperation('settle', async () => {
-    const opened = await deps.openVaultContext();
-    if (opened.status !== 'open') return;
-    const config = await deps.readVaultConfig();
     try {
+      const opened = await deps.openVaultContext();
+      if (opened.status !== 'open') return;
+      const config = await deps.readVaultConfig();
       await deps.settle({ nativePath: path, harness, store: opened.vault.store, keys: opened.vault.keys, config, wip });
     } catch (error) {
       console.warn(`[vault] settle failed for ${path}:`, error);
@@ -253,21 +254,26 @@ export function startVaultService(overrides: VaultServiceDeps = {}): void {
   bootTimer = setTimeout(() => {
     bootTimer = null;
     void (async () => {
+      if (!started) return;
       const config = await deps.readVaultConfig();
       currentIntervalSec = config.syncIntervalSec;
-      loop = deps.createSyncLoop({ intervalSec: config.syncIntervalSec, run: () => enqueueVaultOperation('sync', cycle) });
+      loop = deps.createSyncLoop({ intervalSec: config.syncIntervalSec, run: () => enqueueVaultOperation('sync', cycle), onError: (error) => console.warn('[vault] sync failed:', error) });
       loop.start();
-    })();
+    })().catch((error) => console.warn('[vault] boot failed:', error));
   }, VAULT_BOOT_DELAY_MS);
   if (typeof bootTimer.unref === 'function') bootTimer.unref();
   poller = deps.createVaultSettlePoller({ settle: queuedSettle });
   poller.start();
 }
 
+/** FR-3: the whole shutdown sequence (flush plus any queued cycle/settle) fits in one 10 s budget. */
+const VAULT_SHUTDOWN_BUDGET_MS = 10_000;
+
 /** Stops the poller (flushing pending settles) and the loop, and awaits the queue draining. */
 export async function stopVaultService(): Promise<void> {
   if (!started) return;
   started = false;
+  const deadline = Date.now() + VAULT_SHUTDOWN_BUDGET_MS;
   if (bootTimer) {
     clearTimeout(bootTimer);
     bootTimer = null;
@@ -281,9 +287,25 @@ export async function stopVaultService(): Promise<void> {
     const current = poller;
     poller = null;
     current.stop();
-    await current.flush(10_000).catch((error) => console.warn('[vault] shutdown flush failed:', error));
+    await current.flush(Math.max(0, deadline - Date.now())).catch((error) => console.warn('[vault] shutdown flush failed:', error));
   }
-  await queueTail.catch(() => undefined);
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    console.warn('[vault] shutdown budget exhausted before the queue drained');
+    return;
+  }
+  let timedOut = false;
+  await Promise.race([
+    queueTail.catch(() => undefined),
+    new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, remaining);
+      if (typeof timer.unref === 'function') timer.unref();
+    }),
+  ]);
+  if (timedOut) console.warn('[vault] shutdown budget exhausted while the queue was still draining');
 }
 
 /**
@@ -359,11 +381,27 @@ function vaultUnavailableMessage(opened: Exclude<VaultOpenResult, { status: 'ope
   }
 }
 
-export async function confirmEvictionBatch(fingerprint: string): Promise<ConfirmResult | { unavailable: string }> {
+/**
+ * `deletableVaultIds` is the set of `verified` vaultIds the caller displayed
+ * next to `fingerprint`. `batchFingerprint` does not cover `verification`
+ * (only vaultId/nativePath/sizeBytes/settlementChunk), so a `failed` entry
+ * that becomes eligible again between the display and this call can produce
+ * the same fingerprint while the deletable set has grown. Comparing the sets
+ * here, before calling into the engine, catches that race and returns the
+ * same `{ refused: true, fingerprint }` shape `confirmEviction` uses for a
+ * changed fingerprint.
+ */
+export async function confirmEvictionBatch(fingerprint: string, deletableVaultIds: string[]): Promise<ConfirmResult | { unavailable: string }> {
   return enqueueVaultOperation('confirm-eviction-batch', async () => {
     const opened = await deps.openVaultContext();
     if (opened.status !== 'open') return { unavailable: vaultUnavailableMessage(opened) };
     const config = await deps.readVaultConfig();
+    const batch = await readEvictionBatch();
+    const currentFingerprint = batchFingerprint(batch);
+    const currentDeletable = batch.entries.filter((entry) => entry.verification === 'verified').map((entry) => entry.vaultId).sort();
+    const expectedDeletable = [...deletableVaultIds].sort();
+    const sameDeletableSet = currentDeletable.length === expectedDeletable.length && currentDeletable.every((id, index) => id === expectedDeletable[index]);
+    if (!sameDeletableSet) return { refused: true as const, fingerprint: currentFingerprint };
     return deps.confirmEviction(fingerprint, { store: opened.vault.store, keys: opened.vault.keys, config, isLive: deps.isLive, skipFailed: true });
   });
 }

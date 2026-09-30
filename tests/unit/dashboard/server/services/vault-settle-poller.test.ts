@@ -20,7 +20,7 @@ function conv(name: string, harness: string | null = 'claude-code'): LegacyConve
 const DEBOUNCE_SEC = 30;
 
 function makeDeps(overrides: Partial<VaultSettlePollerDeps> = {}): { deps: VaultSettlePollerDeps; readConfig: ReturnType<typeof vi.fn>; settle: ReturnType<typeof vi.fn> } {
-  const readConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, debounceSec: DEBOUNCE_SEC });
+  const readConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, backend: 'dir:test', debounceSec: DEBOUNCE_SEC });
   const settle = vi.fn().mockResolvedValue(undefined);
   const deps: VaultSettlePollerDeps = { readConfig, settle, pollMs: VAULT_POLL_MS, ...overrides };
   return { deps, readConfig, settle };
@@ -162,6 +162,63 @@ describe('createVaultSettlePoller (PAN-4307 WI-5)', () => {
     expect(settle).toHaveBeenCalledWith(pathA, 'claude-code', 'force');
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[vault\] shutdown flush skipped \d+ transcript\(s\)$/));
     expect(doorMocks.removeTranscriptFile).not.toHaveBeenCalled();
+    warn.mockRestore();
+    poller.stop();
+  });
+
+  it('FR-7: never lists conversations or arms a timer while the vault is off (no backend)', async () => {
+    const listActive = vi.fn().mockReturnValue([conv('a')]);
+    const { deps, settle } = makeDeps({
+      listActive,
+      resolvePath: vi.fn().mockResolvedValue('/p/a.jsonl'),
+      statSize: vi.fn().mockResolvedValue(100),
+      readConfig: vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, debounceSec: DEBOUNCE_SEC }),
+    });
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS * 3);
+    expect(listActive).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
+    poller.stop();
+  });
+
+  it('NFR-6: a rejecting readConfig logs a warning instead of throwing out of the interval timer', async () => {
+    const readConfig = vi.fn().mockRejectedValue(new Error('config.json is not valid JSON'));
+    const { deps } = makeDeps({ readConfig });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS * 2);
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('[vault] poll failed:', expect.any(Error));
+    warn.mockRestore();
+    poller.stop();
+  });
+
+  it('NFR-6: a rejecting settle after the debounce logs a warning instead of throwing out of the timer', async () => {
+    const sizes: Record<string, number> = { '/p/a.jsonl': 100 };
+    const settle = vi.fn().mockRejectedValue(new Error('vault unavailable'));
+    const { deps } = makeDeps({
+      listActive: () => [conv('a')],
+      resolvePath: vi.fn().mockResolvedValue('/p/a.jsonl'),
+      statSize: vi.fn(async (path: string) => sizes[path] ?? null),
+      settle,
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    sizes['/p/a.jsonl'] = 150;
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_SEC * 1000);
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[vault\] settle failed for \/p\/a\.jsonl:$/), expect.any(Error));
     warn.mockRestore();
     poller.stop();
   });

@@ -98,7 +98,13 @@ describe('vault routes', () => {
     mocks.confirmEvictionBatch.mockResolvedValue({ refused: true, fingerprint: 'current-fp' });
     const result = await call('POST', '/api/vault/eviction-batch/confirm', { body: { fingerprint: 'stale-fp' } });
     expect(result).toEqual({ status: 409, body: { error: 'The pending-deletion batch changed since it was displayed.', code: 'batch-changed', fingerprint: 'current-fp' } });
-    expect(mocks.confirmEvictionBatch).toHaveBeenCalledWith('stale-fp');
+    expect(mocks.confirmEvictionBatch).toHaveBeenCalledWith('stale-fp', []);
+  });
+
+  it('POST confirm forwards the displayed deletableVaultIds to the service', async () => {
+    mocks.confirmEvictionBatch.mockResolvedValue({ refused: false, deleted: [], skipped: [], bytesFreed: 0, fingerprint: 'fp' });
+    await call('POST', '/api/vault/eviction-batch/confirm', { body: { fingerprint: 'fp', deletableVaultIds: ['v1', 'v2'] } });
+    expect(mocks.confirmEvictionBatch).toHaveBeenCalledWith('fp', ['v1', 'v2']);
   });
 
   it('POST confirm passes through the confirm result on success', async () => {
@@ -111,6 +117,26 @@ describe('vault routes', () => {
     mocks.confirmEvictionBatch.mockResolvedValue({ unavailable: 'Session Vault is off. Run: pan vault setup <git-url>' });
     const result = await call('POST', '/api/vault/eviction-batch/confirm', { body: { fingerprint: 'fp' } });
     expect(result).toEqual({ status: 409, body: { error: 'Session Vault is off. Run: pan vault setup <git-url>', code: 'vault-unavailable' } });
+  });
+
+  it('POST confirm with a malformed JSON body returns a distinct 400', async () => {
+    const headers: Record<string, string> = {
+      cookie: `${DASHBOARD_SESSION_COOKIE}=${SESSION}`,
+      'content-type': 'application/json',
+      [DASHBOARD_CSRF_HEADER]: CSRF,
+    };
+    const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/vault/eviction-batch/confirm', {
+      method: 'POST',
+      headers,
+      body: '{not json',
+    }));
+    const response = await Effect.runPromise(Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(vaultRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      ),
+    ));
+    expect(response.status).toBe(400);
+    expect(mocks.confirmEvictionBatch).not.toHaveBeenCalled();
   });
 
   it('POST decline requires a non-empty vaultId and otherwise returns the refreshed batch', async () => {
