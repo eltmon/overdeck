@@ -102,6 +102,12 @@ function PairDeviceDialogBody({ onClose }: { onClose: () => void }) {
     : [];
   const newest = newlyPaired.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
+  // Refresh the status card's device count as soon as a new device pairs.
+  const newestId = newest?.id;
+  useEffect(() => {
+    if (newestId) void queryClient.invalidateQueries({ queryKey: ANYWHERE_STATUS_QUERY_KEY });
+  }, [newestId, queryClient]);
+
   useEffect(() => {
     if (!pairing) return undefined;
     setExpired(false);
