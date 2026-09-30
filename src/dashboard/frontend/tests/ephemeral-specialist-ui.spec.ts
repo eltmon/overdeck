@@ -209,9 +209,6 @@ test.describe('Ephemeral Per-Project Specialist UI (PAN-300)', () => {
     await page.route('**/api/specialists/projects', (route) => {
       route.fulfill({ json: MOCK_PROJECT_SPECIALISTS_RESPONSE });
     });
-    await page.route('**/api/tldr/**', (route) => {
-      route.fulfill({ status: 404, json: {} });
-    });
 
     await page.goto(`${DASHBOARD_URL}/#health`);
     await page.waitForTimeout(500);

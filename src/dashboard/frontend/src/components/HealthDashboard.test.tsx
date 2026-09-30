@@ -141,9 +141,6 @@ function stubServiceQueries(projectSpecialists: unknown[] = []) {
     if (url === '/api/health/agents') {
       return Promise.resolve(jsonResponse(hookState.current?.agents ?? []));
     }
-    if (url === '/api/services/tldr/status') {
-      return Promise.resolve(jsonResponse({ daemons: [] }));
-    }
     if (url === '/api/specialists/projects') {
       return Promise.resolve(jsonResponse(projectSpecialists));
     }
@@ -158,17 +155,12 @@ describe('HealthDashboard', () => {
     stubServiceQueries();
   });
 
-  it('keeps host, Deacon, and optional TLDR visible with no agents', async () => {
+  it('keeps host and Deacon visible with no agents', async () => {
     renderDashboard();
 
     expect(screen.getByRole('heading', { name: 'Host health' })).toBeInTheDocument();
     expect(screen.getByLabelText('Deacon status')).toBeInTheDocument();
-    expect(await screen.findByText('TLDR · Not configured (optional)')).toBeInTheDocument();
-    expect(screen.getByText('No agents to monitor')).toBeInTheDocument();
-
-    const tldrStatus = screen.getByText('TLDR · Not configured (optional)').parentElement;
-    expect(tldrStatus?.querySelector('.lucide-database')).toBeInTheDocument();
-    expect(tldrStatus?.querySelector('.lucide-circle-x')).not.toBeInTheDocument();
+    expect(await screen.findByText('No agents to monitor')).toBeInTheDocument();
   });
 
   it('renders every accepted status and falls unknown future statuses back to unavailable', async () => {
@@ -191,8 +183,7 @@ describe('HealthDashboard', () => {
 
     renderDashboard();
 
-    expect(await screen.findByText('TLDR · Not configured (optional)')).toBeInTheDocument();
-    expect(screen.getByLabelText('agent-wedged status: Wedged')).toBeInTheDocument();
+    expect(await screen.findByLabelText('agent-wedged status: Wedged')).toBeInTheDocument();
     expect(screen.getByLabelText('agent-future status: Unavailable')).toBeInTheDocument();
     expect(screen.getByText('Warm · reusable')).toBeInTheDocument();
 
@@ -227,8 +218,7 @@ describe('HealthDashboard', () => {
 
     renderDashboard();
 
-    expect(await screen.findByText('TLDR · Not configured (optional)')).toBeInTheDocument();
-    expect(screen.getByText('Warm · reusable')).toBeInTheDocument();
+    expect(await screen.findByText('Warm · reusable')).toBeInTheDocument();
     const reclaimable = screen.getByRole('heading', { name: 'Reclaimable sessions' }).parentElement;
     expect(reclaimable).not.toBeNull();
     expect(within(reclaimable!).getByText('specialist-overdeck-PAN-2646-test-agent')).toBeInTheDocument();
@@ -266,9 +256,8 @@ describe('HealthDashboard', () => {
 
     renderDashboard();
 
-    expect(await screen.findByText('TLDR · Not configured (optional)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('agent-unavailable status: Unavailable')).toBeInTheDocument();
     expect(screen.getByText('CPU unavailable')).toBeInTheDocument();
     expect(screen.getByText('Memory unavailable')).toBeInTheDocument();
-    expect(screen.getByLabelText('agent-unavailable status: Unavailable')).toBeInTheDocument();
   });
 });
