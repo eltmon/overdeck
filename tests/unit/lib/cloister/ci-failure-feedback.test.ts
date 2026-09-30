@@ -227,6 +227,7 @@ describe('relayCiFailureFeedback', () => {
   });
 
   it('skips feedback when no work agent exists', async () => {
+    const log = vi.spyOn(console, 'log');
     mockGetAgentStateSync.mockReturnValue(null);
 
     const result = await relayCiFailureFeedback({
@@ -241,9 +242,11 @@ describe('relayCiFailureFeedback', () => {
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('no work agent'));
   });
 
   it('skips feedback for non-work agent roles', async () => {
+    const log = vi.spyOn(console, 'log');
     mockGetAgentStateSync.mockReturnValue({
       id: 'agent-pan-1801',
       issueId: 'PAN-1801',
@@ -265,6 +268,7 @@ describe('relayCiFailureFeedback', () => {
 
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('agent role is review'));
   });
 
   it('still messages the agent when gh log fetch fails', async () => {
@@ -871,6 +875,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
   });
 
   it('ignores a red test job reported for a head the PR has moved past', async () => {
+    const log = vi.spyOn(console, 'log');
     makeGhMocks();
     const readPrFacts = vi.fn(async () => facts({ headSha: 'newer0000000', checks: 'red', testChecks: 'red' }));
 
@@ -878,9 +883,11 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
 
     expect(result.testGateFailed).toBeUndefined();
     expect(readPipelineJournal(workspacePath)).toEqual([]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('the PR head is now'));
   });
 
   it('leaves a verification.tests: local project to the local gate', async () => {
+    const log = vi.spyOn(console, 'log');
     makeGhMocks();
     mockFindProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: projectPath, verification: { tests: 'local' } });
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
@@ -895,5 +902,6 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(result.testGateFailed).toBeUndefined();
     expect(passRecorded).toBe(false);
     expect(readPipelineJournal(workspacePath)).toEqual([]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('tests are not in CI mode'));
   });
 });
