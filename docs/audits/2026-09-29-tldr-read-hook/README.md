@@ -12,9 +12,9 @@ measure llm-tldr's other features or every summarize-first design.
 
 ## Sample
 
-- 6,564 local Claude Code transcripts from the last 60 days on one development machine
+- 6,572 local Claude Code transcripts from the last 60 days on one development machine
   (main sessions and subagents, all projects).
-- 414 blocked reads in 148 sessions, 2026-08-09 to 2026-09-29.
+- 414 blocked reads in 143 sessions, 2026-08-09 to 2026-09-29.
 - Mixed models: mostly Claude Sonnet 5, plus MiniMax M3, Kimi, Claude Opus 5.5 and others
   running inside Claude Code. Full breakdown in `results-60d.json`.
 
@@ -33,6 +33,7 @@ measure llm-tldr's other features or every summarize-first design.
 - The injected outlines themselves added about 159K tokens.
 - Each re-read cost on average 1.12 extra model turns. An extra turn re-read about
   179K tokens of conversation context (mostly from the prompt cache).
+- About 97% of the extra turns' input tokens were prompt-cache reads.
 - Cost of the extra turns: 9.9M input-token equivalents. Best-case savings: 3.5M.
   For every token the hook saved, the extra turns cost about 2.8. Net: -6.4M.
 - Timing: the hook took about 250 ms per blocked read on this machine, before the
