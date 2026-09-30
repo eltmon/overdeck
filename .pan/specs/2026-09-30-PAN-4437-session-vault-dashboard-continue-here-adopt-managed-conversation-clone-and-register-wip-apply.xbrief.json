@@ -1,0 +1,767 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T19:27:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4437: Session Vault: dashboard \"Continue here\" (adopt, managed conversation, clone-and-register, WIP apply)",
+    "updated": "2026-09-30T19:29:05.064Z"
+  },
+  "plan": {
+    "id": "pan-4437",
+    "title": "Session Vault: dashboard \"Continue here\" (adopt, managed conversation, clone-and-register, WIP apply)",
+    "status": "proposed",
+    "uid": "607205a5-3441-4f04-8712-d1f9a9186b47",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T19:27:15Z",
+    "updated": "2026-09-30T19:29:05.064Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4437",
+        "label": "PAN-4437",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4447",
+        "label": "PAN-4447 (sibling: continued-on states)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4436",
+        "label": "PAN-4436 (blocker: browse copies)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4307",
+        "label": "PAN-4307 (blocker: vault service)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "dashboard",
+      "conversations",
+      "wip-apply",
+      "projects"
+    ],
+    "narratives": {
+      "Problem": "A browse copy of a conversation owned by another machine (PAN-4436) is read-only; continuing it requires `pan vault resume` in a terminal. No route creates a managed conversation resuming an outside session, the CLI's resume flow is interactive and not callable from a route, codex managed conversations read a private Codex home, and isWipPresent writes git objects so a preview cannot use it.",
+      "Proposal": "A write-free GET continue-preview and a POST continue route pair backed by a dashboard service (src/dashboard/server/services/vault-continue.ts) that resolves the target checkout (saved cwd → gitOrigin-matched project → clone offer), applies the WIP snapshot (in place when clean, in a scratch workspace when dirty), rechecks drift, adopts the record inside the vault queue with an owner-token race guard, creates a managed conversation through a new conversations door that reuses the plain-fork spawn, and removes the browse row. A frontend dialog on the browse copy's read-only notice drives it, and the clone offer opens the existing Add-project dialog prefilled. Engine helpers: continue-inspect.ts; projects helper: origin-match.ts.",
+      "NonGoals": "- \"Continued on <machine>\" and \"Local turns saved as a fork\" states (moved to PAN-4447)\n- @version forks from the dashboard, and harnesses other than claude-code and codex (400 with the CLI hint)\n- A browser-chosen cwd or worktree directory\n- Refactoring resumeCommand beyond moving driftNote\n- Any edit to ConversationPanel.tsx, conversations.ts, conversation-runtime.ts, conversation-forks.ts or routes/conversations.ts (size caps)\n- Cleaning up the abandoned scratch/vault-<id8> branch or workspace\n- A new project-registration route or a second clone path\n- Continuing a conversation this machine already owns\n- Writing to the operator's real ~/.claude or ~/.codex in any test"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the round-trip states ('Continued on <machine>', 'Local turns saved as a fork') and issue AC-4 into sibling PAN-4447, blocked by PAN-4436.",
+        "rationale": "With them the plan needed ~35 files; finalize allows 25. They do not depend on the Continue button (CLI resume produces them), so they ship independently. Issue body and a comment record the move; the design is carried in the PRD's Sibling S3 section."
+      },
+      {
+        "summary": "Target checkout order: saved cwd if it exists here, else the project matched by gitOrigin slug, else a clone offer, else refuse with the `pan vault resume --cwd` hint. The route never accepts a browser-chosen cwd.",
+        "rationale": "Mirrors the CLI's resolveTargetCwd plus the issue's match rule; a browser-supplied path is an injection surface the CLI already covers."
+      },
+      {
+        "summary": "Dirty checkout: create a scratch isolated workspace 'vault-<id8>' through resolveWorkspaceCreateIntent/performWorkspaceCreate and apply the snapshot there; a dirty unregistered checkout is refused with 409 dirty-unregistered.",
+        "rationale": "The issue requires the normal workspace path and never the dirty index; that path needs a registered project."
+      },
+      {
+        "summary": "Clean checkout, including a primary checkout, applies the snapshot in place; the preview shows the resulting branch and base.",
+        "rationale": "The issue's AC requires in-place apply on clean, and a fresh clone depends on it; wip-apply never moves a branch backward."
+      },
+      {
+        "summary": "The preview returns an opaque ownerToken (sha256 of owner environmentId, 16 hex); continue refuses with 'Already continued on <label>' when the owner changed since the preview; truly concurrent adopters are decided by adoptRecord's casRef.",
+        "rationale": "Adopting whatever the current owner is would silently steal a conversation another machine just continued; the token keeps environment ids out of the browser."
+      },
+      {
+        "summary": "Codex records adopt into codexAgentHome(agents/<tmuxSession>) and record the thread id with recordCodexRolloutSession, with a checkpoint that resolveCodexRolloutPath finds the rollout.",
+        "rationale": "Managed codex conversations resume from their private home, not ~/.codex; a mismatch must fail loudly rather than add a second codex path."
+      },
+      {
+        "summary": "The drift note is delivered with injectForkSummary after spawn; driftNote moves from resume.ts to the engine module and is re-exported for the CLI.",
+        "rationale": "injectForkSummary already waits for readiness and confirms acceptance for both harnesses; the dashboard must not import CLI modules."
+      },
+      {
+        "summary": "Clone-and-register reuses the Add-project dialog via a prefilled initialUrl and an extra onCreated callback in its store.",
+        "rationale": "The issue forbids a second registration path; the existing dialog already drives POST /api/projects and its job polling."
+      },
+      {
+        "summary": "The conversation row uses forkStatus 'spawning' with no forkRequest; a dashboard restart mid-spawn ends it as failed but resumable.",
+        "rationale": "Reuses the plain-fork pattern without inventing a new persisted request shape; the native file exists so nothing is lost."
+      },
+      {
+        "summary": "Model = record.model when it matches MODEL_ID_PATTERN, else omitted; effort unset.",
+        "rationale": "No hardcoded model fallback and effort defaults to high per repo rules."
+      }
+    ],
+    "items": [
+      {
+        "id": "continue-inspect",
+        "title": "Engine: write-free continue inspection and moved driftNote",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/continue-inspect.ts",
+            "src/cli/commands/vault/resume.ts",
+            "tests/unit/lib/vault/continue-inspect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/continue-inspect.test.ts tests/unit/lib/vault/import-graph.test.ts tests/unit/cli/vault",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "continue-inspect.test.ts, import-graph.test.ts and every tests/unit/cli/vault test pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-4437.md WI-1. Create src/lib/vault/continue-inspect.ts exporting inspectContinue(record, targetCwd), driftFields(record, current, codePlaced) and the moved driftNote (from src/cli/commands/vault/resume.ts line 64, text unchanged). In resume.ts replace the function with `export { driftNote } from '../../../lib/vault/continue-inspect.js'` and import it for line 204. Placement: none when the wip is not captured or readCwdState is null; new-workspace when dirty; else in-place. Drift is [] when code is placed. Never call isWipPresent/buildWipCommit or any writing git command (they write objects). Import only node built-ins and sibling vault modules."
+        },
+        "items": [
+          {
+            "id": "continue-inspect.ac1",
+            "title": "Given a clean temp git repo and a record with a captured WIP entry, when inspectContinue runs, then it returns codePlacement 'in-place' and drift []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-inspect.ac2",
+            "title": "Given a dirty temp git repo, when inspectContinue runs, then it returns codePlacement 'new-workspace' and `git count-objects -v` output is unchanged before and after",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-inspect.ac3",
+            "title": "Given a non-git directory or a skipped WIP entry, when inspectContinue runs, then it returns codePlacement 'none' and a skipped entry carries the CLI reason text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-inspect.ac4",
+            "title": "Given driftNote(['branch']), when called from the new module, then it returns the exact sentence resume.ts produced, and tests/unit/cli/vault resume tests pass without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-origin-match",
+        "title": "Projects: findProjectForGitOrigin matches a record origin to a registered project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/origin-match.ts",
+            "tests/unit/lib/projects/origin-match.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/origin-match.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "origin-match.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "D-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Pure function findProjectForGitOrigin(gitOrigin, projects) over listProjectsAsync() output: parseRepoUrl(gitOrigin).slug (src/lib/projects/repo-url.ts line 150) compared case-insensitively to config.github_repo when provider is 'github' and to config.gitlab_repo when 'gitlab'. First match in input order wins; null/unparseable/unknown-host origins return null."
+        },
+        "items": [
+          {
+            "id": "project-origin-match.ac1",
+            "title": "Given github_repo 'acme/widget', when the origin is git@github.com:Acme/Widget.git or https://github.com/acme/widget, then the function returns that project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-origin-match.ac2",
+            "title": "Given a GitLab origin, when only a project with a matching github_repo exists, then the function returns null, and it returns the project whose gitlab_repo matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-origin-match.ac3",
+            "title": "Given two matching projects, when the function runs, then it returns the first in input order; given a null or unparseable origin it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-vault-launch",
+        "title": "Conversations: create and launch a managed conversation resuming an adopted session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-vault-continue.ts",
+            "tests/unit/lib/overdeck/conversation-vault-continue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-vault-continue.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-continue.test.ts passes",
+            "typecheck and lint complete without errors (including lint:circular)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "D-8",
+            "D-10",
+            "D-11",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New door src/lib/overdeck/conversation-vault-continue.ts: allocateVaultContinueNames() (<yyyymmdd>-<4 hex>, conv-<name>, the plain-fork rule at conversation-forks.ts lines 846-849); createVaultContinuedConversation(input) calls createConversation with claudeSessionId=newSessionId, cwd, harness, title, titleSource 'manual', titleSeed 'Continued from Session Vault', model only when MODEL_ID_PATTERN (src/lib/model-validation.ts) matches, projectKey, forkStatus 'spawning', no effort, no parentName, then markConversationActive; launchVaultContinuedConversation(conv, note) wraps the plain-fork tail in registerInFlightForkPipeline: ensureForkSessionReady(conv, conv.claudeSessionId, true, true), injectForkSummary(conv, note, 'vault-continue') only when note is non-null ('stranded' throws), markConversationActive, updateForkStatus(name, null); any throw → handleForkPipelineFailure. Do NOT edit conversations.ts, conversation-forks.ts or conversation-runtime.ts (size caps)."
+        },
+        "items": [
+          {
+            "id": "conversation-vault-launch.ac1",
+            "title": "Given an input with an unsafe model string, when createVaultContinuedConversation runs, then createConversation receives claudeSessionId, cwd, harness, forkStatus 'spawning', no effort and no model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-vault-launch.ac2",
+            "title": "Given a created conversation and note null, when launchVaultContinuedConversation runs, then ensureForkSessionReady is called with (conv, id, true, true) and injectForkSummary is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-vault-launch.ac3",
+            "title": "Given a note, when the launch runs, then injectForkSummary is called once with caller 'vault-continue'; given a throwing spawn, then handleForkPipelineFailure receives the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-continue-service",
+        "title": "Dashboard service: previewContinue and continueHere (target, WIP, drift, adopt, row, browse-row removal)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/vault-continue.ts",
+            "tests/unit/dashboard/server/services/vault-continue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-continue.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "vault-continue.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-10",
+            "FR-12",
+            "FR-13",
+            "NFR-1",
+            "D-2",
+            "D-4",
+            "D-5",
+            "D-6",
+            "D-7",
+            "D-9",
+            "D-12",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "vault-continue-routes",
+            "uat-continue-here"
+          ],
+          "parallelSafeReason": "It writes only its own two new files; its inputs (continue-inspect, origin-match, the conversation door) arrive through blocks edges, so once they land nothing else touches these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (read D-2, D-4..D-9, D-12 first). previewContinue(vaultId) is write-free: open vault (not open → 409 vault-unavailable), read record (missing/tombstone → 404), resolve target by D-2 (saved cwd dir → project match → clone offer → no-checkout), inspectContinue, return the wire-contract ContinuePreview including ownerToken = sha256(owner.environmentId).slice(0,16). continueHere(vaultId, {expectedOwnerToken, onDrift}) runs everything inside one enqueueVaultOperation('continue', …): re-read; FR-13 harness check; owned-here and owner-token checks (D-6); target; WIP step (D-4: clean → applyWipSnapshot in place; dirty → isWipPresent or scratch workspace 'vault-<id8>' via resolveWorkspaceCreateIntent+performWorkspaceCreate then applyWipSnapshot there; dirty+no project → 409 dirty-unregistered); drift recheck (D-5); allocate names; adoptRecord with projectsRoot claudeProjectsRoot() (claude) or codexHome codexAgentHome(agents/<tmuxSession>) (codex, D-9); CAS conflict → 409 already-continued; path assertions (D-7 sessionFilePath, D-9 resolveCodexRolloutPath) → 500 on mismatch; codex recordCodexRolloutSession; createVaultContinuedConversation; void launchVaultContinuedConversation; removeVaultBrowseRow best-effort. All deps injectable. CHECKPOINT: openVaultContext and enqueueVaultOperation (PAN-4307) and removeVaultBrowseRow (PAN-4436) must exist on main; if missing or renamed, stop and `pan tell flywheel-orchestrator`."
+        },
+        "items": [
+          {
+            "id": "vault-continue-service.ac1",
+            "title": "Given a clean target and a captured WIP, when continueHere runs, then applyWipSnapshot, adoptRecord, createVaultContinuedConversation and removeVaultBrowseRow are called in that order inside one enqueueVaultOperation labelled 'continue'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-service.ac2",
+            "title": "Given a dirty target of a registered project, when continueHere runs, then a scratch workspace named vault-<id8> is created (vault-<id8>-2 after a path-exists finding) and the snapshot applies in its path; given a dirty unregistered target, then it returns 409 dirty-unregistered and adoptRecord is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-service.ac3",
+            "title": "Given adoptRecord returns a CAS conflict or the owner token no longer matches, when continueHere runs, then it returns 409 already-continued with the current owner label and creates no conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-service.ac4",
+            "title": "Given a codex record, when continueHere runs, then adoptRecord receives a codexHome under agents/<tmuxSession>/ and recordCodexRolloutSession is called; given a materialized path that differs from sessionFilePath, then it returns 500 and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-service.ac5",
+            "title": "Given no target and a GitHub origin, when previewContinue runs, then it returns clone.slug and noTargetReason 'clone-offered', and no write dependency is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-continue-routes",
+        "title": "Routes: GET continue-preview and POST continue with no-loss rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/vault.ts",
+            "tests/unit/dashboard/server/routes/vault.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/vault.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In PAN-4307's src/dashboard/server/routes/vault.ts add GET /api/vault/records/:vaultId/continue-preview (rejectUnauthorizedDashboardRequest) and POST /api/vault/records/:vaultId/continue (rejectUnsafeDashboardMutationRequest), both calling only previewContinue/continueHere and returning {status, body}. Validate vaultId [0-9a-f-]+, expectedOwnerToken 16 hex chars, onDrift absent|'continue'|'note' (400 otherwise). Add two NO_LOSS_MATRIX rows beside the PAN-4307 vault rows (text in the PRD). No server.ts edit: PAN-4307 registers the layer."
+        },
+        "items": [
+          {
+            "id": "vault-continue-routes.ac1",
+            "title": "Given a mocked previewContinue, when GET continue-preview is called, then the route returns its status and body unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-routes.ac2",
+            "title": "Given onDrift 'maybe' or no expectedOwnerToken, when POST continue is called, then it returns 400 and continueHere is not called; a POST without the CSRF header is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-routes.ac3",
+            "title": "Given the two new routes, when tests/unit/lib/overdeck/no-loss-matrix.test.ts runs, then it passes with one row per route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-project-prefill",
+        "title": "Add-project dialog: open in clone mode with a prefilled URL and an extra onCreated",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/addProjectDialogStore.ts",
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectFormStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/project/new/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "every test under components/project/new/__tests__ passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "D-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. useAddProjectDialog.show(mode?, returnTo?, options?: { initialUrl?, onCreated? }) stores initialUrl and onCreatedExtra; hide() clears them. AddProjectDialogHost passes initialUrl to AddProjectDialog and calls onCreatedExtra after its own onCreated, before hide(). AddProjectDialog passes initialUrl to AddProjectFormStep for the clone step only; the form step passes it to useProjectCreateIntent({ initialMode, onCreated, initialUrl }), which initializes url state with it. No new route: creation still goes through POST /api/projects."
+        },
+        "items": [
+          {
+            "id": "add-project-prefill.ac1",
+            "title": "Given show('clone', undefined, { initialUrl: 'https://github.com/acme/widget.git' }), when the host renders, then the clone form's URL field holds that URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-prefill.ac2",
+            "title": "Given a successful create after that show, when the dialog completes, then the extra onCreated callback fires exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-prefill.ac3",
+            "title": "Given hide() after a prefilled show, when show('clone') is called again, then the URL field renders empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-continue-dialog",
+        "title": "Frontend: Continue here button on the browse copy and the continue dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/VaultContinueDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultContinueDialog.test.tsx",
+            "src/dashboard/frontend/src/components/chat/VaultReadOnlyNotice.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/VaultContinueDialog.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "VaultContinueDialog.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Find PAN-4436's read-only notice (grep -rn \"pan vault resume\" src/dashboard/frontend/src; PRD name VaultReadOnlyNotice rendered by ComposerFooter.tsx) and add a 'Continue here' button opening the new VaultContinueDialog (vaultId derived from the row name vault-<vaultId>). The dialog fetches GET continue-preview (react-query key ['vault-continue-preview', vaultId]), renders the non-resumable, clone-offered (button calls useAddProjectDialog.getState().show('clone', undefined, { initialUrl: clone.url, onCreated: refetch })), no-checkout, clean and drift states with the exact texts in the PRD, and POSTs { expectedOwnerToken: preview.ownerToken, onDrift? } with dashboardMutationJsonHeaders() after ensureDashboardSession(). 200 → invalidate conversation queries, select the new conversation (same callback the fork flow uses via useConversationMutations' onSelectConversation), close. 409 already-continued → 'Already continued on <label>.'; 409 drift → drift step with returned fields. Do NOT edit ConversationPanel.tsx (at cap). Follow /pan-style-guide."
+        },
+        "items": [
+          {
+            "id": "vault-continue-dialog.ac1",
+            "title": "Given a clean preview, when the operator clicks Continue here in the dialog, then fetch POSTs { expectedOwnerToken } to /api/vault/records/<id>/continue and onContinued receives the returned conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-dialog.ac2",
+            "title": "Given a preview with drift fields, when the dialog renders, then it shows Continue, Continue with a note and Cancel, and Continue with a note POSTs onDrift 'note'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-dialog.ac3",
+            "title": "Given a 409 already-continued response with label laptop-b, when the POST returns, then the dialog renders 'Already continued on laptop-b.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-continue-dialog.ac4",
+            "title": "Given a clone-offered preview, when the operator clicks 'Clone and register <slug>', then useAddProjectDialog.show is called with mode 'clone' and the preview's clone URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-continue-here",
+        "title": "UAT: two-home Playwright check of Continue here, the race and the clone offer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4437-continue-here.spec.ts",
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "npx playwright test src/dashboard/frontend/tests/pan-4437-continue-here.spec.ts"
+          ],
+          "expected_outputs": [
+            "the spec passes",
+            "test-results/pan-4437/continue-dialog.png and continued.png exist and were inspected against /pan-style-guide"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-10",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add optional env to IsolatedDashboardOptions (merged last into the spawned env). Build two OVERDECK_HOMEs (labels machine-a/machine-b via environment-id.json), one dir: vault, a temp HOME UH, a bare repo R and clone C; save a transcript with a forced WIP from HA (pan vault save captures force-mode WIP), join HB with --phrase-file, sync, register C in HB. Start the isolated dashboard for HB with env { HOME: UH, PATH: <stubdir>:$PATH } where <stubdir>/claude records argv and sleeps. Click Continue here; assert browse row gone, a row with the materialized claudeSessionId, the .jsonl under UH/.claude/projects, C holds the snapshot changes, argv.log contains --resume <uuid> (fallback if no terminal backend: skip only the argv assertion and say so in the PR body). Race: third home HC adopts T2 via `pan vault resume --no-launch --no-code` with HOME=UH2 while HB's dialog is open → 'Already continued on machine-c.'. Clone offer: record with an unregistered GitHub origin and missing cwd opens Add-project with the URL (do not submit). Never write the operator's real ~/.claude. Own browser context per test; cleanup in afterEach."
+        },
+        "items": [
+          {
+            "id": "uat-continue-here.ac1",
+            "title": "Given a browse copy in HB and a clean registered checkout, when the operator clicks Continue here twice (open and confirm), then the browse row disappears from GET /api/conversations, the native .jsonl exists under the fake HOME, and the stub claude argv contains --resume <newSessionId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-continue-here.ac2",
+            "title": "Given machine-c adopts the record while HB's dialog is open, when HB confirms, then the dialog renders 'Already continued on machine-c.' and no new .jsonl appears under the fake HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-continue-here.ac3",
+            "title": "Given a record whose gitOrigin matches no project and whose cwd is missing, when the dialog opens, then it shows 'Clone and register acme/not-registered' and clicking it renders the Add-project dialog with that URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-continue-here.ac4",
+            "title": "Given the run completes, when the agent opens the two PNGs, then both screenshots exist and match the style guide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-continue-here",
+        "title": "Docs: Session Vault docs describe dashboard Continue here",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:27:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4437",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Continue here' docs/SESSION-VAULT.md configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints at least one line from each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-11",
+            "D-2",
+            "D-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. docs/SESSION-VAULT.md: in '### Resume, versions and drift' add a 'Dashboard: Continue here' paragraph (button on a browse copy; D-2 target order; in-place vs scratch/vault-<id8> workspace vs refused dirty unregistered checkout; drift choices; 'Already continued on <label>'; codex adopts into the agent's private Codex home; @version forks and other harnesses stay CLI-only); add the two routes to PAN-4307's dashboard routes list and the four new modules to '## Module map'. configuration/session-vault.mdx: in '## Continue on another machine' the click-Continue-here and clone-offer sentences; in '### Your uncommitted code comes along' the dirty-checkout-new-workspace sentence."
+        },
+        "items": [
+          {
+            "id": "docs-continue-here.ac1",
+            "title": "Given docs/SESSION-VAULT.md, when a reader opens '### Resume, versions and drift', then it states the target order (saved cwd, matching project, clone offer) and that a dirty checkout gets a scratch/vault-<id8> workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-continue-here.ac2",
+            "title": "Given configuration/session-vault.mdx, when a reader opens '## Continue on another machine', then it tells them to click Continue here and says the dialog offers to clone and register a missing project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-continue-here.ac3",
+            "title": "Given docs/SESSION-VAULT.md '## Module map', when read, then it lists continue-inspect.ts, origin-match.ts, conversation-vault-continue.ts and vault-continue.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "continue-inspect",
+        "to": "vault-continue-service",
+        "type": "blocks"
+      },
+      {
+        "from": "project-origin-match",
+        "to": "vault-continue-service",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-vault-launch",
+        "to": "vault-continue-service",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-continue-service",
+        "to": "vault-continue-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-prefill",
+        "to": "vault-continue-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-continue-routes",
+        "to": "uat-continue-here",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-continue-dialog",
+        "to": "uat-continue-here",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-30-PAN-4437-session-vault-dashboard-continue-here-adopt-managed-conversation-clone-and-register-wip-apply.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
