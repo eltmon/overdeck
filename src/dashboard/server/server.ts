@@ -61,6 +61,7 @@ import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
+import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
 import { metricsRouteLayer } from './routes/metrics.js'
@@ -291,6 +292,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   remoteRouteLayer,
   settingsRouteLayer,
   modelPresetsRouteLayer,
+  vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
   metricsRouteLayer,

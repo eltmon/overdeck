@@ -547,6 +547,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
   { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
 
+  // ── vault.ts ──────────────────────────────────────────────────────────────
+  { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
+  { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/confirm',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts confirmEviction → transcript-deletion-door (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/decline',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts declineEntry (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/clear',                 kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts clearBatch (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/reoffer',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts reofferEntry (PAN-4307)' },
+
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },
   { surface: 'GET /api/show/:issueId/agents',             kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents' },
