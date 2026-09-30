@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:45:08.882Z",
+  "updated": "2026-09-30T17:45:23.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "origin-bearer-exemption.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T17:45:08.881Z"
+    },
+    "origin-bearer-exemption.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:45:23.974Z"
     }
   }
 }
