@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:16:33.770Z",
+  "updated": "2026-09-30T21:16:46.000Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "require-token-mint-toggle.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T21:16:33.770Z"
+    },
+    "require-token-mint-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:45.999Z"
     }
   }
 }
