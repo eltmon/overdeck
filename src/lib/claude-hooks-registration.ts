@@ -207,6 +207,29 @@ export function addOverdeckHookIfMissing(
 }
 
 /**
+ * PAN-2609 P-15: register an arbitrary hook command (not a `~/.overdeck/bin`
+ * script) under `hookType`, idempotently. Returns false when an entry with the
+ * identical command is already present. Mutates `settings` in place.
+ */
+export function addHookCommandIfMissing(
+  settings: ClaudeSettings,
+  hookType: HookType,
+  command: string,
+  matcher: string = '.*',
+): boolean {
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  const list = (settings.hooks[hookType] ??= []);
+  const present = list.some((hookConfig) =>
+    hookConfig.hooks?.some((hook) => hook.command === command),
+  );
+  if (present) return false;
+  list.push({ matcher, hooks: [{ type: 'command', command }] });
+  return true;
+}
+
+/**
  * Apply the full Overdeck registration table to `settings` (mutated in place,
  * delta-only). Returns what changed so callers can decide whether to write.
  */

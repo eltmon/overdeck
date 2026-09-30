@@ -1,0 +1,228 @@
+{
+  "version": "1",
+  "issueId": "PAN-4359",
+  "created": "2026-09-29T03:48:03.128Z",
+  "updated": "2026-09-29T05:04:31.231Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "capability-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T03:48:03.128Z",
+      "doneAt": "2026-09-29T03:49:21.451Z"
+    },
+    "claude-code-version": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T03:49:52.343Z",
+      "doneAt": "2026-09-29T03:54:19.898Z"
+    },
+    "claude-code-requirements": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:00:10.590Z"
+    },
+    "launch-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:00:15.080Z",
+      "doneAt": "2026-09-29T04:04:16.241Z"
+    },
+    "launch-sites-agents": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:04:25.395Z",
+      "doneAt": "2026-09-29T04:14:23.899Z"
+    },
+    "launch-sites-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:14:25.174Z",
+      "doneAt": "2026-09-29T04:14:44.540Z"
+    },
+    "claude-code-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:14:52.112Z",
+      "doneAt": "2026-09-29T04:20:48.354Z"
+    },
+    "claude-code-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:20:57.112Z",
+      "doneAt": "2026-09-29T04:38:09.450Z"
+    },
+    "upgrade-banner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:38:10.881Z",
+      "doneAt": "2026-09-29T04:38:35.284Z"
+    },
+    "doctor-claude-code": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:38:41.468Z",
+      "doneAt": "2026-09-29T04:45:01.981Z"
+    },
+    "docs-claude-code-versions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:45:08.334Z",
+      "doneAt": "2026-09-29T04:46:42.186Z"
+    },
+    "capability-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:55:04.800Z"
+    },
+    "capability-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:55:19.079Z"
+    },
+    "claude-code-version.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:55:32.594Z"
+    },
+    "claude-code-version.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:55:46.245Z"
+    },
+    "claude-code-version.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:00.024Z"
+    },
+    "claude-code-version.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:14.287Z"
+    },
+    "claude-code-version.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:29.029Z"
+    },
+    "claude-code-requirements.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:43.316Z"
+    },
+    "claude-code-requirements.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:57.831Z"
+    },
+    "claude-code-requirements.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:14.404Z"
+    },
+    "claude-code-requirements.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:31.395Z"
+    },
+    "upgrade-banner.ac5": {
+      "status": "cancelled"
+    },
+    "launch-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:45.271Z"
+    },
+    "launch-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:59.926Z"
+    },
+    "launch-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:58:14.871Z"
+    },
+    "launch-sites-agents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:58:31.084Z"
+    },
+    "launch-sites-agents.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:58:46.567Z"
+    },
+    "launch-sites-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:59:02.767Z"
+    },
+    "launch-sites-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:59:19.753Z"
+    },
+    "claude-code-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:59:37.188Z"
+    },
+    "claude-code-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:59:53.916Z"
+    },
+    "claude-code-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:00:12.908Z"
+    },
+    "claude-code-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:00:32.068Z"
+    },
+    "claude-code-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:00:46.383Z"
+    },
+    "claude-code-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:00.952Z"
+    },
+    "claude-code-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:13.864Z"
+    },
+    "upgrade-banner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:30.069Z"
+    },
+    "upgrade-banner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:45.058Z"
+    },
+    "upgrade-banner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:01:57.565Z"
+    },
+    "upgrade-banner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:02:12.123Z"
+    },
+    "doctor-claude-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:02:27.804Z"
+    },
+    "doctor-claude-code.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:02:45.606Z"
+    },
+    "doctor-claude-code.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:01.323Z"
+    },
+    "doctor-claude-code.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:16.362Z"
+    },
+    "docs-claude-code-versions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:31.572Z"
+    },
+    "docs-claude-code-versions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:44.558Z"
+    },
+    "docs-claude-code-versions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:03:57.302Z"
+    },
+    "claude-code-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:04:15.084Z"
+    }
+  }
+}

@@ -243,6 +243,10 @@ These `models:` keys belonged to the old work-type router. Presets went first
 favour of roles and workhorse slots. Nothing picks a model from these keys. A config file that still carries them loads without error, and the
 keys do nothing.
 
+The retired `models.preset` key is unrelated to the provider presets added in
+PAN-4400. Those presets write explicit values into `config.yaml` once and are
+never a live key; see [Model presets](../configuration/model-presets.mdx).
+
 | Key | What it did | Where the job went |
 |---|---|---|
 | `models.preset` (`premium` / `balanced` / `budget`) | Picked a curated model per work type | `workhorses.expensive` / `mid` / `cheap`, which the role defaults reference as `workhorse:<slot>` |
@@ -300,6 +304,34 @@ fixed: a lane's model comes from `roles.review.sub.<lane>.model`, and whether
 the lanes run at all comes from `roles.review.mode`. Reviewer dispatch does not
 consult `review:*` keys in `models.overrides`; that map is retired (see
 [Removed: Presets, Work-Type Overrides, Thinking Levels](#removed-presets-work-type-overrides-thinking-levels)).
+
+### Plan critic model
+
+A flagged plan (issue label `architecture`, `substrate-improvement` or
+`security`, or `pan plan finalize --critic`) gets one independent critique
+before finalize promotes it (PAN-4341; see the "Plan critique" step in
+[XBRIEF.md](XBRIEF.md)). The critic's model is `roles.plan.sub.critic.model`.
+It accepts a model id or a `workhorse:` ref.
+
+```yaml
+roles:
+  plan:
+    sub:
+      critic:
+        model: gpt-5.5
+```
+
+The critic must be from a different model family than the planner. The family
+is `familyOf(model)` in `src/lib/planning/plan-critic-model.ts`: `claude`,
+`gpt`, `gemini`, `kimi`, `minimax`, `glm` or `mimo` from the model id, else
+`provider:<provider>`. The critic's harness is the provider default for its
+model, the same rule as every other role.
+
+There is no default. `resolveModel` would fall back to `roles.plan.model`, and
+every default workhorse is a Claude model, so any default would put the critic
+in the planner's family. When the setting is unset, or names a model in the
+planner's family, `pan plan finalize` refuses a flagged plan with exit code 5
+and a message that names the setting and both families.
 
 ---
 

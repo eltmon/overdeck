@@ -16,6 +16,9 @@
  * otherwise, so a handoff started with `--issue X --role review` is X's
  * Review row.
  *
+ * It also applies the pane's CPU class (PAN-4311): batch agents and lanes
+ * launch under `nice`, operator conversations do not.
+ *
  * Importing it registers both adapters.
  */
 
@@ -23,6 +26,7 @@ import { homedir } from 'node:os';
 
 import { Effect } from 'effect';
 
+import { defaultCpuClass, withCpuClass, type CpuClass } from './cpu-class.js';
 import { AGENT_ID_TOKEN, HerdrBackend } from './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
@@ -111,6 +115,8 @@ export interface LaunchPaneRequest {
   readonly argv: readonly string[];
   readonly env: Readonly<Record<string, string>>;
   readonly tokens: PaneTokens;
+  /** CPU class for `nice` (PAN-4311); defaults from `tokens.role`. */
+  readonly cpuClass?: CpuClass;
 }
 
 /**
@@ -133,6 +139,19 @@ async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> 
   }
 }
 
+/** Prefix the launch with `nice` for its CPU class (PAN-4311). */
+async function applyCpuClass(request: LaunchPaneRequest): Promise<readonly string[]> {
+  const cpuClass = request.cpuClass ?? defaultCpuClass(request.tokens.role);
+  if (cpuClass === 'interactive') return request.argv;
+  // Lazy: keep config loading out of this widely imported module's static graph.
+  const { loadConfigSync } = await import('../config-yaml/load.js');
+  const { resources } = loadConfigSync().config;
+  return withCpuClass(request.argv, cpuClass, process.platform, {
+    batch: resources.agentNice,
+    lane: resources.laneNice,
+  });
+}
+
 /**
  * Place a pane in the issue workspace, run the launcher in it, and stamp its
  * tokens. Behaves exactly as `createSession` did on tmux. A Claude Code pane's
@@ -150,10 +169,11 @@ export async function launchAgentPane(
     throw new Error(`${resolved.name} cannot host an issue workspace: ${workspace.reason}`);
   }
   await preTrustClaudeCodeCwd(request);
+  const argv = await applyCpuClass(request);
   const pane = await Effect.runPromise(
     resolved.startAgent(workspace, {
       kind: request.tokens.harness,
-      argv: request.argv,
+      argv,
       env: request.env,
       tokens: request.tokens,
       name: request.agentId,

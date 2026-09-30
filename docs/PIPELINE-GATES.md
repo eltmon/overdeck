@@ -500,6 +500,88 @@ strike request (nothing sends one now); it passes the same gate against the
 cannot stand in for it, and refuses when the PR the forge reports is on any
 other branch.
 
+## Conflict repair (PAN-4384)
+
+An approved, green PR that turns CONFLICTING with main fails the merge gate on
+its last condition (`PR is not mergeable (state=conflicting)`), so no merge
+door ever reaches the merge executor's conflict step. The pre-review conflict
+gate runs only before review dispatch, and the merge-train reconciler never
+sees a conflicting PR. Before PAN-4384 such a PR sat until someone noticed:
+PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
+
+**The predicate.** `evaluateConflictRepairGate` in `cloister/merge-gate.ts`
+calls a PR *merge-ready but conflicting* when the forge reports
+`mergeable: false` and every other merge-gate condition holds under the same
+policy as `evaluateIssueMergeGate`: open, not a draft, no change request,
+checks green, the CI test job passed in `verification.tests: ci` projects, no
+failed required UAT at the head, and approval proven at the head. A verdict
+marker naming the head proves the approval; otherwise the GitHub reviews are
+read directly, because `withForgeApprovalAtHead` skips unmergeable PRs.
+Nothing is stored: the answer comes from `getPrFacts` at the moment it is
+asked.
+
+**The patrol.** `startConflictRepairPatrol`
+(`dashboard/server/services/conflict-repair-patrol.ts`) runs
+`tickConflictRepair` (`cloister/conflict-repair.ts`) every 60 seconds in the
+dashboard process, where prompt-carrying dispatch and the guarded review
+request live. A tick reads forge facts only for workspaces whose journal shows
+the last `review.verdict` as `APPROVED` with no `merge.completed` after it, so
+it costs about one cached `gh` read per approved open PR per minute. It does
+nothing while the Deacon is frozen, on a peer dashboard, or with
+`OVERDECK_DISABLE_CONFLICT_REPAIR=1`, and it skips a paused issue. An
+overlapping tick is skipped, and one issue's failure never stops the rest.
+
+**One repair per head.** The episode key is the PR head sha (8 characters) at
+detection. The first tick that sees a merge-ready but conflicting head with no
+repair sends the issue's work agent one repair instruction through
+`resolveIssueFeedbackTarget` (wake the live agent, else resume or start one)
+and journals `conflict.repair-requested` with `data.head`. The prompt tells the
+agent to commit or discard uncommitted work, run `pan sync-main <id>`, resolve
+both intents, build and run the gates, commit, push, and run
+`pan review request <id>`. It also gives the rules for generated files:
+
+- `scripts/file-size-allowlist.txt`: take main's rows, never raise a cap, and
+  shrink a file that is over its cap.
+- `.overdeck/context/codebase/*.md`: keep both sides and refresh the
+  `last-verified` date.
+- `bun.lock`: take main's version, then run `bun install`.
+- The slash-command manifest: run `npm run generate:slash-commands`.
+- `.pan/continues` and `.pan/specs`: `pan sync-main` already prefers main.
+
+The count is journal-derived, so a dashboard restart never re-sends a repair.
+
+**Escalation.** If the same head is still merge-ready but conflicting 45
+minutes after its repair entry, the patrol raises Needs-you once through
+`surfaceIssueFeedbackNeedsYou` and journals `conflict.repair-escalated`
+(`data.head`, `data.reason`). It never sends a second repair for that head,
+and an escalated head gets no further action. When the work agent cannot be
+reached (`resolveIssueFeedbackTarget` returns needs-you, or delivery fails),
+the patrol escalates at once with `reason: 'unreachable'` and journals no
+repair. A new head starts a new episode.
+
+**The head-bound review request.** GitHub does not dismiss an approval on push
+in this repository (`main` has no branch protection), so after the repair's
+push `reviewDecision` still says `APPROVED` while the merge gate needs an
+approval at the new head. The guarded review request (`requestReviewGuarded`,
+behind `POST /api/review/:id/request`, `pan review request`, and `pan done`)
+therefore short-circuits an approved PR as `already-passed` or
+`tests-requeued` only when the approval is not proven stale. When
+`readApprovalStandsAtHead` (`cloister/merge-gate.ts`) proves the approval
+does not stand at the current head, the request starts the review pipeline.
+An approval that stands, or one that cannot be read, keeps the old behavior.
+
+**The review backstop.** After a repair, the agent's own
+`pan review request` normally starts re-review. If a repair entry exists for
+head H1, the PR is now at a different head that the forge calls mergeable, no
+`review.requested` entry follows the repair, and the repair is at least 15
+minutes old, the patrol asks the guarded review door once (source
+`conflict-repair`). The door journals `review.requested`, which ends the
+backstop. The patrol logs the door's answer, and raises Needs-you once per head
+when the door refuses for a reason the operator must fix (`circuit-breaker`,
+`no-project`, `dirty-workspace`). The guarded request reads the PR by branch
+so no cached pre-push head answers for the new one. When the new head is approved, the existing auto-merge scheduler
+re-arms the issue under the same policy as before the conflict.
+
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
@@ -647,7 +729,8 @@ Auto-resume is intentionally suppressible:
   - `pan unpause` (and the dashboard Unpause) clears `stoppedByUser` on those
     rows. It then re-requests the review through the guarded review request
     (`requestReviewGuarded`, the logic of `POST /api/review/:id/request`:
-    merged check, approved-head check, re-request breaker; source
+    merged check, approved-head check (a stale approval is re-reviewed,
+    PAN-4384), re-request breaker; source
     `pan-unpause`), before the work agent resumes. That dispatches a fresh
     synthesis parent and convoy for the current head. A merged issue or an
     approved head is reported as "no review re-requested", not as a request.
@@ -676,14 +759,14 @@ Auto-resume is intentionally suppressible:
   into a permanent stall.
 - **Memory gate (PAN-2500, scaled defaults PAN-4267):** the hysteresis
   resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
-  gates exactly one caller: the preemptive scheduler's
-  `preemption.ts:resumeYieldedAgents`. It also feeds the memory-pressure
-  patrol (`memory-pressure-patrol.ts`), which only reports the band to the
-  activity feed — `shed()` (stack-stop / idle-agent-pause reclaim) has no
-  caller anywhere in the codebase. The governor never gates conversations,
-  `pan start`, or dashboard Start. Below the SOFT reserve the governor
-  defers `resumeYieldedAgents`; below HARD it reports `shedding`; neither
-  re-admits until memory clears RECOVERY. Reserve defaults are a share of
+  runs in the deacon child and its verdict only feeds the memory-pressure
+  patrol (`memory-pressure-patrol.ts`), which reports the band to the
+  activity feed. Nothing else acts on it: `preemption.ts:resumeYieldedAgents`
+  (which would defer on a held verdict) and `shed()` (stack-stop /
+  idle-agent-pause reclaim) have no production caller. The governor never
+  gates conversations, `pan start`, or dashboard Start. Below the SOFT
+  reserve the governor reports `holding`; below HARD it reports `shedding`;
+  neither re-admits until memory clears RECOVERY. Reserve defaults are a share of
   RAM with an absolute floor and a cap (hard &le; 10%, soft &le; 20%,
   watch &le; 25%, recovery &le; 35% of total RAM; see
   `src/lib/config-yaml/governor-reserves.ts`), so a small host (an 8-16 GB
@@ -697,6 +780,54 @@ Auto-resume is intentionally suppressible:
   hysteresis; these defaults are also scaled, `min(4, RAM/8)` GB warn and
   `min(2, RAM/16)` GB block. This is separate from `--no-resume`, which
   suppresses resume outright regardless of memory.
+- **CPU pressure (PAN-4311):** the signal is CPU PSI `some avg60` from
+  `/proc/pressure/cpu` (`system-health/cpu-psi.ts`), the share of the last
+  minute during which a runnable task waited for a CPU. Unlike load average
+  it does not count IO wait. Load per core is the fallback only where PSI is
+  unavailable (macOS, old kernels). The governor holds at
+  `resources.governor_cpu_psi_hold_avg60` (default 50) and stays held until
+  PSI falls below `governor_cpu_psi_recovery_avg60` (default 25); a CPU-caused
+  hold records trigger kind `cpu`, and the feed names the CPU reading and the
+  recovery threshold. The governor's own verdict still gates nothing. The
+  dispatch doors read CPU directly through the stateless
+  `assessCpuPressure()` (`cloister/cpu-pressure.ts`: PSI against the hold
+  threshold, no stored state), because the governor's verdict lives in the
+  deacon child and the doors run in the dashboard main process or a `pan`
+  CLI process. Three doors read it: (1) the lane door (`launchLane`, `POST
+  /api/lanes`, `pan lane start`) refuses with HTTP 429 `cpu-saturated`
+  unless `--force` / `force: true`; (2) `POST /api/agents` adds an
+  acknowledgeable `cpu_saturated` guardrail warning (code `cpu_pressure`),
+  which the operator's confirm covers but the planning auto-handoff does
+  not, so a deferred handoff waits and retries; (3) `spawnAgent` holds
+  Flywheel-started (`flywheel:*`) work agents with a `CpuPressureHoldError`
+  only when `resources.governor_cpu_hold_dispatch` is true (default false,
+  until calibration data exists). Conversations, operator `pan start`, and
+  dashboard Start are never gated on CPU. The memory-pressure patrol logs a
+  `cpu-pressure sample` calibration line (PSI some avg10/avg60, load per core)
+  to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
+  (`quality-gate-admission.ts`) treats the host as contended at PSI `some
+  avg10 >= 25`, with load per core `>= 1` as the fallback.
+- **Runaway processes (PAN-4311):** the runaway patrol
+  (`cloister/runaway-process-patrol.ts`, classifier `runaway-classify.ts`)
+  runs every 30 s in the dashboard main process and is observe-only: it
+  never kills, pauses, or messages anything. It reads `/proc` for every
+  process in the Overdeck cgroups (the Herdr unit, the tmux server and
+  `tmux-spawn-*` scopes) and flags a process group whose CPU sustained over
+  the last 10 minutes is at least half a core and which is `orphaned` (age
+  >= 10 min, no live harness ancestor, parent chain reaches pid 1 or the
+  user manager), `detached-from-tool-shell` (a non-shell direct child of a
+  harness process, age >= 10 min), `outlived-tool-call` (age > 15 min and
+  its agent idle or its harness gone), or `long-burn` (age >= 30 min).
+  Never flagged: harness processes and their pane shells, Herdr, tmux, the
+  dashboard, Docker/containerd cgroups, gate-shaped groups (leader at nice
+  19, younger than the 20.5-minute gate watchdog), and the quality-gate
+  admission owner with its descendants. Ownership resolves from the
+  process's environ (`OVERDECK_CONVERSATION`, `OVERDECK_AGENT_ID`), then an
+  ancestor's environ, then the cgroup unit, then a `workspaces/feature-*`
+  cwd. The feed gets one `warn` per group (naming `kill -TERM -<pgid>`),
+  one escalation at 60 minutes, and one `info` entry when the group exits.
+  The same sample feeds `/api/resources` `hostProcesses` and the load-spike
+  sampler.
 - **macOS measurement (PAN-4267):** the header collector
   (`system-health/darwin.ts`) and the governor's reader
   (`readProcMemoryDarwin` in `dashboard/server/services/proc-memory.ts`)
@@ -740,6 +871,16 @@ Auto-resume is intentionally suppressible:
   retried, until the freeze thaws — the warn activity line, `pan plan
   finalize`/`pan plan done`'s output, and `pan show` all say so (PAN-4210).
   See "Deacon-lite" below for the schedule and stop conditions.
+- **Stack-unhealthy deferral (PAN-4399):** a 422 answer that carries a
+  `stackHealth` verdict is deferred exactly like a guardrail refusal, with
+  `reason: 'stack-unhealthy'` on the `handoff.deferred`/`.retried` journal
+  entries instead of `'guardrails'`. `completePlanningAutoSpawn` no longer
+  chains its own `/api/workspaces/:id/rebuild-and-start` request on this
+  refusal — deacon-lite's ordinary retry loop owns it. Each retried
+  `/api/agents` call runs the same bounded spawn-time stack rebuild every
+  spawn already gets (`SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3`,
+  `SPAWN_STACK_REBUILD_COOLDOWN_MS` = 15 minutes, `agents/spawn-prep.ts`), so
+  the rebuild still happens, just from one call path instead of two.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -773,7 +914,9 @@ spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
 App installation tokens). Readers aggregate the last 60 minutes from the
 current and previous hour files; files older than 3 hours are deleted on the
 hour rollover. The dashboard, the deacon child, CLI processes and the agent
-`gh` shim (beside the agent git guard, count-only) all write it.
+`gh` shim (beside the agent git guard; conversations get it alone), which
+counts every call and, for agent panes and the Flywheel conversation, refuses
+grant-label writes (PAN-4343), all write it.
 `src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),
 `withGitHubCaller` (the caller context), the App/PAT metering in
 `rest-meter.ts`, and the pause gate.
@@ -860,7 +1003,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
-| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched, and by the conflict-repair review backstop (source `conflict-repair`) |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
@@ -869,11 +1012,51 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
-| `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail refused the auto-start |
-| `handoff.retried` / `.started` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
+| `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
+| `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
+| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
+
+### Work agent not started (PAN-4399)
+
+`work-start-state.ts` (`lib/overdeck/`) derives a `workStart` read from an
+issue's `handoff.*` journal, but only when the derived issue state has no PR
+and no live pane — the moment either exists, the terminal backend or the
+forge already tells that story better. `WORK_START_GRACE_MS` (10 minutes) is
+the one tunable: a `handoff.deferred`/`.retried` entry always reads as
+`status: 'retrying'`; a `handoff.abandoned` with `outcome: 'gave-up'` always
+reads as `status: 'not-started'`; and an accepted `handoff.started` reads as
+`not-started` only once it is older than the grace window with still no live
+work agent — inside the window it reads as nothing at all, since the spawn
+may simply not have produced a pane yet. A real accepted spawn is never
+misread as "never started": `pan start` writes the work agent's own
+`startedAt` before the `/api/agents` route answers, so `handoff.started` is
+journaled after a successful launch already happened. Both writers
+(`completePlanningForIssue` and deacon-lite's `retryDeferredHandoffs`) stamp
+`data.requestedAt` right before the spawn call, and `deriveWorkStart`
+compares the work agent's `startedAt` against that instead of the entry's own
+`at` — the one field that is guaranteed to precede a real start. An open
+issue only: a closed issue never carries a `workStart` or the
+`work-not-started` attention, whatever its journal says. `deriveIssueState`
+(FR-6) promotes a `not-started` workStart to `attention: 'work-not-started'`
+when nothing else already claimed the attention slot (`needs-you` and
+`api-error` still outrank it). While the Deacon is frozen (PAN-4210) the last
+journal entry still carries `data.deaconPaused: true`, which `deriveWorkStart`
+surfaces as `held: true` on a `retrying` read — the badge and subline say
+"held", not "retrying", since nothing is actually being retried.
+
+Command Deck's state badge renders "Work agent not started" (a `not-started`
+workStart), "Work start retrying" (a `retrying`, unheld one), or "Work start
+held" (a `retrying`, `held` one) in place of the ordinary state badge
+(`featureStateBadge.ts`), and groups `work-not-started` into Needs-you with a
+subline naming the recorded error. The Needs-you strip's "Start work" card
+(`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
+text in place of the generic "Plan ready" card, with its existing Start work
+button (`POST /api/agents`) unchanged.
 
 ## Deacon-lite: seven routines
 
@@ -882,6 +1065,14 @@ observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
+
+   `checkStuckWorkAgents` does **not** read the Jev turn-end assessment
+   (PAN-4371) in this release. That assessment only labels the Needs-you row
+   (`describePendingInput`'s turn-end label) and the parked `idle-running`
+   row's evidence (`src/lib/parked/resolver.ts`, `src/lib/cloister/stall-sweeper.ts`).
+   It is advisory: it never suppresses, adds, or changes a nudge here.
+   Letting this routine act on the assessment is a separate, operator-signed
+   issue (phase 2).
 2. `checkApiErrorAgents` — nudges a work, specialist, or planning agent wedged
    on a provider error (including Claude Code's "API Error: Connection lost
    mid-response"), once per 5 minutes, and only when liveness.ts `isIdle`
@@ -1052,4 +1243,7 @@ auto-start consent is no longer `granted`, or the retried spawn answers
 hours after the first refusal, or on an `unauthorized` answer, it gives up: a
 `handoff.abandoned` entry with `outcome: 'gave-up'`, a `planning.failed` event
 with `stage: 'auto-handoff'`, and a warn-level activity line that tells the
-operator to run `pan start`.
+operator to run `pan start`. The give-up message names the deferral's own
+reason — "spawn guardrails still refused the work agent" for `'guardrails'`,
+"the workspace docker stack is still unhealthy" for `'stack-unhealthy'` —
+preferring the last retry's own recorded error when one is present (PAN-4399).

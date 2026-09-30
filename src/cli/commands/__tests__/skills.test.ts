@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
       super(message);
     }
   }
+  class SageoxConfigError extends Error {}
   return {
     SkillOverrideError,
     PackSourceError,
@@ -36,6 +37,12 @@ const mocks = vi.hoisted(() => {
     applyClaudePacks: vi.fn(),
     applyCodexPacks: vi.fn(),
     writeCodexPackBlock: vi.fn(),
+    getPack: vi.fn(),
+    resolveSageoxLaunch: vi.fn(),
+    loadSkillOverrideLayers: vi.fn(),
+    SageoxConfigError,
+    listSageoxUploads: vi.fn(),
+    setSageoxUpload: vi.fn(),
   };
 });
 
@@ -44,6 +51,15 @@ vi.mock('../../../lib/skill-overrides/store.js', () => ({
   listSkillStates: mocks.listSkillStates,
   setSkillOverride: mocks.setSkillOverride,
   listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides,
+  loadSkillOverrideLayers: mocks.loadSkillOverrideLayers,
+}));
+
+vi.mock('../../../lib/sageox/launch.js', () => ({ SAGEOX_PACK_ID: 'sageox', resolveSageoxLaunch: mocks.resolveSageoxLaunch }));
+
+vi.mock('../../../lib/sageox/config.js', () => ({
+  SageoxConfigError: mocks.SageoxConfigError,
+  listSageoxUploads: mocks.listSageoxUploads,
+  setSageoxUpload: mocks.setSageoxUpload,
 }));
 
 vi.mock('../../../lib/skill-packs/sources.js', () => ({
@@ -55,6 +71,7 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   listPacks: mocks.listPacks,
   packUpdateAvailable: mocks.packUpdateAvailable,
   writePackEntry: mocks.writePackEntry,
+  getPack: mocks.getPack,
 }));
 
 vi.mock('../../../lib/skill-overrides/catalog.js', () => ({ listPackCatalog: mocks.listPackCatalog }));
@@ -98,6 +115,7 @@ beforeEach(() => {
   mocks.setSkillOverride.mockResolvedValue({});
   mocks.applyClaudePacks.mockResolvedValue([]);
   mocks.applyCodexPacks.mockResolvedValue([]);
+  mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
 });
 
 afterEach(() => {
@@ -251,7 +269,7 @@ describe('pan skills launch-settings', () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
     mocks.applyClaudePacks.mockResolvedValue(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
     await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--issue', 'PAN-1', '--plugin-link', '/tmp/none/skill-packs');
-    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/tmp/none/skill-packs');
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/tmp/none/skill-packs', new Set(['sageox']));
     expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
     expect(errors).toEqual(['[launcher] WARNING: skill pack x not cached; run pan skills pack sync x']);
   });
@@ -274,13 +292,50 @@ describe('pan skills launch-settings', () => {
   it('applies Codex packs after the skill-override block and clears them on failure', async () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
-    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch');
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set(['sageox']));
     expect(mocks.writeCodexSkillOverrides.mock.invocationCallOrder[0]).toBeLessThan(mocks.applyCodexPacks.mock.invocationCallOrder[0] ?? 0);
 
     mocks.applyCodexPacks.mockRejectedValue(new Error('boom'));
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
     expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: boom']);
     expect(mocks.writeCodexPackBlock).toHaveBeenCalledWith('/ch', null);
+  });
+});
+
+describe('pan skills launch-settings SageOx wiring (PAN-2444)', () => {
+  const env = { OX_HOST_MANAGED: '1', OX_HOST_NETWORK: 'off' };
+  const events = ['SessionStart', 'PreCompact', 'PostToolUse', 'Stop', 'SessionEnd', 'UserPromptSubmit'];
+  const hooks = Object.fromEntries(events.map(event => [event, [{ matcher: '', hooks: [{ type: 'command', command: `ox agent hook ${event}` }] }]]));
+
+  it('merges env and hooks into the settings JSON and mounts sageox when active', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: true, settings: { env, hooks }, warnings: [] });
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
+    expect(mocks.resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, 'claude-code');
+    const printed = stdout.join('');
+    expect(printed.trimEnd().split('\n')).toHaveLength(1);
+    const settings = JSON.parse(printed) as { env: Record<string, string>; hooks: Record<string, unknown> };
+    expect(settings.env.OX_HOST_MANAGED).toBe('1');
+    expect(Object.keys(settings.hooks)).toEqual(events);
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/tmp/none/skill-packs', new Set());
+  });
+
+  it('prints the warning, adds no SageOx keys and excludes sageox when inactive', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx not applied: probe failed'] });
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
+    expect(errors).toEqual(['[launcher] WARNING: SageOx not applied: probe failed']);
+    expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+    expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/tmp/none/skill-packs', new Set(['sageox']));
+  });
+
+  it('excludes sageox from Codex and prints the Codex warning', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx is on but supports Claude Code launches only'] });
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, 'codex');
+    expect(errors).toEqual(['[launcher] WARNING: SageOx is on but supports Claude Code launches only']);
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set(['sageox']));
   });
 });
 
@@ -340,10 +395,13 @@ describe('pan skills pack', () => {
     expect(logs.join('\n')).toContain('Turn it on with: pan skills set --pack mattpocock on');
   });
 
-  it('refuses sageox with the integration note', async () => {
-    mocks.addPack.mockRejectedValue(new mocks.PackSourceError('integration', 'SageOx is an integration, not a skill pack; see https://github.com/eltmon/overdeck/issues/2444'));
-    await expect(run('pack', 'add', 'sageox', 'https://github.com/sageox/ox', '--ref', 'main', '--yes')).rejects.toThrow('exit 1');
-    expect(errors.join('\n')).toContain('issues/2444');
+  it('adds sageox like any pack', async () => {
+    await run('pack', 'add', 'sageox', 'https://github.com/eltmon/ox', '--ref', 'overdeck/host-managed', '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'sageox', url: 'https://github.com/eltmon/ox', ref: 'overdeck/host-managed' }),
+      expect.any(Function),
+    );
+    expect(mocks.writePackEntry).toHaveBeenCalledOnce();
   });
 
   it('rejects an unknown adapter before any work', async () => {
@@ -370,6 +428,12 @@ describe('pan skills pack', () => {
     mocks.packUpdateAvailable.mockResolvedValue('f'.repeat(40));
     await run('pack', 'list', '--json');
     expect(JSON.parse(logs.join('\n'))[0]).toMatchObject({ cached: false, skills: 0, updateAvailable: 'f'.repeat(40) });
+  });
+
+  it('prints the fork add hint when no packs are registered', async () => {
+    mocks.listPackCatalog.mockResolvedValue([]);
+    await run('pack', 'list', '--offline');
+    expect(logs.join('\n')).toBe('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3');
   });
 
   it('reports an up-to-date pack without asking', async () => {
@@ -401,5 +465,64 @@ describe('pan skills pack', () => {
     await run('pack', 'gc');
     expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
     expect(logs.join('\n')).toContain('Removed 1 mount(s) and 0 dangling launch link(s).');
+  });
+});
+
+describe('pan skills pack sageox (PAN-2444)', () => {
+  beforeEach(() => {
+    mocks.listSageoxUploads.mockResolvedValue([{ projectKey: 'oss', upload: true }, { projectKey: 'work', upload: false }]);
+    mocks.getPack.mockResolvedValue({ id: 'sageox', url: 'https://github.com/eltmon/ox', ref: 'overdeck/host-managed', commit: 'c'.repeat(40) });
+    mocks.loadSkillOverrideLayers.mockImplementation(async ({ projectKey }: { projectKey: string }) => ({
+      global: {},
+      packs: { global: {}, project: projectKey === 'oss' ? { sageox: true } : {} },
+    }));
+  });
+
+  it('reports pack and upload state per project as JSON', async () => {
+    await run('pack', 'sageox', 'status', '--json');
+    expect(JSON.parse(logs.join('\n'))).toEqual({
+      registered: true,
+      projects: [
+        { project: 'oss', pack: 'on', packSource: 'project', upload: true },
+        { project: 'work', pack: 'off', packSource: 'default', upload: false },
+      ],
+    });
+  });
+
+  it('filters status to one project and rejects an unknown one', async () => {
+    await run('pack', 'sageox', 'status', '--project', 'work');
+    expect(logs.join('\n')).toMatch(/work\s+off\s+default\s+disabled/);
+    expect(logs.join('\n')).not.toContain('oss');
+    await expect(run('pack', 'sageox', 'status', '--project', 'nope')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('unknown project: nope');
+  });
+
+  it('hints how to add the pack when it is not registered', async () => {
+    mocks.getPack.mockResolvedValue(null);
+    await run('pack', 'sageox', 'status');
+    expect(logs.join('\n')).toContain('pan skills pack add sageox https://github.com/eltmon/ox');
+  });
+
+  it('turns uploads on for a project and says what leaves the machine', async () => {
+    mocks.setSageoxUpload.mockResolvedValue({ changed: true });
+    await run('pack', 'sageox', 'upload', 'on', '--project', 'oss');
+    expect(mocks.setSageoxUpload).toHaveBeenCalledWith('oss', true);
+    expect(logs.join('\n')).toContain('sageox upload: enabled for project oss');
+    expect(logs.join('\n')).toContain('uploaded to the SageOx cloud ledger');
+  });
+
+  it('turns uploads off and reports an unchanged value', async () => {
+    mocks.setSageoxUpload.mockResolvedValue({ changed: false });
+    await run('pack', 'sageox', 'upload', 'off', '--project', 'oss');
+    expect(mocks.setSageoxUpload).toHaveBeenCalledWith('oss', false);
+    expect(logs.join('\n')).toContain('sageox upload: disabled for project oss (unchanged)');
+  });
+
+  it('rejects a bad state and an unknown project', async () => {
+    await expect(run('pack', 'sageox', 'upload', 'maybe', '--project', 'oss')).rejects.toThrow('exit 1');
+    expect(mocks.setSageoxUpload).not.toHaveBeenCalled();
+    mocks.setSageoxUpload.mockRejectedValue(new mocks.SageoxConfigError('unknown project: nope'));
+    await expect(run('pack', 'sageox', 'upload', 'on', '--project', 'nope')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('unknown project: nope');
   });
 });

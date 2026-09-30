@@ -1,3 +1,4 @@
+import { resolveCodexPolicyContext } from './codex/policy-context.js';
 import { canUseHarness, canUseModelWithAuth } from './harness-policy.js';
 import {
   configuredHarnessBinaryPath,
@@ -101,7 +102,8 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
     throw new HarnessResolutionError(modelDecision.reason ?? `Model ${input.model} is not allowed with the current auth mode`);
   }
 
-  const decision = canUseHarness(winner, input.model, authMode);
+  const policyContext = await resolveCodexPolicyContext(winner, input.model, authMode);
+  const decision = canUseHarness(winner, input.model, authMode, policyContext);
   if (!decision.allowed) {
     if (explicit) {
       throw new HarnessResolutionError(

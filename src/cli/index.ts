@@ -42,6 +42,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
+import { registerPairCommands } from './commands/pair.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -221,6 +222,7 @@ backup
   .action(lazyAction(() => import('./commands/backup.js'), 'backupCleanCommand'));
 
 registerSkillsCommands(program);
+registerPairCommands(program);
 
 // pan issues — list and triage work
 program
@@ -328,6 +330,7 @@ planCmd
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for xBRIEF quality lint during finalize')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
+  .option('--critic', 'Require an independent different-family plan critique before promotion (automatic for architecture, substrate-improvement and security labels)')
   .action(lazyAction(() => import('./commands/plan-finalize.js'), 'planFinalizeCommand'));
 
 planCmd
@@ -486,6 +489,7 @@ program
 await groups.register('knowledge');
 await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
+await groups.register('vault');
 await groups.register('test');
 await groups.register('tts');
 
@@ -497,6 +501,7 @@ await groups.register('memory');
 await groups.register('briefing');
 await groups.register('compliance');
 await groups.register('registry'); await groups.register('orders');
+await groups.register('models');
 await groups.register('parked');
 await groups.register('docs');
 

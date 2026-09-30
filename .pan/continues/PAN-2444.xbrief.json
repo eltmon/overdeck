@@ -1,0 +1,309 @@
+{
+  "version": "1",
+  "issueId": "PAN-2444",
+  "created": "2026-09-29T22:31:10.767Z",
+  "updated": "2026-09-30T00:51:50.436Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fork-base": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T22:31:10.767Z",
+      "doneAt": "2026-09-29T22:55:25.226Z"
+    },
+    "known-pack-sageox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T22:55:35.218Z",
+      "doneAt": "2026-09-29T23:00:57.886Z"
+    },
+    "ox-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:01:02.219Z",
+      "doneAt": "2026-09-29T23:02:14.037Z"
+    },
+    "sageox-upload-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:02:18.403Z",
+      "doneAt": "2026-09-29T23:06:53.657Z"
+    },
+    "ui-disclosure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:06:58.712Z",
+      "doneAt": "2026-09-29T23:16:25.775Z"
+    },
+    "doctor-sageox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:16:32.087Z",
+      "doneAt": "2026-09-29T23:19:03.506Z"
+    },
+    "claude-launch-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:19:07.047Z",
+      "doneAt": "2026-09-29T23:25:08.864Z"
+    },
+    "docs-sageox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:25:17.408Z",
+      "doneAt": "2026-09-29T23:26:06.761Z"
+    },
+    "fork-no-repo-writes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:26:13.678Z",
+      "doneAt": "2026-09-29T23:36:55.144Z"
+    },
+    "fork-network-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:37:00.506Z",
+      "doneAt": "2026-09-29T23:46:44.546Z"
+    },
+    "fork-no-attribution": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:47:15.114Z",
+      "doneAt": "2026-09-29T23:53:26.098Z"
+    },
+    "fork-host-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:53:31.600Z",
+      "doneAt": "2026-09-29T23:59:52.787Z"
+    },
+    "fork-init-host-managed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-30T00:05:44.470Z",
+      "doneAt": "2026-09-30T00:18:06.805Z"
+    },
+    "live-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-30T00:18:19.836Z",
+      "doneAt": "2026-09-30T00:21:37.780Z"
+    },
+    "ui-disclosure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:35:54.404Z"
+    },
+    "ui-disclosure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:36:34.059Z"
+    },
+    "ui-disclosure.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:36:48.619Z"
+    },
+    "sageox-upload-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:37:59.487Z"
+    },
+    "sageox-upload-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:38:12.490Z"
+    },
+    "sageox-upload-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:38:25.490Z"
+    },
+    "sageox-upload-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:38:38.652Z"
+    },
+    "fork-base.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:40:34.208Z"
+    },
+    "fork-base.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:41:00.882Z"
+    },
+    "fork-base.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:41:15.810Z"
+    },
+    "fork-no-repo-writes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:41:34.114Z"
+    },
+    "fork-no-repo-writes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:41:49.100Z"
+    },
+    "fork-no-repo-writes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:42:02.958Z"
+    },
+    "fork-no-repo-writes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:42:19.695Z"
+    },
+    "fork-no-repo-writes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:42:31.917Z"
+    },
+    "fork-network-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:42:45.548Z"
+    },
+    "fork-network-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:42:57.360Z"
+    },
+    "fork-network-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:43:10.082Z"
+    },
+    "fork-network-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:43:22.956Z"
+    },
+    "fork-network-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:43:36.993Z"
+    },
+    "fork-no-attribution.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:43:49.907Z"
+    },
+    "fork-no-attribution.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:44:02.509Z"
+    },
+    "fork-no-attribution.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:44:15.141Z"
+    },
+    "fork-host-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:44:27.344Z"
+    },
+    "fork-host-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:44:46.014Z"
+    },
+    "fork-host-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:45:07.189Z"
+    },
+    "fork-init-host-managed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:45:28.059Z"
+    },
+    "fork-init-host-managed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:45:45.564Z"
+    },
+    "fork-init-host-managed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:45:58.365Z"
+    },
+    "known-pack-sageox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:46:11.764Z"
+    },
+    "known-pack-sageox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:46:24.904Z"
+    },
+    "known-pack-sageox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:46:38.095Z"
+    },
+    "known-pack-sageox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:46:51.909Z"
+    },
+    "ox-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:04.865Z"
+    },
+    "ox-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:18.397Z"
+    },
+    "ox-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:31.269Z"
+    },
+    "ox-probe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:43.651Z"
+    },
+    "claude-launch-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:59.310Z"
+    },
+    "claude-launch-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:48:21.449Z"
+    },
+    "claude-launch-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:48:40.379Z"
+    },
+    "claude-launch-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:49:00.460Z"
+    },
+    "claude-launch-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:49:16.568Z"
+    },
+    "doctor-sageox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:49:29.799Z"
+    },
+    "doctor-sageox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:49:43.639Z"
+    },
+    "doctor-sageox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:50:00.890Z"
+    },
+    "doctor-sageox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:50:13.761Z"
+    },
+    "docs-sageox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:50:26.534Z"
+    },
+    "docs-sageox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:50:43.350Z"
+    },
+    "docs-sageox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:50:58.786Z"
+    },
+    "live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:51:11.223Z"
+    },
+    "live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:51:24.666Z"
+    },
+    "live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:51:38.128Z"
+    },
+    "live-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:51:50.436Z"
+    }
+  }
+}

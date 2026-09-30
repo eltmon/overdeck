@@ -85,6 +85,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Meta published 1.3 rates, per 1K tokens (2026-09-08).
   { provider: 'custom', model: 'muse-spark-1.3', inputPer1k: 0.00125, outputPer1k: 0.00425, cacheReadPer1k: 0.00015, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
+  // TypeSafe Jev (PAN-4369): $0.042/Mtok input, output free. The exact -free row is required:
+  // getPricing() falls back to a prefix match, which would otherwise price jev-1.13-free as paid.
+  { provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' },
+  { provider: 'custom', model: 'jev-1.13-free', inputPer1k: 0, outputPer1k: 0, currency: 'USD' },
   // Anthropic - Fable 5 (Mythos-class flagship): $10/M input, $50/M output. Cache
   // rates mirror Anthropic's standard ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
   { provider: 'anthropic', model: 'claude-fable-5-1', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.00025, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },
@@ -116,6 +120,8 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026);
   // gpt-6-astra per developers.openai.com/api/docs/models/gpt-6-astra (Sept 2026)
   { provider: 'openai', model: 'gpt-6-astra', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, currency: 'USD' },
+  // gpt-6.1-sol per developers.openai.com/api/docs/models/gpt-6.1-sol (2026-09-29)
+  { provider: 'openai', model: 'gpt-6.1-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   // gpt-6-sol / gpt-6-luna per developers.openai.com/api/docs/models/gpt-6-sol and /gpt-6-luna (2026-09-22)
   { provider: 'openai', model: 'gpt-6-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'openai', model: 'gpt-6-luna', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.00001, currency: 'USD' },

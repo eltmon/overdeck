@@ -2,10 +2,12 @@
 
 Live landmines a change in this repo can step on. Verified 2026-09-26.
 
-- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
-  Pi + Anthropic + subscription auth. Every harness resolution path must end by
-  passing its winner through this gate; blocked ⇒ collapse to `claude-code`.
-  Never bypass, never reorder around it.
+- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
+  ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
+  rules listed in its header). Every harness resolution path must end by passing its
+  winner through this gate. In `resolveHarness` a denial throws `HarnessResolutionError`
+  for an explicit pick or a non-claude-code provider default (PAN-1871); only an
+  Anthropic-native model collapses to `claude-code`. Never bypass, never reorder around it.
 - **Harness resolution is unified in `resolveHarness()`** (PAN-1787, landed
   3da6c9bc1) — `src/lib/harness-resolve.ts`. Precedence: explicit → roles[role].harness
   → providerHarnesses[provider] → built-in provider default → claude-code. Any value
@@ -182,6 +184,25 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
   header collector (`system-health/darwin.ts`) measured available memory with
   different formulas until PAN-4267 unified them.
+- **Agent-memory RAG (not the RAM governor) needs a credentialed provider**
+  (PAN-4370) — `memory.extraction.provider: anthropic` uses the Anthropic SDK,
+  which needs `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` in the dashboard and hook
+  env; a subscription-only host fails every extraction and query expansion (see
+  `health.json` `last_failure_detail` under `~/.overdeck/memory/<project>/<ws>/`).
+  `searchMemory` ANDs every quoted term (`buildMatchQuery`, `search.ts`), so a
+  raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
+  must search in OR mode. Expansion calls share `recordHealth` with extraction, so
+  `extractions_attempted` also counts expansion calls.
+
+- **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
+  — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
+  `dashboard/server/deacon-main.ts` starts (a separate Node process). A module
+  cache written by a hygiene routine (e.g. `setCachedMemoryVerdict`) is
+  invisible to `/api/*` routes in the main process and to `pan` CLI processes;
+  `getCachedMemoryVerdict()` is null there. Samplers that feed `/api/resources`
+  must run in main (`main.ts` next to `startResourcesSnapshotService`), and
+  gates must use a stateless read (PAN-4311). Likewise the runtime mirror behind
+  `getAgentRuntimeStateSync`/`isIdle` is populated only in the main process.
 
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
@@ -189,16 +210,26 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   session ever drafted reads as "tracked", and the walk is slow. Ask history
   questions of `HEAD` (or a named branch) instead — PAN-4212.
 
-- **Per-issue continue/spec writers still target the primary checkout,
-  uncommitted** (PAN-4225) — unlike the plan-home push path fixed in PAN-4224
-  (`pushPlanArtifacts`, `promoteWorkspacePrdDraft`), the feedback-writer, session
-  history, and `transitionXBriefOnMain` still write per-issue `.pan/`
-  artifacts into the primary checkout instead of the issue's workspace, and
-  never commit them. `pushPlanArtifacts` tolerates the untracked collisions
-  this leaves behind (clears an identical one, backs up a differing one under
-  `.overdeck/plan-artifact-backups/<stamp>/`) — that's a safety net, not a fix
-  for the write-site bug. Don't add another primary-checkout writer without
-  routing it through the workspace like the fixed paths.
+- **Per-issue continue/spec writers target the issue's base workspace, never
+  the primary checkout** (PAN-4225) — `resolveIssueWorkspacePlanHome(projectRoot,
+  issueId)` in `xbrief/lifecycle-io.ts` is the one place that resolves
+  `<project>/workspaces/feature-<issue>`'s plan home; every per-issue writer
+  (feedback, session history, `transitionIssueXBrief`, the swarm slot ledger)
+  routes through it and writes nothing once that workspace is gone. Readers
+  (`readContinueStateForIssue`) check the workspace copy first, then the
+  primary. Routine server writes leave `.pan/continues/`/`.pan/specs/` dirty
+  and uncommitted in the workspace — `isOverdeckOwnedOnlyStatus`
+  (`state-plane.ts`) already exempts both paths from the "uncommitted work"
+  gate, so a server-dirtied file sitting there is expected, not a bug. The
+  server is NOT lock-free of commits in a workspace, though:
+  `commitPendingIssueArtifacts` (`overdeck/plan-artifact-commit.ts`) commits
+  both paths at the two spots that would otherwise hit `git rebase`'s refusal
+  on a dirty tree — `pan done`'s rebase-and-push step, and the merge
+  pipeline's in-place feature-branch rebase (`cloister/merge-rebase.ts`) —
+  and `autoCommitWorkspaceChangesBeforeSync` (`merge-agent.ts`, pre-dating
+  PAN-4225) already committed `.pan/continues/` before a sync-main rebase for
+  the same reason. Don't add a writer that resolves the primary checkout
+  directly; route it through `resolveIssueWorkspacePlanHome` like the rest.
 - **A `verification.passed` journal tail is ambiguous** (PAN-4221) — quick
   review mode writes no `review.dispatched`, so the tail stays
   `verification.passed` while a healthy quick reviewer runs, AND when a
@@ -256,6 +287,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Origin checks never authenticate** — `validateOriginHeaders` passes a GET
+  (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
+  are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
+  (`isLoopbackPeer`, incl. Docker-bridge Traefik) belongs only in the session
+  mint. PAN-1166 routes all `/ws/*` upgrades through `ws-auth.ts`.
 - **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
   `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
   handles, never agent ids. Six server sites joined by `terminalId ?? id` and
@@ -279,5 +315,31 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`xbrief/plan-finalized.ts`) or every open branch fails verification. For a
   polyrepo `pan_records.repo` project, finalize makes that commit in the nested
   plan-home repo, not the wrapper.
+- **The stall sweeper is not scheduled** — PAN-3917 W4 (`94255f055fe`) cut the
+  only call site of `runStallSweeperPatrol` (`cloister/stall-sweeper.ts`); it
+  runs only in tests. Live parked-row readers are `pan parked` and
+  `/api/velocity` (both via `parked/resolver.ts`) and `/api/parked`
+  (`routes/parked.ts`, its own derivation). Anything added to sweeper output
+  has no live emitter until the sweeper is rescheduled (operator decision).
+
+- **Session Vault WIP capture runs in the Stop hook** (PAN-4329) — `pan vault save --hook`
+  now builds a temp-index commit, bundles and uploads per turn. Never touch the user's
+  index/worktree/stash (temp `GIT_INDEX_FILE` seeded from a *copy* of the real index —
+  an empty one drops force-added ignored files), async `execFile` only, and skip when the
+  (base, tree) pair is unchanged.
+- **Vault git `casRefs` publishes every untracked object in the clone** — `casRefsSerialized`
+  (`src/lib/vault/store/git.ts`) runs `git add -A -- .`, so objects left untracked by an
+  earlier failed settle ride along with the next successful ref write. Anything that must
+  not publish stale objects (key rotation, re-join after rotation, PAN-4333) has to drop
+  them first with `discardUnpublished()`. Also: vault ref names are HMACs under the vault key, so a new key renames
+  every ref, and `settle` mints a truncated record when an owned record's ref is absent.
+
+- **The whole-document settings save is lossy** — `saveSettingsApi` →
+  `writeYamlConfigPreservingComments` (`src/lib/settings-api.ts`) replaces
+  `workhorses`/`roles` wholesale, writes env-derived `api_keys` back in plaintext
+  (there is no server-side key masking), drops `tts.summarizer.batch_window_seconds`
+  and `memory.features.knowledge_index`, and copies project `.pan.yaml` values into the
+  global file. Writers that must touch only named keys use a path-scoped
+  `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
 
 <!-- last-verified: 2026-09-29 -->

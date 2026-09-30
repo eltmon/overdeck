@@ -24,7 +24,7 @@ function isObject(value: unknown): value is JsonObject {
 }
 
 /** JSON serialization with sorted object keys, so key order never counts as a change. */
-function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (isObject(value)) {
     return `{${Object.keys(value)
@@ -44,7 +44,7 @@ function sameValue(a: unknown, b: unknown): boolean {
  * after planning: `status`, `plan.status`, `plan.updated`, `plan.sequence`,
  * `xBRIEFInfo.updated`.
  */
-function stripAllowedFields(doc: unknown): JsonObject {
+export function stripAllowedFields(doc: unknown): JsonObject {
   const normalized = normalizeXBriefEnvelope(doc);
   const copy: JsonObject = isObject(normalized) ? structuredClone(normalized) : {};
   delete copy.status;

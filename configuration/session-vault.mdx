@@ -1,0 +1,242 @@
+---
+title: Session Vault
+description: Encrypted off-machine storage and cross-machine resume for agent conversations
+---
+
+# Session Vault
+
+Session Vault saves your agents' conversations, encrypted, into a git remote you own, and
+lets another machine pick a conversation up where it left off. Overdeck never sees the
+contents: everything is encrypted on your machine with a key only you hold, and
+`pan vault` commands send no telemetry.
+
+It also works without the dashboard: `npm install -g @overdeck/core`, then `pan vault` on any
+machine.
+
+## Set up the first machine
+
+1. Create an empty private repository anywhere you trust (GitHub, GitLab, a NAS, your own
+   server). Overdeck never provides or defaults a backend.
+2. Run:
+
+   ```bash
+   pan vault setup git@github.com:you/session-vault.git
+   ```
+
+3. Write down the 24-word recovery phrase it prints. It is shown only once.
+
+<Warning>
+The recovery phrase is the vault key. Anyone with these words can read your vault. Losing every device and these words loses the vault: there is no recovery on any server.
+</Warning>
+
+Add `--hooks` to register a Claude Code `Stop` hook that saves after every turn:
+
+```bash
+pan vault setup git@github.com:you/session-vault.git --hooks
+```
+
+## Join from a second machine
+
+```bash
+pan vault join git@github.com:you/session-vault.git
+```
+
+Enter the 24 words when prompted (or pass `--phrase-file <path>`). If the vault has a
+passphrase, you are asked for that first; see below. A wrong phrase prints
+`The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.`
+and writes nothing.
+
+## Passphrase unlock
+
+Most people do not have the 24 words at hand when they set up a new machine. A vault
+passphrase lets a new machine join by typing the passphrase instead.
+
+Setup offers it right after printing the recovery phrase. On a terminal it suggests a
+generated 6-word passphrase: press Enter to use it, type your own (16 or more characters), or
+type `skip`. For scripts, pass `--generate-passphrase`, `--passphrase-file <path>` or
+`--no-passphrase`.
+
+Turn it on, change it, or turn it off later:
+
+```bash
+pan vault passphrase set                          # prompt; Enter generates one
+pan vault passphrase set --generate               # print a generated 6-word passphrase once
+pan vault passphrase set --passphrase-file <path>
+pan vault passphrase remove
+```
+
+When a passphrase is set, `pan vault join` asks for it first. Press Enter to use the
+recovery phrase instead, or pass `--passphrase-file <path>`. A wrong passphrase prints
+`The passphrase did not unlock this vault.` and writes nothing.
+
+<Warning>
+The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: setting or removing a passphrase never changes the vault key, and removing the passphrase never locks you out.
+</Warning>
+
+## Lost a device? Rotate the key
+
+Every machine that joined the vault holds the vault key. Removing a lost or stolen machine
+from your accounts stops it from syncing, but it still holds the key. Rotate the key so that
+machine can read nothing you save from now on:
+
+```bash
+pan vault rotate-key
+```
+
+Run it on a machine you still have. It asks
+`Rotate the vault key? Every other machine must re-join with the new recovery phrase or passphrase. [y/N]`,
+re-encrypts every saved conversation's record under a new key, and prints a **new**
+24-word recovery phrase. Write it down: it is shown only once, and the old phrase no longer
+opens the vault.
+
+| Flag | Effect |
+| --- | --- |
+| `--yes` | Rotate without the confirmation prompt. Required when the command does not run in a terminal. |
+| `--passphrase-file <path>` | Keep passphrase unlock, with the passphrase in this file, for the new key. |
+| `--generate-passphrase` | Keep passphrase unlock with a generated 6-word passphrase, printed once. |
+| `--no-passphrase` | Turn passphrase unlock off. |
+
+If the vault has a passphrase, the command asks for a new one in a terminal (Enter generates
+one). In a script you must pass one of the three passphrase flags. The passphrase never
+keeps unlocking the old key after a finished rotation.
+
+<Warning>
+A rotation protects what you save after it. The lost machine can still read everything that was saved before the rotation, because it already holds those conversations' key. It can read nothing saved afterwards.
+</Warning>
+
+After a rotation:
+
+1. Every other machine refuses to save or sync and prints
+   `This machine's vault key was retired by a key rotation. Run: pan vault join <backend> with the new recovery phrase or passphrase.`
+2. On each of those machines, run `pan vault join <git-url>` again and enter the new
+   recovery phrase or the passphrase. The machine keeps its saved-conversation list and
+   continues its own conversations where they were.
+3. On the git backend, also revoke or rotate the git credentials (deploy key, access token)
+   the lost machine had. The vault key protects what the conversations say; the git
+   credentials decide who may write to the repository.
+
+Upgrade Overdeck on every machine before you rotate. Older versions cannot read
+conversations saved before a rotation.
+
+If a rotation is interrupted (a crash, a lost connection), other `pan vault` commands on
+that machine print
+`A vault key rotation started on this machine has not finished. Run: pan vault rotate-key`.
+Run the command again: it finishes with the same new key and prints the phrase.
+`pan vault status` shows when the key was last rotated.
+
+## Save and sync
+
+```bash
+pan vault save --all              # every transcript on this machine
+pan vault save <session-id>       # one conversation
+pan vault sync                    # push what grew, pull what others saved
+pan vault status                  # backend, this machine, last sync, machines
+```
+
+If a new line contains something that looks like a credential, the save is blocked and the
+output names the line number and pattern, never the value. Rotate the secret if it is real,
+then run `pan vault allow-secret <id> <line>` or `pan vault exclude --session <id>`.
+
+## Continue on another machine
+
+```bash
+pan vault list                    # what is saved, and which machine owns each conversation
+pan vault show <id>               # read it first
+pan vault resume <id>             # take it over here and launch the harness
+pan vault resume <id>@3           # fork at version 3 instead
+```
+
+`resume` compares the target directory's git state with the state saved with the
+conversation. If the branch, commit or dirty state differs, it asks whether to continue,
+continue with a short note as the first message, or cancel. Use `--on-drift continue|note|cancel`
+in scripts and `--no-launch` to print the command instead of running it.
+
+Claude Code and Codex resume natively. Other harnesses receive a markdown digest of the
+conversation in the target directory to paste into a new session.
+
+### Your uncommitted code comes along
+
+Each save also takes an encrypted snapshot of the code the conversation was working on:
+every tracked and untracked file in the working tree plus any local commits you have not
+pushed. Files matched by `.gitignore` are left out, and everything arrives unstaged. The
+snapshot is stored in your vault like the conversation, end-to-end encrypted, and is
+**never pushed to your git host**, so it works even when the first machine is switched off.
+
+```bash
+pan vault resume <id>                      # applies the snapshot, then continues
+pan vault resume <id> --worktree ../fresh  # apply into a new git worktree instead
+pan vault resume <id> --no-code            # continue the conversation only
+```
+
+`resume` fetches origin, checks out the saved commit, and applies the changes. The target
+checkout must be clean: with uncommitted changes it offers a fresh worktree at a TTY, and
+otherwise stops and asks for `--worktree <dir>`. Nothing in the dirty checkout is touched.
+
+A snapshot larger than 50 MB (`wipMaxBytes` in the vault config) is skipped, and `resume`
+says so. If the uncommitted code contains something that looks like a credential, the
+snapshot is not uploaded; `save` names the file and pattern and prints the command to allow
+it: `pan vault allow-secret <id> --file <path>`, then `pan vault save`.
+
+## Exclude what should never leave the machine
+
+```bash
+pan vault exclude /work/client-x                       # everything under a path
+pan vault exclude --origin git@github.com:acme/private.git
+pan vault exclude --session <id>                       # one conversation; its saved copy becomes a tombstone
+pan vault include /work/client-x                       # undo
+```
+
+## Free local disk space (optional)
+
+Transcripts can grow to tens of gigabytes. Eviction is off by default and never deletes
+anything on its own. To use it:
+
+1. Set `"evict": true` in `~/.overdeck/vault/config.json`.
+2. Run `pan vault evict`. It lists every transcript whose contents are fully in the vault
+   and verified by reading them back, with a fingerprint of that list. Nothing is deleted.
+3. Run `pan vault evict --confirm <fingerprint>` to delete exactly those files. Anything that
+   changed since the review is skipped, and a changed list is refused with a new fingerprint.
+4. `pan vault restore <id>` rebuilds any evicted transcript byte for byte.
+
+`pan vault evict --decline <id>` keeps a transcript out of future lists; `--clear` empties the
+list without deleting anything.
+
+## Windows
+
+Checked on 2026-09-29 in the `windows-smoke` workflow
+([run 36615182191](https://github.com/eltmon/overdeck/actions/runs/36615182191)), on GitHub's
+`windows-2022` runner: Windows Server 2022 Datacenter, Git for Windows 2.55.0, Node 22.23, and
+Ubuntu 24.04 in WSL2 (Git 2.43, Node 22.23). Windows 11 and continuing a conversation after
+dual-booting the same machine were not verified.
+
+- **WSL2 is supported.** Run `pan vault` inside your WSL2 distro. Join, list and resume work,
+  the code snapshot arrives, and Claude Code finds the conversation and starts. (The test had no
+  Claude credentials, so no reply was exchanged.) The tested checkout was in
+  the Linux filesystem (`~/w/proj`); a checkout under `/mnt/c` was not tested.
+- **Native Windows is not supported yet.** `pan vault join` fails with `... is neither empty nor
+  a vault (no VAULT-FORMAT on main)` when git has `core.autocrlf=true`, which is the Git for
+  Windows default ([#4418](https://github.com/eltmon/overdeck/issues/4418)). With that setting
+  turned off in a test run, `pan vault resume` still could not start Claude Code
+  (`spawn claude ENOENT`, [#4419](https://github.com/eltmon/overdeck/issues/4419)).
+  `--no-launch` printed the `claude --resume <id>` command instead.
+- **Files in the code snapshot:** in WSL2, line endings, the executable bit and symlinks arrive
+  as saved. In the native Windows test run (with `core.autocrlf` off), line endings and the
+  symlink arrived as saved, but `run.sh` lost its executable bit (mode 100644; the clone's
+  `core.filemode` was `false`).
+- **The dashboard on native Windows:** `npx @overdeck/core` starts, but every page returns 404
+  ([#4420](https://github.com/eltmon/overdeck/issues/4420)). Starting a conversation fails
+  because the Herdr terminal backend is not available; the error says to run `pan install` or
+  set `terminal.backend: tmux`.
+
+## Where things live
+
+| Path | Contents |
+| --- | --- |
+| `~/.overdeck/vault/key` | Your vault key (mode 0600). Back it up as the recovery phrase. |
+| `~/.overdeck/vault/key.next` | Present only while a key rotation is in progress. Finish it with `pan vault rotate-key`. |
+| `~/.overdeck/vault/config.json` | Backend URL, exclusions, `evict`, `liveQuietMinutes`. |
+| `~/.overdeck/vault/git/` | Local clone of your vault remote. |
+| `~/.overdeck/vault/index.json` | This machine's saved-transcript index and list cache. Never uploaded. |
+
+The developer reference, including the wire format and the module map, is
+[docs/SESSION-VAULT.md](https://github.com/eltmon/overdeck/blob/main/docs/SESSION-VAULT.md).

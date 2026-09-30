@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,8 @@ import {
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { readPipelineJournal } from '../../../../lib/cloister/pipeline-journal.js';
+import { applyCritiqueGateForPromotion } from '../../../../lib/planning/plan-critique-io.js';
+import { planDigest } from '../../../../lib/xbrief/plan-digest.js';
 import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import { planFinalizedHash } from '../../../../lib/xbrief/plan-finalized.js';
@@ -501,6 +504,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -524,6 +528,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634a',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -544,6 +549,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634b',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -565,6 +571,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634c',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -690,6 +697,46 @@ describe('completePlanningArtifacts', () => {
     }
   });
 
+  // PAN-4399: a stack-unhealthy deferral journals its own reason and never
+  // mentions "guardrails" — the operator sees the real cause.
+  it('journals a stack-unhealthy deferred handoff with its own reason', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-4399-stack-unhealthy-'));
+    try {
+      const emitActivity = vi.fn();
+      const result = recordPlanningAutoHandoffDeferred({
+        issueId: 'PAN-4399',
+        workspacePath: workspace,
+        result: {
+          workAgentSpawned: false,
+          workAgentSkipReason: 'stack-unhealthy',
+          workAgentError: 'Workspace docker stack for PAN-4399 is not healthy: no containers found',
+          workAgentHttpStatus: 422,
+          workAgentDeferred: true,
+        },
+        emitActivity,
+        readDeaconPaused: () => false,
+      });
+
+      expect(result).toEqual({ error: 'Workspace docker stack for PAN-4399 is not healthy: no containers found', deaconPaused: false });
+      const entries = readPipelineJournal(workspace);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.deferred',
+        issueId: 'PAN-4399',
+        source: 'complete-planning',
+        data: { reason: 'stack-unhealthy' },
+      });
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'plan',
+        level: 'warn',
+        issueId: 'PAN-4399',
+        message: expect.stringContaining('the workspace docker stack is unhealthy'),
+      }));
+      expect(emitActivity.mock.calls[0]![0].message).not.toMatch(/guardrails/);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it('reports queued container startup without claiming launch acceptance', async () => {
     await expect(completePlanningAutoSpawn({
       issueId: 'PAN-1146',
@@ -704,6 +751,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: true,
       workAgentQueued: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -766,26 +814,21 @@ describe('completePlanningArtifacts', () => {
     }));
   });
 
-  it('queues rebuild-and-start without consuming consent before the chained start succeeds', async () => {
-    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
+  // PAN-4399: a stack-unhealthy refusal is deferred to deacon-lite's retry,
+  // same as a guardrail refusal — completePlanningAutoSpawn no longer chains
+  // a rebuild-and-start request of its own.
+  it('defers a stack-unhealthy refusal instead of chaining rebuild-and-start', async () => {
     const requests: string[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(String(input));
       expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
-      if (String(input).endsWith('/api/agents')) {
-        return new Response(JSON.stringify({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
-          stackHealth: { healthy: false, reasons: ['no containers found'] },
-        }), { status: 422 });
-      }
-      expect(JSON.parse(String(init?.body))).toEqual({
-        startedBy: 'planning-auto-handoff',
-        autoSpawnConsentRequired: true,
-      });
-      return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
+      return new Response(JSON.stringify({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+        stackHealth: { healthy: false, reasons: ['no containers found'] },
+      }), { status: 422 });
     };
 
     await expect(completePlanningAutoSpawn({
@@ -793,16 +836,14 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
-      consumeAutoSpawnConsent,
     })).resolves.toEqual({
-      workAgentSpawned: true,
-      workAgentSession: 'agent-pan-1147',
+      workAgentSpawned: false,
+      workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+      workAgentSkipReason: 'stack-unhealthy',
+      workAgentHttpStatus: 422,
+      workAgentDeferred: true,
     });
-    expect(requests).toEqual([
-      'http://127.0.0.1:3011/api/agents',
-      'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
-    ]);
-    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
+    expect(requests).toEqual(['http://127.0.0.1:3011/api/agents']);
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {
@@ -824,6 +865,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1148',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual(['spawn', 'kill:planning-pan-1148']);
   });
@@ -881,7 +923,91 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1151',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual([]);
+  });
+});
+
+describe('plan critique gate', () => {
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Overdeck Test',
+    GIT_AUTHOR_EMAIL: 'test@overdeck.local',
+    GIT_COMMITTER_NAME: 'Overdeck Test',
+    GIT_COMMITTER_EMAIL: 'test@overdeck.local',
+  };
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd, env: gitEnv, stdio: 'ignore' });
+
+  function critiqueWorkspace(issueId: string, prd = '# PRD\n') {
+    const { workspacePath } = makeProject(issueId);
+    const drafts = join(workspacePath, '.pan', 'drafts');
+    mkdirSync(drafts, { recursive: true });
+    git(workspacePath, 'init', '-b', 'main');
+    const prdPath = join(drafts, `${issueId}.md`);
+    writeFileSync(prdPath, prd);
+    git(workspacePath, 'add', '.');
+    git(workspacePath, 'commit', '-m', 'prd');
+    return { workspacePath, prdPath, drafts };
+  }
+
+  const flagged = async () => ['architecture'];
+
+  it('refuses a flagged plan with no critique', async () => {
+    const { workspacePath } = critiqueWorkspace('PAN-4341');
+    const gate = await applyCritiqueGateForPromotion({
+      issueId: 'PAN-4341', workspacePath, doc: makeDoc('PAN-4341'), forced: false, getLabels: flagged, warn: vi.fn(),
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.result.kind).toBe('missing');
+  });
+
+  it('passes when the critique matches and the PRD answers every blocking finding', async () => {
+    const doc = makeDoc('PAN-4341');
+    const { workspacePath, drafts } = critiqueWorkspace('PAN-4341', '# PRD\n\n## Critique response\n\n### Missing rollback\n\nAdded WI-9.\n');
+    writeFileSync(join(drafts, 'PAN-4341-critique.md'), `plan-digest: ${planDigest(doc)}\n\n## blocks-the-design: Missing rollback\n## footnote: Typo\n`);
+    const gate = await applyCritiqueGateForPromotion({
+      issueId: 'PAN-4341', workspacePath, doc, forced: false, getLabels: flagged, warn: vi.fn(),
+    });
+    expect(gate).toMatchObject({ ok: true, result: { kind: 'answered' } });
+  });
+
+  it('refuses a critique written for an earlier draft as stale', async () => {
+    const doc = makeDoc('PAN-4341');
+    const { workspacePath, drafts } = critiqueWorkspace('PAN-4341');
+    writeFileSync(join(drafts, 'PAN-4341-critique.md'), `plan-digest: ${planDigest(doc)}\n\n## footnote: fine\n`);
+    doc.plan.items[0]!.title = 'Promote spec, changed after the critique';
+    const gate = await applyCritiqueGateForPromotion({
+      issueId: 'PAN-4341', workspacePath, doc, forced: false, getLabels: flagged, warn: vi.fn(),
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.result.kind).toBe('stale');
+  });
+
+  it('proceeds at the two-round cap and lists unresolved findings in the PRD', async () => {
+    const { workspacePath, prdPath, drafts } = critiqueWorkspace('PAN-4341');
+    writeFileSync(join(drafts, 'PAN-4341-critique.md'), `plan-digest: ${'1'.repeat(64)}\n\n## blocks-the-design: First gap\n`);
+    writeFileSync(join(drafts, 'PAN-4341-critique-2.md'), `plan-digest: ${'2'.repeat(64)}\n\n## blocks-the-design: Second gap\n## sharpens-framing: Naming\n`);
+    git(workspacePath, 'add', '.');
+    git(workspacePath, 'commit', '-m', 'two critique rounds');
+
+    const gate = await applyCritiqueGateForPromotion({
+      issueId: 'PAN-4341', workspacePath, doc: makeDoc('PAN-4341'), forced: false, getLabels: flagged, warn: vi.fn(),
+    });
+
+    expect(gate).toMatchObject({ ok: true, result: { kind: 'cap-reached', unresolved: ['Second gap'] } });
+    const prd = readFileSync(prdPath, 'utf-8');
+    expect(prd).toContain('## Critique response');
+    expect(prd).toContain('### Unresolved after two critic rounds');
+    expect(prd).toContain('- Second gap');
+  });
+
+  it('does not require a critique for unflagged labels', async () => {
+    const { workspacePath } = critiqueWorkspace('PAN-4341');
+    const gate = await applyCritiqueGateForPromotion({
+      issueId: 'PAN-4341', workspacePath, doc: makeDoc('PAN-4341'), forced: false, getLabels: async () => ['enhancement'], warn: vi.fn(),
+    });
+    expect(gate).toMatchObject({ ok: true, result: { kind: 'not-required' } });
   });
 });

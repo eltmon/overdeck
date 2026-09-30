@@ -6,9 +6,11 @@
  * workspace, stamped with the FR-5 metadata tokens `{issue, role: 'worker',
  * harness, model}` so the issue tree renders it under its issue.
  *
- * An item that declares a `files_scope` gets its own worktree under
- * `<workspace>/.swarm/<item>/` so two workers never share a working tree; an
- * item without one runs in the workspace itself.
+ * Every worker gets its own worktree under `<workspace>/.swarm/<item>/` on the
+ * branch `<feature-branch>-<item>`, so two workers never share a working tree.
+ * It commits there and hands back; the foreman integrates, pushes and runs
+ * `pan task done` (PAN-4340). `--shared` (foreman or operator only) runs the
+ * worker in the workspace itself, for strictly serial use.
  *
  * Nothing about the pane is persisted: the backend is the owner of session
  * liveness and is read live.
@@ -44,6 +46,7 @@ export interface SpawnOptions {
   item?: string;
   model?: string;
   harness?: string;
+  shared?: boolean;
 }
 
 export interface SpawnDeps {
@@ -51,6 +54,8 @@ export interface SpawnDeps {
   readonly resolveBackend?: () => Promise<TerminalBackend>;
   /** Create the item worktree. Injected by the test. */
   readonly createWorktree?: (workspacePath: string, itemId: string) => Promise<string>;
+  /** The caller's environment. Injected by the test. */
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -75,6 +80,14 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
     return exitCli(1);
   }
 
+  const env = deps.env ?? process.env;
+  if (options.shared && env.OVERDECK_ITEM_ID) {
+    console.error(chalk.red(
+      '--shared is for the foreman or an operator: a pan spawn worker cannot put another worker in the shared workspace.',
+    ));
+    return exitCli(1);
+  }
+
   const issueId = resolveIssueId(options.issue);
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved?.projectPath) {
@@ -96,10 +109,9 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   }
 
   const harness = options.harness ?? 'claude-code';
-  const filesScope = item.metadata?.files_scope;
-  const cwd = filesScope?.length
-    ? await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id)
-    : workspacePath;
+  const cwd = options.shared
+    ? workspacePath
+    : await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id);
 
   const backend = await (deps.resolveBackend ?? defaultResolveBackend)();
 
@@ -144,10 +156,11 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
 export function registerSpawnCommand(program: Command): void {
   program
     .command('spawn')
-    .description('Create a worker pane for one xBRIEF item in the issue workspace')
+    .description('Create a worker pane for one xBRIEF item in its own item worktree')
     .requiredOption('--issue <id>', 'Issue the worker belongs to')
     .requiredOption('--item <item>', 'xBRIEF item the worker takes')
     .requiredOption('--model <model>', 'Model the worker runs on')
     .option('--harness <harness>', 'Coding-agent harness (default: claude-code)')
+    .option('--shared', 'Run the worker in the issue workspace instead of an item worktree (foreman/operator only; serial use)')
     .action(async (options: SpawnOptions) => spawnCommand(options));
 }

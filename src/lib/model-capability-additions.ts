@@ -29,6 +29,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
+    minClaudeCodeVersion: '2.1.255',
     notes: 'Fable 5.1 requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
   },
 
@@ -55,6 +56,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
+    minClaudeCodeVersion: '2.1.284',
     notes: 'Released 2026-09-28. Requires Claude Code 2.1.284 or newer (older versions treat it as an unrecognized model with a 200K window). Native 1M context, 128K max output, adaptive thinking with High default. Non-default temperature/top_p/top_k and forced tool_choice return 400. API $2/M input, $10/M output, $0.20/M cache read. Skill scores inherit the Sonnet 5 baseline until benchmarked.',
   },
 
@@ -205,6 +207,35 @@ export const AUDITED_MODEL_ADDITIONS = {
       'context-length': 95,
     },
     notes: 'OpenAI GPT-6 mid tier (September 2026), successor to gpt-5.6-sol at half its API price. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant: the 372K pin was measured on gpt-5.6-sol only. 1.05M marketing context.',
+  },
+
+  // GPT-6.1 Sol (2026-09-29). Codex 0.159.0 `codex debug models`: context_window 272000,
+  // max_context_window 872000, supported_in_api true, default effort low.
+  // Pricing and 1.05M context / 128K output: developers.openai.com/api/docs/models/gpt-6.1-sol.
+  // Skills inherit the gpt-6-sol baseline.
+  'gpt-6.1-sol': {
+    model: 'gpt-6.1-sol',
+    provider: 'openai',
+    displayName: 'GPT-6.1 Sol',
+    costPer1MTokens: 6, // $2.00 in / $10.00 out ($0.10 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    maxOutputTokens: 128_000,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 95,
+    },
+    notes: 'OpenAI GPT-6.1 mid tier (September 29, 2026), successor to gpt-6-sol at the same API price with half the cached-input price. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+.',
   },
 
   'gpt-6-luna': {

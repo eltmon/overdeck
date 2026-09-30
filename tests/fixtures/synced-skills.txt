@@ -58,6 +58,7 @@ pan-logs
 pan-map
 pan-memory
 pan-merge
+pan-models
 pan-network
 pan-new-project
 pan-open-threads
@@ -92,6 +93,7 @@ pan-tts
 pan-unpause
 pan-untroubled
 pan-up
+pan-vault
 pan-wipe
 pan-worker
 pan-workspace

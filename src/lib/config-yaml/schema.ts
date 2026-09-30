@@ -8,6 +8,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
+import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
@@ -413,7 +414,8 @@ export interface RoleConfig {
 
 export type RolesConfig = Partial<Record<Role, RoleConfig>>;
 
-export interface ResourcesConfig {
+/** PAN-4311 CPU keys live in schema-cpu.ts. */
+export interface ResourcesConfig extends CpuResourcesYamlConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
   memory_warn_gb?: number;
   /** Available RAM threshold that blocks spawns / marks critical state (GiB) */
@@ -540,6 +542,7 @@ export interface YamlConfig {
     nous?: string;
     dashscope?: string;
     quantumllama?: string;
+    typesafe?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -560,6 +563,7 @@ export interface YamlConfig {
 
   /** Local Ollama endpoint used by `ollama:<tag>` models (PAN-1641). */
   ollama?: YamlOllamaConfig;
+  jev?: import('./jev.js').YamlJevConfig;
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -812,6 +816,7 @@ export interface NormalizedConfig {
 
   /** Local Ollama endpoint and the context window an Overdeck-started serve gets (PAN-1641). */
   ollama: NormalizedOllamaConfig;
+  jev: import('./jev.js').NormalizedJevConfig;
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
@@ -829,6 +834,7 @@ export interface NormalizedConfig {
     nous?: string;
     dashscope?: string;
     quantumllama?: string;
+    typesafe?: string;
   };
 
   /** Provider auth mode (subscription vs api-key) by provider */
@@ -967,8 +973,8 @@ export interface NormalizedConfig {
     batchWindowSeconds: number;
   };
 
-  /** Resource thresholds (normalised, never undefined) */
-  resources: {
+  /** Resource thresholds (normalised, never undefined); PAN-4311 CPU fields in schema-cpu.ts */
+  resources: CpuResourcesConfig & {
     memoryWarnGb: number;
     memoryBlockGb: number;
     agentWarnCount: number;

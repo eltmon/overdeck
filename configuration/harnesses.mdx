@@ -77,6 +77,9 @@ A steer never falls back silently to a queued message. A harness without steer a
   summaries and provider fallback). Overdeck omits `temperature` for models
   that reject sampling parameters (Sonnet 5 and newer, Opus 4.7 and newer,
   Fable).
+- To set the workhorse slots, roles, tiers and background models to one
+  provider's eval-backed lineup in one step, use a
+  [model preset](/configuration/model-presets).
 - Proxied models use a dedicated Claude Code context policy rather than copying
   every value from the generic model registry. GPT-6 Astra, Sol, and Luna and
   GPT-5.6 Sol, Terra, and Luna default to a `272000`-token pin for both
@@ -87,8 +90,8 @@ A steer never falls back silently to a queued message. A harness without steer a
   and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
   long-research sessions that accept the surcharge; the `[372k]` suffix is
   Overdeck-side only and is stripped before the model id reaches the API.
-  The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`) have no `[372k]`
-  variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
+  The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6.1-sol`) have no
+  `[372k]` variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
   re-measured for GPT-6.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
@@ -99,6 +102,44 @@ A steer never falls back silently to a queued message. A harness without steer a
   `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
   receive neither override, so Claude Code's native context behavior remains in
   control.
+
+#### Claude Code version requirements
+
+Some models need a newer Claude Code CLI than an older install recognizes.
+Overdeck tracks each model's minimum on its capability row and checks it
+before every `claude-code` launch:
+
+| Model | Minimum Claude Code |
+| --- | --- |
+| Claude Fable 5.1 (`claude-fable-5-1`) | 2.1.255 |
+| Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
+
+A launch whose Claude Code is too old is refused before a terminal session is
+created. The error names the model, the installed and required versions, the
+launch binary's path, and the exact upgrade command — for example:
+
+```
+Claude Sonnet 5.5 (claude-sonnet-5-5) needs Claude Code 2.1.284 or newer, but
+Overdeck would launch Claude Code 2.1.280 at /usr/local/bin/claude. Upgrade it
+with `npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest`
+(or the Upgrade Claude Code button in the dashboard), then launch again.
+Running sessions keep their current Claude Code. No terminal session was
+created.
+```
+
+The dashboard shows the same check as a banner in the system notices row
+while any configured model's minimum is unmet. A user-writable npm, native
+(`claude update`), or reachable-`brew` install gets an **Upgrade Claude
+Code** button that runs the upgrade in a terminal session and re-checks when
+it finishes; a root-owned npm prefix, an unrecognized install, or Windows
+shows a copyable command instead, since Overdeck never runs `sudo` or a
+root-owned install itself. Either way, running agents and conversations keep
+their current Claude Code — only new launches use the upgraded one.
+
+`pan doctor` reports the installed Claude Code version, its install method
+and path, one row per configured model with a documented minimum, and a
+warning row for every other `claude` binary on `PATH` ("shadow" binaries) that
+could confuse a shell running `claude` directly.
 
 ### Muse Code
 
@@ -156,16 +197,26 @@ internal configuration records are excluded from the chat feed.
 ### OpenAI Codex CLI (alternative)
 
 - First-party OpenAI agent loop for the GPT model family (GPT-6 Astra/Sol/Luna,
-  GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
+  GPT-6.1 Sol, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
   ChatGPT-subscription or API-key auth.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
   is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
   `gpt-6-sol` and `gpt-6-luna` (September 2026) are the GPT-6 successors to
-  GPT-5.6 Sol and Luna at half their API price; they are opt-in too. The Codex
-  CLI lists them in its model catalog from `0.156.1`; older CLIs forward the id
-  to the backend unchanged. Early rollout reports show `gpt-6-luna` refused on
-  some ChatGPT sign-in accounts
+  GPT-5.6 Sol and Luna at half their API price; they are opt-in too. Under
+  ChatGPT sign-in, `gpt-6-sol` and `gpt-6-luna` need Codex CLI `0.156.1` or
+  newer — OpenAI answers HTTP 400 below that version
   ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
+  `gpt-6.1-sol` (September 29, 2026) is the GPT-6.1 successor to GPT-6 Sol at
+  the same $2/$10 price with $0.10 cached input; it is opt-in. Under ChatGPT
+  sign-in it needs Codex CLI `0.159.0` or newer.
+  `gpt-6-astra` and API-key auth have no floor. Overdeck refuses such a
+  launch before it starts (`pan start`, the dashboard, conversations, and
+  every other spawn path), names the required version, and never
+  substitutes another model. Upgrade with `npm install -g @openai/codex`;
+  `pan install` does not manage the Codex CLI. `pan doctor` shows a
+  `Codex model floor` row per model. On the claude-code harness through
+  CLIProxy, CLIProxy `7.3.16` (the version `pan install` pins) was verified
+  on 2026-09-29 to serve all three models under ChatGPT sign-in.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
@@ -877,6 +928,14 @@ The native Codex CLI in a conversation's Terminal needs `0.153.4` or newer.
 Below that, the conversation's host falls back to stdio and logs
 `[terminal] native Codex terminal unavailable: cli-unsupported` in Runtime log.
 Upgrade, then stop and resume the conversation.
+
+### "needs Claude Code X or newer"
+
+A `claude-code` launch was refused because the configured model's minimum
+Claude Code version is newer than the launch binary. See
+[Claude Code version requirements](#claude-code-version-requirements) — run
+the upgrade command the error names, or click **Upgrade Claude Code** in the
+dashboard banner, then launch again.
 
 ## Tradeoffs
 

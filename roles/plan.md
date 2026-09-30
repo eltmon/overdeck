@@ -112,6 +112,9 @@ After `pan plan finalize`, the pipeline runs without you once the handoff gate o
 5. **Write the PRD draft** to `.pan/drafts/<ISSUE-ID>.md` in your workspace if no canonical PRD exists (see Outputs #1 for the standard). Do not proceed to the xBRIEF until the PRD is on disk — `pan plan finalize` refuses to run without it and promotes it to `.pan/drafts/` on the feature branch.
 6. Materialize the plan: write `.overdeck/spec.vbrief.json` and `.overdeck/continue.json`; `plan.items[]` is the task checklist and `plan.edges[]` defines dependencies
 7. Run `pan plan finalize` — that marks the workspace xBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `.pan/specs/` on the feature branch, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required. Do not start, request, or wait for the work agent — the handoff gate (human approval or the auto-spawn stamp) lives outside your session.
+
+   If finalize exits 5 with a plan critique refusal, read `.pan/drafts/<stem>-critique*.md`, answer each `blocks-the-design` finding with a `### <title>` heading under `## Critique response` in the PRD (change the draft only when the finding requires it), then re-run `pan plan finalize`. Never edit the critique file to make it pass. When the issue is flagged, run `pan plan finalize` with a 600 s Bash timeout or `run_in_background: true`; a finalize killed mid-wait leaves the critic running, and the next run waits on it.
+
 8. Stop after `pan plan finalize` returns; do not start implementation work. Stop after planning is complete. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
 
 ## TLDR: prefer code summaries over full reads

@@ -1,0 +1,838 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T14:18:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4400: One-click provider presets: \"Apply Anthropic defaults\" / \"Apply OpenAI defaults\", backed by eval results and documented",
+    "updated": "2026-09-29T14:24:53.956Z"
+  },
+  "plan": {
+    "id": "pan-4400",
+    "title": "One-click provider presets: \"Apply Anthropic defaults\" / \"Apply OpenAI defaults\", backed by eval results and documented",
+    "status": "running",
+    "uid": "eee65ca0-80bc-44ec-a8db-4eb501a1ba78",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T14:18:38Z",
+    "updated": "2026-09-29T14:24:53.956Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4400",
+        "label": "PAN-4400",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4400.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md",
+        "label": "Opus 5.5 vs Sonnet 5.5 eval",
+        "type": "doc"
+      },
+      {
+        "uri": ".pan/drafts/model-routing-2026-09.md",
+        "label": "Model routing research 2026-09",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "models",
+      "settings",
+      "presets",
+      "cli",
+      "dashboard",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "The finalize surface lint counts every Mintlify page, fixture and generated manifest as its own two-segment subsystem, so any slice that carries its required docs and CLI lockstep files (pan-help fixture, slash-command manifest, synced-skills fixture) exceeds 6 subsystems; a sibling split would not avoid this. Issue AC3 also requires the CLI and the Settings UI to render one diff engine, so the lib, CLI and UI slices ship together. The work is already decomposed into 9 items with a narrow DAG.",
+      "canonicalFilename": "2026-09-29-PAN-4400-one-click-provider-presets-apply-anthropic-defaults-apply-openai-defaults-backed-by-eval-results-and-documented.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Operators must set about 40 model and effort settings by hand to get a coherent single-provider lineup. The eval evidence (docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md) and the GPT-6 routing research exist, but nothing applies them in one step, and the existing whole-document settings save rewrites roles wholesale, writes env API keys in plaintext and drops sub-keys, so it cannot apply a preset without touching unrelated config.",
+      "Proposal": "Versioned preset data in src/lib/model-presets/presets.ts (anthropic, anthropic-cost-saver pilot, openai) covers a registry of every model and effort config path with a value or an explicit keep plus reason. A read-only plan engine computes a per-setting diff with a credential gate and canUseHarness checks. A path-scoped config.yaml write (parseDocument + setIn/deleteIn, validation through mergeConfigs, compare-and-swap, atomic rename) applies it inside runSettingsWriteSerialized and records a single-level undo and lastApplied in ~/.overdeck/model-presets-state.json. Four HTTP routes, `pan models preset list|show|apply|undo`, and Settings > Model Routing buttons with a diff dialog, an Undo toast and a 'preset updated' notice all render the same plan object. A user page, configuration/model-presets.mdx, documents each placement with its eval evidence.",
+      "NonGoals": "- No Google/Gemini preset\n- No change to product defaults (DEFAULT_WORKHORSES.expensive claude-opus-4-8, the flywheel literal in src/lib/config-yaml/roles.ts)\n- No deletion or rewiring of GET /api/settings/optimal-defaults or /minimax-defaults\n- No change to providers.ts tierModels, the capability class table, or Codex version floors\n- No auto-apply of a newer preset version\n- No multi-level undo or preset history\n- No fix to saveSettingsApi's plaintext key write-back or dropped sub-keys (separate issue)\n- No enabling of tiered execution, and no creation of tiers or a supervisor\n- No persistence of preset state in config.yaml (the retired models.preset key stays retired)\n- No routes added to src/dashboard/server/routes/settings.ts and no scripts/file-size-allowlist.txt raise\n- No Claude Code subagent model setting (none exists; subagents inherit the session model)\n- No use of saveSettingsApi or writeYamlConfigPreservingComments for preset writes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Apply presets through a new path-scoped YAML write, not saveSettingsApi",
+        "rationale": "saveSettingsApi rewrites workhorses/roles wholesale (settings-api.ts:785-786), writes env-derived API keys back in plaintext (:946-958), drops tts.summarizer.batch_window_seconds and memory.features.knowledge_index, and copies project .pan.yaml values into the global file; issue AC1 cannot hold on that path. The new door still uses runSettingsWriteSerialized."
+      },
+      {
+        "summary": "The AC1 test fixture uses $VAR env references and literal keys instead of 'masked keys'",
+        "rationale": "Overdeck has no server-side API-key masking; the closest real risk is env references and project-only values leaking into config.yaml."
+      },
+      {
+        "summary": "The CLI writes through the lib directly, with a compare-and-swap on config.yaml text for cross-process safety",
+        "rationale": "This matches how pan skills writes config; the per-process queue cannot serialize a CLI and the dashboard, so a re-read before write aborts on a concurrent change."
+      },
+      {
+        "summary": "Ship three presets: anthropic, anthropic-cost-saver (pilot), openai",
+        "rationale": "The operator's issue comment allows the cost-saver variant, and it is two data rows on top of anthropic, clearly labelled pilot."
+      },
+      {
+        "summary": "Ship the OpenAI preset now with evidence.status 'research'",
+        "rationale": "The operator asked for the OpenAI button and AC3 exercises it; no GPT eval exists yet (the 2026-09-29 run used a Claude-only route), so the docs state that plainly per placement."
+      },
+      {
+        "summary": "The OpenAI preset keeps background AI models (titles, compaction, fork summary, handoff author, status review, TTS summarizer, memory extraction, provider fallback)",
+        "rationale": "Background AI runs through `claude -p` (transcript-summary.ts:344), so an OpenAI model would need the CLIProxy route; the research rates GPT-6 Luna 'not yet' for summaries and memory (77% hallucination); the 272K GPT pin excludes the 1M fork-summary slot. They are reported as 'not set' rows."
+      },
+      {
+        "summary": "Missing credentials block the whole preset; a harness-policy denial skips only that row, except a denied workhorse row, which blocks",
+        "rationale": "'requires that provider's credentials/harness to be available, and says what it could not set'; roles reference workhorse slots, so a partial workhorse write would be incoherent."
+      },
+      {
+        "summary": "Tier rows are computed from existing tiers by hardest difficulty; an existing distribution is removed; tiered_execution.enabled and tier creation are never touched",
+        "rationale": "Tier names are user-defined and the default is tiers: {}; a preset fills explicit settings only and must not change whether tiered execution runs."
+      },
+      {
+        "summary": "Anthropic tier band complex/expert uses workhorse:expensive (Opus 5.5), not Fable 5.1",
+        "rationale": "No eval covers Fable 5.1, and it costs 2.5x Opus 5.5; a later preset version can add it."
+      },
+      {
+        "summary": "Review lanes are set to parent under roles.review.model = workhorse:expensive in every preset",
+        "rationale": "The eval keeps review on Opus; parent makes all four lanes follow the review model, as the eval report's recommended config describes."
+      },
+      {
+        "summary": "Undo is single-level and restores only paths still holding the preset's value",
+        "rationale": "This restores previous values exactly (AC2) without clobbering edits the operator made after the apply."
+      },
+      {
+        "summary": "Preset state (lastApplied, undo record) lives in ~/.overdeck/model-presets-state.json, not config.yaml",
+        "rationale": "The models.preset YAML key is retired (docs/CONFIGURATION.md:248); prior values and the applied version cannot be derived, so a small state file is legitimate."
+      },
+      {
+        "summary": "Add `pan models preset undo` beside the issue's list/show/apply",
+        "rationale": "Undo must be reachable where the CLI apply happens; it reuses the same lib function as the UI Undo."
+      },
+      {
+        "summary": "Settings page replaces formData after a preset apply or undo",
+        "rationale": "The page's whole-document autosave refreshes only workhorses/roles/ui/part of conversations, so a stale formData would revert preset-written paths on the next unrelated edit."
+      },
+      {
+        "summary": "Keep one issue with sizeJustification instead of sibling issues",
+        "rationale": "The surface lint counts each doc page and fixture as a subsystem, so any docs-carrying slice trips it; AC3 needs CLI and UI on one diff engine."
+      },
+      {
+        "summary": "Both presets keep tts.summarizer.model",
+        "rationale": "The TTS summarizer posts to https://api.openai.com/v1/chat/completions with apiKeys.openai (tts-summarizer.ts:114), so a Claude id breaks it and an OpenAI id needs an API key plus the E4 gate."
+      }
+    ],
+    "items": [
+      {
+        "id": "preset-data",
+        "title": "Define the preset setting registry and the anthropic, anthropic-cost-saver and openai presets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-presets/presets.ts",
+            "tests/unit/lib/model-presets/presets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/model-presets/presets.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "presets.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "preset-plan",
+            "preset-apply",
+            "preset-cli",
+            "docs-presets"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4400.md WI-1 exactly. Create src/lib/model-presets/presets.ts exporting PresetId, PresetSetting, PresetValue, PresetTierBand, ModelPreset, PRESET_SETTINGS, MODEL_PRESETS, getPreset and unknownPresetModelIds. PRESET_SETTINGS lists the static YAML paths in the PRD 'Preset values (v1, 2026-09-29)' table: 3 workhorses, roles.<role>.model/.effort for the 10 roles in ROLE_NAMES order, the 4 review lanes' .model/.effort, and the models.*, conversations.*, tts.summarizer.model, memory.extraction.provider/model, registry/docs/jev/embedding/enrichment/gemini keep rows. Before adding each path, confirm the YAML key exists in src/lib/config-yaml/schema.ts; if one is missing, drop it from the registry and add a one-line comment naming the missing key. Preset values come verbatim from the PRD table (anthropic: expensive=mid=claude-opus-5-5, cheap=claude-haiku-4-5; cost-saver: roles.work.model=[{model:'workhorse:mid',weight:70},{model:'claude-sonnet-5-5',weight:30}], pilot:true; openai: gpt-6-astra/gpt-6-sol/gpt-6-luna, harness codex, evidence.status 'research', every background path kept with the D7 reason). Both presets keep tts.summarizer.model because the TTS summarizer calls the OpenAI chat API directly (src/dashboard/server/services/tts-summarizer.ts:114). Every effort value is 'high'. Never set effort for a band whose model is claude-haiku-4-5. Write the tests listed in WI-1 step 5."
+        },
+        "items": [
+          {
+            "id": "preset-data.ac1",
+            "title": "Given MODEL_PRESETS, when the coverage test iterates PRESET_SETTINGS, then every preset has a value or a keep entry with a non-empty reason for every path, and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-data.ac2",
+            "title": "Given a cloned preset whose workhorses.mid is 'not-a-model', when unknownPresetModelIds runs, then it returns ['not-a-model'], so an unknown model id fails the suite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-data.ac3",
+            "title": "Given every model id a preset writes, when checked, then hasModelCapability(resolveModelId(id)) is true and the id is absent from MODEL_DEPRECATIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-data.ac4",
+            "title": "Given every effort value in every preset, when checked, then it equals 'high' and effortConfigErrors returns [] for its resolved model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-plan",
+        "title": "Compute the per-setting preset diff with credential and harness checks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-presets/plan.ts",
+            "tests/unit/lib/model-presets/plan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/model-presets/plan.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "foundationFor": [
+            "preset-apply",
+            "preset-routes",
+            "preset-cli",
+            "ui-preset-buttons"
+          ],
+          "parallelSafeReason": "Touches only two new files (src/lib/model-presets/plan.ts and its test); no other item edits them, and it runs after preset-data completes."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly. Create src/lib/model-presets/plan.ts exporting PresetPlanRow, PresetPlan, PresetPlanDeps, UnknownPresetError, planPresetApplyFromText and planPresetApply. Parse the global config.yaml text (getGlobalConfigPath, src/lib/config-yaml/load.ts:383; a missing file means '') with yaml parseDocument. Emit one row per PRESET_SETTINGS entry (keep -> status 'skipped' with the keep reason), tier rows per D9 (band by hardest difficulty; .model/.harness/.effort; an existing .distribution becomes {removed:true}; supervisor rows only when the node exists; the note 'tiered execution has no tiers; nothing to set' when there are no tiers), and the provider-node row per D10 (the whole raw node; an absent models.providers.anthropic counts as enabled, so it is 'same' for the anthropic preset). The status is 'same' when before deep-equals after, else 'change'. Credential gate (D8): deps.getAuthMode(<resolved mid model>) === undefined -> blocked with a reason naming claude / codex login or an API key, and every change row becomes skipped. Harness gate: canUseHarness(effectiveHarness, model, authMode, await deps.resolveCodexContext(...)) (src/lib/harness-policy.ts:156, src/lib/codex/policy-context.ts:24); a denied row is skipped with decision.reason; a denied workhorse row blocks the plan. digest = sha256 hex of JSON.stringify(rows.map(r=>[r.path,r.before,r.after,r.status])). Never write any file. Write the WI-2 step 8 tests with stubbed deps (no real claude/codex spawns)."
+        },
+        "items": [
+          {
+            "id": "preset-plan.ac1",
+            "title": "Given an empty config and a credentialed provider, when planPresetApply('anthropic') runs, then it returns a change row for every non-keep registry path and a skipped row with a reason for every keep path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-plan.ac2",
+            "title": "Given getAuthMode returns undefined, when a plan is computed, then plan.blocked.reason names the sign-in step and no row has status 'change'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-plan.ac3",
+            "title": "Given a config with a tier whose difficulties are [complex] and that has a distribution, when the openai plan is computed, then the tier rows set model workhorse:expensive and harness codex, and the distribution row's after value is {removed:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-plan.ac4",
+            "title": "Given the openai preset, when its plan is computed, then conversations.title_model, conversations.compaction_model and conversations.fork_summary_model rows are skipped with the D7 reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-plan.ac5",
+            "title": "Given two configs that differ in one registry value, when both are planned, then their digests differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-apply",
+        "title": "Apply a preset through a path-scoped config.yaml write, with single-level undo and preset state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/model-presets/apply.ts",
+            "src/lib/model-presets/state.ts",
+            "tests/unit/lib/model-presets/apply.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/model-presets/apply.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "apply.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "preset-routes",
+            "preset-cli",
+            "ui-preset-undo-notice"
+          ],
+          "parallelSafeReason": "Touches only three new files under src/lib/model-presets/ and its test; no other item edits them, and it runs after preset-plan completes."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 exactly. Never call saveSettingsApi or writeYamlConfigPreservingComments: that path rewrites roles/workhorses wholesale, writes env API keys in plaintext and drops sub-keys (PRD fact 1). state.ts: presetStatePath() = join(getOverdeckHome(),'model-presets-state.json'); readPresetState / writePresetState (temp + rename, 0o600, fs/promises only). apply.ts: the error classes PresetBlockedError, PresetPlanStaleError, ConfigChangedError, PresetValidationError, NoPresetUndoError. applyPreset(presetId,{expectedDigest},deps?) inside runSettingsWriteSerialized (src/lib/settings-api.ts:889) does the following: read the text -> planPresetApplyFromText -> refuse if blocked or the digest mismatches -> parseDocument -> setIn/deleteIn only the change rows -> validate (mergeConfigs(doc.toJS()) must not throw; config.tieredExecutionInvalid must stay undefined if it was undefined; effortConfigErrors must be [] for each written effort) -> re-read the text and throw ConfigChangedError if it differs -> atomic write (temp + rename, keeping the file mode) -> clearConfigCache() -> write the state {lastApplied, undo:{presetId,version,appliedAt,changes:[{path,before,after}]}}. undoLastPresetApply restores before only where current deep-equals after (else leftAsIs 'changed since apply; left as is'); {absent:true} restores via deleteIn; the same validate + CAS + write; then the state becomes {}. listPresetStatus returns the preset metadata plus lastApplied, updateAvailable (lastApplied.presetId===id && lastApplied.version<version) and undoAvailable. Write the WI-3 step 3 tests using a temp OVERDECK_HOME and the exact fixture the PRD describes (comment, custom_block, api_keys $OPENAI_API_KEY, tts batch_window_seconds 7, memory.features.knowledge_index, project .pan.yaml project-only-model)."
+        },
+        "items": [
+          {
+            "id": "preset-apply.ac1",
+            "title": "Given the PRD fixture config.yaml and a project .pan.yaml, when applyPreset('anthropic') succeeds, then the leading comment, custom_block, the literal text $OPENAI_API_KEY, batch_window_seconds: 7 and knowledge_index: true are still byte-present and the file does not contain project-only-model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-apply.ac2",
+            "title": "Given a config with models.providers.openai: false, when applyPreset('openai') and then undoLastPresetApply run, then the parsed document deep-equals the original and models.providers.openai is the boolean false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-apply.ac3",
+            "title": "Given an applied preset whose roles.work.model was later edited, when undo runs, then that path is left as is and reported in leftAsIs, and the other paths are restored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-apply.ac4",
+            "title": "Given a stale expectedDigest, a blocked plan, or a config.yaml that changes between the plan read and the write, when applyPreset runs, then it rejects with PresetPlanStaleError, PresetBlockedError or ConfigChangedError and the file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-apply.ac5",
+            "title": "Given a state file with lastApplied {presetId:'anthropic', version:0}, when listPresetStatus runs, then the anthropic entry reports updateAvailable true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-routes",
+        "title": "Serve preset list, plan, apply and undo over HTTP",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/model-presets.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/model-presets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/model-presets.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "model-presets.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. Create src/dashboard/server/routes/model-presets.ts exporting modelPresetsRouteLayer with GET /api/model-presets, GET /api/model-presets/:id/plan, POST /api/model-presets/:id/apply (body {expectedDigest}) and POST /api/model-presets/undo. Copy the hardened mutation template of PUT /api/settings/design-language (src/dashboard/server/routes/settings.ts:917-937): rejectUnsafeDashboardMutationRequest on both POSTs. After a successful apply or undo, await refreshTtsRuntimeConfig() and syncTtsPlaybackWithConfig(). Error mapping: UnknownPresetError 404; PresetBlockedError/PresetPlanStaleError/ConfigChangedError/NoPresetUndoError 409 with {error, code}; PresetValidationError 400; a missing expectedDigest 400. Do NOT add anything to routes/settings.ts (0 lines of headroom). Mount the layer in server.ts right after settingsRouteLayer (~line 365). Add four rows to tests/unit/lib/overdeck/no-loss-matrix.ts after the settings block (GET = READ 'FILE-CONFIG via model-presets plan (read-only)'; POST = WRITE 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)'). Use async fs only (no execSync)."
+        },
+        "items": [
+          {
+            "id": "preset-routes.ac1",
+            "title": "Given a running route layer with the lib mocked, when GET /api/model-presets/anthropic/plan is requested, then it returns 200 with the plan JSON, and GET /api/model-presets/nope/plan returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-routes.ac2",
+            "title": "Given a POST /api/model-presets/anthropic/apply without the CSRF/origin headers, when it is handled, then it returns 403 and applyPreset is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-routes.ac3",
+            "title": "Given applyPreset rejects with PresetPlanStaleError, when the apply route handles the request, then it returns 409 with code 'stale-plan'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-routes.ac4",
+            "title": "Given the four new routes, when no-loss-matrix.test.ts runs, then every enumerated route has a matrix row and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-cli",
+        "title": "Add pan models preset list, show, apply and undo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/models.ts",
+            "src/lib/model-presets/format.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/models-preset.test.ts",
+            "tests/fixtures/pan-help.txt",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-models/SKILL.md",
+            "tests/fixtures/synced-skills.txt",
+            "sync-sources/skills/pan/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/models-preset.test.ts tests/unit/cli/command-groups.test.ts tests/fixtures/pan-help.test.ts tests/fixtures/synced-skills.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the four test files pass",
+            "typecheck completes without errors",
+            "lint passes including lint-skills and lint-slash-commands"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. format.ts: formatPresetPlanText(plan) with a header (label, version, date, PILOT marker, evidence status), change rows 'label  before -> after', a 'Not set' section with reasons, the notes, and 'Blocked: <reason>'. models.ts: createModelsCommand() -> 'models' -> 'preset' with list [--json], show <id> [--json], apply <id> [--dry-run] [--yes] [--json], undo [--json]. show and apply --dry-run print formatPresetPlanText, or with --json exactly JSON.stringify(plan, null, 2), the same object GET /api/model-presets/:id/plan returns. apply without --yes prompts 'Apply these N changes? [y/N]' via readline/promises, then calls applyPreset(id,{expectedDigest: plan.digest}) and prints 'Applied <label>: N settings changed, M not set. Undo with: pan models preset undo'. A blocked plan or any error prints the message and sets process.exitCode = 1. Register a lazy group in src/cli/command-groups.ts copying the registry entry (~line 99), and add `await groups.register('models');` near src/cli/index.ts:500. Add sync-sources/skills/pan-models/SKILL.md modeled on sync-sources/skills/pan-admin-config/SKILL.md, plus one line in sync-sources/skills/pan/SKILL.md near line 74. Regenerate: UPDATE_FIXTURES=1 npx vitest run tests/fixtures/pan-help.test.ts; npm run build:cli && npm run generate:slash-commands; UPDATE_FIXTURES=1 npx vitest run tests/fixtures/synced-skills.test.ts."
+        },
+        "items": [
+          {
+            "id": "preset-cli.ac1",
+            "title": "Given a mocked plan, when `pan models preset apply openai --dry-run --json` runs, then stdout equals JSON.stringify(plan, null, 2) and applyPreset is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-cli.ac2",
+            "title": "Given `pan models preset apply anthropic --yes`, when it runs, then applyPreset is called with {expectedDigest: plan.digest} and stdout contains 'Undo with: pan models preset undo'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-cli.ac3",
+            "title": "Given a blocked plan, when `pan models preset apply openai --yes` runs, then it prints the blocked reason and exits with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-cli.ac4",
+            "title": "Given the new verb and skill, when npm run lint runs, then lint-skills and lint-slash-commands pass against the regenerated pan-help.txt and composer-commands.generated.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-preset-buttons",
+        "title": "Add preset buttons and the per-setting diff dialog to Settings > Model Routing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/ModelPresetsBar.tsx",
+            "src/dashboard/frontend/src/components/Settings/PresetDiffDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ModelPresetsBar.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ModelPresetsBar.test.tsx src/components/Settings/__tests__/SettingsPage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ModelPresetsBar.test.tsx and SettingsPage.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. ModelPresetsBar({onPresetChanged}) uses React Query ['model-presets'] on GET /api/model-presets and renders one button per preset from its label ('Apply Anthropic defaults', 'Apply Anthropic cost-saver (pilot)', 'Apply OpenAI defaults'). A click fetches GET /api/model-presets/:id/plan and opens PresetDiffDialog({open, plan, busy, onConfirm, onCancel}), modeled on components/Settings/ReindexConfirmDialog.tsx. The dialog shows the title '<label> v<version>', the evidence status line, the change rows (before -> after, model ids font-mono), a 'Not set' list of skipped rows with reasons, and the notes. A blocked plan shows its reason in the warning note style and disables confirm; the confirm label is 'Apply N changes'. Confirm POSTs /api/model-presets/:id/apply {expectedDigest: plan.digest} with the same CSRF-aware fetch helper the Settings mutations use; a 409 shows the error text in the dialog. On success: invalidate ['settings'], ['model-presets'], ['available-models'], call invalidateAvailableModelsCache() and onPresetChanged(), then toast.success('Applied <label>'). Follow pan-style-guide: tokens only, no pill badges, weights <= 600, never components/Settings/Shared/Button.tsx. In SettingsPage.tsx, render <ModelPresetsBar onPresetChanged={...} /> under the Model Routing <h2>, before <WorkhorsePanel />. Keep <WorkhorsePanel /> and <RolesPanel /> with no props in that order, and never introduce the text onSave=, onReset= or hasChanges (SettingsPage.test.ts pins these). For this item, onPresetChanged only invalidates ['settings']. Add src/components/Settings/__tests__/ModelPresetsBar.test.tsx to the root package.json test:frontend-subset file list."
+        },
+        "items": [
+          {
+            "id": "ui-preset-buttons.ac1",
+            "title": "Given GET /api/model-presets returns the three presets, when ModelPresetsBar renders, then it shows the buttons 'Apply Anthropic defaults', 'Apply Anthropic cost-saver (pilot)' and 'Apply OpenAI defaults'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-buttons.ac2",
+            "title": "Given a plan fixture with change and skipped rows, when 'Apply Anthropic defaults' is clicked, then the dialog renders each change row's before and after values and a 'Not set' list with each skipped row's reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-buttons.ac3",
+            "title": "Given the dialog is open, when 'Apply N changes' is clicked, then the component POSTs /api/model-presets/anthropic/apply with body {expectedDigest: plan.digest}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-buttons.ac4",
+            "title": "Given a blocked plan, when the dialog renders, then the blocked reason is shown and the confirm button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-buttons.ac5",
+            "title": "Given an isolated Playwright browser profile on /settings, when 'Apply Anthropic defaults' is clicked and confirmed, then `pan models preset show anthropic` afterwards reports zero change rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-preset-undo-notice",
+        "title": "Add the Undo action and the 'preset updated' notice to the preset bar",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/ModelPresetsBar.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ModelPresetsBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ModelPresetsBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ModelPresetsBar.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. Replace the apply success toast with toast('Applied <label>', {duration: 10_000, action: {label: 'Undo', onClick: undo}}) (pattern: src/dashboard/frontend/src/App.tsx:749-756). undo POSTs /api/model-presets/undo, invalidates the same queries, calls onPresetChanged(), and toasts 'Restored N settings', adding '; M changed since apply were left as is' when leftAsIs is non-empty. When undoAvailable is true, show a text button 'Undo last preset' calling the same undo. For each preset with updateAvailable, render '<label> updated (v<version>): review changes' in text-[11px] leading-snug text-warning; clicking 'review changes' opens that preset's diff dialog. Never auto-apply."
+        },
+        "items": [
+          {
+            "id": "ui-preset-undo-notice.ac1",
+            "title": "Given a successful apply, when the toast's Undo action is clicked, then the component POSTs /api/model-presets/undo and calls onPresetChanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-undo-notice.ac2",
+            "title": "Given GET /api/model-presets reports anthropic updateAvailable true with version 1, when the bar renders, then it shows 'Anthropic defaults updated (v1): review changes', and clicking it opens the anthropic diff dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-undo-notice.ac3",
+            "title": "Given updateAvailable is false for every preset, when the bar renders, then no 'updated' notice is rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-preset-undo-notice.ac4",
+            "title": "Given an isolated Playwright browser profile, when a preset is applied and the toast Undo action is clicked, then config.yaml parses deep-equal to its pre-apply content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-formdata-refresh",
+        "title": "Refresh the Settings page formData after a preset apply or undo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/SettingsPage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SettingsPage.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8 (decision D14). SettingsPage keeps a formData copy taken once (lines ~370-374), and its whole-document autosave refreshes only workhorses/roles/ui/part of conversations before each PUT, so without this item the next autosave reverts preset-written paths such as models.providers.openai. Implement handlePresetChanged: const fresh = await queryClient.fetchQuery({queryKey: ['settings'], queryFn: <the page's existing settings fetcher>, staleTime: 0}); setFormData(fresh); and pass onPresetChanged={handlePresetChanged} to <ModelPresetsBar />. Add a source-text assertion to SettingsPage.test.ts that the page contains onPresetChanged={handlePresetChanged} and setFormData(fresh). Keep the existing pinned assertions passing."
+        },
+        "items": [
+          {
+            "id": "settings-formdata-refresh.ac1",
+            "title": "Given SettingsPage.tsx, when SettingsPage.test.ts runs, then the source contains onPresetChanged={handlePresetChanged} and setFormData(fresh), and the existing tag-order and no-onSave assertions still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-formdata-refresh.ac2",
+            "title": "Given an isolated Playwright browser profile where the OpenAI preset was applied from the UI, when an unrelated Settings field is changed and autosaves, then models.providers.openai.harness in config.yaml still equals codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-presets",
+        "title": "Document the presets, their eval evidence and the preset commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T14:18:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4400",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/model-presets.mdx",
+            "docs.json",
+            "configuration/harnesses.mdx",
+            "docs/MODEL_ROUTING.md",
+            "docs/CONFIGURATION.md",
+            "docs/MODEL-CALLS.md",
+            "docs/model-evals/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'configuration/model-presets' docs.json configuration/harnesses.mdx docs/MODEL_ROUTING.md docs/CONFIGURATION.md docs/MODEL-CALLS.md docs/model-evals/README.md",
+            "grep -c '30/60\\|30 of 60' configuration/model-presets.mdx"
+          ],
+          "expected_outputs": [
+            "each of the six files prints at least one match",
+            "the count is 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9 exactly. Create configuration/model-presets.mdx (frontmatter title 'Model presets', description 'One-click, eval-backed model lineups for Anthropic and OpenAI'). Sections: What a preset does; Apply a preset (the Settings buttons and pan models preset list|show|apply|undo with --dry-run/--json); What a preset will not set (keep rows, credentials and harness checks); one section per preset with a setting -> value -> why table. Anthropic evidence with numbers: E2 30/60 vs 10/60 any-severity, 11/20 vs 3/20 per-case majority, sign test 8-0 p~0.008; E5 15/15; delegation 100% intent in both framings; Sonnet ~45% of Opus cost and 25-45% faster; run date 2026-09-29; link https://github.com/eltmon/overdeck/blob/main/docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md. The cost-saver section is labelled pilot, with the comparison metrics. OpenAI: 'Research-backed; not yet eval-tested in Overdeck' beside each placement, the pending E2/E6 gates and the Codex 0.156.1 ChatGPT sign-in floor. Then a 'Preset versions and updates' section, and a note to reload Settings after a CLI apply (hazard H1). Add 'configuration/model-presets' right after 'configuration/harnesses' in docs.json. Add a link sentence to configuration/harnesses.mdx near line 76, docs/MODEL_ROUTING.md (header note lines 3-8 and the Tiered execution section ~line 212 with the D9 band rule), docs/CONFIGURATION.md under 'Removed: Presets, ...' (the retired models.preset key is unrelated to provider presets), docs/MODEL-CALLS.md section B, and docs/model-evals/README.md. Never present xhigh or max as a default."
+        },
+        "items": [
+          {
+            "id": "docs-presets.ac1",
+            "title": "Given docs.json, when the Configuration group is read, then 'configuration/model-presets' appears immediately after 'configuration/harnesses'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets.ac2",
+            "title": "Given configuration/model-presets.mdx, when read, then the Anthropic review placement shows the E2 numbers 30/60 vs 10/60 with the 2026-09-29 date and a link to the eval report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets.ac3",
+            "title": "Given configuration/model-presets.mdx, when read, then every OpenAI placement row shows the status 'Research-backed; not yet eval-tested in Overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets.ac4",
+            "title": "Given harnesses.mdx, MODEL_ROUTING.md, CONFIGURATION.md, MODEL-CALLS.md and model-evals/README.md, when grepped, then each contains a link to configuration/model-presets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "preset-data",
+        "to": "preset-plan",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-plan",
+        "to": "preset-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-apply",
+        "to": "preset-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-apply",
+        "to": "preset-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-routes",
+        "to": "ui-preset-buttons",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-preset-buttons",
+        "to": "ui-preset-undo-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-preset-buttons",
+        "to": "settings-formdata-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-data",
+        "to": "docs-presets",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

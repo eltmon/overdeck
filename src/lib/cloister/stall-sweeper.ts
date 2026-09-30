@@ -29,6 +29,9 @@
  *  - a global recommendation budget per scan so a graveyard census can't
  *    flood the feed at once;
  *  - this module holds no door to any mutation — there is nothing to force.
+ *
+ * A Jev turn-end reading (PAN-4371) may enrich the evidence; it never selects
+ * or triggers an action.
  */
 import { emitActivityEntry, type ActivityLevel } from '../activity-logger.js';
 import {
@@ -270,7 +273,12 @@ async function reportRow(
         previouslyRecommended
           ? `stop or resume ${agentId} via pan kill ${agentId} / pan resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
           : `nudge ${agentId} via pan tell ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
-        { agentId, idleMinutes: lastActivity, live: await reporting.isAgentLive(agentId) },
+        {
+          agentId, idleMinutes: lastActivity, live: await reporting.isAgentLive(agentId),
+          ...(typeof (row.details?.turnEnd as { summary?: unknown } | undefined)?.summary === 'string'
+            ? { turnEnd: (row.details!.turnEnd as { summary: string }).summary }
+            : {}),
+        },
       );
       return true;
     }

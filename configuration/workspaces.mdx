@@ -326,3 +326,77 @@ refused, so your Claude Code session transcripts stay out of reach.
 A pin's scope determines its lifetime: a project-scoped pin survives every
 workspace under that project, while a workspace-scoped pin is deleted when
 its workspace is.
+
+### Extraction providers and memory health
+
+Observations aren't stored verbatim — turning a raw transcript into a
+searchable observation goes through an LLM extraction call, configured by
+`memory.extraction.provider` and `memory.extraction.model`. Query expansion
+(turning a prompt into a handful of search terms) uses the same provider.
+
+The `anthropic` provider needs `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`
+set in the environment of **both** the dashboard service and agent sessions
+(hooks that call into memory run inside the agent's own process). A Claude
+subscription login does **not** authenticate it — the Anthropic SDK only
+reads API keys and auth tokens from the environment, so a host with no key
+exported fails every extraction and every query expansion the same way,
+even though `claude` itself works fine interactively.
+
+`pan memory doctor` shows a `failures=<reason>:<count>` suffix per workspace
+and an indented `cause:` line once a failure has a detail; `pan doctor`
+reports one `Memory extraction` row for whichever workspace has the newest
+success or failure across the whole memory base. Both read `health.json`
+evidence — they never probe your shell's own environment, which is why they
+catch a missing key even when your own `pan doctor` run happens to have one
+set locally.
+
+`health.json` and `pan memory doctor` use these reasons for a failed extraction
+or query-expansion call; `timeout` is specific to prompt-time query expansion
+and never appears in `health.json`, since a timed-out expansion still lets
+injection continue with the fallback keyword query rather than failing:
+
+| Reason | Meaning | What to do |
+| --- | --- | --- |
+| `provider-auth-failed` | The configured provider has no working credentials (missing or rejected key/token). | Export `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` for the dashboard service and agent sessions, or point `memory.extraction.provider` at one that can authenticate on this host. |
+| `extraction-failed` | The provider call failed for a reason other than auth (network error, rate limit, unexpected response shape). | Check `pan memory doctor`'s `cause:` line for the provider's error text; retry once the underlying issue clears. |
+| `malformed-response` | The provider replied, but its output didn't parse as the expected JSON payload. | Usually transient (a truncated or off-schema completion); if it recurs for one model, that model may not follow the extraction schema reliably. |
+| `cost-cap` | Today's memory-extraction spend reached `memory.extraction.per_day_cost_cap_usd`. | Raise the cap, or wait for the next local day. |
+| `timeout` (query expansion only) | Prompt-time query expansion didn't return within its 750 ms budget. | Informational — prompt-time injection still runs, falling back to the raw prompt's keyword query (see below). No action needed unless it's constant, which usually means the provider itself is slow. |
+
+### Reading RAG decision logs
+
+Every prompt-time memory attempt is logged, win or lose, at
+`~/.overdeck/memory/{project}/{workspaceId}/rag-runs/{date}.jsonl` — one JSON
+object per line. Two line types appear in that file:
+
+- **`query-expansion`** — one per expansion attempt: `outcome` (`expanded`,
+  `cache-hit`, or `expansion-failed`), the expanded `query` and
+  `expandedTerms`, and `reason` (one of the reasons above, or `null` on
+  success).
+- **`rag-decision`** — one per prompt-time injection attempt: whether
+  anything was actually injected, and why not when it wasn't.
+
+An annotated `rag-decision` line:
+
+```json
+{
+  "id": "8f2c1e4a-...",
+  "type": "rag-decision",
+  "outcome": "injected",           // injected | skipped | no-hits | expansion-failed | context-too-large | budget-truncated
+  "reason": "provider-auth-failed", // carries the expansion's reason on a non-truncated outcome, even when something was still injected
+  "query": "verification gate block review findings", // the OR-mode keyword query actually searched, not the raw prompt
+  "hitCounts": { "status": 1, "observations": 2, "summaries": 0, "sibling": 1, "knowledgeIndex": 0 },
+  "expansion": { "status": "fallback", "reason": "provider-auth-failed", "cacheKey": "..." }
+}
+```
+
+That example is deliberately a **failed** expansion (`expansion.status:
+"fallback"`, `expansion.reason: "provider-auth-failed"`) that still injected
+memory (`outcome: "injected"`, `hitCounts.observations: 2`): prompt-time
+retrieval searches in OR mode over a stopword-filtered keyword query built
+from the prompt, so a failed or fallback expansion still finds observations
+that share content words with the prompt instead of returning nothing. The
+top-level `reason` mirrors `expansion.reason` here rather than being `null`,
+because it is only forced to a fixed string (`memory-context-truncated-to-budget`)
+when the outcome is `budget-truncated`; otherwise it passes the expansion's
+own reason through unchanged, injected or not.

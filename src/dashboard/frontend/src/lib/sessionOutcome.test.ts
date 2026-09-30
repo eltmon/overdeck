@@ -6,6 +6,7 @@ import {
   deriveSessionOutcome,
   outcomeFactsFromAgent,
   outcomeFactsFromSessionNode,
+  planFinalizedFromState,
   type SessionOutcomeFacts,
 } from './sessionOutcome';
 
@@ -82,6 +83,16 @@ describe('deriveSessionOutcome — precedence table', () => {
     expect(deriveSessionOutcome(facts({ role: 'plan', planningComplete: true })).label).toBe('Plan finalized');
   });
 
+  it('planFinalizedFromState: true for the six post-planning states, false for backlog, parked, closed, undefined', () => {
+    for (const state of ['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged'] as const) {
+      expect(planFinalizedFromState(state)).toBe(true);
+    }
+    for (const state of ['backlog', 'parked', 'closed'] as const) {
+      expect(planFinalizedFromState(state)).toBe(false);
+    }
+    expect(planFinalizedFromState(undefined)).toBe(false);
+  });
+
   it('row 7: stoppedByUser → Stopped by operator', () => {
     expect(deriveSessionOutcome(facts({ stoppedByUser: true })).label).toBe('Stopped by operator');
   });
@@ -102,13 +113,40 @@ describe('deriveSessionOutcome — precedence table', () => {
     expect(outcome.tone).toBe('attention');
   });
 
-  it('row 11: primary agent ended cleanly on a known open, unmerged issue → Ended unexpectedly', () => {
+  it('row 11: in-review work agent handed off → Handed to review (quiet)', () => {
+    const outcome = deriveSessionOutcome(facts({ role: 'work', synthesized: false, issueState: 'in-review' }));
+    expect(outcome.label).toBe('Handed to review');
+    expect(outcome.tone).toBe('quiet');
+  });
+
+  it('row 11: strike role and changes-requested/ready issue states also hand off', () => {
+    expect(deriveSessionOutcome(facts({ role: 'strike', synthesized: false, issueState: 'in-review' })).label).toBe('Handed to review');
+    expect(deriveSessionOutcome(facts({ role: 'work', synthesized: false, issueState: 'changes-requested' })).label).toBe('Handed to review');
+    expect(deriveSessionOutcome(facts({ role: 'work', synthesized: false, issueState: 'ready' })).label).toBe('Handed to review');
+  });
+
+  it('row 11: a paused work agent still hands off (paused is not consulted)', () => {
+    const outcome = deriveSessionOutcome(facts({ role: 'work', synthesized: false, paused: true, issueState: 'in-review' }));
+    expect(outcome.label).toBe('Handed to review');
+  });
+
+  it('rows 9/10 outrank row 11: recorded error/running on an in-review issue → Ended unexpectedly (attention)', () => {
+    const errored = deriveSessionOutcome(facts({ role: 'work', synthesized: false, recordedStatus: 'error', issueState: 'in-review' }));
+    expect(errored.label).toBe('Ended unexpectedly');
+    expect(errored.tone).toBe('attention');
+
+    const running = deriveSessionOutcome(facts({ role: 'work', synthesized: false, recordedStatus: 'running', issueState: 'in-review' }));
+    expect(running.label).toBe('Ended unexpectedly');
+    expect(running.tone).toBe('attention');
+  });
+
+  it('row 12: primary agent ended cleanly on a known open, unmerged issue → Ended unexpectedly', () => {
     const outcome = deriveSessionOutcome(facts({ role: 'work', synthesized: false, paused: false, issueState: 'working' }));
     expect(outcome.label).toBe('Ended unexpectedly');
     expect(outcome.tone).toBe('attention');
   });
 
-  it('row 12: otherwise → the fallback', () => {
+  it('row 13: otherwise → the fallback', () => {
     expect(deriveSessionOutcome(facts())).toEqual(SESSION_ENDED_FALLBACK);
   });
 
@@ -122,6 +160,7 @@ describe('deriveSessionOutcome — precedence table', () => {
       facts({ role: 'plan', planningComplete: true }),
       facts({ stoppedByUser: true }),
       facts({ issueState: 'closed' }),
+      facts({ role: 'work', issueState: 'in-review' }),
       facts(),
     ];
     for (const f of kinds) {
@@ -179,11 +218,27 @@ describe('outcomeFactsFromSessionNode — role mapping', () => {
     expect(deriveSessionOutcome(f)).toEqual(SESSION_ENDED_FALLBACK);
   });
 
+  it('a stopped work node with no agent snapshot, on an in-review issue → Handed to review (agent-pan-4358 case)', () => {
+    const f = outcomeFactsFromSessionNode(node({ type: 'work', status: 'stopped' }), derived({ state: 'in-review' }), undefined);
+    expect(deriveSessionOutcome(f).label).toBe('Handed to review');
+  });
+
+  it('planning node with planningComplete undefined and derived state planned → Plan finalized', () => {
+    const f = outcomeFactsFromSessionNode(node({ type: 'planning', status: 'stopped', planningComplete: undefined }), derived({ state: 'planned' }), undefined);
+    expect(deriveSessionOutcome(f).label).toBe('Plan finalized');
+  });
+
+  it('planning node with planningComplete false and derived state backlog → Ended unexpectedly (still unfinished)', () => {
+    const f = outcomeFactsFromSessionNode(node({ type: 'planning', status: 'stopped', planningComplete: false }), derived({ state: 'backlog' }), undefined);
+    expect(deriveSessionOutcome(f).label).toBe('Ended unexpectedly');
+    expect(deriveSessionOutcome(f).tone).toBe('attention');
+  });
+
   it('planning node maps to role plan', () => {
     expect(outcomeFactsFromSessionNode(node({ type: 'planning' }), undefined, undefined).role).toBe('plan');
   });
 
-  it('legacy node maps to role plan but is synthesized (reaches the fallback, not row 11)', () => {
+  it('legacy node maps to role plan but is synthesized (reaches the fallback, not row 12)', () => {
     const f = outcomeFactsFromSessionNode(node({ type: 'legacy', status: 'stopped' }), derived({ state: 'working' }), undefined);
     expect(f.role).toBe('plan');
     expect(f.synthesized).toBe(true);
@@ -282,10 +337,15 @@ describe('outcomeFactsFromAgent — drawer role mapping', () => {
     expect(deriveSessionOutcome(f).label).toBe('Stopped by close-out');
   });
 
-  it('a clean stopped status is not failure evidence for the drawer (only row 11 can flag it)', () => {
+  it('a clean stopped status is not failure evidence for the drawer (only row 12 can flag it)', () => {
     const f = outcomeFactsFromAgent({ id: 'a', status: 'stopped', role: 'work' }, derived({ state: 'working' }));
     expect(f.recordedStatus).toBe('stopped');
     expect(deriveSessionOutcome(f).label).toBe('Ended unexpectedly');
+  });
+
+  it('a stopped work agent on an in-review issue, via the drawer adapter → Handed to review', () => {
+    const f = outcomeFactsFromAgent({ id: 'a', status: 'stopped', role: 'work' }, derived({ state: 'in-review' }));
+    expect(deriveSessionOutcome(f).label).toBe('Handed to review');
   });
 
   it('stoppedByUser and paused pass through from the agent record', () => {

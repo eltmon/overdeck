@@ -112,6 +112,33 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     expect(recs).toHaveLength(1);
     expect(String(recs[0]!.payload.recommendation)).toContain('stop or resume agent-pan-1');
   });
+
+  it('idle-running: carries the WI-7 turn-end reading in recommendation evidence and the activity message (PAN-4371)', async () => {
+    const row = parkedRow({
+      orbit: 'idle-running',
+      parkReason: 'agent-pan-1 is alive but has done nothing for 120 minutes and no pipeline stage owns the next move; last message reads as: blocked (0.84)',
+      details: {
+        agentId: 'agent-pan-1',
+        idleMinutes: 120,
+        turnEnd: { kind: 'reports_blocked', confidence: 0.84, model: 'm', summary: 'last message reads as: blocked (0.84)' },
+      },
+    });
+    const h = harness([row], { liveAgents: ['agent-pan-1'] });
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.turnEnd)).toContain('blocked');
+    expect(h.calls.activity[0]!.message).toContain('blocked');
+  });
+
+  it('idle-running: no turnEnd key in evidence when the row has no details.turnEnd', async () => {
+    const row = parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 120 } });
+    const h = harness([row], { liveAgents: ['agent-pan-1'] });
+    await runStallSweeperPatrol(h.deps);
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]!.payload).not.toHaveProperty('turnEnd');
+  });
 });
 
 describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
@@ -151,6 +178,36 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
     const h = harness([parkedRow({ orbit: 'merge-failed' })]);
     await runStallSweeperPatrol(h.deps);
     expect(h.calls.events.some((e) => e.type === 'sweep.scan')).toBe(false);
+  });
+});
+
+describe('runStallSweeperPatrol — event vocabulary and door isolation (PAN-4371)', () => {
+  it('every emitted event type is one of sweep.scan, sweep.recommendation, sweep.escalated', async () => {
+    const rows = [
+      parkedRow({ issueId: 'PAN-1', orbit: 'zombie-session', details: { agentId: 'agent-pan-1' } }),
+      parkedRow({ issueId: 'PAN-2', orbit: 'idle-running', details: { agentId: 'agent-pan-2', idleMinutes: 7200 } }),
+      parkedRow({ issueId: 'PAN-3', orbit: 'operator-gate' }),
+    ];
+    const h = harness(rows, { liveAgents: ['agent-pan-1', 'agent-pan-2'] });
+    await runStallSweeperPatrol(h.deps);
+    const KNOWN_TYPES = new Set(['sweep.scan', 'sweep.recommendation', 'sweep.escalated']);
+    expect(h.calls.events.length).toBeGreaterThan(0);
+    for (const event of h.calls.events) {
+      expect(KNOWN_TYPES.has(event.type), `unexpected event type ${event.type}`).toBe(true);
+    }
+  });
+
+  it('runStallSweeperPatrol touches no door beyond the injected isAgentLive, emitActivity, emitEvent', async () => {
+    const touched = new Set<string>();
+    const deps: StallSweeperDeps = {
+      now: NOW,
+      resolveRows: async () => [parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 7200 } })],
+      isAgentLive: (agentId) => { touched.add('isAgentLive'); return agentId === 'agent-pan-1'; },
+      emitActivity: () => { touched.add('emitActivity'); },
+      emitEvent: () => { touched.add('emitEvent'); },
+    };
+    await runStallSweeperPatrol(deps);
+    expect([...touched].sort()).toEqual(['emitActivity', 'emitEvent', 'isAgentLive']);
   });
 });
 

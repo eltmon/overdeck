@@ -15,6 +15,7 @@ import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
   getConversationByName,
+  getConversationByTmuxSession,
   createConversation,
   markConversationEnded,
   markConversationActive,
@@ -32,6 +33,7 @@ import {
 import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { cpuClassForConversation } from '../terminal-backends/cpu-class.js';
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
@@ -83,6 +85,7 @@ import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/sto
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
+import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -555,7 +558,7 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
-  const harnessLaunch = await prepareHarnessLaunch(harness);
+  const harnessLaunch = await prepareHarnessLaunch(harness, { model });
   const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
   if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
@@ -781,6 +784,7 @@ export async function spawnConversationSession(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
+        ghShim: { id: tmuxSession, denyGrantLabels: tmuxSession === FLYWHEEL_CONVERSATION_SESSION },
         // Hooks attribute by OVERDECK_AGENT_ID when there is no $TMUX to read (Herdr).
         overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || primeLaunch || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
@@ -833,6 +837,8 @@ export async function spawnConversationSession(
         cwd,
         agentId: tmuxSession,
         argv: ['bash', launcherScript],
+        // PAN-4311: a lane row launches as `lane` (read from the row, so a resume keeps it).
+        cpuClass: cpuClassForConversation(getConversationByTmuxSession(tmuxSession)?.laneRole, role),
         env: {
           ...BLANKED_PROVIDER_ENV,
           ...(primeLaunch?.paneEnv ?? {}),

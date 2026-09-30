@@ -95,6 +95,8 @@ export interface Decision {
   pendingQuestionPrompt?: PendingInputSubject['pendingQuestionPrompt'];
   /** The pending input reason from the agent enrichment (for classification). */
   pendingQuestionReason?: PendingInputSubject['pendingQuestionReason'];
+  /** PAN-4371 — advisory Jev reading of why a bare agentTurnEnded kind happened. */
+  turnEndAssessment?: PendingInputSubject['turnEndAssessment'];
 }
 
 /**
@@ -208,6 +210,7 @@ export function useDecisions(): Decision[] {
         blocking: isBlockingDecision(s.kinds),
         pendingQuestionPrompt: s.pendingQuestionPrompt,
         pendingQuestionReason: s.pendingQuestionReason,
+        turnEndAssessment: s.turnEndAssessment,
       });
     }
 

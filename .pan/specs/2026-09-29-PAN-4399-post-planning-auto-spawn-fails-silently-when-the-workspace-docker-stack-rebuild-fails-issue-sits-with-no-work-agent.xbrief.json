@@ -1,0 +1,673 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T13:21:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4399: Post-planning auto-spawn fails silently when the workspace Docker stack rebuild fails; issue sits with no work agent",
+    "updated": "2026-09-29T13:22:02.658Z"
+  },
+  "plan": {
+    "id": "pan-4399",
+    "title": "Post-planning auto-spawn fails silently when the workspace Docker stack rebuild fails; issue sits with no work agent",
+    "status": "running",
+    "uid": "ac39fc76-bd29-4f78-a807-0d70c2184cdb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-29T13:21:04Z",
+    "updated": "2026-09-29T13:22:02.658Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4399",
+        "label": "PAN-4399",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4399.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "planning",
+      "auto-start",
+      "deacon-lite",
+      "derived-state",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "When planning finalizes with auto-start and the workspace docker stack is unhealthy, complete-planning posts /api/workspaces/:id/rebuild-and-start, treats its immediate 200 as 'work agent spawned', and the detached rebuild then fails with only one activity line. Nothing journals or retries it, and because the plan commit puts the feature branch ahead of main, deriveIssueState shows the agentless issue as 'working'. PAN-4370 and PAN-4384 sat 7-9 hours this way on 2026-09-29.",
+      "Proposal": "Treat a stack-unhealthy auto-start refusal as a PAN-4155 deferred hand-off (reason 'stack-unhealthy') retried by deacon-lite, drop the fire-and-forget rebuild-and-start hop, journal handoff.started on accepted auto-starts, and derive a new 'work-not-started' attention plus a workStart detail from the workspace journal so Command Deck shows 'Work agent not started' / 'Work start retrying' instead of 'Working' and the Needs-you strip offers Start work with the error.",
+      "NonGoals": "- Spawning the work agent without the docker stack when plan items do not need it\n- Fixing docker address-pool exhaustion\n- Retrying failures that happen after an accepted spawn (container-wait timeout, background pan start failure); they are surfaced, not retried\n- Changing the nine-state precedence or deriveState\n- God View changes and cockpit NeedsYouSlot kinds\n- Changing DEFERRED_HANDOFF_WINDOW_MS, the backoff, or SPAWN_STACK_REBUILD_* constants\n- Removing the /api/workspaces/:id/rebuild-and-start route or the dashboard Rebuild & start action\n- Showing Needs-you for planned issues that never had an auto-start (no handoff journal entry)\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse the PAN-4155 deferred hand-off for stack-unhealthy refusals (reason 'stack-unhealthy') instead of a new retry loop",
+        "rationale": "The retry POSTs /api/agents whose stack gate already runs the bounded in-process rebuild (same rebuildWorkspaceStack as pan workspace rebuild); one schedule, journaled, restart-safe."
+      },
+      {
+        "summary": "Remove the fire-and-forget rebuild-and-start hop from the auto-start path; keep the route and UI action",
+        "rationale": "Its 200 was reported as workAgentSpawned:true before anything ran (root cause of PAN-4384), and it would race deacon-lite's +2 min retry on the same compose project."
+      },
+      {
+        "summary": "Surface late failures after an accepted spawn via a journaled handoff.started plus a 10-minute grace, not by retrying them",
+        "rationale": "The container-wait path returns success before the outcome; derivation catches any such path generically without adding retry state to spawn-helpers."
+      },
+      {
+        "summary": "Add IssueAttention 'work-not-started' and an optional workStart detail instead of changing the nine-state precedence",
+        "rationale": "Additive contract change; consumers override the 'Working' presentation while lanes, action phases and state precedence stay untouched."
+      },
+      {
+        "summary": "Trigger the derivation only when the workspace journal has a handoff.* entry",
+        "rationale": "Human-initiated planning never journals a hand-off and correctly waits for pan start (pickup gate); flagging every planned issue would flood Needs-you."
+      },
+      {
+        "summary": "Scope surfaces to Command Deck and the Kanban/simple Needs-you strip; God View and the cockpit NeedsYouSlot are unchanged",
+        "rationale": "God View only draws agent-backed orbs so it never showed these issues as working; the strip already has a Start work button posting /api/agents; keeps the plan under the 25-file / 6-subsystem finalize limits."
+      },
+      {
+        "summary": "The issue's 'spawn without waiting for the Docker stack' idea is a NonGoal",
+        "rationale": "The issue says 'consider'; work keeps its deliberate hard stack gate (PAN-1645) and per-plan stack need is a separate design."
+      },
+      {
+        "summary": "Keep the 2-hour deferral window for stack failures",
+        "rationale": "Three bounded rebuilds land within ~40 minutes; later retries only detect an operator fix, and the 'Work start retrying' label keeps the issue visible meanwhile."
+      }
+    ],
+    "items": [
+      {
+        "id": "deferral-reason",
+        "title": "Carry the deferral reason (guardrails | stack-unhealthy) through deferred-handoff.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deferred-handoff.ts",
+            "src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-lite-retry-deferred-handoff.test.ts passes including the new stack-unhealthy cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4399.md). In src/lib/cloister/deferred-handoff.ts: export type DeferredHandoffReason = 'guardrails' | 'stack-unhealthy'; add option reason?: DeferredHandoffReason to recordHandoffDeferred and write `reason: options.reason ?? 'guardrails'` instead of the hardcoded `reason: 'guardrails'` (line ~77); add readReason(entry) reading entry.data.reason ('stack-unhealthy' else 'guardrails'); copy `reason` into every handoff.retried entry; at the window give-up (line ~217, `giveUpHandoff(workspacePath, issueId, schedule, 'guardrails', 'spawn guardrails still refused the work agent', emitActivity)`) pass the read reason and the message 'the workspace docker stack is still unhealthy' for stack-unhealthy, preferring the last retry's data.error when present. Update the module header comment. Tests use the file's existing injected-`now` pattern (no real timers)."
+        },
+        "items": [
+          {
+            "id": "deferral-reason.ac1",
+            "title": "Given a handoff.deferred entry with data.reason 'stack-unhealthy' and now past nextRetryAt, when retryDeferredHandoffs runs with a spawn stub answering { spawned: false, skippedReason: 'stack-unhealthy' }, then it appends handoff.retried whose data.reason is 'stack-unhealthy' and whose nextRetryAt is later",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reason.ac2",
+            "title": "Given the same deferral and a spawn stub answering { spawned: true }, when retryDeferredHandoffs runs, then it appends handoff.started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reason.ac3",
+            "title": "Given the same deferral with now >= deferredAt + DEFERRED_HANDOFF_WINDOW_MS, when retryDeferredHandoffs runs, then it appends handoff.abandoned with outcome 'gave-up' and skipReason 'stack-unhealthy' and emits a warn activity whose message contains 'pan start'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reason.ac4",
+            "title": "Given recordHandoffDeferred is called without a reason, then the journal entry's data.reason defaults to 'guardrails' (existing guardrail tests keep passing unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-defer-stack",
+        "title": "Defer a stack-unhealthy auto-start instead of posting rebuild-and-start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/cli/commands/plan-finalize.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes with the replaced stack-unhealthy test",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 steps 1-3, 5-6. In completePlanningAutoSpawn (src/lib/overdeck/planning-promotion.ts) delete the whole `if (skipReason === 'stack-unhealthy') { ... /rebuild-and-start ... }` block (~lines 524-545) and change the deferral flag to `...((skipReason === 'guardrails' && body['guardrails']) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {})`. In recordPlanningAutoHandoffDeferred pass reason ('stack-unhealthy' when result.workAgentSkipReason is 'stack-unhealthy', else 'guardrails') to recordHandoffDeferred and build console/activity text from a cause string ('the workspace docker stack is unhealthy' | 'spawn guardrails'), keeping the Deacon-frozen variant. Use the same cause wording in the completePlanningForIssue response message (~lines 980-986). In src/cli/commands/plan-finalize.ts (~line 403) print the deferral cause from the response's workAgentSkipReason instead of hardcoded 'spawn guardrails'. Replace the test 'queues rebuild-and-start without consuming consent before the chained start succeeds' in complete-planning.test.ts. planning-promotion.ts must end at <= 1000 lines. Do NOT remove the /api/workspaces/:id/rebuild-and-start route."
+        },
+        "items": [
+          {
+            "id": "planning-defer-stack.ac1",
+            "title": "Given POST /api/agents answers 422 with a stackHealth body, when completePlanningAutoSpawn runs, then it returns workAgentSpawned false, workAgentSkipReason 'stack-unhealthy' and workAgentDeferred true after exactly one request, and consent is not consumed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-defer-stack.ac2",
+            "title": "`grep -n \"rebuild-and-start\" src/lib/overdeck/planning-promotion.ts` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-defer-stack.ac3",
+            "title": "Given a stack-unhealthy result, when recordPlanningAutoHandoffDeferred runs, then the workspace journal entry has data.reason 'stack-unhealthy' and the emitted activity message does not contain 'guardrails'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-defer-stack.ac4",
+            "title": "`wc -l src/lib/overdeck/planning-promotion.ts` reports 1000 or fewer lines and `bash scripts/lint-file-size.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-handoff-started",
+        "title": "Journal handoff.started when complete-planning's auto-start is accepted",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes including the handoff.started case",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 step 4. In completePlanningForIssue's success branch (search `work-agent startup accepted`), when autoSpawnResult?.workAgentSpawned and workspacePath exists, call appendPipelineEntry(workspacePath, { type: 'handoff.started', issueId: id.toUpperCase(), source: 'complete-planning', data: { agentId: autoSpawnResult.workAgentSession, ...(autoSpawnResult.workAgentQueued ? { queued: true } : {}) } }) (import from ../cloister/pipeline-journal.js). Keep planning-promotion.ts <= 1000 lines. Add a complete-planning test that an accepted auto-start writes the entry."
+        },
+        "items": [
+          {
+            "id": "journal-handoff-started.ac1",
+            "title": "Given the auto-start POST is accepted, when completePlanningForIssue finishes, then the workspace .overdeck/pipeline.jsonl gains a handoff.started entry with source 'complete-planning' and data.agentId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-handoff-started.ac2",
+            "title": "Given the accepted response carried startingContainers true, then the handoff.started entry carries data.queued true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-handoff-started.ac3",
+            "title": "Given the auto-start was refused, then no handoff.started entry is appended by complete-planning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-work-start",
+        "title": "Add work-not-started attention and DerivedWorkStart to the derived-issue-state contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4399",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/derived-issue-state.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ],
+          "foundationFor": [
+            "derive-work-start",
+            "command-deck-work-start",
+            "needs-you-strip-work-start"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In packages/contracts/src/derived-issue-state.ts add \"work-not-started\" to the IssueAttention literals (doc comment: auto-start was attempted but no work agent came up) and to ISSUE_ATTENTIONS; add `export const DerivedWorkStart = Schema.Struct({ status: Schema.Literals([\"retrying\", \"not-started\"]), at: Schema.String, error: Schema.optional(Schema.String), nextRetryAt: Schema.optional(Schema.String) })` with its type, and `workStart: Schema.optional(DerivedWorkStart)` on DerivedIssueState. packages/contracts/dist is untracked; commit source only."
+        },
+        "items": [
+          {
+            "id": "contract-work-start.ac1",
+            "title": "isIssueAttention('work-not-started') returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-work-start.ac2",
+            "title": "Given a DerivedIssueState payload with workStart { status: 'not-started', at: <iso>, error: 'x' }, Schema decoding accepts it and returns the workStart; a payload without workStart is also accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-work-start.ac3",
+            "title": "npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derive-work-start",
+        "title": "Derive workStart and work-not-started attention from the workspace journal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/work-start-state.ts",
+            "src/lib/overdeck/__tests__/work-start-state.test.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/dashboard/server/services/__tests__/derived-issue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/work-start-state.test.ts src/dashboard/server/services/__tests__/derived-issue-state.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint (including lint:circular and file-size) exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "command-deck-work-start",
+            "needs-you-strip-work-start"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/lib/overdeck/work-start-state.ts exporting WORK_START_GRACE_MS = 10 * 60_000, WorkStartFacts { lastHandoff: {type, at, data?} | null; workAgentStartedAt: number | null }, readWorkStartFacts(issueId, projectPath) (workspace path = getWorkspaceForIssue(ID)?.path from src/lib/workspaces/resolver.ts, else join(projectPath,'workspaces','feature-'+lower); null when missing or lastPipelineEntry(path,'handoff.') is null; workAgentStartedAt from getAgentState('agent-'+lower)?.startedAt imported from src/lib/agents/agent-state-read.js; try/catch -> null) and pure deriveWorkStart(facts, now) with the PRD rules: agent startedAt >= entry at -> undefined; deferred/retried -> {status:'retrying', at, error, nextRetryAt}; abandoned with outcome 'gave-up' -> {status:'not-started', at, error}; started and now-at > grace -> {status:'not-started', at, error:'The work agent was accepted but never started' + (queued ? ' (container startup did not finish)' : '')}; else undefined. In derived-issue-state.ts: IssueStateFacts.workStart?; deriveIssueState sets derived.workStart when no PR, not merged, no live pane, and sets attention 'work-not-started' for status 'not-started' when no other attention; IssueStateLoaderDeps.readWorkStart?; both loadIssueStateFacts and loadIssueStatesForProject call it only for no-PR issues. derived-issue-state.ts stays <= 1000 lines. Do not change deriveState."
+        },
+        "items": [
+          {
+            "id": "derive-work-start.ac1",
+            "title": "Given a journal whose last handoff entry is handoff.abandoned outcome 'gave-up' with error E and no started work agent, deriveWorkStart returns status 'not-started' with error E",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-work-start.ac2",
+            "title": "Given a last entry handoff.started 11 minutes before now with data.queued true and no started agent, deriveWorkStart returns status 'not-started' whose error ends with '(container startup did not finish)'; at 5 minutes it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-work-start.ac3",
+            "title": "Given a last entry handoff.deferred and an agent-<issue> startedAt later than the entry, deriveWorkStart returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-work-start.ac4",
+            "title": "Given facts with branch.aheadOfMain 1, no PR, no panes and a not-started workStart, deriveIssueState returns state 'working', attention 'work-not-started' and workStart.status 'not-started'; with a live pane it returns no workStart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derive-work-start.ac5",
+            "title": "Given a handoff.deferred last entry, deriveIssueState returns workStart.status 'retrying' and no attention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-deck-work-start",
+        "title": "Command Deck: 'Work agent not started' / 'Work start retrying' badge, Needs-you grouping and subline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. featureStateBadge.ts: FeatureStateBadgeInput.workStart?: DerivedWorkStart | null; resolveFeatureStateBadge returns { key:'work-not-started', label:'Work agent not started', tone:'human', title:'Planning finished but the work agent never started. Start it from Needs you or run pan start.' } for status 'not-started' and { key:'work-start-retrying', label:'Work start retrying', tone:'machine', title:'The automatic work-agent start was refused and is being retried.' } for 'retrying', checked before the plain state badge. FeatureItem.tsx (~line 625) passes workStart: storeDerived?.workStart. pipeline-helpers.ts: isNeedsYouFeature true for attention 'work-not-started'; sublineFor's Needs-you branch returns `work agent not started — ${derived.workStart?.error ?? 'run pan start'}` for it; outside Needs-you, a 'retrying' workStart returns 'work agent start retrying' before the phase==='work' line. Follow the pan-style-guide skill rules (no new colors; reuse existing tones)."
+        },
+        "items": [
+          {
+            "id": "command-deck-work-start.ac1",
+            "title": "Given storeState 'working' and workStart status 'not-started', resolveFeatureStateBadge returns label 'Work agent not started' with tone 'human'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-work-start.ac2",
+            "title": "Given storeState 'working' and workStart status 'retrying', resolveFeatureStateBadge returns label 'Work start retrying'; without workStart it still returns 'Working'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-work-start.ac3",
+            "title": "Given derived attention 'work-not-started' with workStart.error 'docker compose failed', isNeedsYouFeature returns true and sublineFor returns a string containing 'work agent not started' and 'docker compose failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-strip-work-start",
+        "title": "Needs-you strip: 'Work agent not started' card with the error and Start work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+            "src/dashboard/frontend/src/lib/simple/derive.ts",
+            "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+            "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. issuePipelineState.ts derivePipelineState: in case 'working', when derived.attention === 'work-not-started' and no live work pane, return 'planning_done_awaiting_work' (already needs-you 'start-work' with 'Start work' in userFacingState.ts:60); 'retrying' keeps the existing mapping. simple/derive.ts: SimpleIssueDerivation.workStartError = derived?.workStart?.status === 'not-started' ? (derived.workStart.error ?? null) : null. NeedsYouStrip.tsx NeedsYouRow: when kind === 'start-work' && item.workStartError, label 'Work agent not started' instead of KIND_META label and render item.workStartError as the sentence; keep the existing Start work button (actions.startWork -> POST /api/agents). New NeedsYouStrip.test.tsx renders the row with a mocked store/actions."
+        },
+        "items": [
+          {
+            "id": "needs-you-strip-work-start.ac1",
+            "title": "Given derived { state: 'working', attention: 'work-not-started' } and no panes, derivePipelineState returns 'planning_done_awaiting_work'; given { state: 'working' } without attention it still returns 'in_progress_work_idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-strip-work-start.ac2",
+            "title": "Given derived workStart { status: 'not-started', error: 'E' }, deriveSimpleIssue returns workStartError 'E' and display.state 'needs-you'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-strip-work-start.ac3",
+            "title": "The Needs-you strip renders a card for that issue showing 'Work agent not started', the text 'E', and an enabled 'Start work' button whose click posts to /api/agents with the issue id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-work-start",
+        "title": "Document stack-unhealthy deferral, handoff.started and the work-not-started derivation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T13:21:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4399",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"stack-unhealthy\" docs/PIPELINE-GATES.md",
+            "grep -n \"work-not-started\" docs/DASHBOARD-ARCHITECTURE.md docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new stack-unhealthy lines",
+            "grep prints the work-not-started lines in both docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. docs/PIPELINE-GATES.md: extend the 'Deferred planning hand-off (PAN-4155)' bullet (~line 726) with stack-health refusals (422 with stackHealth) deferred as reason 'stack-unhealthy', no rebuild-and-start from the auto-start, each retry's /api/agents runs the bounded spawn-time rebuild (3 attempts, 15-minute cooldown); journal table (~874-875): handoff.deferred names both reasons and a row for handoff.started written by completePlanningForIssue on an accepted auto-start; deacon-lite retry text (~1035-1065): give-up names both reasons; add subsection 'Work agent not started (PAN-4399)' with the derivation rules, WORK_START_GRACE_MS (10 minutes), and the Command Deck / Needs-you strip labels. docs/DASHBOARD-ARCHITECTURE.md near the attention table (~668) and paragraph (~731): list the work-not-started attention and the surfaces that render it. docs/WORKSPACE-CONTAINERS.md does not exist and the stack step is unchanged — do not create it."
+        },
+        "items": [
+          {
+            "id": "docs-work-start.ac1",
+            "title": "`grep -n \"stack-unhealthy\" docs/PIPELINE-GATES.md` returns the deferral text stating a stack-unhealthy refusal is journaled as handoff.deferred and retried by deacon-lite, and `grep -n \"handoff.started\" docs/PIPELINE-GATES.md` returns a journal-table row naming completePlanningForIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-work-start.ac2",
+            "title": "docs/PIPELINE-GATES.md contains a 'Work agent not started (PAN-4399)' subsection that states the 10-minute grace and the 'Work agent not started' / 'Work start retrying' labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-work-start.ac3",
+            "title": "`grep -n \"work-not-started\" docs/DASHBOARD-ARCHITECTURE.md` returns a line that names Command Deck and the Needs-you strip as the surfaces that render it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deferral-reason",
+        "to": "planning-defer-stack",
+        "type": "blocks"
+      },
+      {
+        "from": "planning-defer-stack",
+        "to": "journal-handoff-started",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-work-start",
+        "to": "derive-work-start",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-work-start",
+        "to": "command-deck-work-start",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-work-start",
+        "to": "needs-you-strip-work-start",
+        "type": "blocks"
+      },
+      {
+        "from": "derive-work-start",
+        "to": "docs-work-start",
+        "type": "informs"
+      },
+      {
+        "from": "planning-defer-stack",
+        "to": "docs-work-start",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4399-post-planning-auto-spawn-fails-silently-when-the-workspace-docker-stack-rebuild-fails-issue-sits-with-no-work-agent.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

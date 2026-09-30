@@ -11,6 +11,8 @@ export interface MemoryHealthSnapshot {
   last_failure: string | null;
   /** Human-readable cause of the most recent failure (provider error text). */
   last_failure_detail?: string | null;
+  /** Reason paired with `last_failure_detail` (PAN-4370). */
+  last_failure_reason?: string | null;
   extractions_attempted: number;
   extractions_succeeded: number;
   failed_by_reason: Record<string, number>;
@@ -59,10 +61,12 @@ export async function updateMemoryHealth(
   // the provider policy already captured the real provider error). Clear it on
   // success so a recovered pipeline doesn't keep showing a stale cause.
   const nextDetail = update.success ? null : (update.detail ?? current.last_failure_detail ?? null);
+  const nextReason = update.success ? null : (update.detail ? (update.reason ?? null) : (current.last_failure_reason ?? null));
   const next: MemoryHealthSnapshot = {
     ...current,
     status: update.status,
     last_failure_detail: nextDetail,
+    last_failure_reason: nextReason,
     extractions_attempted: current.extractions_attempted + 1,
     extractions_succeeded: current.extractions_succeeded + (update.success ? 1 : 0),
     last_success: update.success ? now : current.last_success,

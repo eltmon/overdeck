@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { AgentSnapshot } from '@overdeck/contracts';
-import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue } from '../simple/derive';
+import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue, isBareTurnEnd, isPlanReadyToStart } from '../simple/derive';
 import { simpleStepIndex } from '../simple/phases';
 import type { BackendPane, DerivedIssueState, DerivedIssueStateName, Issue } from '../../types';
 
@@ -47,6 +47,33 @@ const pane = (role: BackendPane['role'], state: BackendPane['state'] = 'working'
 const WORK = [pane('work')];
 const PLAN = [pane('plan')];
 const PLAN_STOPPED = [pane('plan', 'exited')];
+
+describe('isBareTurnEnd — turn-end assessment override (PAN-4371)', () => {
+  it('a confident asks_operator reading is not a bare turn end', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'], turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' } });
+    expect(isBareTurnEnd(a)).toBe(false);
+  });
+
+  it('a confident reports_complete reading is still a bare turn end', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'], turnEndAssessment: { kind: 'reports_complete', confidence: 0.9, needsAnswer: false, model: 'm' } });
+    expect(isBareTurnEnd(a)).toBe(true);
+  });
+
+  it('no assessment keeps today\'s answer', () => {
+    const a = agent({ pendingInputKinds: ['agentTurnEnded'] });
+    expect(isBareTurnEnd(a)).toBe(true);
+  });
+
+  it('isPlanReadyToStart is false for a plan agent with a confident asks_operator reading', () => {
+    const issue = makeIssue({ hasPlan: true });
+    const planAgent = agent({
+      role: 'plan',
+      pendingInputKinds: ['agentTurnEnded'],
+      turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' },
+    });
+    expect(isPlanReadyToStart(issue, planAgent)).toBe(false);
+  });
+});
 
 describe('deriveSimpleIssue', () => {
   it('working issue with a running work agent → working / Writing code', () => {
@@ -242,6 +269,30 @@ describe('deriveSimpleIssue', () => {
     expect(d.rail.work).toBe('done');
     expect(d.rail.review).toBe('current');
     expect(d.rail.ship).toBe('pending');
+  });
+
+  // PAN-4399: workStartError carries the not-started reason through to the
+  // needs-you card; a retrying or absent workStart carries nothing.
+  it('a not-started workStart carries its error as workStartError and reads as needs-you', () => {
+    const d = deriveSimpleIssue(makeIssue(), [], derived('working', {
+      attention: 'work-not-started',
+      workStart: { status: 'not-started', at: '2026-09-29T10:00:00.000Z', error: 'gave up' },
+    }));
+    expect(d.workStartError).toBe('gave up');
+    expect(d.display.state).toBe('needs-you');
+    expect(d.display.primaryAction).toBe('Start work');
+  });
+
+  it('a retrying workStart carries no workStartError', () => {
+    const d = deriveSimpleIssue(makeIssue(), [agent()], derived('working', {
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z' },
+    }), WORK);
+    expect(d.workStartError).toBeNull();
+  });
+
+  it('no workStart at all carries no workStartError', () => {
+    const d = deriveSimpleIssue(makeIssue(), [agent()], derived('working'), WORK);
+    expect(d.workStartError).toBeNull();
   });
 });
 

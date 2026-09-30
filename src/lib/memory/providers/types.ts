@@ -38,6 +38,18 @@ export interface ExtractionProvider {
   extract<T>(prompt: string, jsonSchema: unknown, options?: ExtractionProviderOptions): Promise<ExtractionProviderResult<T>>;
 }
 
+/** The provider could not authenticate (missing or rejected credentials). Policy records it as `provider-auth-failed` (PAN-4370). */
+export class ExtractionProviderAuthError extends Error {
+  readonly name = 'ExtractionProviderAuthError';
+  constructor(readonly provider: string, message: string, options?: { cause?: unknown }) {
+    super(message, options);
+  }
+}
+
+export function isExtractionProviderAuthError(error: unknown): error is ExtractionProviderAuthError {
+  return error instanceof ExtractionProviderAuthError;
+}
+
 export interface ExtractionProviderTarget {
   provider: string;
   model: string;

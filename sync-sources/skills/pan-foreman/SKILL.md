@@ -4,8 +4,9 @@ description: >-
   The work-agent protocol for an issue whose xBRIEF plan has parallel waves.
   The foreman is the issue's work agent: it dispatches same-family workers as
   in-harness subagents in worktrees and cross-family workers as terminal-backend
-  panes via `pan spawn`, owns claim/commit/`pan task done` per item, integrates
-  every item onto the feature branch, and runs `pan done` once at the end.
+  panes via `pan spawn`, has every worker commit on its own item branch and
+  hand back, integrates each item onto the feature branch and runs `pan task
+  done` for it, and runs `pan done` once at the end.
 triggers:
   - pan foreman
   - foreman
@@ -40,17 +41,22 @@ metadata names `role: work`.
   pan spawn --issue <id> --item <item-id> --model <model> [--harness <h>]
   ```
 
-  This creates a worker pane inside the issue's workspace, stamped with
-  backend metadata `issue=<id>`, `role=worker`, `harness=<h>`, `model=<m>`.
+  This creates a worker pane in its own item worktree
+  `<workspace>/.swarm/<item-id>/` on branch `<feature-branch>-<item-id>`.
+
+  `--shared` runs the pane in the issue workspace instead, on the feature
+  branch. Use it only for strictly serial work, when no other worker is
+  running in the workspace. Only the foreman or the operator may pass it:
+  `pan spawn --shared` from a worker pane exits 1.
 
 Either way, give the worker an exact file-ownership map (which files/paths
-this item owns) restated in its dispatch prompt — concurrent workers in one
-worktree WILL clobber shared files. Items whose ownership maps overlap run
-serially, in the same wave, never concurrently; disjoint items run
-concurrently. `pan task claim` now enforces the no-overlap rule itself: it
-refuses an item whose `files_scope` overlaps another item a running agent
-already holds, so a dispatch mistake fails the claim instead of silently
-clobbering files.
+this item owns) restated in its dispatch prompt — every worker has its own
+worktree, but overlapping items still conflict when you integrate them.
+Items whose ownership maps overlap run serially, in the same wave, never
+concurrently; disjoint items run concurrently. `pan task claim` now enforces
+the no-overlap rule itself: it refuses an item whose `files_scope` overlaps
+another item a running agent already holds, so a dispatch mistake fails the
+claim instead of silently clobbering files.
 
 ## Per-item protocol (every worker follows this)
 
@@ -61,28 +67,47 @@ clobbering files.
    only the foreman or the operator passes `--steal` to override the refusal.
    A `pan spawn` worker pane claims under its own pane name
    (`OVERDECK_CLAIM_ID`, set by `pan spawn`), so its claim can be liveness-checked.
-2. Implement. One item, one concern.
-3. One commit with the trailer `Item: <item-id>`, on the worker's own branch
-   (its worktree branch for an in-harness subagent, or the feature branch
-   directly for a `pan spawn` pane working in the shared workspace).
-4. Push (a `pan spawn` pane pushes the feature branch itself; an in-harness
-   subagent hands its worktree back to the foreman, which integrates and
-   pushes).
-5. `pan task done <id> <item-id>` — verifies the `Item:` trailer is present
-   on a pushed commit on the feature branch and records completion in
-   `.pan/continues/<id>.xbrief.json`. Run this from wherever the commit
-   actually landed on the feature branch — after the foreman's integration
-   step for an in-harness subagent, immediately for a `pan spawn` pane.
+2. Implement. One item, one concern; run only the touched tests.
+3. One commit with the trailer `Item: <item-id>`, on the worker's current
+   branch — its item branch `<feature-branch>-<item-id>` (or the feature
+   branch for a `--shared` pane).
+4. Hand back: report the commit sha and branch to the foreman — an
+   in-harness subagent does this in its final result; a `pan spawn` pane
+   does it with `pan tell <foreman-agent-id> "<item-id> committed <sha> on
+   <branch>"`. Then stop.
+5. The worker does not push, does not run `pan task done`, and never runs
+   `pan done`.
 
-A worker never runs `pan done` — only the foreman does, once, at the end.
+### Dispatch prompt for a worker
+
+Fill this in and send it with `pan tell <pane-id>` after `pan spawn` prints
+the pane id (or pass it as the `Agent` prompt for an in-harness subagent):
+
+```
+Issue: <issue-id>
+Item: <item-id>
+File ownership: <the file-ownership map for this item>
+Foreman agent id: <$OVERDECK_AGENT_ID>
+
+Steps:
+1. `pan task claim <issue-id> <item-id>`.
+2. Implement. One item, one concern; run only the touched tests.
+3. One commit with the trailer `Item: <item-id>`, on your current branch.
+4. Hand back: report the commit sha and branch to the foreman — in your
+   final result if you are a subagent, or with
+   `pan tell <foreman-agent-id> "<item-id> committed <sha> on <branch>"` if
+   you are a pane. Then stop.
+5. Do not push, do not run `pan task done`, and never run `pan done`.
+```
 
 ## Foreman-only responsibilities
 
-- **Integrate.** Pull each in-harness subagent's worktree commit onto the
-  feature branch (cherry-pick or merge — if you squash, re-add the `Item:`
-  trailer so `pan task done` can still find it) and push. A `pan spawn`
-  pane already commits and pushes directly to the shared feature branch, so
-  there is nothing to integrate for those — just confirm the push landed.
+- **Integrate.** For each handed-back item, confirm the commit from the
+  issue workspace with
+  `git log --format=%H -E --grep='^Item: <item-id>[[:space:]]*$' <feature-branch>..<feature-branch>-<item-id>`,
+  cherry-pick or merge it onto the feature branch (re-add the `Item:`
+  trailer if you squash; nothing to pick for a `--shared` worker), `git
+  push`, then `pan task done <id> <item-id>`.
 - **Own messaging.** Only the foreman's pane (`role: work`) or an operator
   conversation may `pan tell` a worker pane; a worker pane refuses a prompt
   from anything else (backend-enforced, FR-17). Workers do not message each

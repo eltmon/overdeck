@@ -47,6 +47,27 @@ describe('derivePipelineState (PAN-3917)', () => {
     expect(derivePipelineState({ derived: derived('working'), panes: [pane('work', 'exited')] })).toBe('in_progress_work_idle');
   });
 
+  // PAN-4399: a gave-up auto-start with no live work pane reads as awaiting
+  // work, same as a plan nobody started — Start work is the right action.
+  it('working + attention work-not-started + no live work pane → awaiting work', () => {
+    expect(derivePipelineState({ derived: derived('working', { attention: 'work-not-started' }) })).toBe('planning_done_awaiting_work');
+  });
+
+  it('working + attention work-not-started + a live work pane → still running', () => {
+    expect(derivePipelineState({
+      derived: derived('working', { attention: 'work-not-started' }),
+      panes: [pane('work', 'working')],
+    })).toBe('in_progress_work_running');
+  });
+
+  it('a retrying workStart does not change the idle mapping', () => {
+    expect(derivePipelineState({
+      derived: derived('working', {
+        workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z' },
+      }),
+    })).toBe('in_progress_work_idle');
+  });
+
   it('reads the review states off the derived state and the PR review state', () => {
     expect(derivePipelineState({ derived: derived('in-review') })).toBe('in_review_reviewers_running');
     expect(derivePipelineState({

@@ -115,3 +115,31 @@ function process(
 ): HostProcessRecord {
   return { pid, ppid, command, cpuPercent, memoryBytes, cgroup };
 }
+
+describe('getHostProcessesSnapshot from the runaway patrol sample (PAN-4311 AC-6)', () => {
+  it('attributes a Herdr-hosted git to its agent through the harness pid', async () => {
+    const { getHostProcessesSnapshot } = await import('../../../../src/dashboard/server/routes/resources/host-processes.js');
+    const rows = getHostProcessesSnapshot({
+      records: [
+        { pid: 100, ppid: 1917, command: 'herdr server', cpuPercent: 5, memoryBytes: 50_000_000 },
+        { pid: 200, ppid: 100, command: 'bash', cpuPercent: 0, memoryBytes: 4_000_000 },
+        { pid: 300, ppid: 200, command: 'claude --model opus', cpuPercent: 40, memoryBytes: 400_000_000 },
+        { pid: 400, ppid: 300, command: 'bash -c git log -S fly-hoff | head', cpuPercent: 0, memoryBytes: 3_000_000 },
+        { pid: 401, ppid: 400, command: 'git log --all --oneline -S fly-hoff', cpuPercent: 90, memoryBytes: 80_000_000 },
+      ],
+      agentSessions: [{ agentId: 'conv-2884', rootPid: 300 }],
+      coreServicePids: [100, 4242],
+    });
+
+    expect(rows.length).toBeGreaterThan(0);
+    const git = rows.find((row) => row.family === 'git');
+    expect(git).toMatchObject({ owner: { agentId: 'conv-2884' }, pids: [401], cpuPercent: 90 });
+    expect(rows.flatMap((row) => row.pids)).not.toContain(100);
+    expect(rows.flatMap((row) => row.pids)).not.toContain(300);
+  });
+
+  it('returns no rows before the patrol has sampled', async () => {
+    const { getHostProcessesSnapshot } = await import('../../../../src/dashboard/server/routes/resources/host-processes.js');
+    expect(getHostProcessesSnapshot(null)).toEqual([]);
+  });
+});

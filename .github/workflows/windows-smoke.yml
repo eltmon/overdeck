@@ -1,0 +1,252 @@
+# PAN-4331: does `npx @overdeck/core` and the Session Vault B-flow (join → list →
+# resume, with the code snapshot) work on native Windows and in WSL2?
+#
+# pack     builds the subject tarball exactly as release.yml publishes it
+# fixture  saves a Claude Code conversation with uncommitted code into a vault, on Linux
+# windows  continues it natively on windows-2022, under pwsh and under Git Bash;
+#          a third, diagnostic leg reruns pwsh with core.autocrlf=false to see what
+#          breaks behind the autocrlf blocker at step 3a (it rates nothing itself)
+# wsl      continues it inside Ubuntu-24.04 on WSL2 (WSL1 fallback, PRD CP-3)
+# summary  turns the results into one table (job summary + artifact)
+#
+# Manual and path-triggered only; not part of ci.yml and not a required check.
+# Scripts and the step catalogue: scripts/windows-smoke/, .pan/drafts/PAN-4331.md.
+name: windows-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/windows-smoke.yml
+      - scripts/windows-smoke/**
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Pack
+        run: |
+          mkdir -p subject
+          npm pack --ignore-scripts --pack-destination subject
+
+      - name: Tarball contains the dashboard bundle (CP-1)
+        run: |
+          tar tzf subject/*.tgz > subject-files.txt
+          grep -qx 'package/dist/dashboard/server.js' subject-files.txt
+          grep -qx 'package/dist/dashboard/public/index.html' subject-files.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: subject
+          path: subject/*.tgz
+          if-no-files-found: error
+
+  fixture:
+    needs: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: subject
+          path: ${{ runner.temp }}/subject
+
+      - name: Build the fixture
+        run: SUBJECT_TGZ="$(ls "$RUNNER_TEMP"/subject/*.tgz)" bash scripts/windows-smoke/make-fixture.sh "$RUNNER_TEMP/fx"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixture
+          path: |
+            ${{ runner.temp }}/fx/origin.git
+            ${{ runner.temp }}/fx/vault.git
+            ${{ runner.temp }}/fx/passphrase.txt
+            ${{ runner.temp }}/fx/fixture.json
+          if-no-files-found: error
+
+  windows:
+    needs: [pack, fixture]
+    runs-on: windows-2022
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [pwsh, gitbash, pwsh-autocrlf-false]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code
+        run: npm i -g @anthropic-ai/claude-code
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: subject
+          path: ${{ runner.temp }}/subject
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: fixture
+          path: ${{ runner.temp }}/fixture
+
+      - name: Probe (pwsh)
+        if: matrix.shell == 'pwsh'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $tgz = (Get-ChildItem "$env:RUNNER_TEMP\subject\*.tgz").FullName
+          pwsh -NoProfile -File scripts/windows-smoke/probe.ps1 -Env windows-pwsh -Subject $tgz -Fixture "$env:RUNNER_TEMP\fixture" -Out results/windows-pwsh.json
+
+      - name: Probe (pwsh, core.autocrlf=false; diagnostic)
+        if: matrix.shell == 'pwsh-autocrlf-false'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          $tgz = (Get-ChildItem "$env:RUNNER_TEMP\subject\*.tgz").FullName
+          pwsh -NoProfile -File scripts/windows-smoke/probe.ps1 -Env windows-pwsh-autocrlf-false -Subject $tgz -Fixture "$env:RUNNER_TEMP\fixture" -Out results/windows-pwsh-autocrlf-false.json
+
+      # Git Bash exports HOME=/c/Users/<user>; pass it on explicitly (PRD CP-4).
+      - name: Probe (Git Bash)
+        if: matrix.shell == 'gitbash'
+        continue-on-error: true
+        shell: bash
+        run: |
+          tmp="$(cygpath -u "$RUNNER_TEMP")"
+          tgz="$(ls "$tmp"/subject/*.tgz)"
+          echo "HOME=$HOME"
+          HOME="$HOME" pwsh -NoProfile -File scripts/windows-smoke/probe.ps1 -Env windows-gitbash \
+            -Subject "$(cygpath -w "$tgz")" -Fixture "$(cygpath -w "$tmp/fixture")" -Out results/windows-gitbash.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-windows-${{ matrix.shell }}
+          path: results/*.json
+          if-no-files-found: warn
+
+  wsl:
+    needs: [pack, fixture]
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: subject
+          path: ${{ runner.temp }}/subject
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: fixture
+          path: ${{ runner.temp }}/fixture
+
+      - name: Set up WSL2
+        id: wsl2
+        continue-on-error: true
+        uses: Vampire/setup-wsl@v7
+        with:
+          distribution: Ubuntu-24.04
+          wsl-version: 2
+
+      # CP-3: when WSL2 does not start, record why and prove the flow on WSL1.
+      - name: Set up WSL1 (fallback)
+        if: steps.wsl2.outcome == 'failure'
+        uses: Vampire/setup-wsl@v7
+        with:
+          distribution: Ubuntu-24.04
+          wsl-version: 1
+
+      - name: WSL status
+        continue-on-error: true
+        shell: pwsh
+        env:
+          WSL_UTF8: '1'
+        run: |
+          $f = "$env:RUNNER_TEMP\wsl-status.txt"
+          "setup-wsl wsl-version 2 outcome: ${{ steps.wsl2.outcome }}" | Out-File -FilePath $f -Encoding utf8NoBOM
+          wsl --status *>&1 | Out-File -FilePath $f -Append -Encoding utf8NoBOM
+          wsl -l -v *>&1 | Out-File -FilePath $f -Append -Encoding utf8NoBOM
+          Get-Content $f
+
+      # The Windows checkout has CRLF line endings (core.autocrlf=true is the
+      # runner default the probes observe), so strip CRs before bash runs it.
+      - name: Probe (WSL)
+        continue-on-error: true
+        shell: wsl-bash {0}
+        run: |
+          env_name=${{ steps.wsl2.outcome == 'failure' && 'wsl1-fallback' || 'wsl2' }}
+          tmp="$(wslpath -u '${{ runner.temp }}')"
+          ws="$(wslpath -u '${{ github.workspace }}')"
+          tr -d '\r' < "$ws/scripts/windows-smoke/probe-wsl.sh" > "$HOME/probe-wsl.sh"
+          GITHUB_SHA='${{ github.sha }}' bash "$HOME/probe-wsl.sh" --env "$env_name" \
+            --subject "$(ls "$tmp"/subject/*.tgz)" --fixture "$tmp/fixture" \
+            --out "$ws/results/$env_name.json" --wsl-status "$tmp/wsl-status.txt"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ steps.wsl2.outcome == 'failure' && 'wsl1-fallback' || 'wsl2' }}
+          path: results/*.json
+          if-no-files-found: warn
+
+  summary:
+    needs: [windows, wsl]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: results-*
+          path: results
+          merge-multiple: true
+
+      - name: Summarize
+        run: |
+          mkdir -p results
+          node scripts/windows-smoke/summarize.mjs results > table.md
+          cat table.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-table
+          path: table.md
+          if-no-files-found: error

@@ -1,0 +1,227 @@
+{
+  "version": "1",
+  "issueId": "PAN-4369",
+  "created": "2026-09-29T04:37:53.207Z",
+  "updated": "2026-09-29T05:28:18.829Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "sdk-dependency": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T04:37:53.207Z",
+      "doneAt": "2026-09-29T04:38:23.100Z"
+    },
+    "sdk-dependency.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:00.938Z"
+    },
+    "sdk-dependency.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:39:13.850Z"
+    },
+    "config-jev-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T04:39:30.281Z",
+      "doneAt": "2026-09-29T04:46:49.853Z"
+    },
+    "config-jev-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:47:03.214Z"
+    },
+    "config-jev-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:47:16.134Z"
+    },
+    "config-jev-block.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:47:29.056Z"
+    },
+    "config-jev-block.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:47:41.883Z"
+    },
+    "config-jev-block.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:47:53.798Z"
+    },
+    "background-ai-jev-features": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T04:48:07.933Z",
+      "doneAt": "2026-09-29T04:51:32.132Z"
+    },
+    "background-ai-jev-features.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:51:46.724Z"
+    },
+    "background-ai-jev-features.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:52:00.185Z"
+    },
+    "background-ai-jev-features.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:52:14.324Z"
+    },
+    "jev-pricing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T04:52:33.308Z",
+      "doneAt": "2026-09-29T04:56:30.488Z"
+    },
+    "jev-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:44.603Z"
+    },
+    "jev-pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:56:58.845Z"
+    },
+    "jev-pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:57:14.973Z"
+    },
+    "jev-config-resolution": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:11:02.720Z",
+      "doneAt": "2026-09-29T05:11:15.053Z"
+    },
+    "jev-config-resolution.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:11:27.402Z"
+    },
+    "jev-config-resolution.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:11:39.339Z"
+    },
+    "jev-config-resolution.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:11:51.836Z"
+    },
+    "jev-memo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:13:01.483Z",
+      "doneAt": "2026-09-29T05:13:16.464Z"
+    },
+    "jev-memo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:13:30.447Z"
+    },
+    "jev-memo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:13:43.756Z"
+    },
+    "jev-memo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:13:56.206Z"
+    },
+    "jev-memo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:14:08.535Z"
+    },
+    "jev-client-assess": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:15:58.717Z",
+      "doneAt": "2026-09-29T05:16:11.004Z"
+    },
+    "jev-client-assess.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:16:22.454Z"
+    },
+    "jev-client-assess.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:16:34.302Z"
+    },
+    "jev-client-assess.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:16:46.679Z"
+    },
+    "jev-client-assess.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:16:58.249Z"
+    },
+    "jev-client-assess.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:17:09.738Z"
+    },
+    "jev-smoke-eval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:18:19.818Z",
+      "doneAt": "2026-09-29T05:18:33.277Z"
+    },
+    "jev-smoke-eval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:18:46.804Z"
+    },
+    "jev-smoke-eval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:18:59.070Z"
+    },
+    "jev-smoke-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:19:11.421Z"
+    },
+    "jev-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:19:57.649Z",
+      "doneAt": "2026-09-29T05:20:11.547Z"
+    },
+    "jev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:20:24.794Z"
+    },
+    "jev-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:20:36.433Z"
+    },
+    "jev-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:20:48.243Z"
+    },
+    "settings-jev-toggles": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:26:18.030Z",
+      "doneAt": "2026-09-29T05:26:31.708Z"
+    },
+    "settings-jev-toggles.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:43.957Z"
+    },
+    "settings-jev-toggles.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:55.816Z"
+    },
+    "settings-jev-toggles.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:07.614Z"
+    },
+    "typesafe-key-slot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4369",
+      "claimedAt": "2026-09-29T05:27:26.208Z",
+      "doneAt": "2026-09-29T05:27:38.764Z"
+    },
+    "typesafe-key-slot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:51.020Z"
+    },
+    "typesafe-key-slot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:02.663Z"
+    },
+    "typesafe-key-slot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:18.829Z"
+    }
+  }
+}

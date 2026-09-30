@@ -21,7 +21,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -226,20 +226,48 @@ function emptyState(issueId: string, now: string): ContinueState {
   };
 }
 
+/** Thrown by {@link updateContinueState} when the on-disk continue file exists but is not valid JSON. */
+export class ContinueStateUnreadableError extends Error {
+  constructor(
+    public readonly path: string,
+    public readonly cause: unknown,
+  ) {
+    super(`Continue file at ${path} exists but is not valid JSON; refusing to overwrite it`);
+    this.name = 'ContinueStateUnreadableError';
+  }
+}
+
 export function writeContinueState(planHome: string, issueId: string, state: ContinueState): void {
   const path = continueStatePath(planHome, issueId);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify({ ...state, updated: new Date().toISOString() }, null, 2)}\n`, 'utf-8');
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ ...state, updated: new Date().toISOString() }, null, 2)}\n`, 'utf-8');
+  renameSync(tmp, path);
 }
 
-/** Read-modify-write on the continue file; creates it when absent. */
+/**
+ * Read-modify-write on the continue file; creates it when absent. Throws
+ * {@link ContinueStateUnreadableError} — and writes nothing — when the file
+ * exists but fails to parse, so a transient corruption never wipes recorded
+ * item statuses back to an empty state.
+ */
 export function updateContinueState(
   planHome: string,
   issueId: string,
   mutate: (state: ContinueState) => ContinueState,
 ): ContinueState {
   const now = new Date().toISOString();
-  const current = readContinueState(planHome, issueId) ?? emptyState(issueId, now);
+  const path = continueStatePath(planHome, issueId);
+  let current: ContinueState;
+  if (!existsSync(path)) {
+    current = emptyState(issueId, now);
+  } else {
+    try {
+      current = JSON.parse(readFileSync(path, 'utf-8')) as ContinueState;
+    } catch (cause) {
+      throw new ContinueStateUnreadableError(path, cause);
+    }
+  }
   const next = mutate(current);
   writeContinueState(planHome, issueId, next);
   return next;

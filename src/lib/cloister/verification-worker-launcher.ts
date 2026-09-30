@@ -14,6 +14,7 @@ export function buildVerificationWorkerLaunch(
   request: string,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
+  cpuWeight = 20,
 ): VerificationWorkerLaunch {
   const forceSystemd = env.OVERDECK_VERIFICATION_SYSTEMD_SCOPE === '1';
   const useSystemd = platform === 'linux'
@@ -34,6 +35,9 @@ export function buildVerificationWorkerLaunch(
       '--unit', systemdUnit,
       '--collect',
       '--quiet',
+      // PAN-4311: gates are batch work; a low weight keeps them behind the
+      // dashboard and agents when the host is contended (work-conserving).
+      `--property=CPUWeight=${cpuWeight}`,
       '--same-dir',
       process.execPath,
       workerPath,

@@ -1,0 +1,171 @@
+{
+  "version": "1",
+  "issueId": "PAN-4328",
+  "created": "2026-09-29T09:43:01.978Z",
+  "updated": "2026-09-29T10:17:55.028Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-slot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:43:01.978Z",
+      "doneAt": "2026-09-29T09:45:38.338Z"
+    },
+    "eff-wordlist": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:45:47.638Z",
+      "doneAt": "2026-09-29T09:46:26.085Z"
+    },
+    "keywrap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:46:35.329Z",
+      "doneAt": "2026-09-29T09:48:07.084Z"
+    },
+    "passphrase-cmd": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:48:11.656Z",
+      "doneAt": "2026-09-29T09:53:24.195Z"
+    },
+    "setup-offer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:53:28.686Z",
+      "doneAt": "2026-09-29T09:56:09.258Z"
+    },
+    "join-passphrase": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:56:22.338Z",
+      "doneAt": "2026-09-29T09:59:17.337Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4328",
+      "claimedAt": "2026-09-29T09:59:21.880Z",
+      "doneAt": "2026-09-29T10:00:07.754Z"
+    },
+    "store-slot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:11:47.105Z"
+    },
+    "store-slot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:01.126Z"
+    },
+    "store-slot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:15.176Z"
+    },
+    "store-slot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:28.095Z"
+    },
+    "eff-wordlist.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:39.639Z"
+    },
+    "eff-wordlist.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:12:51.227Z"
+    },
+    "eff-wordlist.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:02.721Z"
+    },
+    "keywrap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:15.154Z"
+    },
+    "keywrap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:27.445Z"
+    },
+    "keywrap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:39.061Z"
+    },
+    "keywrap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:13:51.371Z"
+    },
+    "keywrap.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:03.619Z"
+    },
+    "passphrase-cmd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:16.199Z"
+    },
+    "passphrase-cmd.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:29.089Z"
+    },
+    "passphrase-cmd.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:41.968Z"
+    },
+    "passphrase-cmd.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:14:55.664Z"
+    },
+    "passphrase-cmd.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:09.712Z"
+    },
+    "setup-offer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:27.243Z"
+    },
+    "setup-offer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:42.006Z"
+    },
+    "setup-offer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:15:55.036Z"
+    },
+    "setup-offer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:16:08.699Z"
+    },
+    "join-passphrase.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:16:22.228Z"
+    },
+    "join-passphrase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:16:35.098Z"
+    },
+    "join-passphrase.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:16:48.331Z"
+    },
+    "join-passphrase.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:17:02.284Z"
+    },
+    "join-passphrase.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:17:16.285Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:17:29.118Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:17:41.419Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:17:55.028Z"
+    }
+  }
+}

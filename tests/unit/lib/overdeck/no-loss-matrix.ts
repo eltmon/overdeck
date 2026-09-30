@@ -403,6 +403,13 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/deacon/pause',                     kind: 'http', disposition: 'READ',        door: 'SettingsResolver.isDeaconPaused' },
   { surface: 'POST /api/deacon/pause',                    kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused' },
   { surface: 'GET /api/version',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build version probe; outside 8 remodel domains' },
+  { surface: 'OPTIONS /api/dashboard/session',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Dashboard session mint CORS preflight (auth); outside 8 remodel domains' },
+  { surface: 'POST /api/dashboard/session',                 kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Dashboard session mint (auth: root session or device cookie); outside 8 remodel domains' },
+  { surface: 'GET /api/environment',                      kind: 'http', disposition: 'READ',        door: 'environment-identity.ensureEnvironmentIdentity (descriptor)' },
+  { surface: 'POST /api/pairing/credentials',              kind: 'http', disposition: 'WRITE',       door: 'pairing-credentials.issuePairingCredential' },
+  { surface: 'POST /api/pairing/exchange',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (pairing)' },
+  { surface: 'GET /api/devices',                          kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind device)' },
+  { surface: 'DELETE /api/devices/:id',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
   { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },
@@ -528,6 +535,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/settings/provider-env-conflicts',             kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
   { surface: 'GET /api/settings/legacy-import/conversations',        kind: 'http', disposition: 'READ',        door: 'previewLegacyConversations (src/lib/overdeck/legacy-import.ts)' },
   { surface: 'POST /api/settings/legacy-import/conversations',       kind: 'http', disposition: 'WRITE',       door: 'importLegacyConversations → importLegacyConversation write door' },
+  { surface: 'GET /api/model-presets',                               kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via model-presets plan (read-only)' },
+  { surface: 'GET /api/model-presets/:id/plan',                      kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via model-presets plan (read-only)' },
+  { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
+  { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },
@@ -826,6 +837,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'WRITE',     door: 'Project config writer sets the project-level swarm policy' },
   { surface: 'GET /api/issues/:issueId/swarm-policy',      kind: 'http', disposition: 'READ',       door: 'Issue record resolver reads and resolves the issue-level swarm policy' },
   { surface: 'POST /api/issues/:issueId/swarm-policy',     kind: 'http', disposition: 'WRITE',      door: 'Issue record writer sets the issue-level swarm policy' },
+
+  // ── claude-code.ts (PAN-4359) ─────────────────────────────────────────────
+  { surface: 'GET /api/claude-code/status',   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'getClaudeCodeStatus (PAN-4359); host tool version check, outside 8 remodel domains' },
+  { surface: 'POST /api/claude-code/upgrade', kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Claude Code upgrade terminal session (PAN-4359); outside 8 remodel domains' },
 ];
 
 /** PAN-2648 Beads-removal surface lock. */

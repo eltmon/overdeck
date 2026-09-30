@@ -12,6 +12,7 @@ import {
 import { readAutoSpawnConsentWorkModel } from '../../../../lib/planning/auto-spawn-consent.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
+import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
@@ -30,7 +31,7 @@ import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spaw
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
-import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
+import { resolveIssueWorkspacePlanHome, transitionIssueXBrief, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -110,9 +111,10 @@ export function resolveSpawnGuardrailRefusal(
   issueId: string,
   health: SystemHealthSnapshot,
   acknowledgement: SpawnGuardrailAcknowledgement,
+  cpu: CpuPressureVerdict | null = null,
 ): { decision: SpawnGuardrailDecision; refusal: { status: number; body: Record<string, unknown> } | null } {
   emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
-  const spawnGuardrails = evaluateSpawnGuardrails(health);
+  const spawnGuardrails = evaluateSpawnGuardrails(health, cpu);
   if (spawnGuardrails.blocked) {
     emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error ?? 'guardrails blocked', {
       status: spawnGuardrails.status,
@@ -455,7 +457,8 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     const health = yield* Effect.promise(() => getSystemHealthSnapshot());
-    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
+    const cpu = yield* Effect.promise(() => assessCpuPressure());
+    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement, cpu);
     if (guardrailRefusal) return jsonResponse(guardrailRefusal.body, { status: guardrailRefusal.status });
 
     // PAN-3022: a consent-bearing spawn with no explicit body model honors the
@@ -611,28 +614,29 @@ export const postAgentsRoute = HttpRouter.add(
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-      await transitionXBriefOnMain(
-        projectPath,
-        issueId,
-        'active',
-        'running',
-        `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
-      ).then(
-        (result) => {
-          if (result.moved) {
-            console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
-          }
-          if (result.statusUpdated) {
-            console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-          }
-          if (result.committed) {
-            console.log(`[start-agent] Committed running transition for ${issueId}`);
-          }
-        },
-        (err: unknown) => {
-          console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-        },
-      );
+      const startPlanHome = resolveIssueWorkspacePlanHome(projectPath, issueId);
+      if (!startPlanHome) {
+        console.log(`[start-agent] no base workspace for ${issueId}; spec transition skipped`);
+      } else {
+        await transitionIssueXBrief(
+          startPlanHome,
+          issueId,
+          'active',
+          'running',
+        ).then(
+          (result) => {
+            if (result.moved) {
+              console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
+            }
+            if (result.statusUpdated) {
+              console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+            }
+          },
+          (err: unknown) => {
+            console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+          },
+        );
+      }
 
       if (planPath.startsWith(workspacePath + sep)) {
         try {

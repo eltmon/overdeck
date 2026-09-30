@@ -88,6 +88,54 @@ describe('needs-you classification', () => {
   });
 });
 
+// PAN-4399: a not-started work-start is its own Needs-you reason; a retrying
+// one stays out of Needs-you but still explains the "work" phase subline.
+describe('work-not-started classification (PAN-4399)', () => {
+  it('is a needs-you feature and its subline names the error', () => {
+    const feature = makeFeature();
+    const derived = derivedState('working', {
+      attention: 'work-not-started',
+      workStart: { status: 'not-started', at: '2026-09-29T10:00:00.000Z', error: 'spawn guardrails still refused the work agent' },
+    });
+
+    expect(isNeedsYouFeature(feature, derived)).toBe(true);
+    expect(sublineFor(makeBucket(feature, derived))).toBe(
+      'work agent not started — spawn guardrails still refused the work agent',
+    );
+  });
+
+  it('falls back to "run pan start" when the journal carries no error text', () => {
+    const feature = makeFeature();
+    const derived = derivedState('working', {
+      attention: 'work-not-started',
+      workStart: { status: 'not-started', at: '2026-09-29T10:00:00.000Z' },
+    });
+
+    expect(sublineFor(makeBucket(feature, derived))).toBe('work agent not started — run pan start');
+  });
+
+  it('a retrying workStart is not needs-you but names itself in the work-phase subline', () => {
+    const feature = makeFeature();
+    const derived = derivedState('working', {
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z', nextRetryAt: '2026-09-29T10:10:00.000Z' },
+    });
+
+    expect(isNeedsYouFeature(feature, derived)).toBe(false);
+    expect(sublineFor(makeBucket(feature, derived))).toBe('work agent start retrying');
+  });
+
+  // PAN-4210, review non-blocking #3: a Deacon-frozen retry is held, not
+  // actively retrying — the subline must say so.
+  it('a held workStart names the frozen Deacon instead of claiming an active retry', () => {
+    const feature = makeFeature();
+    const derived = derivedState('working', {
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z', held: true },
+    });
+
+    expect(sublineFor(makeBucket(feature, derived))).toBe('work agent start held while the Deacon is frozen');
+  });
+});
+
 describe('isStalledFeature', () => {
   it('returns true when the issue has an artifact signal but no live agent', () => {
     const feature = makeFeature({

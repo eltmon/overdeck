@@ -177,7 +177,7 @@ describe('canUseHarness', () => {
 
   // GPT-6 Sol/Luna publish API pricing and report supported_in_api true in the
   // Codex catalog, so (like gpt-6-astra) they are NOT subscription-only.
-  it.each(['gpt-6-sol', 'gpt-6-luna'] as const)(
+  it.each(['gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol'] as const)(
     'allows %s + api-key on the codex harness (published API model)',
     (model) => {
       expect(canUseHarness('codex', model, 'api-key')).toEqual({ allowed: true })
@@ -304,5 +304,49 @@ describe('Ollama harness pin (PAN-1641)', () => {
       const decision = canUseHarness(harness, 'ollama:gemma4:12b', undefined)
       expect(decision.allowed === false && decision.reason).toContain('claude-code')
     }
+  })
+})
+
+describe('codex model client-version floor (PAN-4363)', () => {
+  it('blocks gpt-6-luna under ChatGPT sign-in below the floor', () => {
+    const decision = canUseHarness('codex', 'gpt-6-luna', 'subscription', { codexCliVersion: '0.153.4' })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('0.156.1')
+    expect(decision.reason).toContain('0.153.4')
+    expect(decision.reason).toContain('npm install -g @openai/codex')
+  })
+
+  it('blocks gpt-6-sol under ChatGPT sign-in below the floor', () => {
+    const decision = canUseHarness('codex', 'gpt-6-sol', 'subscription', { codexCliVersion: '0.156.0' })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('0.156.1')
+  })
+
+  it.each(['0.158.0', '0.156.1'])('allows both floored models at or above the floor (%s)', (version) => {
+    expect(canUseHarness('codex', 'gpt-6-luna', 'subscription', { codexCliVersion: version })).toEqual({ allowed: true })
+    expect(canUseHarness('codex', 'gpt-6-sol', 'subscription', { codexCliVersion: version })).toEqual({ allowed: true })
+  })
+
+  it('allows api-key auth regardless of installed version', () => {
+    expect(canUseHarness('codex', 'gpt-6-luna', 'api-key', { codexCliVersion: '0.153.4' })).toEqual({ allowed: true })
+  })
+
+  it('allows when no policy context is supplied', () => {
+    expect(canUseHarness('codex', 'gpt-6-luna', 'subscription')).toEqual({ allowed: true })
+  })
+
+  it('allows a model without a floor at any installed version', () => {
+    expect(canUseHarness('codex', 'gpt-6-astra', 'subscription', { codexCliVersion: '0.153.4' })).toEqual({ allowed: true })
+  })
+
+  it('blocks gpt-6.1-sol under ChatGPT sign-in below 0.159.0', () => {
+    const decision = canUseHarness('codex', 'gpt-6.1-sol', 'subscription', { codexCliVersion: '0.158.0' })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('0.159.0')
+    expect(decision.reason).toContain('npm install -g @openai/codex')
+  })
+
+  it('allows gpt-6.1-sol at 0.159.0', () => {
+    expect(canUseHarness('codex', 'gpt-6.1-sol', 'subscription', { codexCliVersion: '0.159.0' })).toEqual({ allowed: true })
   })
 })

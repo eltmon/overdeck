@@ -4,16 +4,30 @@ import { join } from 'node:path'
 import { setImmediate as realSetImmediate } from 'node:timers/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const osMocks = vi.hoisted(() => ({
+  cpus: vi.fn(),
+  loadavg: vi.fn(),
+}))
+
+// PAN-4311: pin CPU counters and load so the pressure sample is deterministic.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>()
+  osMocks.cpus.mockImplementation(actual.cpus)
+  osMocks.loadavg.mockImplementation(actual.loadavg)
+  return { ...actual, cpus: () => osMocks.cpus(), loadavg: () => osMocks.loadavg() }
+})
+
 import {
   acquireQualityGateAdmission,
   QualityGateAdmissionTimeoutError,
+  sampleQualityGatePressure,
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
 } from '../../../../src/lib/cloister/quality-gate-admission.js'
 
 const homes: string[] = []
-const low: QualityGatePressureSample = { cpuUtilization: 0.2, loadPerCore: 0.2, pressured: false }
-const high: QualityGatePressureSample = { cpuUtilization: 0.95, loadPerCore: 1.5, pressured: true }
+const low: QualityGatePressureSample = { cpuUtilization: 0.2, loadPerCore: 0.2, psiSomeAvg10: null, pressured: false }
+const high: QualityGatePressureSample = { cpuUtilization: 0.95, loadPerCore: 1.5, psiSomeAvg10: null, pressured: true }
 
 function home(): string {
   const path = mkdtempSync(join(tmpdir(), 'quality-gate-admission-'))
@@ -146,5 +160,44 @@ describe('quality gate admission', () => {
     )).rejects.toBeInstanceOf(QualityGateAdmissionTimeoutError)
 
     expect(readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-'))).toEqual([])
+  })
+})
+
+describe('sampleQualityGatePressure (PAN-4311)', () => {
+  // Identical counters before and after the (skipped) 250 ms wait: 0% utilization.
+  const idleCpus = Array.from({ length: 4 }, () => ({
+    model: 'cpu', speed: 1, times: { user: 100, nice: 0, sys: 100, idle: 800, irq: 0 },
+  }))
+  const noWait = async () => undefined
+
+  beforeEach(() => {
+    osMocks.cpus.mockReturnValue(idleCpus)
+  })
+
+  afterEach(async () => {
+    const actual = await vi.importActual<typeof import('node:os')>('node:os')
+    osMocks.cpus.mockImplementation(actual.cpus)
+    osMocks.loadavg.mockImplementation(actual.loadavg)
+  })
+
+  it('is pressured when PSI some avg10 reaches 25, even at low utilization and load', async () => {
+    osMocks.loadavg.mockReturnValue([0.4, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 30, someAvg60: 10 }))
+
+    expect(sample).toEqual({ cpuUtilization: 0, loadPerCore: 0.1, psiSomeAvg10: 30, pressured: true })
+  })
+
+  it('lets PSI win over a high load per core', async () => {
+    osMocks.loadavg.mockReturnValue([12, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 10, someAvg60: 10 }))
+
+    expect(sample).toMatchObject({ loadPerCore: 3, psiSomeAvg10: 10, pressured: false })
+  })
+
+  it('falls back to load per core when PSI is unavailable', async () => {
+    osMocks.loadavg.mockReturnValue([4.8, 0, 0])
+    const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: null, someAvg60: null }))
+
+    expect(sample).toMatchObject({ loadPerCore: 1.2, psiSomeAvg10: null, pressured: true })
   })
 })

@@ -17,13 +17,15 @@ import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentState } from '../agents.js';
 import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
-import { recordHandoffDeferred } from '../cloister/deferred-handoff.js';
+import { appendPipelineEntry } from '../cloister/pipeline-journal.js';
+import { recordHandoffDeferred, type DeferredHandoffReason } from '../cloister/deferred-handoff.js';
 import { isDeaconGloballyPaused } from './control-settings.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { checkPrdGate, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
+import { applyCritiqueGateForPromotion } from '../planning/plan-critique-io.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
@@ -120,9 +122,11 @@ export interface CompletePlanningAutoSpawnResult {
    */
   workAgentDeferred?: boolean;
   workAgentHttpStatus?: number;
+  /** PAN-4399: stamped before the `/api/agents` POST, since `pan start` writes its own `startedAt` before the route answers. */
+  workAgentRequestedAt?: string;
 }
 
-type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'critiqueGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 const completePlanningGuard = createInFlightGuard();
@@ -416,10 +420,10 @@ function defaultReadDeaconPaused(): boolean {
 }
 
 /**
- * PAN-4155: a guardrail refused the hand-off. Journal the deferral in the
- * workspace so deacon-lite retries the spawn without acknowledgement, and say
- * so at warn level. No `planning.failed`: that is recorded only if the retries
- * give up.
+ * PAN-4155: a guardrail or an unhealthy workspace Docker stack refused the
+ * hand-off. Journal the deferral in the workspace so deacon-lite retries the
+ * spawn without acknowledgement, and say so at warn level. No
+ * `planning.failed`: that is recorded only if the retries give up.
  *
  * PAN-4210: deacon-lite's retry only ever runs from `runDeaconLite()`, which
  * returns immediately while the Deacon is globally frozen — so a deferral
@@ -432,24 +436,27 @@ export function recordPlanningAutoHandoffDeferred(options: {
   emitActivity?: typeof emitActivityEntry;
   readDeaconPaused?: () => boolean;
 }): { error: string; deaconPaused: boolean } {
-  const error = options.result.workAgentError ?? 'Work agent startup refused by spawn guardrails';
+  const reason: DeferredHandoffReason = options.result.workAgentSkipReason === 'stack-unhealthy' ? 'stack-unhealthy' : 'guardrails';
+  const cause = reason === 'stack-unhealthy' ? 'the workspace docker stack is unhealthy' : 'spawn guardrails';
+  const error = options.result.workAgentError ?? `Work agent startup refused by ${cause}`;
   const deaconPaused = (options.readDeaconPaused ?? defaultReadDeaconPaused)();
   recordHandoffDeferred({
     workspacePath: options.workspacePath,
     issueId: options.issueId,
     error,
+    reason,
     httpStatus: options.result.workAgentHttpStatus,
     deaconPaused,
   });
-  console.warn(`[complete-planning] ${options.issueId} auto-handoff deferred by spawn guardrails: ${error}`);
+  console.warn(`[complete-planning] ${options.issueId} auto-handoff deferred by ${cause}: ${error}`);
   (options.emitActivity ?? emitActivityEntry)({
     source: 'plan',
     level: 'warn',
     message: deaconPaused
-      ? `${options.issueId} planning complete; work-agent start deferred by spawn guardrails. The retry is held while the Deacon is frozen: unfreeze it, or run pan start ${options.issueId}. ${error}`
-      : `${options.issueId} planning complete; work-agent start deferred by spawn guardrails and retried for up to 2 hours: ${error}`,
+      ? `${options.issueId} planning complete; work-agent start deferred by ${cause}. The retry is held while the Deacon is frozen: unfreeze it, or run pan start ${options.issueId}. ${error}`
+      : `${options.issueId} planning complete; work-agent start deferred by ${cause} and retried for up to 2 hours: ${error}`,
     issueId: options.issueId,
-    details: JSON.stringify({ workAgentSkipReason: 'guardrails', workAgentError: error }),
+    details: JSON.stringify({ workAgentSkipReason: reason, workAgentError: error }),
   });
   return { error, deaconPaused };
 }
@@ -475,6 +482,7 @@ export async function completePlanningAutoSpawn(options: {
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
     : {};
   emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
+  const requestedAt = new Date().toISOString();
   try {
     const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
       method: 'POST',
@@ -512,7 +520,7 @@ export async function completePlanningAutoSpawn(options: {
         workAgentQueued ? 'container startup queued before work-agent spawn' : 'work agent spawn requested',
         { agentId },
       );
-      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId };
+      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId, workAgentRequestedAt: requestedAt };
     }
 
     const error = typeof body['error'] === 'string'
@@ -521,27 +529,6 @@ export async function completePlanningAutoSpawn(options: {
         ? body['message']
         : `Work agent spawn returned HTTP ${response.status}`;
     const skipReason = classifyAutoSpawnSkip(response.status, body);
-    if (skipReason === 'stack-unhealthy') {
-      const recovery = await (options.fetchImpl ?? fetch)(
-        new URL(`/api/workspaces/${encodeURIComponent(options.issueId)}/rebuild-and-start`, dashboardOrigin),
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', origin: dashboardOrigin, ...internalTokenHeaders },
-          body: JSON.stringify({
-            startedBy: handoffStartedBy,
-            autoSpawnConsentRequired: true,
-          }),
-        },
-      );
-      const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
-      if (recovery.ok && recoveryBody['success'] !== false) {
-        emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'stack rebuild and work-agent spawn requested', {
-          agentId,
-          activityId: recoveryBody['activityId'],
-        });
-        return { workAgentSpawned: true, workAgentSession: agentId };
-      }
-    }
     emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', skipReason, {
       httpStatus: response.status,
       error,
@@ -552,7 +539,7 @@ export async function completePlanningAutoSpawn(options: {
       workAgentError: error,
       workAgentSkipReason: skipReason,
       workAgentHttpStatus: response.status,
-      ...(skipReason === 'guardrails' && body['guardrails'] ? { workAgentDeferred: true } : {}),
+      ...((skipReason === 'guardrails' && body['guardrails']) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {}),
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -728,18 +715,12 @@ export async function completePlanningForIssue(options: {
         emitCompletePlanningPhase(id, 'prdGate', 'success', `found ${prdGate.path} (${prdGate.lineCount} lines)`);
       }
 
-      // PRD promotion: promote the workspace-authored draft to the canonical
-      // `.pan/drafts/` location in the workspace's own plan home, so it is a
-      // tracked file the issue's own commits carry (the PAN-2858 defect: spec
-      // promoted, PRD stranded). The target is the workspace, not the primary
-      // checkout — writing it there instead used to leave an untracked file
-      // behind that later broke the primary's plan-artifact push (PAN-4224).
-      // primaryRoot is a read-only fallback for a draft an earlier, unfixed
-      // run already stranded in the primary checkout. Never overwrites an
-      // existing canonical draft. Runs even under the noPrd bypass — if a
-      // draft exists anyway, promoting it is strictly better than stranding
-      // it. A promotion failure fails this route loudly, same as a spec-write
-      // failure.
+      // PRD promotion: copy the workspace-authored draft to the canonical
+      // `.pan/drafts/` of the workspace's own plan home so the issue's commits
+      // carry it (PAN-2858); the primary checkout is never the target (PAN-4224)
+      // and primaryRoot is a read-only fallback for a draft an earlier run
+      // stranded there. Never overwrites a canonical draft, runs even under
+      // noPrd, and a failure fails this route loudly like a spec-write failure.
       try {
         const draftPromotion = await Effect.runPromise(
           promoteWorkspacePrdDraft({ projectRoot: workspacePath, workspacePath, issueId: id, primaryRoot: projectPath }),
@@ -768,6 +749,11 @@ export async function completePlanningForIssue(options: {
             return jsonResponse({ error: 'xBRIEF quality lint failed', qualityIssues: error.issues }, { status: 422 });
           }
           throw error;
+        }
+        const critique = await applyCritiqueGateForPromotion({ issueId: id, workspacePath, doc: workspaceDoc, forced: (body as any)?.critic === true, warn: console.warn });
+        if (!critique.ok) {
+          emitCompletePlanningPhase(id, 'critiqueGate', 'failure', critique.message);
+          return jsonResponse({ error: `Plan critique gate: ${critique.message}`, critiqueGate: critique.result }, { status: 422 });
         }
       }
     }
@@ -941,6 +927,18 @@ export async function completePlanningForIssue(options: {
         eventStore,
       });
     } else {
+      if (autoSpawnResult?.workAgentSpawned && workspacePath && existsSync(workspacePath)) {
+        appendPipelineEntry(workspacePath, {
+          type: 'handoff.started',
+          issueId: id.toUpperCase(),
+          source: 'complete-planning',
+          data: {
+            agentId: autoSpawnResult.workAgentSession,
+            ...(autoSpawnResult.workAgentQueued ? { queued: true } : {}),
+            ...(autoSpawnResult.workAgentRequestedAt ? { requestedAt: autoSpawnResult.workAgentRequestedAt } : {}),
+          },
+        });
+      }
       emitActivityEntry({
         source: 'plan',
         level: 'info',
@@ -981,8 +979,8 @@ export async function completePlanningForIssue(options: {
       ...(autoHandoffDeferred && autoHandoffDeaconPaused ? { workAgentRetryHeld: 'deacon-paused' as const } : {}),
       message: autoHandoffDeferred
         ? autoHandoffDeaconPaused
-          ? `Planning complete; work-agent start deferred by spawn guardrails and held while the Deacon is frozen (unfreeze it or run pan start ${id}): ${autoHandoffError}`
-          : `Planning complete; work-agent start deferred by spawn guardrails and retried automatically for up to 2 hours: ${autoHandoffError}`
+          ? `Planning complete; work-agent start deferred by ${autoSpawnResult?.workAgentSkipReason === 'stack-unhealthy' ? 'the workspace docker stack being unhealthy' : 'spawn guardrails'} and held while the Deacon is frozen (unfreeze it or run pan start ${id}): ${autoHandoffError}`
+          : `Planning complete; work-agent start deferred by ${autoSpawnResult?.workAgentSkipReason === 'stack-unhealthy' ? 'the workspace docker stack being unhealthy' : 'spawn guardrails'} and retried automatically for up to 2 hours: ${autoHandoffError}`
         : autoHandoffFailed
         ? `Planning complete, but work-agent startup failed (${autoSpawnResult?.workAgentSkipReason ?? 'spawn-failed'}): ${autoHandoffError}`
         : autoSpawnResult?.workAgentSpawned

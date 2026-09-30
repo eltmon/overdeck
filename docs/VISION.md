@@ -8,6 +8,8 @@
 
 Overdeck runs as a **single-developer local Electron app** on individual developer machines. The dashboard, SQLite database, agent orchestration, and git worktrees all live on the same machine. Fly.io is used only for AI agent workspaces (to offload RAM, CPU, and disk), not for hosting the dashboard itself.
 
+Each machine is an independent **environment** with a stable `environmentId` (`GET /api/environment`), and it owns its own projects, agents, conversations, terminals and credentials. Other devices reach a machine by pairing with it (`pan pair`), which gives each device its own revocable session; the root internal token never leaves the machine (PAN-3762, see [configuration/remote-access.mdx](../configuration/remote-access.mdx)).
+
 ### Why local-first?
 - Source code never leaves the developer's machine.
 - No network latency for git operations, file search, or terminal interaction.

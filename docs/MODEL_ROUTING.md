@@ -6,6 +6,8 @@
 > `roles.<role>.model`, `roles.review.sub.<lane>.model`, and `workhorses`; see
 > [CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels)
 > and [MODEL-CALLS.md](MODEL-CALLS.md). This page is kept for history.
+> For one-click provider lineups see
+> [configuration/model-presets.mdx](../configuration/model-presets.mdx).
 
 Overdeck routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Overdeck workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Overdeck looks up which model is assigned to that step's work type.
 
@@ -225,6 +227,8 @@ tiered_execution:
     complex:       { model: workhorse:expensive, harness: claude-code, difficulties: [complex, expert] }
   supervisor: { model: workhorse:expensive, harness: claude-code, subscribe: flagged }
 ```
+
+A [model preset](../configuration/model-presets.mdx) sets tier models by band and never creates or deletes tiers. For each existing tier it picks the band from the tier's hardest difficulty: `trivial` → `workhorse:cheap`; `simple` or `medium` → `workhorse:mid`; `complex` or `expert` → `workhorse:expensive`. It also sets the tier's `harness` to the preset's harness and its `effort` to `high` (except on the Anthropic cheap band, because Haiku 4.5 has no effort control). It removes a tier `distribution`, which undo restores. An existing `supervisor` gets `workhorse:expensive` and the preset's harness.
 
 A ref to an undefined slot, or the `parent` sentinel, is invalid. The Settings save refuses it. On config load it disables tiered staffing and reports the reason through `pan doctor`. A Settings save writes the ref back to `config.yaml`, never the model the slot currently holds.
 

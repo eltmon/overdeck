@@ -13,7 +13,7 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 | `src/dashboard/server/` | Effect.js HTTP server + raw WebSocket terminal streaming. Entry `main.ts`, routes in `routes/`, services in `services/`. Runs ONLY as built `dist/dashboard/server.js` under Node 22. |
 | `src/dashboard/frontend/` | React + Zustand + Vite SPA. Components under `src/components/`. |
 | `packages/contracts/` | Shared types/schemas (`@overdeck/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
-| `skills/` | Claude Code wrapper skills for `pan` verbs (lint-enforced vs `--help`). |
+| `sync-sources/skills/` | Bundled wrapper skills for `pan` verbs, one `<name>/SKILL.md` each (lint-enforced vs `--help` by `scripts/lint-skills.sh`). Exception: `okf/` is canonical in `eltmon/okf` (since 2026-09-29; the old subtree mirror was deleted in `abaeeab9647`) and is vendored here from a release tag — never edit it in place (PAN-4408). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
 
@@ -29,8 +29,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
   'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
   legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`.
-- `harness-policy.ts` — ToS gate `canUseHarness()` (ohmypi + Anthropic + subscription
-  is the only blocked combo). Never weaken.
+- `harness-policy.ts` — sync, pure launchability gate `canUseHarness()`. Denies ohmypi or
+  prime-agent + Anthropic + subscription (ToS), non-Kimi models on acp/kimi-code,
+  cross-routing of opencode and Muse ids, Ollama off claude-code, and subscription-only
+  OpenAI models under API-key auth. Unlisted harnesses are denied. Never weaken.
 - `providers.ts` — `PROVIDERS` registry (18 providers incl. opencode/meta),
   `getProviderForModel()`, per-provider `tierModels` (opus/sonnet/haiku slots).
 - `model-capabilities.ts` — `MODEL_CAPABILITIES` skill/cost matrix; `model-deprecations.ts`
@@ -50,6 +52,12 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,
   and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
+- `vault/` (PAN-2609) — Session Vault: encrypted off-machine transcript storage. Standalone
+  (Node built-ins + sibling modules only; `tests/unit/lib/vault/import-graph.test.ts`).
+  `store/types.ts` is the `VaultStore` contract (immutable objects + CAS refs; reserved
+  slot `keywrap/v1` for the PAN-4328 passphrase-wrapped key), with `store/dir.ts` and
+  `store/git.ts` backends and a shared contract suite under `tests/unit/lib/vault/store/`.
+  `identity.ts` owns the key and the 24-word phrase. CLI verbs: `src/cli/commands/vault/`.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -155,6 +163,22 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
-Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
+Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store. Skill packs (PAN-4334, `src/lib/skill-packs/`): third-party skill repos registered with `pan skills pack add` (registry `config.yaml` `skills.packs.<id>`, pinned to a trusted commit, cache `~/.overdeck/packs/`), off unless toggled on per level (`pack_overrides`/`skill_pack_overrides`/issue `packs:`); the same launch step mounts enabled pack skills as a generated plugin (Claude `--plugin-dir` per-launch link, Codex `overdeck-packs` local marketplace in per-agent `CODEX_HOME`), shown to agents as `pack:skill`. `KNOWN_PACKS` (`adapters.ts`) carries per-id defaults such as opt-in skills.
 
-<!-- last-verified: 2026-09-28 -->
+SageOx (PAN-2444): the `sageox` skill pack (sourced from the `eltmon/ox` fork, off by default) is also the opt-in for session capture. `src/lib/sageox/launch.ts` runs inside `pan skills launch-settings` for Claude Code only: when the pack resolves on, the git root has `.sageox/`, and `ox host-contract --json` answers `overdeck-host/1` (`probe.ts`), it merges the host-managed env and six `ox agent hook` entries into the `--settings` JSON; otherwise it warns once and excludes the pack from the mount. Uploads are a per-project `sageox_upload` flag in `projects.yaml` (`config.ts`); `pan doctor` reports the probe (`doctor-sageox.ts`). Fork contract and ledger: `docs/SAGEOX-FORK.md`.
+
+## Session Vault (PAN-2609, standalone)
+
+`src/lib/vault/**` + `src/cli/commands/vault/**` (`pan vault`): encrypted off-machine
+storage and cross-machine resume. `settle.ts` appends transcript chunks and a `Settlement`
+to a CAS'd record through `VaultStore` (`store/dir.ts`, `store/git.ts`); `adopt.ts` +
+`materialize.ts` resume elsewhere. Must stay importable without the dashboard, Effect or
+terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
+`wip-capture.ts` / `wip-apply.ts`: encrypted git-bundle snapshots of uncommitted code on
+`Settlement.wip`.
+
+## Dashboard auth (verified 2026-09-29)
+
+No global auth middleware: each route opts in (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`), and many call only `validateOrigin`. The one credential check is `hasDashboardAuthHeaders` (internal token or the root-derived `overdeck_session` cookie); the session mint also trusts `isLoopbackPeer`. The server binds `0.0.0.0`. `/ws/*` upgrades bypass `HttpRouter` (PAN-1166 / PR #4317 adds `ws-auth.ts`). Machine identity is `src/lib/environment-identity.ts` (`environment-id.json`). PAN-3762 adds device sessions, pairing and a global remote request gate; see `docs/DASHBOARD-AUTH.md`.
+
+<!-- last-verified: 2026-09-29 -->

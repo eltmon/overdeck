@@ -46,6 +46,7 @@ import {
   type BootGateOptions,
   type BootGateState,
 } from '../../lib/boot-gates.js';
+import { loadConfigSync } from '../../lib/config-yaml/load.js';
 import { readActiveDashboardBundle, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
@@ -259,6 +260,8 @@ export interface DashboardSpawnOptions extends BootGateOptions {
   readonly serverPath?: string;
   readonly repoRoot?: string;
   readonly runSystemctl?: SystemctlRunner;
+  /** PAN-4311: systemd CPUWeight for the dashboard unit; defaults to resources.dashboard_cpu_weight. */
+  readonly dashboardCpuWeight?: number;
 }
 
 export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardSpawnOptions): DashboardSpawnHandle {
@@ -298,7 +301,8 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
   // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
   // Run the server in its own transient systemd unit (same isolation the
   // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
-  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot, opts?.runSystemctl);
+  const cpuWeight = opts?.dashboardCpuWeight ?? loadConfigSync().config.resources.dashboardCpuWeight;
+  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot, cpuWeight, opts?.runSystemctl);
   if (systemdHandle) return systemdHandle;
 
   const child = spawn(resolveNode22(), [serverPath], {
@@ -353,6 +357,7 @@ function spawnDashboardSystemdUnit(
   serverPath: string,
   fullEnv: Record<string, string | undefined>,
   repoRoot: string,
+  cpuWeight: number,
   systemctlRunner?: SystemctlRunner,
 ): DashboardSpawnHandle | null {
   if (process.platform !== 'linux') return null;
@@ -371,6 +376,9 @@ function spawnDashboardSystemdUnit(
         '--collect', '--quiet',
         // The dashboard is the orchestrator — shed agents before it (PAN-2500).
         '--property=ManagedOOMPreference=avoid',
+        // PAN-4311: a weight enables the cpu controller in app.slice, so the
+        // dashboard's event loop is scheduled per cgroup, not as one thread of many.
+        `--property=CPUWeight=${cpuWeight}`,
         `--property=StandardOutput=append:${DASHBOARD_LOG_FILE}`,
         `--property=StandardError=append:${DASHBOARD_LOG_FILE}`,
         // /api/health identity derives repoRoot from the server's cwd; keep it.

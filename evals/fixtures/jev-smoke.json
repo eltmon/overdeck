@@ -1,0 +1,42 @@
+[
+  {
+    "name": "asks whether to migrate callers",
+    "state": "I finished the parser. Should I also migrate the old callers, or leave them for a follow-up?",
+    "asksQuestion": true
+  },
+  {
+    "name": "asks the reader to pick a database",
+    "state": "Both options work locally. Which one do you want for production: SQLite or Postgres?",
+    "asksQuestion": true
+  },
+  {
+    "name": "requests approval before deleting",
+    "state": "The cleanup script is ready, but it removes 40 archived branches. Please confirm before I run it.",
+    "asksQuestion": true
+  },
+  {
+    "name": "asks for a missing credential",
+    "state": "The deploy step needs a registry token that is not in the environment. Can you provide one?",
+    "asksQuestion": true
+  },
+  {
+    "name": "reports finished work",
+    "state": "All three items are done, tests pass, and the PR is open.",
+    "asksQuestion": false
+  },
+  {
+    "name": "summarizes a refactor",
+    "state": "I split the config loader into two modules and updated every import. Typecheck and lint are green.",
+    "asksQuestion": false
+  },
+  {
+    "name": "describes a fixed bug",
+    "state": "The timeout came from a missing await in the retry loop. I added the await and a regression test.",
+    "asksQuestion": false
+  },
+  {
+    "name": "states the next step it is taking",
+    "state": "Review feedback is addressed and pushed. I am starting the next item now.",
+    "asksQuestion": false
+  }
+]

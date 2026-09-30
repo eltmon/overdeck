@@ -23,7 +23,7 @@ import { conversationArchiveDependencies } from './conversations.js';
 import { validateOrigin } from './origin-validation.js';
 
 const STRING_FIELDS = ['parent', 'run', 'key', 'for', 'role', 'project', 'model', 'harness', 'effort', 'brief', 'briefSource', 'title', 'branch', 'from', 'at'] as const;
-const BOOLEAN_FIELDS = ['reuse', 'replace'] as const;
+const BOOLEAN_FIELDS = ['reuse', 'replace', 'force'] as const;
 
 /** Validate a POST /api/lanes body into a launch request; the core validates values. */
 export function parseLaneLaunchBody(body: unknown): { ok: true; request: LaneLaunchRequest } | { ok: false; error: string } {

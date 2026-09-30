@@ -13,6 +13,7 @@ const base: ConnectionInputs = {
   serverReachable: true,
   streamLive: true,
   restarting: false,
+  sessionAuthFailed: false,
   hasSnapshot: true,
   lastLiveAt: 1,
 };

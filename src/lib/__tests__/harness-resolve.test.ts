@@ -4,6 +4,9 @@ const policyMocks = vi.hoisted(() => ({
   canUseHarness: vi.fn(),
   canUseModelWithAuth: vi.fn(() => ({ allowed: true })),
 }));
+const codexPolicyMocks = vi.hoisted(() => ({
+  resolveCodexPolicyContext: vi.fn(async () => ({})),
+}));
 const providerMocks = vi.hoisted(() => ({
   getBuiltInDefaultHarness: vi.fn(),
   getProviderForModel: vi.fn(),
@@ -19,6 +22,9 @@ vi.mock('../harness-policy.js', () => ({
   canUseHarness: policyMocks.canUseHarness,
   canUseModelWithAuth: policyMocks.canUseModelWithAuth,
 }));
+vi.mock('../codex/policy-context.js', () => ({
+  resolveCodexPolicyContext: codexPolicyMocks.resolveCodexPolicyContext,
+}));
 vi.mock('../providers.js', () => ({
   getBuiltInDefaultHarness: providerMocks.getBuiltInDefaultHarness,
   getProviderForModel: providerMocks.getProviderForModel,
@@ -33,6 +39,8 @@ beforeEach(() => {
   binaryMocks.available.add('kimi');
   binaryMocks.availablePaths.clear();
   binaryMocks.resolutions.length = 0;
+  codexPolicyMocks.resolveCodexPolicyContext.mockReset();
+  codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({});
 });
 
 // Control shared harness-binary resolution so binary-gated harnesses can be
@@ -267,5 +275,62 @@ describe('resolveHarness — PAN-1984 + explicit-pick refinement: provider defau
     // so hasHarnessBinary('ohmypi') returns true and resolveHarness reaches
     // `return winner` — confirming the built-in default is 'ohmypi', not 'pi'.
     await expect(resolveHarness({ model: 'kimi-k2.7-code' })).resolves.toBe('ohmypi');
+  });
+});
+
+describe('resolveHarness — codex policy context (PAN-4363)', () => {
+  beforeEach(async () => {
+    process.env.NODE_ENV = 'test';
+    // An earlier test in this file (AC(PAN-1989)) reassigns the mocked
+    // module's canUseHarness export directly, detaching it from
+    // policyMocks.canUseHarness. Restore the shared mock so it drives the
+    // module again.
+    vi.mocked(await import('../harness-policy.js')).canUseHarness = policyMocks.canUseHarness;
+    policyMocks.canUseHarness.mockReset();
+    policyMocks.canUseModelWithAuth.mockReturnValue({ allowed: true });
+    configMock.loadConfigSync.mockReturnValue({ config: {} });
+    providerMocks.getProviderForModel.mockReturnValue({ name: 'openai' });
+    const { resetHarnessResolveCachesForTests } = await import('../harness-resolve.js');
+    resetHarnessResolveCachesForTests();
+  });
+
+  it('passes the resolved policy context to canUseHarness for an explicit codex pick', async () => {
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.153.4' });
+    policyMocks.canUseHarness.mockReturnValue({ allowed: true });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await resolveHarness({ explicit: 'codex', model: 'gpt-6-luna', role: 'work' });
+
+    expect(codexPolicyMocks.resolveCodexPolicyContext).toHaveBeenCalledWith('codex', 'gpt-6-luna', 'apikey');
+    expect(policyMocks.canUseHarness).toHaveBeenCalledWith('codex', 'gpt-6-luna', 'apikey', { codexCliVersion: '0.153.4' });
+  });
+
+  it('rejects with HarnessResolutionError carrying the policy reason for an explicit codex pick', async () => {
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.153.4' });
+    policyMocks.canUseHarness.mockReturnValue({ allowed: false, reason: 'needs Codex CLI 0.156.1' });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    const error = await resolveHarness({ explicit: 'codex', model: 'gpt-6-luna', role: 'work' }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: 'HarnessResolutionError' });
+    expect((error as Error).message).toContain('needs Codex CLI 0.156.1');
+  });
+
+  it('rejects with HarnessResolutionError carrying the policy reason for a provider-default codex pick', async () => {
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('codex');
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.153.4' });
+    policyMocks.canUseHarness.mockReturnValue({ allowed: false, reason: 'needs Codex CLI 0.156.1' });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    const error = await resolveHarness({ model: 'gpt-6-luna', role: 'work' }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: 'HarnessResolutionError' });
+    expect((error as Error).message).toContain('needs Codex CLI 0.156.1');
+  });
+
+  it('resolves codex when the policy allows it', async () => {
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.158.0' });
+    policyMocks.canUseHarness.mockReturnValue({ allowed: true });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ explicit: 'codex', model: 'gpt-6-luna', role: 'work' })).resolves.toBe('codex');
   });
 });

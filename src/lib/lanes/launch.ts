@@ -23,6 +23,7 @@ import { join, resolve, sep } from 'node:path';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { workerDir } from '../agents/worker/ids.js';
 import { latestWorkerReport, type WorkerReport } from '../agents/worker/report.js';
+import { assessCpuPressure, type CpuPressureVerdict } from '../cloister/cpu-pressure.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { conversationHarnessAlive } from '../overdeck/conversation-liveness.js';
 import {
@@ -89,6 +90,8 @@ export interface LaneLaunchDeps {
   homeDir?: () => string;
   /** FR-3: lanes may not live under this directory. Default `/tmp`. */
   tmpRoot?: string;
+  /** PAN-4311: the stateless CPU pressure check. Default `assessCpuPressure`. */
+  cpuPressure?: () => Promise<CpuPressureVerdict>;
 }
 
 const projectLocks = new Map<string, Promise<void>>();
@@ -317,6 +320,18 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
 
   validateRequest(request);
   const { role } = request;
+
+  // PAN-4311 FR-14: a lane adds load the operator did not start by hand; hold
+  // it while the host is CPU-saturated unless the caller forces it.
+  if (!request.force) {
+    const cpu = await (deps.cpuPressure ?? assessCpuPressure)();
+    if (cpu.saturated) {
+      throw new LaneLaunchError(
+        429,
+        `cpu-saturated: ${cpu.signal} ${cpu.reading} is at or above ${cpu.threshold}; the host is CPU-saturated. Pass --force to launch anyway.`,
+      );
+    }
+  }
 
   // 1-2. Parent (D5), effective launcher (D21) and its D8 standing, run (D4).
   const parent = resolveParent(request.parent);
