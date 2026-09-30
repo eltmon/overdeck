@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:17:36.543Z",
+  "updated": "2026-09-30T21:17:49.690Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "docs.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T21:17:36.543Z"
+    },
+    "settings-uat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:17:49.689Z"
     }
   }
 }
