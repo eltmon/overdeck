@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:13:21.583Z",
+  "updated": "2026-09-30T21:13:34.249Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "settings-api-mapping.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T21:13:21.583Z"
+    },
+    "live-toggle-invalidation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:34.249Z"
     }
   }
 }
