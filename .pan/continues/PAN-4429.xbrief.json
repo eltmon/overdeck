@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:33:07.726Z",
+  "updated": "2026-09-30T02:33:22.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,6 +300,10 @@
     "no-loss-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T02:33:07.725Z"
+    },
+    "no-loss-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:33:22.242Z"
     }
   }
 }
