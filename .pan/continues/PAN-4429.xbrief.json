@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:26:09.985Z",
+  "updated": "2026-09-30T02:26:21.371Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "workspace-lifecycle-no-daemon.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T02:26:09.985Z"
+    },
+    "workspace-lifecycle-no-daemon.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:26:21.370Z"
     }
   }
 }
