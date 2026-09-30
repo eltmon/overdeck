@@ -63,7 +63,14 @@ export async function refreshVaultBrowseCopies(
 
   let firstChanged: string | null = null;
   for (const copy of result.copies) {
-    const outcome = upsert(copy);
+    let outcome: ReturnType<typeof upsertVaultBrowseRow>;
+    try {
+      outcome = upsert(copy);
+    } catch (error) {
+      counts.failed += 1;
+      warnOnce(`[vault] browse row ${vaultBrowseConversationName(copy.vaultId)} failed: ${(error as Error).message}`);
+      continue;
+    }
     if (outcome === 'conflict') {
       warnOnce(`[vault] browse copy ${vaultBrowseConversationName(copy.vaultId)} skipped: a local conversation holds that name`);
       continue;
@@ -80,12 +87,18 @@ export async function refreshVaultBrowseCopies(
     if (vaultId && !keep.has(vaultId)) stale.add(vaultId);
   }
   for (const vaultId of stale) {
-    if (!remove(vaultId)) continue;
+    try {
+      if (!remove(vaultId)) continue;
+    } catch (error) {
+      counts.failed += 1;
+      warnOnce(`[vault] browse row ${vaultBrowseConversationName(vaultId)} failed: ${(error as Error).message}`);
+      continue;
+    }
     counts.removed += 1;
     firstChanged ??= vaultBrowseConversationName(vaultId);
   }
 
-  counts.failed = result.failed.length;
+  counts.failed += result.failed.length;
   for (const { vaultId, message } of result.failed) warnOnce(`[vault] browse refresh failed for ${vaultId}: ${message}`);
   if (firstChanged) emit(firstChanged);
   return counts;

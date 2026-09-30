@@ -136,6 +136,30 @@ describe('vault browse service (PAN-4436 WI-7)', () => {
     warn.mockRestore();
   });
 
+  it('one row whose upsert throws does not stop the rest of the reconcile', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const emit = vi.fn();
+    const copy = (vaultId: string) => ({
+      vaultId, harness: 'claude-code' as const, title: 't', ownerLabel: 'laptop', cwd: '/w', model: null,
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z', path: '/unused',
+    });
+    const upsert = vi.fn((input: { vaultId: string }) => {
+      if (input.vaultId === 'bad') throw new Error('SQLITE_BUSY');
+      return 'inserted' as const;
+    });
+    const counts = await refreshVaultBrowseCopies(vault, {
+      emit,
+      refreshBrowseCache: async () => ({ copies: [copy('bad'), copy('good')], removed: [], failed: [] }),
+      upsertVaultBrowseRow: upsert,
+      listVaultBrowseConversations: () => [],
+    });
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(counts).toEqual({ inserted: 1, updated: 0, removed: 0, failed: 1 });
+    expect(emit).toHaveBeenCalledWith('vault-good');
+    expect(warn).toHaveBeenCalledWith('[vault] browse row vault-bad failed: SQLITE_BUSY');
+    warn.mockRestore();
+  });
+
   it('registers one sync-report listener however often it starts', () => {
     startVaultBrowseService();
     startVaultBrowseService();
