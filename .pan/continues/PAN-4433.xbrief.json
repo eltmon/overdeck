@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4433",
   "created": "2026-09-30T16:40:45.395Z",
-  "updated": "2026-09-30T17:37:50.883Z",
+  "updated": "2026-09-30T17:38:13.931Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "stall-config.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T17:37:50.882Z"
+    },
+    "stall-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:13.931Z"
     }
   }
 }
