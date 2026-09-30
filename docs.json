@@ -109,6 +109,7 @@
               "configuration/remote-access",
               "configuration/knowledge",
               "configuration/harnesses",
+              "configuration/model-presets",
               "configuration/local-models",
               "configuration/effort",
               "configuration/terminal-backend",

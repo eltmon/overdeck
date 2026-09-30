@@ -30,7 +30,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
-import { notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
+import { KNOWN_PACKS, notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
 import { listPacks, packUpdateAvailable } from '../skill-packs/sources.js';
 import { listPackCatalog, listSkillCatalog, readInstalledClaudePluginNames, type PackCatalogEntry } from './catalog.js';
 import {
@@ -240,6 +240,8 @@ export interface PackState {
   license: string | null;
   cached: boolean;
   notApplied: string[];
+  /** What leaves the machine when the pack is on (PAN-2444), or null. */
+  disclosure: string | null;
   /** The same upstream plugin is also installed in Claude Code, so its skills would appear twice. */
   duplicatePluginInstall: boolean;
   /** Filled only when asked (`checkUpdates`): the newer remote commit, or null. */
@@ -302,6 +304,7 @@ function resolvePackStates(
       license: manifest?.license ?? null,
       cached: pack.cached,
       notApplied: manifest ? notAppliedLabels(manifest.capabilities) : [],
+      disclosure: KNOWN_PACKS[pack.id]?.disclosure ?? null,
       duplicatePluginInstall: manifest?.pluginName ? installedPlugins.has(manifest.pluginName) : false,
       global: valueAt(layers.packs?.global, pack.id),
       project: valueAt(layers.packs?.project, pack.id),

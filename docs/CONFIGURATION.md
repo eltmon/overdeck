@@ -243,6 +243,10 @@ These `models:` keys belonged to the old work-type router. Presets went first
 favour of roles and workhorse slots. Nothing picks a model from these keys. A config file that still carries them loads without error, and the
 keys do nothing.
 
+The retired `models.preset` key is unrelated to the provider presets added in
+PAN-4400. Those presets write explicit values into `config.yaml` once and are
+never a live key; see [Model presets](../configuration/model-presets.mdx).
+
 | Key | What it did | Where the job went |
 |---|---|---|
 | `models.preset` (`premium` / `balanced` / `budget`) | Picked a curated model per work type | `workhorses.expensive` / `mid` / `cheap`, which the role defaults reference as `workhorse:<slot>` |

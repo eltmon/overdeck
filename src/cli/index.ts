@@ -501,6 +501,7 @@ await groups.register('memory');
 await groups.register('briefing');
 await groups.register('compliance');
 await groups.register('registry'); await groups.register('orders');
+await groups.register('models');
 await groups.register('parked');
 await groups.register('docs');
 

@@ -33,7 +33,7 @@ export const CODEX_SKILL_BLOCK_BEGIN = '# overdeck:skill-overrides:begin';
 export const CODEX_SKILL_BLOCK_END = '# overdeck:skill-overrides:end';
 
 /** Issue from ctx or the workspace path, project from the cwd. */
-async function resolveLaunchScope(ctx: LaunchSkillContext): Promise<{ projectKey?: string; issueId?: string }> {
+export async function resolveLaunchScope(ctx: LaunchSkillContext): Promise<{ projectKey?: string; issueId?: string }> {
   const [{ resolveProjectKeyForCwdAsync }, { issueIdFromWorkspacePath }] = await Promise.all([
     import('../projects.js'),
     import('../xbrief/io.js'),
@@ -59,6 +59,7 @@ export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Prom
  */
 export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
+  exclude: ReadonlySet<string> = new Set(),
 ): Promise<{ selection: MountSelection; warnings: string[] }> {
   const [{ loadSkillOverrideLayers }, { resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir }] =
     await Promise.all([
@@ -71,6 +72,7 @@ export async function resolveLaunchPackSelection(
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
   for (const pack of packs) {
+    if (exclude.has(pack.id)) continue;
     if (!pack.manifest) {
       const perSkillOn = [layers.global, layers.project, layers.issue].some(map =>
         Object.entries(map ?? {}).some(([id, enabled]) => enabled && id.startsWith(`${pack.id}/`)));
@@ -95,18 +97,21 @@ export async function resolveLaunchPackSelection(
   return { selection, warnings };
 }
 
-/** Build the mount and point the Claude plugin link at it (or remove the link). Returns warnings. */
-export async function applyClaudePacks(ctx: LaunchSkillContext, link: string): Promise<string[]> {
+/**
+ * Build the mount and point the Claude plugin link at it (or remove the link).
+ * `exclude` drops whole packs (SageOx when its wiring is off, PAN-2444). Returns warnings.
+ */
+export async function applyClaudePacks(ctx: LaunchSkillContext, link: string, exclude?: ReadonlySet<string>): Promise<string[]> {
   const { buildMount, linkClaudeMount } = await import('../skill-packs/mount.js');
-  const { selection, warnings } = await resolveLaunchPackSelection(ctx);
+  const { selection, warnings } = await resolveLaunchPackSelection(ctx, exclude);
   await linkClaudeMount(link, await buildMount(selection));
   return warnings;
 }
 
 /** Build the mount and write the Codex pack block and plugin cache (or remove them). Returns warnings. */
-export async function applyCodexPacks(ctx: LaunchSkillContext, codexHome: string): Promise<string[]> {
+export async function applyCodexPacks(ctx: LaunchSkillContext, codexHome: string, exclude?: ReadonlySet<string>): Promise<string[]> {
   const { buildMount, writeCodexPackBlock } = await import('../skill-packs/mount.js');
-  const { selection, warnings } = await resolveLaunchPackSelection(ctx);
+  const { selection, warnings } = await resolveLaunchPackSelection(ctx, exclude);
   await writeCodexPackBlock(codexHome, await buildMount(selection));
   return warnings;
 }
@@ -145,13 +150,22 @@ export async function applyDeftForLaunch(
   return { hideSkills: plan.hideSkills, deny: plan.denyCli ? DEFT_CLI_DENY : [], provenance: plan.provenance, warnings };
 }
 
-/** The `--settings` JSON for Claude Code, or '' when nothing is hidden or denied. */
-export function claudeSkillSettingsJson(disabled: readonly string[], deny: readonly string[] = []): string {
-  if (disabled.length === 0 && deny.length === 0) return '';
-  return JSON.stringify({
-    ...(disabled.length > 0 ? { skillOverrides: Object.fromEntries(disabled.map(name => [name, 'off'])) } : {}),
-    ...(deny.length > 0 ? { permissions: { deny: [...deny] } } : {}),
-  });
+/**
+ * The `--settings` JSON for Claude Code, or '' when nothing is hidden and
+ * `extra` (SageOx env and hooks, PAN-2444; the Deft CLI deny list, PAN-3943)
+ * adds nothing. One line: the launcher accepts only '' or a single `{...}`
+ * object.
+ */
+export function claudeSkillSettingsJson(
+  disabled: readonly string[],
+  extra: { env?: Record<string, string>; hooks?: Record<string, unknown[]>; deny?: readonly string[] } = {},
+): string {
+  const settings: Record<string, unknown> = {};
+  if (disabled.length > 0) settings['skillOverrides'] = Object.fromEntries(disabled.map(name => [name, 'off']));
+  if (extra.env && Object.keys(extra.env).length > 0) settings['env'] = extra.env;
+  if (extra.hooks && Object.keys(extra.hooks).length > 0) settings['hooks'] = extra.hooks;
+  if (extra.deny && extra.deny.length > 0) settings['permissions'] = { deny: [...extra.deny] };
+  return Object.keys(settings).length === 0 ? '' : JSON.stringify(settings);
 }
 
 function escapeTomlBasicString(value: string): string {

@@ -37,6 +37,7 @@ function pack(overrides: Partial<PackState> = {}): PackState {
     license: 'MIT',
     cached: true,
     notApplied: [],
+    disclosure: null,
     duplicatePluginInstall: false,
     global: null,
     project: null,
@@ -95,6 +96,13 @@ describe('SkillPacksSection', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'mattpocock' }));
     expect(document.querySelector('[data-pack-skill="mattpocock/grilling"]')).toBeTruthy();
     expect(screen.getByText('Overdeck also bundles grilling')).toBeTruthy();
+  });
+
+  it('shows the sageox disclosure and none for a pack without one', () => {
+    const disclosure = 'SageOx records agent sessions on this machine. With uploads off nothing is sent.';
+    renderSection({ level: 'global', packs: [pack(), pack({ id: 'sageox', disclosure, skills: [] })] });
+    expect(within(packRow('sageox')).getByTestId('pack-disclosure').textContent).toBe(disclosure);
+    expect(within(packRow('mattpocock')).queryByTestId('pack-disclosure')).toBeNull();
   });
 
   it('notes the opt-in skill', () => {

@@ -378,9 +378,82 @@ Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their 
 
 In the dashboard, packs appear above the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead.
 
-### SageOx and Deft are not plain packs
+### SageOx
 
-SageOx installs hooks, git hooks, and a daemon that record sessions, so hiding its skills would not turn it off. It needs an integration, tracked in [#2444](https://github.com/eltmon/overdeck/issues/2444); `pan skills pack add sageox` refuses with that pointer. Deft's skills depend on its engine and project files, so Overdeck mounts only a read-only subset through the `deft-readonly` adapter; see [Deft Directive](#deft-directive).
+[SageOx](https://github.com/sageox/ox) records coding-agent sessions and syncs them to a team ledger. Overdeck offers it as the `sageox` pack, built from the operator's fork [eltmon/ox](https://github.com/eltmon/ox). The fork adds a **host-managed mode**: with `OX_HOST_MANAGED=1`, `ox` writes nothing into the repository (no `AGENTS.md`/`CLAUDE.md` markers, no `.claude/settings.json` hooks), adds no attribution to commits or PRs, never asks the agent to run `ox init`, and stays offline unless Overdeck allows the network.
+
+SageOx is **off by default**, for every project and issue. It works with **Claude Code** launches only; Codex launches never get SageOx skills or hooks, and print a warning when the pack would have been on.
+
+**What leaves the machine:**
+
+> SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Requires the eltmon/ox build; see `pan doctor`.
+
+The Skills page shows the same text on the `sageox` pack row.
+
+#### One-time setup
+
+1. **Build `ox` from the fork**, at the commit the pack trusts. Overdeck never installs `ox`. The fork needs Go 1.26 (the default `GOTOOLCHAIN=auto` downloads it).
+
+   ```bash
+   git clone git@github.com:eltmon/ox.git && cd ox
+   git switch --detach <trusted commit>      # shown by: pan skills pack list
+   go build -o ~/.local/bin/ox ./cmd/ox
+   ox host-contract --json                   # must print "contract":"overdeck-host/1"
+   ```
+
+2. **Register the pack** (the ref is a branch or tag in the fork):
+
+   ```bash
+   pan skills pack add sageox https://github.com/eltmon/ox --ref overdeck/host-managed
+   ```
+
+   The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
+
+3. **In each repository you choose**, log in and initialize SageOx yourself, once. Overdeck never runs these commands. Host-managed `ox init` writes only `.sageox/` (no `AGENTS.md`/`CLAUDE.md` markers, no hook files, no git hooks). It registers the repository with SageOx, so it needs the network:
+
+   ```bash
+   ox login
+   OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init
+   ox status        # wait until it shows the project's ledger
+   ```
+
+   Session recording writes into a local clone of the project's SageOx ledger. The ox daemon that `ox init` starts clones it; wait until `ox status` shows the ledger. With uploads off, Overdeck keeps `ox` offline and no daemon runs, so without this clone SageOx records nothing.
+
+4. **Turn the pack on** for that project (or one issue):
+
+   ```bash
+   pan skills set --pack sageox on --project myapp
+   ```
+
+#### Uploads
+
+Uploads are a second, separate opt-in per project. They are off until you turn them on:
+
+```bash
+pan skills pack sageox upload on --project myapp    # writes sageox_upload: enabled in projects.yaml
+pan skills pack sageox upload off --project myapp
+pan skills pack sageox status [--project <key>] [--json]
+```
+
+`status` shows, for each project, whether the pack is on (and from which level) and whether uploads are enabled. With uploads off, Overdeck sets `OX_HOST_NETWORK=off` and `OX_SESSION_PUBLISHING=manual`, so sessions stay on this machine. With uploads on, it sets `OX_HOST_NETWORK=on` and `OX_SESSION_PUBLISHING=auto`.
+
+#### What a launch gets
+
+When the pack is on for a Claude Code launch, Overdeck checks two more things at launch time: the launch's git root has a `.sageox/` directory, and the `ox` on `PATH` answers `ox host-contract --json` within 2 seconds. When all hold, the launch's `--settings` JSON carries:
+
+- the env `OX_HOST_MANAGED=1`, `OX_PROJECT_ROOT=<git root>`, `OX_HOST_NETWORK`, `OX_SESSION_PUBLISHING`, `SAGEOX_TELEMETRY=false`, `SAGEOX_FRICTION=false`, `SAGEOX_DAEMON=false`, and `OX_NO_DAEMON=1`;
+- one `ox agent hook <event>` hook for each of `SessionStart`, `PreCompact`, `PostToolUse`, `Stop`, `SessionEnd`, and `UserPromptSubmit`, with the same env written inline in each hook command;
+- the `sageox` pack skills you turned on.
+
+These hooks come from Overdeck, not from the pack; the pack's own capabilities are still **Not applied**. If any check fails, or anything goes wrong, the launch continues without SageOx: no env, no hooks, no `sageox` skills, and one `[launcher] WARNING:` line naming the reason. Turning the pack off removes all of it at the next launch.
+
+#### What `pan doctor` checks
+
+When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. It is `ok` when `ox` answers the `overdeck-host/1` contract and was built from the pack's trusted commit. It warns, with the build command as the fix, when `ox` is missing, is upstream `ox` without the host contract, or was built from a different commit. Without the pack, there is no row.
+
+### Deft
+
+Deft's skills depend on its engine and project files, so Overdeck mounts only a read-only subset through the `deft-readonly` adapter; see [Deft Directive](#deft-directive).
 
 ## Deft Directive
 

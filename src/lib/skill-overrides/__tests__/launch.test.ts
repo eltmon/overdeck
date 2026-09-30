@@ -48,13 +48,13 @@ describe('claudeSkillSettingsJson', () => {
 
   it('returns an empty string when nothing is disabled', () => {
     expect(claudeSkillSettingsJson([])).toBe('');
-    expect(claudeSkillSettingsJson([], [])).toBe('');
+    expect(claudeSkillSettingsJson([], { deny: [] })).toBe('');
   });
 
   it('adds permissions.deny for the Deft CLI list as one JSON object (PAN-3943)', () => {
-    const json = claudeSkillSettingsJson([], DEFT_CLI_DENY);
+    const json = claudeSkillSettingsJson([], { deny: DEFT_CLI_DENY });
     expect(JSON.parse(json)).toEqual({ permissions: { deny: [...DEFT_CLI_DENY] } });
-    expect(JSON.parse(claudeSkillSettingsJson(['grilling'], ['Bash(deft:*)']))).toEqual({
+    expect(JSON.parse(claudeSkillSettingsJson(['grilling'], { deny: ['Bash(deft:*)'] }))).toEqual({
       skillOverrides: { grilling: 'off' },
       permissions: { deny: ['Bash(deft:*)'] },
     });
@@ -63,6 +63,21 @@ describe('claudeSkillSettingsJson', () => {
       encoding: 'utf8',
     });
     expect(guard).toBe('keep\n');
+  });
+
+  it('merges SageOx env and hooks into one single-line object (PAN-2444)', () => {
+    const hooks = { Stop: [{ matcher: '', hooks: [{ type: 'command', command: 'if command -v ox >/dev/null 2>&1; then OX_HOST_MANAGED=1 ox agent hook Stop; fi' }] }] };
+    const json = claudeSkillSettingsJson(['grilling'], { env: { OX_HOST_MANAGED: '1' }, hooks });
+    expect(json).not.toContain('\n');
+    expect(JSON.parse(json)).toEqual({ skillOverrides: { grilling: 'off' }, env: { OX_HOST_MANAGED: '1' }, hooks });
+    expect(JSON.parse(claudeSkillSettingsJson([], { env: { OX_HOST_MANAGED: '1' }, hooks }))).toEqual({ env: { OX_HOST_MANAGED: '1' }, hooks });
+    expect(claudeSkillSettingsJson([], { env: {}, hooks: {} })).toBe('');
+  });
+
+  it('carries SageOx env and the Deft deny list together (PAN-2444 + PAN-3943)', () => {
+    const json = claudeSkillSettingsJson([], { env: { OX_HOST_MANAGED: '1' }, deny: ['Bash(deft:*)'] });
+    expect(json).not.toContain('\n');
+    expect(JSON.parse(json)).toEqual({ env: { OX_HOST_MANAGED: '1' }, permissions: { deny: ['Bash(deft:*)'] } });
   });
 });
 
@@ -315,6 +330,14 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(() => lstatSync(link)).toThrow();
     expect(execFile).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('leaves an excluded pack out of the mount without a not-cached warning (PAN-2444)', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
+    expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
+    expect(() => lstatSync(link)).toThrow();
+    listPackCatalog.mockResolvedValue([catalogEntry(false)]);
+    expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
   });
 
   it('stays quiet about an uncached pack that nothing turns on', async () => {

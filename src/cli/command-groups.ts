@@ -101,6 +101,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/registry.js'),
     register: (mod, program) => { program.addCommand(mod.createRegistryCommand()); },
   }),
+  models: group({
+    names: ['models'],
+    load: () => import('./commands/models.js'),
+    register: (mod, program) => { program.addCommand(mod.createModelsCommand()); },
+  }),
   orders: group({
     names: ['orders'],
     load: () => import('./commands/orders.js'),
