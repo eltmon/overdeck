@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:20:14.477Z",
+  "updated": "2026-09-30T20:20:16.120Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4445",
       "claimedAt": "2026-09-30T20:11:24.863Z",
       "doneAt": "2026-09-30T20:20:14.476Z"
+    },
+    "status-card": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:20:16.120Z"
     }
   }
 }
