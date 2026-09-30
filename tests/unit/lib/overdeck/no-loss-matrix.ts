@@ -412,6 +412,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/pairing/exchange',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (pairing)' },
   { surface: 'GET /api/devices',                          kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind device)' },
   { surface: 'DELETE /api/devices/:id',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
+  { surface: 'POST /api/anywhere/trusted-origins',        kind: 'http', disposition: 'WRITE',       door: 'remote-access/trusted-origins.addSavedTrustedOrigin (PAN-4445)' },
   { surface: 'GET /api/access-tokens',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind token)' },
   { surface: 'POST /api/access-tokens',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (kind token)' },
   { surface: 'DELETE /api/access-tokens/:id',             kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
