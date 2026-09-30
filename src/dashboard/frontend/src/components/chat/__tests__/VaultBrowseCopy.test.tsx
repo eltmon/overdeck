@@ -1,9 +1,11 @@
 /**
  * PAN-4436: a Session Vault browse copy (a conversation another machine owns)
- * shows its owner on the row.
+ * shows its owner on the row and a read-only notice in place of the composer.
  */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { ComposerFooter } from '../ComposerFooter';
 
 import { ConversationRow } from '../../CommandDeck/ConversationRow';
 import type { Conversation } from '../../CommandDeck/ConversationList';
@@ -12,6 +14,35 @@ import type { ConversationMutations } from '../../CommandDeck/useConversationMut
 vi.mock('../../DialogProvider', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
 }));
+
+// The composer's editor and pickers, stubbed the way ComposerFooter.test.tsx does.
+vi.mock('lexical', () => ({ $getRoot: () => ({ getTextContent: () => '', clear: () => {} }) }));
+vi.mock('../ComposerPromptEditor', () => ({
+  loadDraft: () => '',
+  ComposerPromptEditor: ({ editorRef }: { editorRef: { current: unknown } }) => {
+    editorRef.current = { read: (callback: () => void) => callback(), update: (callback: () => void) => callback(), focus: vi.fn() };
+    return <textarea aria-label="Composer editor" data-testid="composer-editor" />;
+  },
+}));
+vi.mock('../ModelPicker', () => ({
+  ModelPicker: ({ value }: { value: string }) => <div data-testid="model-picker">{value}</div>,
+  MODEL_EFFORT_SUPPORT: { 'claude-sonnet-4-6': ['low', 'medium', 'high'] },
+  loadStoredHarness: () => 'claude-code',
+  saveStoredHarness: vi.fn(),
+  saveStoredModel: vi.fn(),
+}));
+vi.mock('../defaultConversationModel', () => ({ getDefaultConversationModel: () => 'claude-sonnet-4-6' }));
+vi.mock('../EffortPicker', () => ({ EffortPicker: () => <div data-testid="effort-picker" />, loadStoredEffort: () => 'medium' }));
+vi.mock('../VoiceWidget', () => ({ VoiceWidget: () => <div data-testid="voice-widget" /> }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
+vi.mock('../../Settings/modelCatalog', () => ({
+  modelSupportsImages: vi.fn(() => true),
+  findModelDef: vi.fn(() => ({ name: 'Claude Sonnet 4.6' })),
+}));
+
+afterEach(() => {
+  cleanup();
+});
 
 const VAULT_ID = '00000000-0000-4000-8000-000000000042';
 
@@ -65,5 +96,22 @@ describe('ConversationRow owner badge (PAN-4436)', () => {
   it.each(['flat', 'nested'] as const)('shows no owner badge on a local row in the %s variant', (variant) => {
     renderRow({ ...browseCopy, name: 'local', origin: 'local', vaultOwnerLabel: null }, variant);
     expect(screen.queryByTestId('vault-owner-badge')).not.toBeInTheDocument();
+  });
+});
+
+describe('ComposerFooter read-only notice (PAN-4436)', () => {
+  it('shows how to continue a browse copy instead of an input', () => {
+    render(<ComposerFooter conversation={browseCopy} />);
+    const notice = screen.getByTestId('vault-read-only-notice');
+    expect(notice).toHaveTextContent('Read-only copy from laptop-a.');
+    expect(notice).toHaveTextContent(`To continue it here, run: pan vault resume ${VAULT_ID}`);
+    expect(screen.queryByTestId('composer-editor')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('renders the input for a local conversation', () => {
+    render(<ComposerFooter conversation={{ ...browseCopy, name: 'local', origin: 'local', status: 'active', sessionAlive: true, vaultOwnerLabel: null }} />);
+    expect(screen.getByTestId('composer-editor')).toBeInTheDocument();
+    expect(screen.queryByTestId('vault-read-only-notice')).not.toBeInTheDocument();
   });
 });

@@ -128,7 +128,7 @@ function formatFileSize(bytes: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({
+function ComposerFooterInput({
   conversation,
   onSend,
   onSendAcknowledged,
@@ -896,4 +896,23 @@ export function ComposerFooter({
       </div>
     </div>
   );
+}
+
+/** PAN-4436: a Session Vault browse copy is read-only — show how to continue it instead of an input. */
+function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
+  const label = conversation.vaultOwnerLabel ?? 'another machine';
+  const vaultId = conversation.name.startsWith('vault-') ? conversation.name.slice('vault-'.length) : conversation.name;
+  return (
+    <div className={styles.composerFooter}>
+      <div className={styles.composerBox} role="status" data-testid="vault-read-only-notice">
+        <p>{`Read-only copy from ${label}.`}</p>
+        <p>To continue it here, run: <code>{`pan vault resume ${vaultId}`}</code></p>
+      </div>
+    </div>
+  );
+}
+
+export function ComposerFooter(props: ComposerFooterProps) {
+  if (props.conversation.origin === 'vault') return <VaultReadOnlyNotice conversation={props.conversation} />;
+  return <ComposerFooterInput {...props} />;
 }
