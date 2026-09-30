@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:50:36.707Z",
+  "updated": "2026-09-30T01:52:10.059Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,9 +106,10 @@
       "doneAt": "2026-09-30T01:50:32.795Z"
     },
     "skills-removal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4429",
-      "claimedAt": "2026-09-30T01:50:36.707Z"
+      "claimedAt": "2026-09-30T01:50:36.707Z",
+      "doneAt": "2026-09-30T01:52:10.059Z"
     }
   }
 }
