@@ -727,13 +727,27 @@ async function relayCiFailureFeedbackInQueue(
     // throwing (PR #3874), so success is the outcome, not the absence of a throw.
     agentMessageSent = outcome?.delivered === true;
     if (!agentMessageSent) {
+      const reason = outcome?.reason ?? 'no delivery outcome';
       console.warn(
-        `[ci-failure-feedback] Message to ${agentId} was not delivered (${outcome?.reason ?? 'no delivery outcome'}); feedback file remains at ${fileResult.filePath}`,
+        `[ci-failure-feedback] Message to ${agentId} was not delivered (${reason}); feedback file remains at ${fileResult.filePath}`,
+      );
+      await surfaceNeedsYou(
+        issueId,
+        `CI failure feedback for ${opts.headSha.slice(0, 8)} was not delivered to ${agentId}: ${reason}`,
+        { specialist: 'ci-monitor', feedbackPath: fileResult.filePath, via: 'ci' },
+        deps,
       );
     }
   } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`,
+      `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${reason}`,
+    );
+    await surfaceNeedsYou(
+      issueId,
+      `CI failure feedback for ${opts.headSha.slice(0, 8)} was not delivered to ${agentId}: ${reason}`,
+      { specialist: 'ci-monitor', feedbackPath: fileResult.filePath, via: 'ci' },
+      deps,
     );
   }
 

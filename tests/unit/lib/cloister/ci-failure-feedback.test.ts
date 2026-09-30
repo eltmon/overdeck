@@ -162,6 +162,7 @@ function makeGhMocks(logExcerpt = 'FAIL: assertion failed') {
 describe('relayCiFailureFeedback', () => {
   it('writes feedback and messages the work agent', async () => {
     makeGhMocks();
+    const surfaceNeedsYou = vi.fn(async () => undefined);
 
     const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
@@ -171,7 +172,7 @@ describe('relayCiFailureFeedback', () => {
       headRef: 'feature/pan-1801',
       prUrl: 'https://github.com/test-owner/test-repo/pull/42',
       source: 'check_run:test',
-    });
+    }, { surfaceNeedsYou });
 
     expect(result.agentMessageSent).toBe(true);
     expect(result.feedbackPath).toBe('/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md');
@@ -186,6 +187,54 @@ describe('relayCiFailureFeedback', () => {
       specialist: 'ci-monitor',
       outcome: 'failed',
     }));
+    expect(surfaceNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('surfaces needs-you when the CI FAILED message is not delivered (PAN-4432)', async () => {
+    makeGhMocks();
+    mockMessageAgent.mockResolvedValue({ delivered: false, queuedToMail: false, reason: 'pane gone' });
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+
+    const result = await relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+      source: 'check_run:test',
+    }, { surfaceNeedsYou });
+
+    expect(result.agentMessageSent).toBe(false);
+    expect(surfaceNeedsYou).toHaveBeenCalledTimes(1);
+    expect(surfaceNeedsYou).toHaveBeenCalledWith(
+      'PAN-1801',
+      expect.stringContaining('pane gone'),
+      expect.objectContaining({ specialist: 'ci-monitor' }),
+    );
+  });
+
+  it('surfaces needs-you when messaging the agent throws (PAN-4432)', async () => {
+    makeGhMocks();
+    mockMessageAgent.mockRejectedValue(new Error('x'));
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+
+    await relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+      source: 'check_run:test',
+    }, { surfaceNeedsYou });
+
+    expect(surfaceNeedsYou).toHaveBeenCalledTimes(1);
+    expect(surfaceNeedsYou).toHaveBeenCalledWith(
+      'PAN-1801',
+      expect.stringContaining('x'),
+      expect.objectContaining({ specialist: 'ci-monitor' }),
+    );
   });
 
   it('labels failures inherited from main', async () => {
