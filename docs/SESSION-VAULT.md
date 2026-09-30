@@ -329,14 +329,14 @@ Session Vault gives eviction review a UI. This layer is additive: every command 
 works the same way against the same on-disk vault.
 
 - **Auto-settle.** A poller checks every active managed conversation (`claude-code`, `codex`)
-  every 15 seconds. Growth (re-)arms a `debounceSec` timer (from `vault/config.json`) that
-  settles the transcript once it has been quiet that long, so a busy conversation is not
-  settled mid-turn. Session end and dashboard shutdown force an immediate settle regardless of
-  the debounce, bounded by a 10-second flush budget on shutdown; anything not settled in time
-  is picked up by the next boot's sync cycle.
-- **Sync cycle.** The primary dashboard also runs the vault's own sync loop: first cycle 5
-  seconds after the dashboard starts, then every `syncIntervalSec`, with the engine's normal
-  offline backoff when the backend is unreachable. A peer/isolated dashboard
+  every **15 seconds**. Growth (re-)arms a `debounceSec` timer (`vault/config.json`, default
+  **30 seconds**) that settles the transcript once it has been quiet that long, so a busy
+  conversation is not settled mid-turn. Session end and dashboard shutdown force an immediate
+  settle regardless of the debounce, bounded by a **10-second** flush budget on shutdown;
+  anything not settled in time is picked up by the next boot's sync cycle.
+- **Sync cycle.** The primary dashboard also runs the vault's own sync loop: first cycle
+  **5 seconds** after the dashboard starts, then every `syncIntervalSec`, with the engine's
+  normal offline backoff when the backend is unreachable. A peer/isolated dashboard
   (`OVERDECK_DISABLE_DEACON=1`, NFR-4) never starts this background service — it still reads
   the real on-disk vault state through the routes below, it just never advances it.
 - **Eviction liveness (D-3).** When `vault.evict` is on, eligibility checks in Overdeck mode
@@ -345,10 +345,12 @@ works the same way against the same on-disk vault.
   `src/lib/agents/liveness.ts` alone. A live conversation or agent is never eligible, and a
   liveness check that throws counts as live. No dashboard timer deletes anything on its own;
   eviction still requires the explicit confirm, from the CLI or the panel.
-- **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`, and
-  `POST /api/vault/eviction-batch/{confirm,decline,clear,reoffer}`. `confirm` re-runs the same
-  eligibility checks as `pan vault evict --confirm` but skips re-checking entries already
-  marked `failed` (`skipFailed`), so one failing entry never blocks confirming the rest.
+- **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`,
+  `POST /api/vault/eviction-batch/confirm`, `POST /api/vault/eviction-batch/decline`,
+  `POST /api/vault/eviction-batch/clear`, and `POST /api/vault/eviction-batch/reoffer`.
+  `confirm` re-runs the same eligibility checks as `pan vault evict --confirm` but skips
+  re-checking entries already marked `failed` (`skipFailed`), so one failing entry never
+  blocks confirming the rest.
 - Browsing another machine's vaulted conversations from the dashboard and a "Continue here"
   resume action are separate, not yet built ([PAN-4436](https://github.com/eltmon/overdeck/issues/4436),
   [PAN-4437](https://github.com/eltmon/overdeck/issues/4437)).
