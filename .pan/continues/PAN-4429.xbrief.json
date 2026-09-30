@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:32:38.182Z",
+  "updated": "2026-09-30T02:32:52.387Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,10 @@
     "skills-removal.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T02:32:38.182Z"
+    },
+    "skills-removal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:32:52.386Z"
     }
   }
 }
