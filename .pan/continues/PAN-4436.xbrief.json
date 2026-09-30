@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:40:16.632Z",
+  "updated": "2026-09-30T20:40:29.377Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "uat-vault-browse.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T20:40:16.631Z"
+    },
+    "docs-browse-copies.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:29.377Z"
     }
   }
 }
