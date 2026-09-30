@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:11:38.543Z",
+  "updated": "2026-09-30T17:11:43.814Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-2351",
       "claimedAt": "2026-09-30T17:08:26.953Z",
       "doneAt": "2026-09-30T17:11:38.543Z"
+    },
+    "access-token-routes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T17:11:43.814Z"
     }
   }
 }
