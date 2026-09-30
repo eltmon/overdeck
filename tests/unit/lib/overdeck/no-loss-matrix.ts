@@ -332,6 +332,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/prd',                             kind: 'http', disposition: 'READ',        door: 'getIssuePrd → findDraftPrd + readPrdContent' },
   { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },
   { surface: 'GET /api/issues/:id/verification',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Verification artifact + ReviewStatus verification state' },
+  { surface: 'GET /api/issues/:id/test-removal-waiver',             kind: 'http', disposition: 'READ',        door: 'readTestSkipWaiver + snapshotWorkspaceHeads' },
+  { surface: 'POST /api/issues/:id/test-removal-waiver',            kind: 'http', disposition: 'WRITE',       door: 'grantTestSkipWaiver → <workspace>/.overdeck/test-removal-waiver.json' },
   { surface: 'GET /api/issues/:issueId/staffing',                   kind: 'http', disposition: 'READ',        door: 'Issue record staffing override + resolved configuration' },
   { surface: 'POST /api/issues/:issueId/staffing',                  kind: 'http', disposition: 'WRITE',       door: 'Issue record writer updates the work-model override' },
   { surface: 'GET /api/issues/:id/tasks',                           kind: 'http', disposition: 'READ',        door: 'readWorkspacePlanSync (merged xBRIEF items) + issue record claims' },
