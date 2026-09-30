@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:32:24.476Z",
+  "updated": "2026-09-30T02:32:38.182Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,10 @@
     "legacy-tldr-cleanup.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T02:32:24.476Z"
+    },
+    "skills-removal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:32:38.182Z"
     }
   }
 }
