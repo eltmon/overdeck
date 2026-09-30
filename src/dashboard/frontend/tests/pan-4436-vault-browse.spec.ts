@@ -54,7 +54,7 @@ test.beforeEach(async () => {
   const sessionId = randomUUID();
   const cwd = join(fixtureDir, 'uat-project');
   mkdirSync(cwd, { recursive: true });
-  const transcript = join(fixtureDir, '.claude', 'projects', '-uat', `${sessionId}.jsonl`);
+  const transcript = join(fixtureDir, 'transcripts', `${sessionId}.jsonl`);
   mkdirSync(dirname(transcript), { recursive: true });
   const now = new Date().toISOString();
   writeFileSync(transcript, [
