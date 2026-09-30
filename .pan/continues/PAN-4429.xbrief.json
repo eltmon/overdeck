@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:25:57.461Z",
+  "updated": "2026-09-30T02:26:09.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "workspace-create-no-venv.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T02:25:57.461Z"
+    },
+    "workspace-lifecycle-no-daemon.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:26:09.985Z"
     }
   }
 }
