@@ -4,17 +4,17 @@
     "created": "2026-09-30T20:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4436: Session Vault: dashboard browse copies (read-only rows for conversations owned by another machine)",
-    "updated": "2026-09-30T19:36:13.784Z"
+    "updated": "2026-09-30T19:36:54.380Z"
   },
   "plan": {
     "id": "pan-4436",
     "title": "Session Vault: dashboard browse copies (read-only rows for conversations owned by another machine)",
-    "status": "proposed",
+    "status": "running",
     "uid": "3bc2ad1e-260e-4ee5-83ef-19b2009aabc2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T20:30:00Z",
-    "updated": "2026-09-30T19:36:13.784Z",
+    "updated": "2026-09-30T19:36:54.380Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4436",
@@ -947,5 +947,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
