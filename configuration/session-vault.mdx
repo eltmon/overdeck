@@ -154,6 +154,11 @@ in scripts and `--no-launch` to print the command instead of running it.
 Claude Code and Codex resume natively. Other harnesses receive a markdown digest of the
 conversation in the target directory to paste into a new session.
 
+In the dashboard, open the conversation from the other machine and click **Continue here**.
+If this machine has no checkout of the project, the dialog offers to clone and register it
+first. If another machine continued the conversation in the meantime, the dialog says
+`Already continued on <machine>.` and changes nothing.
+
 ### Your uncommitted code comes along
 
 Each save also takes an encrypted snapshot of the code the conversation was working on:
@@ -171,6 +176,9 @@ pan vault resume <id> --no-code            # continue the conversation only
 `resume` fetches origin, checks out the saved commit, and applies the changes. The target
 checkout must be clean: with uncommitted changes it offers a fresh worktree at a TTY, and
 otherwise stops and asks for `--worktree <dir>`. Nothing in the dirty checkout is touched.
+
+**Continue here** in the dashboard follows the same rule: a clean checkout gets the snapshot
+in place, and a checkout with uncommitted changes gets a new workspace for it instead.
 
 A snapshot larger than 50 MB (`wipMaxBytes` in the vault config) is skipped, and `resume`
 says so. If the uncommitted code contains something that looks like a credential, the
