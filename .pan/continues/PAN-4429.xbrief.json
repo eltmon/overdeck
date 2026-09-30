@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:25:32.747Z",
+  "updated": "2026-09-30T02:25:45.207Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "retire-tldr-hooks.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T02:25:32.747Z"
+    },
+    "workspace-create-no-venv.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:25:45.207Z"
     }
   }
 }
