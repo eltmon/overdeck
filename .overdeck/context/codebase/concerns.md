@@ -240,6 +240,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   deacon-lite runs only in the deacon child, where
   `getRequestReviewStarter()` is always null — reach the review pipeline via
   `requestReviewThroughRoute`.
+- **A live reviewer pane is not proof a review is running** (PAN-4433) — a
+  dispatched reviewer can sit idle with no transcript and no report forever
+  (PAN-4383, ~21 h). Both deacon-lite review recoveries skip a live pane.
+  `reviewDeadlineAt` is write-only since the Cut deleted its reader
+  (`deacon-review-signals.ts`, 94255f055fe); PAN-4433 adds
+  `reviewDispatchedAt` and `recoverSilentReviewers`. Never write
+  `review.redispatched` for a quick-mode issue: `recoverStalledReviews` then
+  launches convoy lanes for it.
 - **Claude Code's agent selector decides where typed input goes** (PAN-4268) —
   the `● main` / `◯ <type>  <description>` rows under the prompt box. Pasting
   into a pane whose `●` is on a subagent misroutes; with footer focus (`❯` on a
@@ -342,4 +350,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   global file. Writers that must touch only named keys use a path-scoped
   `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
 
-<!-- last-verified: 2026-09-29 -->
+<!-- last-verified: 2026-09-30 -->
