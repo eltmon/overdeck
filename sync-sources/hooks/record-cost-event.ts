@@ -17,7 +17,6 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { calculateCost, getPricing, AIProvider } from '../../src/lib/cost.js';
 import { appendCostEvent } from '../../src/lib/costs/events.js';
-import { captureTldrMetrics, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
 
 // ============== Types ==============
 
@@ -143,22 +142,7 @@ if (!issueId) {
   issueId = 'UNKNOWN';
 }
 
-// Capture TLDR metrics for this batch (PAN-236)
-// Find workspace root via git (same process already used for branch detection above)
-let tldrMetrics: TldrSessionMetrics | null = null;
-try {
-  const workspaceRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf-8',
-    timeout: 2000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
-  if (workspaceRoot) {
-    tldrMetrics = captureTldrMetrics(workspaceRoot);
-  }
-} catch { /* git not available or no workspace — skip TLDR metrics */ }
-
 // Process new transcript lines looking for assistant messages with usage
-let tldrAttachedToFirstEvent = false;
 for (const line of lines) {
   if (!line.trim()) continue;
 
@@ -215,22 +199,6 @@ for (const line of lines) {
       cacheTTL: '5m',
     }, pricing);
 
-    // Attach TLDR metrics to the first event in each batch (delta since last batch)
-    const tldrFields = tldrMetrics && !tldrAttachedToFirstEvent && tldrMetrics.interceptions + tldrMetrics.bypasses > 0
-      ? {
-          tldrInterceptions: tldrMetrics.interceptions,
-          tldrBypasses: tldrMetrics.bypasses,
-          tldrTokensSaved: tldrMetrics.estimatedTokensSaved,
-          tldrBypassReasons: Object.keys(tldrMetrics.bypassReasons).length > 0
-            ? tldrMetrics.bypassReasons
-            : undefined,
-        }
-      : {};
-
-    if (tldrMetrics && !tldrAttachedToFirstEvent) {
-      tldrAttachedToFirstEvent = true;
-    }
-
     // Record the cost event. PAN-1570: the old Effect-returning facade was a
     // lazy Effect that did nothing unless run, which silently dropped every
     // cost event after the PAN-1249 Effect migration; that facade is gone
@@ -250,7 +218,6 @@ for (const line of lines) {
       cost,
       ...(requestId ? { requestId } : {}),
       sessionId,
-      ...tldrFields,
       ...(cavemanVariant ? { cavemanVariant } : {}),
     });
   } catch {
