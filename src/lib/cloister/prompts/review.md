@@ -16,7 +16,6 @@ optional:
   - POLYREPO_DIRS
   - ACCEPTANCE_CRITERIA
   - MEMORY_CONTEXT
-  - TLDR_AVAILABLE
 ---
 # Code Review — {{ISSUE_ID}}
 
@@ -45,21 +44,6 @@ You are a demanding code review specialist. Your job is to ensure code is produc
 {{MEMORY_CONTEXT}}
 {{/MEMORY_CONTEXT}}
 
-{{#TLDR_AVAILABLE}}
-## TLDR: Efficient Review Context
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-{{/TLDR_AVAILABLE}}
 **IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the verification gate runs the full suite (on CI against the PR head where the project's tests run on CI, otherwise locally before review). Read that result (`gh pr checks <pr-number>`) instead of running the suite.
 
 {{#ACCEPTANCE_CRITERIA}}

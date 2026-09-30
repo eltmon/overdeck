@@ -4,7 +4,6 @@ import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByPath, findProjectByTeam } from '../projects.js';
 import { resolveVerificationTestsMode } from './verification-tests-mode.js';
-import { isTldrEnabled } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, resolvePlanningDraftPath } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
@@ -72,9 +71,6 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
-      // TLDR is advertised to the agent only when the operator toggle is on AND
-      // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
-      TLDR_AVAILABLE: isTldrEnabled() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
       // Review of #3993 (PAN-3965): the test wording follows the project —
       // "the suite runs on CI" only where it does, `npx vitest` only for vitest.
