@@ -540,7 +540,15 @@ export default function App() {
           targetMessageNonce: nonce,
           targetSubagentId: subagentId,
         }
-        : { viewMode: 'conversation' });
+        // Clear a reused pane's stale target explicitly (PAN-4358 review
+        // hardening) rather than leaving a prior target unconsumed.
+        : {
+          viewMode: 'conversation',
+          targetMessageId: undefined,
+          targetMessageIndex: undefined,
+          targetMessageNonce: undefined,
+          targetSubagentId: undefined,
+        });
     } catch (err) {
       toast.error(describeConversationHitOpenFailure(hit, err));
     }

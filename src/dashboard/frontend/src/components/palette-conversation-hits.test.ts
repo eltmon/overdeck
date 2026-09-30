@@ -56,4 +56,17 @@ describe('describeConversationHit', () => {
     const described = describeConversationHit(hit({ byteOffset: null, title: 'Title only row' }));
     expect(described.openRequest.byteOffset).toBeNull();
   });
+
+  it('labels a title-only hit with no Claude session as a conversation, not a bare "Claude session" chip', () => {
+    // A title-only row with no claude-code file falls back to sessionId = conversationId
+    // (palette.ts), so conversationId === rootSessionId — but it always has a real
+    // conversation row (title matching requires a non-null title) (PAN-4358 review).
+    const described = describeConversationHit(hit({
+      sessionId: 'conv-no-claude-session',
+      conversationId: 'conv-no-claude-session',
+      byteOffset: null,
+      title: 'A conversation with no claude-code file',
+    }));
+    expect(described.sourceLabel).toBe('Conversation conv-no-claude-session');
+  });
 });

@@ -14,8 +14,10 @@ vi.mock('../../../../lib/memory/fts-db.js', () => ({
   runMemoryFtsStatement: vi.fn(),
 }));
 
-vi.mock('../../../../lib/overdeck/conversations.js', () => ({
-  getConversationByClaudeSessionId: vi.fn(),
+// PAN-4358 review: palette.ts batch-resolves every distinct root session id
+// in one call instead of one getConversationByClaudeSessionId() call per root.
+vi.mock('../../../../lib/overdeck/conversation-batch-lookup.js', () => ({
+  resolveConversationsByClaudeSessionIds: vi.fn(() => new Map()),
 }));
 
 // PAN-4358: title search reads overdeck.db directly; mock it so this suite
@@ -43,7 +45,7 @@ vi.mock('../../../../lib/conversation-search/embedding-provider.js', async () =>
 import { getConversationSearchConfig } from '../../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../../lib/conversation-search/embedding-provider.js';
 import { runMemoryFtsStatement } from '../../../../lib/memory/fts-db.js';
-import { getConversationByClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
+import { resolveConversationsByClaudeSessionIds } from '../../../../lib/overdeck/conversation-batch-lookup.js';
 import { searchConversationTitles } from '../../../../lib/overdeck/conversation-title-search.js';
 import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
@@ -88,7 +90,7 @@ describe('palette conversation search', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-palette-search-'));
     vi.mocked(listProjectsSync).mockReturnValue([]);
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockClear().mockReturnValue(new Map());
     vi.mocked(runMemoryFtsStatement).mockResolvedValue([]);
     vi.mocked(searchConversationTitles).mockReturnValue([]);
   });
@@ -151,10 +153,9 @@ describe('palette conversation search', () => {
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
 
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue({
-      name: 'managed-conversation',
-      projectKey: 'target-key',
-    } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      ['session-a', { name: 'managed-conversation', projectKey: 'target-key', title: null, archived: false }],
+    ]));
     vi.mocked(listProjectsSync).mockReturnValue([{
       key: 'target-key',
       config: { name: 'Target Project', path: 'foreign-project' },
@@ -191,11 +192,9 @@ describe('palette conversation search', () => {
       key: 'target-key',
       config: { name: 'Target Project', path: 'foreign-project' },
     } as ReturnType<typeof listProjectsSync>[number]]);
-    vi.mocked(getConversationByClaudeSessionId).mockImplementation((sessionId: string) => (
-      sessionId === parentSessionId
-        ? { name: 'parent-conv', projectKey: 'target-key' } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>
-        : null
-    ));
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      [parentSessionId, { name: 'parent-conv', projectKey: 'target-key', title: null, archived: false }],
+    ]));
 
     const db = openEmbeddingsDb(config.dbPath, dimensions);
     expect(db.available).toBe(true);
@@ -218,7 +217,7 @@ describe('palette conversation search', () => {
       projectKey: 'Target Project',
     });
 
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map());
     const unregistered = await runPaletteSearch('needle', 5);
     expect(unregistered.conversations[0]).toMatchObject({
       conversationId: parentSessionId,
@@ -338,6 +337,48 @@ describe('palette conversation search', () => {
     expect(result.conversations[0]).toMatchObject({ conversationId: 'session-two-hits', hitCount: 2 });
   });
 
+  it('resolves every distinct root session id in one batched lookup call, regardless of hit count (PAN-4358 review)', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const sessionFiles = ['session-batch-a', 'session-batch-b', 'session-batch-c'].map((name) => {
+      const filePath = join(projectDir, `${name}.jsonl`);
+      writeFileSync(filePath, jsonlMessage('assistant', `The needle appears in ${name}.`));
+      return filePath;
+    });
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    for (const filePath of sessionFiles) {
+      await indexConversationFile({
+        filePath,
+        config,
+        db,
+        provider,
+        now: () => '2026-06-02T01:01:00.000Z',
+      });
+    }
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations).toHaveLength(3);
+    expect(resolveConversationsByClaudeSessionIds).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(resolveConversationsByClaudeSessionIds).mock.calls[0]?.[0]).toEqual(
+      expect.arrayContaining(['session-batch-a', 'session-batch-b', 'session-batch-c']),
+    );
+  });
+
   it('ranks a title-only match first with no message target (PAN-4358)', async () => {
     vi.mocked(getConversationSearchConfig).mockReturnValue({
       enabled: true,
@@ -389,7 +430,7 @@ describe('palette conversation search', () => {
     expect(result.conversations[0]).toMatchObject({ conversationId: 'title-only-conv', matchTier: 'title' });
   });
 
-  it('carries archived: true and the title from getConversationByClaudeSessionId (PAN-4358)', async () => {
+  it('carries archived: true and the title from the batched conversation lookup (PAN-4358)', async () => {
     const root = tmpDir!;
     const projectDir = join(root, 'projects', 'overdeck');
     mkdirSync(projectDir, { recursive: true });
@@ -407,12 +448,9 @@ describe('palette conversation search', () => {
     const provider = fakeProvider(dimensions);
     vi.mocked(getConversationSearchConfig).mockReturnValue(config);
     vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue({
-      name: 'session-archived',
-      projectKey: null,
-      title: 'T',
-      archivedAt: '2026-09-01T00:00:00.000Z',
-    } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      ['session-archived', { name: 'session-archived', projectKey: null, title: 'T', archived: true }],
+    ]));
 
     const db = openEmbeddingsDb(config.dbPath, dimensions);
     await indexConversationFile({

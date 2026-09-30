@@ -128,7 +128,11 @@ export function describeConversationHit(hit: PaletteConversationHit): Conversati
   // A subagent hit opens through its parent conversation (PAN-3982).
   const subagentId = hit.subagentId ?? null;
   const rootSessionId = hit.parentSessionId ?? hit.sessionId;
-  const isDashboardConversation = hit.conversationId !== rootSessionId;
+  // A title-only row (byteOffset null) always has a real conversation row —
+  // title matching requires a non-null title — even when its sessionId falls
+  // back to the conversationId (no claude-code file), so it must not read as
+  // a bare "Claude session" chip (PAN-4358 review).
+  const isDashboardConversation = hit.byteOffset === null || hit.conversationId !== rootSessionId;
   const rootLabel = isDashboardConversation
     ? `Conversation ${hit.conversationId}`
     : `Claude session ${rootSessionId.slice(0, 8)}`;

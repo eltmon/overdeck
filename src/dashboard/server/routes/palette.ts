@@ -17,7 +17,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
-import { getConversationByClaudeSessionId } from '../../../lib/overdeck/conversations.js';
+import { resolveConversationsByClaudeSessionIds } from '../../../lib/overdeck/conversation-batch-lookup.js';
 import { searchConversationTitles } from '../../../lib/overdeck/conversation-title-search.js';
 import { groupConversationHits, type ConversationIdentity, type GroupedConversationHit } from '../../../lib/conversation-search/group-hits.js';
 import { searchConversationChunks } from '../services/conversation-search-service.js';
@@ -227,23 +227,14 @@ interface RouteableConversation {
   archived: boolean;
 }
 
+/**
+ * `searchConversations()` pre-fills `cache` for every root session id via one
+ * batched query (`resolveConversationsByClaudeSessionIds()`) before calling
+ * this, so every lookup here is a cache hit — no per-root DB query (PAN-4358
+ * review: that used to cost 250-500ms of synchronous work over a 300-chunk pool).
+ */
 function routeableConversation(sessionId: string, cache: Map<string, RouteableConversation>): RouteableConversation {
-  const cached = cache.get(sessionId);
-  if (cached) return cached;
-  let routeable: RouteableConversation = { name: sessionId, projectKey: null, title: null, archived: false };
-  try {
-    const conversation = getConversationByClaudeSessionId(sessionId);
-    routeable = {
-      name: conversation?.name ?? sessionId,
-      projectKey: conversation?.projectKey ?? null,
-      title: conversation?.title ?? null,
-      archived: conversation?.archivedAt != null,
-    };
-  } catch {
-    routeable = { name: sessionId, projectKey: null, title: null, archived: false };
-  }
-  cache.set(sessionId, routeable);
-  return routeable;
+  return cache.get(sessionId) ?? { name: sessionId, projectKey: null, title: null, archived: false };
 }
 
 function toIdentity(conversation: RouteableConversation): ConversationIdentity {
@@ -366,7 +357,20 @@ async function searchConversations(rawQuery: string, matchQuery: string, limit: 
       return [];
     }),
   ]);
+  // Batch-resolve every distinct root session id in one query instead of one
+  // query per root — the palette's 300-chunk pool made the per-root lookup a
+  // 250-500ms synchronous event-loop stall (mostly misses: agent/specialist/
+  // unregistered sessions have no conversation row, and a miss scans every
+  // conversation row) (PAN-4358 review).
+  const roots = new Set(hits.map((hit) => hit.parentSessionId ?? hit.sessionId));
+  const batchResolved = resolveConversationsByClaudeSessionIds([...roots]);
   const routeableConversations = new Map<string, RouteableConversation>();
+  for (const root of roots) {
+    const resolved = batchResolved.get(root);
+    routeableConversations.set(root, resolved
+      ? { name: resolved.name, projectKey: resolved.projectKey, title: resolved.title, archived: resolved.archived }
+      : { name: root, projectKey: null, title: null, archived: false });
+  }
   const projectDirs = registeredProjectDirs();
   const grouped = groupConversationHits({
     hits,
