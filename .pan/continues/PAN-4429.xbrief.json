@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:05:33.033Z",
+  "updated": "2026-09-30T01:05:39.109Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4429",
       "claimedAt": "2026-09-30T00:52:30.650Z",
       "doneAt": "2026-09-30T01:05:33.033Z"
+    },
+    "workspace-lifecycle-no-daemon": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4429",
+      "claimedAt": "2026-09-30T01:05:39.109Z"
     }
   }
 }
