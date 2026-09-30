@@ -68,8 +68,10 @@ const issuePairingCredentialRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
-    if (resolveDashboardCredential(request.headers as HeaderMap)?.kind === 'device') {
-      return noStore(jsonResponse({ error: 'a paired device cannot issue pairing credentials' }, { status: 403 }));
+    // PAN-2351 D-11: only root credentials mint new devices.
+    const issuer = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+    if (issuer !== 'internal-token' && issuer !== 'root-session') {
+      return noStore(jsonResponse({ error: 'only the internal token or the root session can issue pairing credentials' }, { status: 403 }));
     }
 
     const body = parseJsonObject(yield* request.text);
@@ -165,12 +167,16 @@ const revokeDeviceRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     const id = (yield* HttpRouter.params)['id'] ?? '';
+    const credential = resolveDashboardCredential(request.headers as HeaderMap);
+    // PAN-2351 D-11: checked before the lookup, so a token cannot probe device ids.
+    if (credential?.kind === 'token') {
+      return noStore(jsonResponse({ error: 'an access token cannot revoke devices' }, { status: 403 }));
+    }
 
     const records = yield* Effect.promise(() => listAccessTokens());
     const target = records.find((record) => record.id === id && record.kind === 'device');
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
-    const credential = resolveDashboardCredential(request.headers as HeaderMap);
     if (credential?.kind === 'device' && credential.deviceId !== id) {
       return noStore(jsonResponse({ error: 'a paired device may revoke only itself' }, { status: 403 }));
     }

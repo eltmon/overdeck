@@ -33,11 +33,11 @@ function fakeRequest(headers: Record<string, string>, route: { method: string; u
   return { ...route, headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
 }
 
-async function mint(headers: Record<string, string>) {
+async function mint(headers: Record<string, string>, peer?: string) {
   const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/dashboard/session', {
     method: 'POST',
     headers: { Origin: 'http://localhost:3011', ...headers },
-  }));
+  })).modify({ remoteAddress: peer ? Option.some(peer) : Option.none() });
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
     HttpRouter.toHttpEffect(dashboardSessionRouteLayer),
     (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
@@ -154,5 +154,16 @@ describe('token credentials (PAN-2351)', () => {
     expect(revocableCredentialId({ kind: 'internal-token' })).toBeNull();
     expect(revocableCredentialId({ kind: 'root-session' })).toBeNull();
     expect(revocableCredentialId(null)).toBeNull();
+  });
+});
+
+describe('session mint with an access token (PAN-2351)', () => {
+  it('refuses an admin token from a LAN peer and from loopback, setting no cookie', async () => {
+    const { token } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+    for (const peer of ['192.0.2.44', '127.0.0.1']) {
+      const res = await mint({ authorization: `Bearer ${token}` }, peer);
+      expect(res.status, peer).toBe(403);
+      expect(res.setCookie, peer).toBe('');
+    }
   });
 });

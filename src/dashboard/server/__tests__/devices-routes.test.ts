@@ -112,4 +112,15 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect((await call('GET', '/api/devices', asDevice(a.token))).status).toBe(401);
     expect((await call('GET', '/api/devices', asDevice(b.token))).status).toBe(200);
   });
+
+  it('refuses to let an admin access token revoke a device (PAN-2351)', async () => {
+    const device = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const { token } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+
+    const res = await call('DELETE', `/api/devices/${device.record.id}`, { authorization: `Bearer ${token}` });
+    expect(res.status).toBe(403);
+    expect(res.json.error).toBe('an access token cannot revoke devices');
+    expect(stillAuthenticates(device.token)).toBe(true);
+    expect((await call('DELETE', '/api/devices/no-such-device', { authorization: `Bearer ${token}` })).status).toBe(403);
+  });
 });
