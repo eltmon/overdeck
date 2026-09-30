@@ -36,6 +36,22 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 
 ## Pair a device
 
+### From the dashboard
+
+1. On the machine, open **Settings → Anywhere** and click **Pair a device**.
+2. Pick the address the other device opens, for example your Tailscale name.
+   If it is not in the list, choose **Another address…**, type it, and click
+   **Add to trusted addresses**. It is trusted at once, with no restart.
+   **Use this machine only** makes a link that works only on this machine.
+3. Click **Create pairing link**. Scan the QR code with the other device, or
+   copy the link and open it there. The dialog names the device when it pairs.
+
+Only a browser on the machine itself can create pairing links or add
+addresses. A paired device that opens the dialog sees an explanation instead
+of a link.
+
+### From the terminal
+
 1. On the machine, run `pan pair` with an address the other device can reach:
 
    ```bash
@@ -50,7 +66,7 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 
 The pairing credential:
 
-- works once, and expires 10 minutes after `pan pair` printed it;
+- works once, and expires 10 minutes after it was created;
 - lives only in the running dashboard's memory, so a dashboard restart
   invalidates every credential that has not been used yet;
 - always travels in the URL fragment (`#pair=`), never in a query string, so
@@ -66,20 +82,36 @@ credentials.
 
 ### Open the dashboard at a non-default address
 
-The dashboard only accepts browser requests from origins it trusts. If you
-open it at an address other than the default (for example through Tailscale),
-add that origin before starting the dashboard:
+The dashboard only accepts browser requests from origins it trusts. To open it
+at an address other than the default (for example through Tailscale), add that
+address in the pair dialog with **Add to trusted addresses**. It takes effect on
+the next request, with no restart, and is stored in
+`~/.overdeck/trusted-origins.json`:
+
+```json
+{ "version": 1, "origins": ["https://desk.tailnet.ts.net"] }
+```
+
+Loopback addresses (`localhost`, `127.0.0.1`, `::1`, `*.localhost`) cannot be
+added: they are already trusted for this port and never help another device.
+To remove an address, edit the file and restart the dashboard.
+
+`OVERDECK_TRUSTED_ORIGINS` still works and is merged with the file. Separate
+several origins with commas, and set it before starting the dashboard:
 
 ```bash
 export OVERDECK_TRUSTED_ORIGINS=https://desk.tailnet.ts.net
 pan up
 ```
 
-Separate several origins with commas. A later release discovers and advertises
-endpoints automatically
+A later release discovers and advertises endpoints automatically
 ([PAN-4403](https://github.com/eltmon/overdeck/issues/4403)).
 
 ## List and revoke devices
+
+**Settings → Anywhere** lists paired devices with their scopes, when each was
+paired and when it was last seen. **Revoke** there has the same effect as
+`pan devices revoke`. From the terminal:
 
 ```bash
 pan devices list            # id, name, created, last used, revoked
@@ -95,6 +127,31 @@ every 5 seconds, so a revocation from any process takes effect within 5 seconds.
 Device sessions are stored in `~/.overdeck/access-tokens.json` (mode `0600`).
 The file keeps only a SHA-256 hash of each token. If the file is corrupt, the
 dashboard accepts no device session and logs an error naming the file.
+
+## Anywhere status
+
+The **Anywhere** card shows whether other devices can use this machine. It
+appears in **Settings → Anywhere** and on the **Health** page, and shows:
+
+- **This machine:** its label and the start of its environment id.
+- **Reachable at:** the trusted addresses another device can open, or "Only
+  this machine".
+- **Paired devices:** how many device sessions are active (not revoked).
+- **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
+  unfinished", or "Ready" with its backend. **Set up** opens Session Vault
+  settings. Not using the vault is a valid choice, not a problem.
+
+Below that, the card lists each problem with its fix:
+
+| Problem | Fix |
+| --- | --- |
+| No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
+| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to its settings, where you unlock it with the vault passphrase or the recovery phrase. |
+| A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
+| This machine's identity file is unreadable. | **How to fix** links to this page. Repair or restore `~/.overdeck/environment-id.json`; it is never re-created automatically. |
+
+The card reads `GET /api/anywhere/status`, which any dashboard credential may
+call.
 
 ## Scoped API tokens
 

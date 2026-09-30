@@ -1,0 +1,191 @@
+{
+  "version": "1",
+  "issueId": "PAN-4445",
+  "created": "2026-09-30T19:27:37.009Z",
+  "updated": "2026-09-30T20:43:01.928Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "trusted-origins-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T19:27:37.009Z",
+      "doneAt": "2026-09-30T19:43:06.087Z"
+    },
+    "device-scopes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T19:43:10.274Z",
+      "doneAt": "2026-09-30T19:43:38.993Z"
+    },
+    "trusted-origin-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T19:43:40.373Z",
+      "doneAt": "2026-09-30T19:52:15.227Z"
+    },
+    "anywhere-status-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T19:52:16.335Z",
+      "doneAt": "2026-09-30T20:01:33.848Z"
+    },
+    "anywhere-devices-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:02:59.629Z",
+      "doneAt": "2026-09-30T20:11:20.601Z"
+    },
+    "pair-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:11:24.863Z",
+      "doneAt": "2026-09-30T20:20:14.476Z"
+    },
+    "status-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:20:16.120Z",
+      "doneAt": "2026-09-30T20:28:47.075Z"
+    },
+    "playwright-devices": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:28:51.237Z",
+      "doneAt": "2026-09-30T20:33:25.667Z"
+    },
+    "docs-remote-access": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:33:08.889Z",
+      "doneAt": "2026-09-30T20:34:26.845Z"
+    },
+    "trusted-origins-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:36:48.152Z"
+    },
+    "trusted-origins-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:01.903Z"
+    },
+    "trusted-origins-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:14.564Z"
+    },
+    "trusted-origins-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:26.464Z"
+    },
+    "trusted-origins-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:38.574Z"
+    },
+    "device-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:50.867Z"
+    },
+    "device-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:02.511Z"
+    },
+    "trusted-origin-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:15.132Z"
+    },
+    "trusted-origin-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:28.562Z"
+    },
+    "trusted-origin-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:40.280Z"
+    },
+    "trusted-origin-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:38:52.208Z"
+    },
+    "anywhere-status-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:04.380Z"
+    },
+    "anywhere-status-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:16.672Z"
+    },
+    "anywhere-status-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:29.800Z"
+    },
+    "anywhere-status-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:42.734Z"
+    },
+    "anywhere-devices-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:55.001Z"
+    },
+    "anywhere-devices-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:07.393Z"
+    },
+    "anywhere-devices-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:20.790Z"
+    },
+    "pair-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:33.100Z"
+    },
+    "pair-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:44.961Z"
+    },
+    "pair-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:57.192Z"
+    },
+    "status-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:09.191Z"
+    },
+    "status-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:21.297Z"
+    },
+    "status-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:33.015Z"
+    },
+    "status-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:45.159Z"
+    },
+    "playwright-devices.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:58.249Z"
+    },
+    "playwright-devices.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:42:10.772Z"
+    },
+    "playwright-devices.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:42:23.873Z"
+    },
+    "docs-remote-access.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:42:36.344Z"
+    },
+    "docs-remote-access.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:42:48.828Z"
+    },
+    "docs-remote-access.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:43:01.927Z"
+    }
+  }
+}

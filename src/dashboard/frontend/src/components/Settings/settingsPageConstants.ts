@@ -20,6 +20,7 @@ import {
   Globe,
   Trash2,
   KeyRound,
+  Smartphone,
   Archive,
 } from 'lucide-react';
 import { type BackgroundAiFeature } from './types';
@@ -58,6 +59,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'close-out', label: 'Close-out', icon: Trash2 },
   { id: 'session-vault', label: 'Session Vault', icon: Archive },
+  { id: 'anywhere', label: 'Anywhere', icon: Smartphone },
   { id: 'remote', label: 'Remote', icon: Globe },
   { id: 'access-tokens', label: 'Access Tokens', icon: KeyRound },
   { id: 'voice', label: 'Voice', icon: Mic },

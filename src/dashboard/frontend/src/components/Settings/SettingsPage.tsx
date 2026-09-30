@@ -23,6 +23,7 @@ import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { CloseOutSection } from './sections/CloseOutSection';
 import { SessionVaultSection } from './sections/SessionVaultSection';
+import { AnywhereSection } from './sections/AnywhereSection';
 import { RemoteSection } from './sections/RemoteSection';
 import { AccessTokensSection } from './sections/AccessTokensSection';
 import { MemorySection } from './sections/MemorySection';
@@ -552,6 +553,8 @@ export function SettingsPage() {
       />
 
       <SessionVaultSection />
+
+      <AnywhereSection />
 
       <RemoteSection
         formData={formData}
