@@ -284,6 +284,10 @@ export interface LegacyConversation {
   /** PAN-4223 D26: legacy rowid of the builder row a critic or verifier judges. */
   criticOfConversationId: number | null;
   criticOfConversationName: string | null;
+  /** PAN-4436: 'vault' = a Session Vault browse copy of a record another machine owns. */
+  origin: 'local' | 'vault';
+  /** PAN-4436: the owning machine's label for a browse copy; null otherwise. */
+  vaultOwnerLabel: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -383,6 +387,8 @@ interface LegacyConversationRow {
   lane_role: string | null;
   critic_of_legacy_id: number | null;
   critic_of_name: string | null;
+  origin: string | null;
+  vault_owner_label: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -428,6 +434,8 @@ const LEGACY_CONVERSATION_SELECT = `
     c.lane_role,
     b.rowid AS critic_of_legacy_id,
     b.name AS critic_of_name,
+    c.origin,
+    c.vault_owner_label,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -552,6 +560,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     laneRole: (row.lane_role as LaneRole | null) ?? null,
     criticOfConversationId: row.critic_of_legacy_id ?? null,
     criticOfConversationName: row.critic_of_name ?? null,
+    origin: row.origin === 'vault' ? 'vault' : 'local',
+    vaultOwnerLabel: row.vault_owner_label ?? null,
   };
 }
 
@@ -577,6 +587,7 @@ export function listConversations(options?: { limit?: number; offset?: number })
       AND c.name NOT LIKE 'agent-%'
       AND c.name NOT LIKE 'planning-%'
       AND c.name NOT LIKE 'specialist-%'
+      AND c.origin <> 'vault'
     ORDER BY c.created_at DESC`;
   const params: number[] = [];
   if (options?.limit !== undefined) {
@@ -588,6 +599,14 @@ export function listConversations(options?: { limit?: number; offset?: number })
     params.push(options.offset);
   }
   const rows = overdeckDb().prepare(sql).all(...params) as LegacyConversationRow[];
+  return rows.map(rowToLegacyConversation);
+}
+
+/** PAN-4436: Session Vault browse copies, never returned by listConversations(). */
+export function listVaultBrowseConversations(): LegacyConversation[] {
+  const rows = overdeckDb()
+    .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.origin = 'vault' AND c.archived_at IS NULL ORDER BY c.ended_at DESC`)
+    .all() as LegacyConversationRow[];
   return rows.map(rowToLegacyConversation);
 }
 
@@ -874,6 +893,7 @@ export function createConversation(opts: {
   /** PAN-4223: lane facts; requires parentName. Omitted = a root or a successor. */
   lane?: { run: string; key: string; role: LaneRole; criticOfName?: string };
 }): LegacyConversation {
+  if (opts.name.startsWith('vault-')) throw new Error('conversation names starting with "vault-" are reserved for Session Vault browse copies');
   const db = overdeckDb();
   const id = randomUUID();
   const now = toMillis();
