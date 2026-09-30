@@ -658,6 +658,52 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(operatorSave).toMatchObject({ reviewOperatorRequested: true });
   });
 
+  // PAN-4433: the silent-reviewer clock starts before the dispatch call, so a
+  // slow spawn or resume cannot push the stamp past the reviewer's first write.
+  it('stamps reviewDispatchedAt on a fresh parent before spawnRun', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const dispatchTime = new Date('2026-09-30T12:00:00.000Z');
+      vi.setSystemTime(dispatchTime);
+      mockSpawnRun.mockImplementation(async (issueId: string) => {
+        vi.setSystemTime(dispatchTime.getTime() + 5_000);
+        return { id: `agent-${issueId.toLowerCase()}-review` };
+      });
+
+      await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+      const saved = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+        .filter((state) => state.id === 'agent-pan-1982-review');
+      expect(saved.at(-1)?.reviewDispatchedAt).toBe(dispatchTime.toISOString());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rewrites reviewDispatchedAt on a resumed parent with the time before resumeAgent', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const dispatchTime = new Date('2026-09-30T12:00:00.000Z');
+      vi.setSystemTime(dispatchTime);
+      const saved = { id: 'agent-pan-1982-review', status: 'running', reviewDispatchedAt: '2026-09-29T00:00:00.000Z' } as Record<string, unknown>;
+      mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? saved : null));
+      mockGetLatestSessionIdSync.mockReturnValue('session-1');
+      mockResumeAgent.mockImplementation(async () => {
+        vi.setSystemTime(dispatchTime.getTime() + 5_000);
+        return { success: true };
+      });
+
+      const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+      expect(result.message).toContain('Review resumed');
+      const resumedSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+        .find((state) => state.id === 'agent-pan-1982-review');
+      expect(resumedSave?.reviewDispatchedAt).toBe(dispatchTime.toISOString());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
@@ -965,6 +1011,7 @@ describe('convoy orchestration', () => {
       reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewDeadlineAt: expect.any(String),
+      reviewDispatchedAt: expect.any(String),
     }));
     expect(mockSaveAgentStateAsync).not.toHaveBeenCalled();
     expect(mockNotifyPipeline).toHaveBeenCalledWith({
@@ -1001,6 +1048,7 @@ describe('convoy orchestration', () => {
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewDeadlineAt: expect.any(String),
+      reviewDispatchedAt: expect.any(String),
     }));
     expect(mockMessageAgent).not.toHaveBeenCalled();
   });
@@ -1093,7 +1141,44 @@ describe('convoy orchestration', () => {
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
       reviewRunId: REVIEW_AGENT_RUN_ID,
       reviewDeadlineAt: expect.any(String),
+      reviewDispatchedAt: expect.any(String),
     }));
+  });
+
+  it('rewrites reviewDispatchedAt on a warm-resumed lane with the time before resumeAgent (PAN-4433)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const dispatchTime = new Date('2026-09-30T12:00:00.000Z');
+      vi.setSystemTime(dispatchTime);
+      const savedReviewer = {
+        id: 'agent-pan-1059-review-security',
+        model: 'configured-reviewer-model',
+        harness: 'claude-code',
+        reviewDispatchedAt: '2026-09-29T00:00:00.000Z',
+      };
+      mockGetAgentState.mockReturnValue(savedReviewer);
+      mockGetLatestSessionIdSync.mockReturnValue('saved-session');
+      mockResumeAgent.mockImplementation(async () => {
+        vi.setSystemTime(dispatchTime.getTime() + 5_000);
+        return { success: true, messageDelivered: true };
+      });
+
+      const result = await spawnReviewSubRoleForIssue({
+        issueId: 'PAN-1059',
+        workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+        subRole: 'security',
+        runId: REVIEW_AGENT_RUN_ID,
+        contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'agent-pan-1059-review-security',
+        reviewDispatchedAt: dispatchTime.toISOString(),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fresh-spawns when a warm resume cannot confirm its prompt landed', async () => {
@@ -1397,7 +1482,32 @@ describe('redispatchReviewSynthesis', () => {
       id: PARENT_ID,
       reviewRunId: RUN_ID,
       reviewDeadlineAt: expect.any(String),
+      reviewDispatchedAt: expect.any(String),
     }));
+  });
+
+  it('rewrites reviewDispatchedAt on the recovered parent with the time before resumeAgent (PAN-4433)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const dispatchTime = new Date('2026-09-30T12:00:00.000Z');
+      vi.setSystemTime(dispatchTime);
+      withParent({ reviewDispatchedAt: '2026-09-29T00:00:00.000Z' });
+      withSession();
+      mockResumeAgent.mockImplementation(async () => {
+        vi.setSystemTime(dispatchTime.getTime() + 5_000);
+        return { success: true };
+      });
+
+      const result = await redispatch();
+
+      expect(result.success).toBe(true);
+      expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        id: PARENT_ID,
+        reviewDispatchedAt: dispatchTime.toISOString(),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('closes the dead pane, resets only the parent state dir, and spawns a fresh parent when there is no session to resume', async () => {

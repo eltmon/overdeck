@@ -542,6 +542,7 @@ async function spawnReviewRoleForIssueBody(
     });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
+      const resumeDispatchedAt = new Date().toISOString();
       const resumeResult = await resumeAgent(reviewAgentId, prompt);
       if (resumeResult.success) {
         try {
@@ -551,6 +552,8 @@ async function spawnReviewRoleForIssueBody(
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
             resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            // PAN-4433: the silent-reviewer clock starts before the resume.
+            resumed.reviewDispatchedAt = resumeDispatchedAt;
             // #3853: rewritten on every dispatch so a later automatic cycle
             // never inherits an operator's request.
             resumed.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
@@ -589,6 +592,7 @@ async function spawnReviewRoleForIssueBody(
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
+    const dispatchedAt = new Date().toISOString();
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
@@ -604,6 +608,8 @@ async function spawnReviewRoleForIssueBody(
     run.reviewRunId = runId;
     // PAN-2584: arm the parent's liveness deadline for this cycle.
     run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+    // PAN-4433: the silent-reviewer clock starts before the spawn.
+    run.reviewDispatchedAt = dispatchedAt;
     // #3853: the verdict guard lets an operator-requested run block an approved head.
     run.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
     try {

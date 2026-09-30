@@ -140,10 +140,12 @@ export async function redispatchReviewSynthesis(
       }) + buildSynthesisRecoveryAddendum(reviewDir);
 
       const { spawnRun, saveAgentState, getLatestSessionId, resumeAgent } = await import('../agents.js');
-      const armRun = async (state: ReturnType<typeof getAgentState>): Promise<void> => {
+      const armRun = async (state: ReturnType<typeof getAgentState>, dispatchedAt: string): Promise<void> => {
         if (!state) return;
         state.reviewRunId = opts.runId;
         state.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+        // PAN-4433: the silent-reviewer clock starts before the resume/spawn.
+        state.reviewDispatchedAt = dispatchedAt;
         try {
           await Effect.runPromise(saveAgentState(state));
         } catch (err) {
@@ -160,12 +162,13 @@ export async function redispatchReviewSynthesis(
       let via: 'resumed' | 'spawned';
       try {
         if (canResume) {
+          const dispatchedAt = new Date().toISOString();
           const resumed = await resumeAgent(parentId, prompt);
           if (!resumed.success) {
             return { success: false, message: `Synthesis recovery for ${normalized} could not resume ${parentId}: ${resumed.error ?? 'resume refused'}` };
           }
           via = 'resumed';
-          await armRun(getAgentState(parentId));
+          await armRun(getAgentState(parentId), dispatchedAt);
         } else {
           const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
           const closed = await closeAgentPaneDetailed(parentId);
@@ -182,6 +185,7 @@ export async function redispatchReviewSynthesis(
               console.warn(`[review-agent] review parent state reset before synthesis respawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`);
             }
           }
+          const dispatchedAt = new Date().toISOString();
           const run = await spawnRun(normalized, 'review', {
             workspace: opts.workspace,
             prompt,
@@ -195,7 +199,7 @@ export async function redispatchReviewSynthesis(
             (run as unknown as Record<string, unknown>)['reviewOperatorRequested'] = operatorRequested;
           }
           via = 'spawned';
-          await armRun(run);
+          await armRun(run, dispatchedAt);
         }
       } catch (err) {
         return {
