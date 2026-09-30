@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-30T00:35:54.405Z",
+  "updated": "2026-09-30T00:36:34.059Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "ui-disclosure.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T00:35:54.404Z"
+    },
+    "ui-disclosure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:36:34.059Z"
     }
   }
 }
