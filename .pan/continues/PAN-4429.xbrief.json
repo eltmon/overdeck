@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:29:21.659Z",
+  "updated": "2026-09-30T02:29:36.054Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "frontend-settings-toggle.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T02:29:21.658Z"
+    },
+    "prompts-tldr-available.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:29:36.054Z"
     }
   }
 }
