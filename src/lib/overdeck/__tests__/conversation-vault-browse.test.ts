@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { HttpServerResponse } from 'effect/unstable/http';
 
 // OVERDECK_HOME is captured when the path helpers load, so set it before the
 // first dynamic import of the infra and conversation modules.
@@ -38,6 +39,13 @@ const { getConversationListWithVaultCopies, getEnrichedConversationList, invalid
 const { getConversationMessagesRead, resolveSessionFile } = await import('../conversation-reads.js');
 const { getConversationLedgerCosts } = await import('../conversation-ledger-costs.js');
 const { vaultBrowseFilePath } = await import('../../vault/browse.js');
+const { handleConversationResume } = await import('../conversation-runtime.js');
+const { handleConversationMessage } = await import('../conversation-message.js');
+const { conversationHarnessAlive } = await import('../conversation-liveness.js');
+
+async function readResponse(response: HttpServerResponse.HttpServerResponse): Promise<{ status: number; body: Record<string, unknown> }> {
+  return { status: response.status, body: JSON.parse(await HttpServerResponse.toWeb(response).text()) as Record<string, unknown> };
+}
 
 const CWD = join(TEST_HOME, 'projects', 'lexerra');
 
@@ -254,6 +262,30 @@ describe('browse rows in the list, transcript and cost (PAN-4436 WI-5)', () => {
       .run(Date.now(), id, 1.5, 10, 10, 0, 0);
     const row = getConversationByName(name)!;
     expect(getConversationLedgerCosts().has(String(row.id))).toBe(false);
+  });
+});
+
+describe('browse rows refuse resume (PAN-4436 WI-6)', () => {
+  it('resume returns 409 with the full vault id and starts nothing', async () => {
+    const id = vaultId(12);
+    upsertVaultBrowseRow(input(id));
+    vi.mocked(conversationHarnessAlive).mockClear();
+    const { status, body } = await readResponse(await handleConversationResume(`vault-${id}`, {}, { resolveSessionFile }));
+    expect(status).toBe(409);
+    expect(body).toEqual({
+      error: `Read-only copy from laptop. To continue it here, run: pan vault resume ${id}`,
+      code: 'vault-browse-copy',
+    });
+    // The guard returns before the first runtime probe, so no session is looked up or spawned.
+    expect(conversationHarnessAlive).not.toHaveBeenCalled();
+    expect(getConversationByName(`vault-${id}`)).toMatchObject({ status: 'ended' });
+  });
+
+  it('a message to a browse row is refused by the ended-row guard', async () => {
+    const id = vaultId(13);
+    upsertVaultBrowseRow(input(id));
+    const { status } = await readResponse(await handleConversationMessage(`vault-${id}`, { message: 'hi' }));
+    expect(status).toBe(422);
   });
 });
 
