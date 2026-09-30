@@ -27,7 +27,6 @@ import { emitActivityEntry } from '../activity-logger.js';
 import { decideResumeGate, getAgentResumeGateBlockReason, getIssuePause } from '../agents/agent-state.js';
 import { getAgentState, type AgentState } from '../agents/agent-state-read.js';
 import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
-import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { listAgentStates } from '../agents.js';
 import { loadConfigSync, reviewStallMs } from '../config-yaml.js';
 import { AGENTS_DIR } from '../paths.js';
@@ -41,7 +40,6 @@ export interface SilentReviewerDeps {
   listReviewStates: () => AgentState[];
   readState: (agentId: string) => AgentState | null;
   isAlive: (agentId: string) => Promise<LivenessVerdict>;
-  runtimeWaitingOnHuman: (agentId: string) => boolean;
   /** Last transcript write in ms; null = no transcript. */
   transcriptActivityMs: (agentId: string) => Promise<number | null>;
   reportMtimeMs: (path: string) => number | null;
@@ -86,7 +84,6 @@ const defaultDeps: SilentReviewerDeps = {
   listReviewStates: () => listAgentStates({ role: 'review' }),
   readState: getAgentState,
   isAlive: (agentId) => isAlive(agentId),
-  runtimeWaitingOnHuman: (agentId) => getAgentRuntimeStateSync(agentId)?.state === 'waiting-on-human',
   transcriptActivityMs: async (agentId) => {
     // Dynamic: a static import of the runtimes barrel from cloister closes a module cycle.
     const { getRuntimeForAgent } = await import('../runtimes/index.js');
@@ -112,7 +109,9 @@ const defaultDeps: SilentReviewerDeps = {
     if (resetError) return { success: false, message: resetError };
     const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
     const result = await recoverMissingConvoyReviewers(issueId, { source: 'silent-reviewer-recovery' });
-    return { success: result.success, message: result.message };
+    // The door skips a lane whose report file exists at all, even one older
+    // than the stamp; a launch of nothing is a failed re-dispatch, not a success.
+    return { success: result.success && (result.launched ?? 0) > 0, message: result.message };
   },
   redispatchParent: async (issueId, workspace, saved) => {
     const resetError = await resetReviewer(saved.id);
@@ -235,7 +234,11 @@ async function recoverOne(
 
   const liveness = await d.isAlive(s.id);
   if (!liveness.alive && !isConfirmedDead(liveness)) return null;
-  if (liveness.alive && (liveness.backendState === 'blocked' || d.runtimeWaitingOnHuman(s.id))) return null;
+  // A permission prompt shows as Herdr's `blocked`, already surfaced as needs-you.
+  // No separate waiting-on-human check: the in-process runtime mirror is empty
+  // in the deacon child, and a reviewer waiting on a human already wrote its
+  // transcript, so it classifies as active, never silent.
+  if (liveness.alive && liveness.backendState === 'blocked') return null;
   // A first-time dead reviewer belongs to recoverStalledReviews / recoverUndispatchedReviews.
   if (!liveness.alive && history.stalledCount === 0) return null;
   if (liveness.alive && !verdict.silent) return null;

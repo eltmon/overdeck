@@ -1246,9 +1246,11 @@ Convoy lanes had the same hole. The routine reads each review agent's
   and no `review.aborted` since the stamp.
 
 The pane rules come from the liveness oracle. An indeterminate answer is never
-acted on. A pane blocked on a prompt, or a runtime waiting on a human, is
+acted on. A pane blocked on a prompt (Herdr's `blocked` state) is
 skipped: it is already surfaced as needs-you, and a re-dispatch would not
-answer it. A reviewer confirmed dead on its first failure is left to
+answer it. There is no separate waiting-on-human check: a reviewer waiting on a
+human has already written its transcript, so it is active, not silent, and the
+runtime mirror is empty in the deacon child anyway. A reviewer confirmed dead on its first failure is left to
 `recoverStalledReviews` and `recoverUndispatchedReviews`.
 
 On the first failure the routine appends `review.stalled` **before** acting —
@@ -1262,7 +1264,9 @@ these doors directly rather than the review-request route, because the run id
 proves the head is unchanged and the existing `verification.passed` still
 covers it. If anything after the `review.stalled` entry fails — the pane close,
 the reset, the door returning `success: false` (including a merge-conflict
-gate), or the door throwing — the routine escalates in the same tick.
+gate), a lane door that launched nothing (`recoverMissingConvoyReviewers` skips
+a lane whose report file exists at all), or the door throwing — the routine
+escalates in the same tick.
 
 The budget is one re-dispatch per (run, reviewer), counted from the journal. A
 new push is a new run and gets a fresh budget. When the re-dispatched reviewer

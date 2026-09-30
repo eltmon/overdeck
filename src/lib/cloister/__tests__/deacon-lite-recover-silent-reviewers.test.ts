@@ -96,7 +96,6 @@ beforeEach(() => {
     listReviewStates: vi.fn(() => states),
     readState: vi.fn((agentId: string) => states.find((s) => s.id === agentId) ?? null),
     isAlive: vi.fn(async () => idle),
-    runtimeWaitingOnHuman: vi.fn(() => false),
     transcriptActivityMs: vi.fn(async () => null),
     currentRunId: vi.fn(async () => RUN),
     stallMs: vi.fn(() => 15 * MINUTE),
@@ -314,12 +313,6 @@ describe('recoverSilentReviewers — guards', () => {
 
   it('leaves a pane blocked on a prompt to the needs-you it already raised', async () => {
     deps.isAlive.mockResolvedValue({ alive: true, paneAlive: true, backendState: 'blocked' });
-    await tick();
-    expectNothing();
-  });
-
-  it('leaves a reviewer the runtime reports as waiting on a human', async () => {
-    deps.runtimeWaitingOnHuman.mockReturnValue(true);
     await tick();
     expectNothing();
   });
