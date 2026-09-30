@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4438",
   "created": "2026-09-30T16:41:39.289Z",
-  "updated": "2026-09-30T18:00:24.298Z",
+  "updated": "2026-09-30T18:00:41.555Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "waiver-control.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T18:00:24.297Z"
+    },
+    "waiver-control.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T18:00:41.555Z"
     }
   }
 }
