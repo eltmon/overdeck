@@ -30,11 +30,10 @@ files = [f for f in glob.glob(os.path.expanduser('~/.claude/projects/**/*.jsonl'
 LN = re.compile(r'^\d+\t', re.M)
 BASH_READ = re.compile(r'\b(cat|sed|head|tail|awk|less|nl|bat)\b')
 rows = []
-sessions_with = 0; sessions_all = len(files); denial_ts = []
+denial_files = set(); sessions_all = len(files); denial_ts = []
 for f in files:
     txt = open(f, errors='replace').read()
     if 'TLDR summary provided' not in txt: continue
-    sessions_with += 1
     ev = []  # ordered events: ('use', id, name, input) | ('res', id, text, is_err) | ('asst', usage, model) | ('ctx', text)
     for l in txt.splitlines():
         try: r = json.loads(l)
@@ -100,12 +99,13 @@ for f in files:
         def tok_in(u): return (u.get('input_tokens') or 0), (u.get('cache_read_input_tokens') or 0), (u.get('cache_creation_input_tokens') or 0), (u.get('output_tokens') or 0)
         ex = [tok_in(a[1]) for a in extra_asst]
         model = extra_asst[0][2] if extra_asst else (asst_seen[0][2] if asst_seen else None)
+        denial_files.add(f)  # a session counts only if it produced a denial row
         rows.append(dict(size=size, summ=summ, outcome=outcome, extra_turns=len(ex),
             extra_in=sum(a for a,b,c,d in ex), extra_cr=sum(b for a,b,c,d in ex), extra_cw=sum(c for a,b,c,d in ex), extra_out=sum(d for a,b,c,d in ex),
             reread=reread_chars, bash=bash_chars, remaining=remaining_turns, model=model or '?'))
 n = len(rows)
 out = collections.OrderedDict()
-out['window_days'] = DAYS; out['transcripts_scanned'] = sessions_all; out['sessions_with_denials'] = sessions_with; out['denials'] = n
+out['window_days'] = DAYS; out['transcripts_scanned'] = sessions_all; out['sessions_with_denials'] = len(denial_files); out['denials'] = n
 out['first_denial'] = min(denial_ts) if denial_ts else None; out['last_denial'] = max(denial_ts) if denial_ts else None
 oc = collections.Counter(r['outcome'] for r in rows)
 out['outcomes'] = {k: oc[k] for k in ['partial','bash','full','summary_only']}

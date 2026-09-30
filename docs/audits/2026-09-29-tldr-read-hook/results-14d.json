@@ -1,7 +1,7 @@
 {
   "window_days": 14,
-  "transcripts_scanned": 2737,
-  "sessions_with_denials": 106,
+  "transcripts_scanned": 2741,
+  "sessions_with_denials": 100,
   "denials": 313,
   "first_denial": "2026-09-16T14:40:22.494Z",
   "last_denial": "2026-09-29T22:24:33.128Z",

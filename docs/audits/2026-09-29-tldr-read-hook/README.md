@@ -12,9 +12,9 @@ measure llm-tldr's other features or every summarize-first design.
 
 ## Sample
 
-- 6,564 local Claude Code transcripts from the last 60 days on one development machine
+- 6,572 local Claude Code transcripts from the last 60 days on one development machine
   (main sessions and subagents, all projects).
-- 414 blocked reads in 148 sessions, 2026-08-09 to 2026-09-29.
+- 414 blocked reads in 143 sessions, 2026-08-09 to 2026-09-29.
 - Mixed models: mostly Claude Sonnet 5, plus MiniMax M3, Kimi, Claude Opus 5.5 and others
   running inside Claude Code. Full breakdown in `results-60d.json`.
 
