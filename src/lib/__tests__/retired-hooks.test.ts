@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { listCandidateCheckouts, pruneRetiredOverdeckHooks, retireTldrHooks } from '../retired-hooks.js';
+import { listCandidateCheckouts, retireTldrHooks } from '../retired-hooks.js';
+import { pruneRetiredOverdeckHooks } from '../retired-hooks-prune.js';
 
 // PAN-4429: TLDR's hooks are unregistered from settings.json before their
 // scripts are deleted from ~/.overdeck/bin/.

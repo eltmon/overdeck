@@ -15,7 +15,7 @@
 
 import { join } from 'path';
 
-import { pruneRetiredOverdeckHooks } from './retired-hooks.js';
+import { pruneRetiredOverdeckHooks } from './retired-hooks-prune.js';
 
 export interface HookConfig {
   matcher: string; // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
