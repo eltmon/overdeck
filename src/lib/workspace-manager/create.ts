@@ -32,6 +32,7 @@ import {
   stagePreWorktreeMetadata,
   validateFeatureName,
 } from './worktree-ops.js';
+import { checkDiskFloor } from '../disk-floor.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
   clearWorkspaceSetupIncomplete,
@@ -196,6 +197,13 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   if (dryRun) {
     result.steps.push('[DRY RUN] Would create workspace at: ' + workspacePath);
+    return result;
+  }
+
+  const diskError = await checkDiskFloor(projectConfig.path);
+  if (diskError) {
+    result.success = false;
+    result.errors.push(diskError);
     return result;
   }
 
