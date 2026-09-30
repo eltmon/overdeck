@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1674",
   "created": "2026-09-29T23:41:57.389Z",
-  "updated": "2026-09-30T00:01:44.325Z",
+  "updated": "2026-09-30T00:08:43.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-30T00:01:37.369Z"
     },
     "tldr-install-command": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1674",
-      "claimedAt": "2026-09-30T00:01:44.324Z"
+      "claimedAt": "2026-09-30T00:01:44.324Z",
+      "doneAt": "2026-09-30T00:08:43.987Z"
     }
   }
 }
