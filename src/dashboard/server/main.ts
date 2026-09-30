@@ -68,6 +68,7 @@ import { startConversationSearchWatcher, stopConversationSearchWatcher } from '.
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
+import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
 import { startGitHubQuotaPublisher } from './services/github-quota.js';
 import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
@@ -564,8 +565,12 @@ console.log('[overdeck] Conversation rescan scheduler started (boot pass + 6h in
 if (!isPeerDashboard) {
   startPullRequestSyncService();
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
+}
+// PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
+if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
+  startVaultBrowseService();
   startVaultService();
-  console.log('[vault] started (boot +5s, then vault syncIntervalSec)');
+  console.log('[vault] started (boot +5s, then vault syncIntervalSec; browse copies on each sync)');
 }
 
 // PAN-4264: sample GitHub /rate_limit into the quota ledger (boot +2 min, then every 5 min)

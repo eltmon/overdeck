@@ -38,6 +38,7 @@ import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../term
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { validateCwdContainment } from './cwd-containment.js';
+import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -1109,6 +1110,7 @@ export async function handleConversationResume(
   try {
     const conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
     const effort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : (conv.effort ?? undefined);
     const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
