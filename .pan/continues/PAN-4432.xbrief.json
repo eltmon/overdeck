@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4432",
   "created": "2026-09-30T16:34:03.069Z",
-  "updated": "2026-09-30T17:01:58.545Z",
+  "updated": "2026-09-30T17:15:24.433Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-30T17:01:49.829Z"
     },
     "check-suite-empty-prs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4432",
-      "claimedAt": "2026-09-30T17:01:58.545Z"
+      "claimedAt": "2026-09-30T17:01:58.545Z",
+      "doneAt": "2026-09-30T17:15:24.433Z"
     }
   }
 }
