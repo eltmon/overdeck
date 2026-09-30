@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:43:09.118Z",
+  "updated": "2026-09-30T17:43:24.397Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "ws-upgrade-scopes.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T17:43:09.118Z"
+    },
+    "ws-upgrade-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:24.397Z"
     }
   }
 }
