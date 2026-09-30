@@ -1,0 +1,45 @@
+{
+  "window_days": 14,
+  "transcripts_scanned": 2732,
+  "sessions_with_denials": 103,
+  "denials": 313,
+  "first_denial": "2026-09-16T14:40:22.494Z",
+  "last_denial": "2026-09-29T22:24:33.128Z",
+  "outcomes": {
+    "partial": 229,
+    "bash": 48,
+    "full": 11,
+    "summary_only": 25
+  },
+  "outcome_pct": {
+    "partial": 73.2,
+    "bash": 15.3,
+    "full": 3.5,
+    "summary_only": 8.0
+  },
+  "bytes_withheld": 3112840,
+  "bytes_reread_via_read_stripped": 1682113,
+  "bytes_reread_via_bash": 638760,
+  "bytes_summary_injected": 524895,
+  "pct_withheld_that_came_back": 74.6,
+  "denials_reread_ge_80pct": 196,
+  "median_file_bytes": 6757,
+  "extra_turns_total": 323,
+  "extra_turns_mean_per_reread": 1.12,
+  "extra_turn_context_tokens_mean": 203387,
+  "cost_extra_turns_input_equiv_tokens": 7901579,
+  "saving_upper_bound_input_equiv_tokens": 2947714,
+  "net_input_equiv_tokens": -4953864,
+  "net_tokens_kept_out_of_context": 194702,
+  "summary_tokens_injected": 131224,
+  "denials_by_model": {
+    "claude-sonnet-5": 172,
+    "MiniMax-M3": 57,
+    "claude-opus-5-5": 37,
+    "k3-256k": 31,
+    "claude-haiku-4-5-20251001": 7,
+    "claude-fable-5-1": 5,
+    "<synthetic>": 3,
+    "claude-sonnet-5-5": 1
+  }
+}
