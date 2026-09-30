@@ -9,9 +9,13 @@
  *     <root>/refs/<name>             encrypted ref value
  *     <root>/objects/keywrap/v1      reserved slot, overwritten by putSlot
  *
- * A ref's version is the SHA-1 of the ref file bytes. `casRef` is serialized
- * within the process by a promise chain and across processes by an O_EXCL
- * lock file next to the ref; a stale lock (older than 30 s) is reclaimed.
+ * A ref's version is the SHA-1 of the ref file bytes. `casRefs` (and `casRef`,
+ * its single-op form) is serialized within the process by a promise chain and
+ * across processes by an O_EXCL lock file next to each ref, taken in ascending
+ * name order; a stale lock (older than 30 s) is reclaimed. A batch is written
+ * file by file in the order the caller gave, so a crash can leave a prefix of
+ * it on disk. Writes publish at once, so `discardUnpublished` has nothing to
+ * drop.
  * Imports only Node built-ins and the sibling types module.
  */
 import { createHash } from 'node:crypto';
@@ -22,11 +26,13 @@ import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
   VaultOfflineError,
+  assertDistinctRefNames,
   assertNotSlotName,
   assertRefName,
   assertSlotName,
   objectRelativePath,
   type CasResult,
+  type RefOp,
   type VaultRef,
   type VaultStore,
 } from './types.js';
@@ -146,23 +152,47 @@ export class DirVaultStore implements VaultStore {
   }
 
   async casRef(name: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
-    const path = this.refPath(name);
-    const run = this.casQueue.then(() => this.casRefLocked(path, expectedVersion, value));
+    return this.casRefs([{ name, expectedVersion, value }]);
+  }
+
+  async casRefs(ops: ReadonlyArray<RefOp>): Promise<CasResult> {
+    assertDistinctRefNames(ops);
+    const resolved = ops.map((op) => ({ ...op, path: this.refPath(op.name) }));
+    const run = this.casQueue.then(() => this.casRefsLocked(resolved));
     this.casQueue = run.catch(() => undefined);
     return run;
   }
 
-  private async casRefLocked(path: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult> {
-    await mkdir(dirname(path), { recursive: true });
-    return withFileLock(`${path}.lock`, async () => {
+  /**
+   * Locks are taken in ascending name order, so two batches always take them
+   * in the same order. The writes keep the caller's order.
+   */
+  private async casRefsLocked(ops: ReadonlyArray<RefOp & { path: string }>): Promise<CasResult> {
+    for (const { path } of ops) await mkdir(dirname(path), { recursive: true });
+    const lockOrder = [...ops].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const withLocks = (index: number): Promise<CasResult> => {
+      const op = lockOrder[index];
+      if (op !== undefined) return withFileLock(`${op.path}.lock`, () => withLocks(index + 1));
+      return this.casRefsHeld(ops);
+    };
+    return withLocks(0);
+  }
+
+  private async casRefsHeld(ops: ReadonlyArray<RefOp & { path: string }>): Promise<CasResult> {
+    for (const { path, expectedVersion } of ops) {
       const current = await readOrNull(path);
       const currentVersion = current === null ? null : refVersion(current);
       if (currentVersion !== expectedVersion) return 'conflict';
-      await writeAtomic(path, value);
-      return 'ok';
-    });
+    }
+    for (const { path, value } of ops) {
+      if (value !== undefined) await writeAtomic(path, value);
+    }
+    return 'ok';
   }
 
+  async discardUnpublished(): Promise<void> {
+    // Every write lands in the directory at once; nothing is unpublished.
+  }
 
   async refresh(): Promise<void> {
     // The directory is the source of truth; nothing to pull.

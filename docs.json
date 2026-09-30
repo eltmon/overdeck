@@ -106,6 +106,7 @@
               "configuration/projects",
               "configuration/telemetry",
               "configuration/session-vault",
+              "configuration/remote-access",
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/model-presets",

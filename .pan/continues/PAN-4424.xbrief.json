@@ -1,0 +1,143 @@
+{
+  "version": "1",
+  "issueId": "PAN-4424",
+  "created": "2026-09-29T22:24:30.151Z",
+  "updated": "2026-09-29T23:02:50.721Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fork-default-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:24:30.151Z",
+      "doneAt": "2026-09-29T22:34:56.210Z"
+    },
+    "fork-default-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:35:00.920Z",
+      "doneAt": "2026-09-29T22:45:35.730Z"
+    },
+    "docs-fork-source": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:45:38.962Z",
+      "doneAt": "2026-09-29T22:46:57.437Z"
+    },
+    "host-register-pack": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:47:01.974Z",
+      "doneAt": "2026-09-29T22:47:49.611Z"
+    },
+    "verify-levels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:48:01.465Z",
+      "doneAt": "2026-09-29T22:50:23.590Z"
+    },
+    "verify-managed-claude": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:50:29.013Z",
+      "doneAt": "2026-09-29T22:52:28.445Z"
+    },
+    "verify-managed-codex": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:52:33.979Z",
+      "doneAt": "2026-09-29T22:54:57.130Z"
+    },
+    "fork-default-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:56:37.500Z"
+    },
+    "fork-default-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:56:53.611Z"
+    },
+    "fork-default-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:57:14.554Z"
+    },
+    "fork-default-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:57:35.454Z"
+    },
+    "fork-default-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:57:57.428Z"
+    },
+    "docs-fork-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:58:18.732Z"
+    },
+    "docs-fork-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:58:38.895Z"
+    },
+    "docs-fork-source.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:59:01.242Z"
+    },
+    "host-register-pack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:59:23.111Z"
+    },
+    "host-register-pack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:59:39.224Z"
+    },
+    "host-register-pack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T22:59:54.729Z"
+    },
+    "verify-levels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:00:18.930Z"
+    },
+    "verify-levels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:00:35.173Z"
+    },
+    "verify-levels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:00:49.573Z"
+    },
+    "verify-levels.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:01:03.812Z"
+    },
+    "verify-managed-claude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:01:18.327Z"
+    },
+    "verify-managed-claude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:01:34.269Z"
+    },
+    "verify-managed-claude.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:01:52.508Z"
+    },
+    "verify-managed-codex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:02:07.232Z"
+    },
+    "verify-managed-codex.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:02:21.797Z"
+    },
+    "verify-managed-codex.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:02:36.137Z"
+    },
+    "verify-managed-codex.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:02:50.720Z"
+    }
+  }
+}

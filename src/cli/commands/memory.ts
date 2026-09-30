@@ -12,6 +12,7 @@ import {
   resolveMemoryWorkspaceTarget,
   runMemoryDoctor,
   searchMemory,
+  type MemoryDoctorResult,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
@@ -232,6 +233,26 @@ export async function memorySummaryCommand(issue: string | undefined, options: M
   else console.log(chalk.green(`Wrote ${result.observationCount} observations to ${result.path}`));
 }
 
+/** Text-mode `pan memory doctor` lines (PAN-4370): per-workspace failure counts and cause, when present. */
+export function formatMemoryDoctorLines(result: MemoryDoctorResult): string[] {
+  const lines: string[] = [
+    chalk.bold('Memory Doctor'),
+    `Provider: ${result.provider.provider} / ${result.provider.model} (${result.provider.source})`,
+    `Rollup pending threshold: ${result.rollupPendingThreshold}`,
+  ];
+  for (const issue of result.issues) {
+    const failedByReason = Object.entries(issue.health.failed_by_reason ?? {});
+    const failuresSuffix = failedByReason.length > 0
+      ? ` failures=${failedByReason.map(([reason, count]) => `${reason}:${count}`).join(',')}`
+      : '';
+    lines.push(`${issue.issueId}: health=${issue.health.status} pending=${issue.pendingCount} last_success=${issue.health.last_success ?? 'never'}${failuresSuffix}`);
+    if (issue.health.last_failure_detail) {
+      lines.push(`  cause: ${issue.health.last_failure_reason ?? 'unknown'} — ${issue.health.last_failure_detail}`);
+    }
+  }
+  return lines;
+}
+
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
     .description('Search and inspect Overdeck memory');
@@ -317,12 +338,7 @@ export function createMemoryCommand(): Command {
         process.exitCode = result.exitCode;
         return;
       }
-      console.log(chalk.bold('Memory Doctor'));
-      console.log(`Provider: ${result.provider.provider} / ${result.provider.model} (${result.provider.source})`);
-      console.log(`Rollup pending threshold: ${result.rollupPendingThreshold}`);
-      for (const issue of result.issues) {
-        console.log(`${issue.issueId}: health=${issue.health.status} pending=${issue.pendingCount} last_success=${issue.health.last_success ?? 'never'}`);
-      }
+      for (const line of formatMemoryDoctorLines(result)) console.log(line);
       if (result.staleActiveAgents.length > 0) {
         console.log(chalk.red('Stale active agents:'));
         for (const agent of result.staleActiveAgents) {

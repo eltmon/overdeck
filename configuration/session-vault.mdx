@@ -43,7 +43,8 @@ pan vault join git@github.com:you/session-vault.git
 
 Enter the 24 words when prompted (or pass `--phrase-file <path>`). If the vault has a
 passphrase, you are asked for that first; see below. A wrong phrase prints
-`The recovery phrase does not match this vault.` and writes nothing.
+`The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.`
+and writes nothing.
 
 ## Passphrase unlock
 
@@ -69,8 +70,59 @@ recovery phrase instead, or pass `--passphrase-file <path>`. A wrong passphrase 
 `The passphrase did not unlock this vault.` and writes nothing.
 
 <Warning>
-The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: the vault key never changes, and removing the passphrase never locks you out.
+The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: setting or removing a passphrase never changes the vault key, and removing the passphrase never locks you out.
 </Warning>
+
+## Lost a device? Rotate the key
+
+Every machine that joined the vault holds the vault key. Removing a lost or stolen machine
+from your accounts stops it from syncing, but it still holds the key. Rotate the key so that
+machine can read nothing you save from now on:
+
+```bash
+pan vault rotate-key
+```
+
+Run it on a machine you still have. It asks
+`Rotate the vault key? Every other machine must re-join with the new recovery phrase or passphrase. [y/N]`,
+re-encrypts every saved conversation's record under a new key, and prints a **new**
+24-word recovery phrase. Write it down: it is shown only once, and the old phrase no longer
+opens the vault.
+
+| Flag | Effect |
+| --- | --- |
+| `--yes` | Rotate without the confirmation prompt. Required when the command does not run in a terminal. |
+| `--passphrase-file <path>` | Keep passphrase unlock, with the passphrase in this file, for the new key. |
+| `--generate-passphrase` | Keep passphrase unlock with a generated 6-word passphrase, printed once. |
+| `--no-passphrase` | Turn passphrase unlock off. |
+
+If the vault has a passphrase, the command asks for a new one in a terminal (Enter generates
+one). In a script you must pass one of the three passphrase flags. The passphrase never
+keeps unlocking the old key after a finished rotation.
+
+<Warning>
+A rotation protects what you save after it. The lost machine can still read everything that was saved before the rotation, because it already holds those conversations' key. It can read nothing saved afterwards.
+</Warning>
+
+After a rotation:
+
+1. Every other machine refuses to save or sync and prints
+   `This machine's vault key was retired by a key rotation. Run: pan vault join <backend> with the new recovery phrase or passphrase.`
+2. On each of those machines, run `pan vault join <git-url>` again and enter the new
+   recovery phrase or the passphrase. The machine keeps its saved-conversation list and
+   continues its own conversations where they were.
+3. On the git backend, also revoke or rotate the git credentials (deploy key, access token)
+   the lost machine had. The vault key protects what the conversations say; the git
+   credentials decide who may write to the repository.
+
+Upgrade Overdeck on every machine before you rotate. Older versions cannot read
+conversations saved before a rotation.
+
+If a rotation is interrupted (a crash, a lost connection), other `pan vault` commands on
+that machine print
+`A vault key rotation started on this machine has not finished. Run: pan vault rotate-key`.
+Run the command again: it finishes with the same new key and prints the phrase.
+`pan vault status` shows when the key was last rotated.
 
 ## Save and sync
 
@@ -149,11 +201,39 @@ anything on its own. To use it:
 `pan vault evict --decline <id>` keeps a transcript out of future lists; `--clear` empties the
 list without deleting anything.
 
+## Windows
+
+Checked on 2026-09-29 in the `windows-smoke` workflow
+([run 36615182191](https://github.com/eltmon/overdeck/actions/runs/36615182191)), on GitHub's
+`windows-2022` runner: Windows Server 2022 Datacenter, Git for Windows 2.55.0, Node 22.23, and
+Ubuntu 24.04 in WSL2 (Git 2.43, Node 22.23). Windows 11 and continuing a conversation after
+dual-booting the same machine were not verified.
+
+- **WSL2 is supported.** Run `pan vault` inside your WSL2 distro. Join, list and resume work,
+  the code snapshot arrives, and Claude Code finds the conversation and starts. (The test had no
+  Claude credentials, so no reply was exchanged.) The tested checkout was in
+  the Linux filesystem (`~/w/proj`); a checkout under `/mnt/c` was not tested.
+- **Native Windows is not supported yet.** `pan vault join` fails with `... is neither empty nor
+  a vault (no VAULT-FORMAT on main)` when git has `core.autocrlf=true`, which is the Git for
+  Windows default ([#4418](https://github.com/eltmon/overdeck/issues/4418)). With that setting
+  turned off in a test run, `pan vault resume` still could not start Claude Code
+  (`spawn claude ENOENT`, [#4419](https://github.com/eltmon/overdeck/issues/4419)).
+  `--no-launch` printed the `claude --resume <id>` command instead.
+- **Files in the code snapshot:** in WSL2, line endings, the executable bit and symlinks arrive
+  as saved. In the native Windows test run (with `core.autocrlf` off), line endings and the
+  symlink arrived as saved, but `run.sh` lost its executable bit (mode 100644; the clone's
+  `core.filemode` was `false`).
+- **The dashboard on native Windows:** `npx @overdeck/core` starts, but every page returns 404
+  ([#4420](https://github.com/eltmon/overdeck/issues/4420)). Starting a conversation fails
+  because the Herdr terminal backend is not available; the error says to run `pan install` or
+  set `terminal.backend: tmux`.
+
 ## Where things live
 
 | Path | Contents |
 | --- | --- |
 | `~/.overdeck/vault/key` | Your vault key (mode 0600). Back it up as the recovery phrase. |
+| `~/.overdeck/vault/key.next` | Present only while a key rotation is in progress. Finish it with `pan vault rotate-key`. |
 | `~/.overdeck/vault/config.json` | Backend URL, exclusions, `evict`, `liveQuietMinutes`. |
 | `~/.overdeck/vault/git/` | Local clone of your vault remote. |
 | `~/.overdeck/vault/index.json` | This machine's saved-transcript index and list cache. Never uploaded. |

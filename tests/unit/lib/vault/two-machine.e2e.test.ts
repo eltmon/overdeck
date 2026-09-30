@@ -34,7 +34,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,13 +44,14 @@ import { joinCommand } from '../../../../src/cli/commands/vault/join.js';
 import { listCommand } from '../../../../src/cli/commands/vault/list.js';
 import { restoreCommand } from '../../../../src/cli/commands/vault/restore.js';
 import { resumeCommand } from '../../../../src/cli/commands/vault/resume.js';
+import { rotateKeyCommand } from '../../../../src/cli/commands/vault/rotate-key.js';
 import { saveCommand } from '../../../../src/cli/commands/vault/save.js';
 import { setupCommand } from '../../../../src/cli/commands/vault/setup.js';
 import { syncCommand } from '../../../../src/cli/commands/vault/sync.js';
 import type { CliIo } from '../../../../src/cli/commands/vault/shared.js';
 import { readEnvironmentIdentity, type EnvironmentIdentity } from '../../../../src/lib/environment-identity.js';
 import { writeVaultConfig } from '../../../../src/lib/vault/config.js';
-import { deriveSubkeys, loadVaultKey } from '../../../../src/lib/vault/identity.js';
+import { deriveSubkeys, loadVaultKey, phraseToKey } from '../../../../src/lib/vault/identity.js';
 import { listOwned, readListCache } from '../../../../src/lib/vault/local-index.js';
 import { GitVaultStore } from '../../../../src/lib/vault/store/git.js';
 
@@ -124,6 +125,19 @@ describe('Session Vault two-machine end-to-end', () => {
     connectSpy.mockClear();
   });
 
+  /** Every blob, tree and commit in the bare repository must be free of the fixture's distinctive strings. */
+  function expectNoPlaintext(needles: string[]): void {
+    const objects = git(remote, 'cat-file', '--batch-all-objects', '--batch-check=%(objectname) %(objecttype)').trim().split('\n');
+    expect(objects.length).toBeGreaterThan(5);
+    for (const entry of objects) {
+      const [sha, type] = entry.split(' ') as [string, string];
+      if (type !== 'blob' && type !== 'commit' && type !== 'tree') continue;
+      const bytes = execFileSync('git', ['cat-file', type, sha], { cwd: remote, maxBuffer: 64 * 1024 * 1024 });
+      const text = bytes.toString('latin1');
+      for (const needle of needles) expect(text, `${type} ${sha} leaks ${needle}`).not.toContain(needle);
+    }
+  }
+
   afterEach(() => {
     if (originalEnv.home === undefined) delete process.env.HOME; else process.env.HOME = originalEnv.home;
     if (originalEnv.overdeck === undefined) delete process.env.OVERDECK_HOME; else process.env.OVERDECK_HOME = originalEnv.overdeck;
@@ -196,16 +210,7 @@ describe('Session Vault two-machine end-to-end', () => {
     expect(existsSync(join(root, rc.adopted ? 'proj-d' : 'proj-c'))).toBe(false);
 
     // --- ac2: no plaintext anywhere in the bare repository ---
-    const objects = git(remote, 'cat-file', '--batch-all-objects', '--batch-check=%(objectname) %(objecttype)').trim().split('\n');
-    expect(objects.length).toBeGreaterThan(5);
-    const needles = [LINE_TEXT, TITLE, cwdA, PROJECT, SESSION, 'purple heron'];
-    for (const entry of objects) {
-      const [sha, type] = entry.split(' ') as [string, string];
-      if (type !== 'blob' && type !== 'commit' && type !== 'tree') continue;
-      const bytes = execFileSync('git', ['cat-file', type, sha], { cwd: remote, maxBuffer: 64 * 1024 * 1024 });
-      const text = bytes.toString('latin1');
-      for (const needle of needles) expect(text, `${type} ${sha} leaks ${needle}`).not.toContain(needle);
-    }
+    expectNoPlaintext([LINE_TEXT, TITLE, cwdA, PROJECT, SESSION, 'purple heron']);
     // Ref names are keyed HMACs, never ids.
     const tree = git(remote, 'ls-tree', '-r', '--name-only', 'main');
     expect(tree).not.toContain(vaultId);
@@ -246,5 +251,101 @@ describe('Session Vault two-machine end-to-end', () => {
     expect(childProcessCalls.commands.length).toBeGreaterThan(0);
     expect(new Set(childProcessCalls.commands)).toEqual(new Set(['git']));
     void promisify;
+  });
+
+  it('rotation: A rotates, B is refused, B re-joins and resumes pre-rotation history', async () => {
+    const SESSION_B = 'e2eb0000-0000-4000-8000-000000000000';
+    const B_TEXT = 'a saffron kite over the breakwater';
+    const LATE_TEXT = 'the ferry left without the cartographer';
+
+    // --- A: setup and save; B: join and save ---
+    const { overdeckHome: homeA } = useMachine('machine-a');
+    const setupIo = io();
+    expect(await run(() => setupCommand(remote, {}, setupIo))).toBe(0);
+    const oldPhrase = setupIo.stdout.find((line) => line.trim().split(' ').length === 24)!.trim();
+    const pathA = join(root, 'a-transcripts', `${SESSION}.jsonl`);
+    mkdirSync(join(root, 'a-transcripts'));
+    const linesA = [
+      JSON.stringify({ type: 'user', sessionId: SESSION, cwd: cwdA, message: { role: 'user', content: TITLE } }),
+      JSON.stringify({ type: 'assistant', sessionId: SESSION, cwd: cwdA, message: { role: 'assistant', model: 'claude-fable-5-1', content: [{ type: 'text', text: LINE_TEXT }] } }),
+      JSON.stringify({ type: 'user', sessionId: SESSION, cwd: cwdA, message: { role: 'user', content: 'thanks' } }),
+    ];
+    writeFileSync(pathA, `${linesA.join('\n')}\n`);
+    expect(await run(() => saveCommand(pathA, {}, io()))).toBe(0);
+    expect(await run(() => syncCommand({}, io()))).toBe(0);
+    const vaultIdA = (await readListCache())[0]!.vaultId;
+
+    const { home: homeBUser, overdeckHome: homeB } = useMachine('machine-b');
+    const oldPhraseFile = join(root, 'phrase.txt');
+    writeFileSync(oldPhraseFile, oldPhrase);
+    expect(await run(() => joinCommand(remote, { phraseFile: oldPhraseFile }, io()))).toBe(0);
+    const pathB = join(root, 'b-transcripts', `${SESSION_B}.jsonl`);
+    mkdirSync(join(root, 'b-transcripts'));
+    writeFileSync(pathB, `${JSON.stringify({ type: 'user', sessionId: SESSION_B, cwd: cwdA, message: { role: 'user', content: B_TEXT } })}\n`);
+    expect(await run(() => saveCommand(pathB, {}, io()))).toBe(0);
+    expect(await run(() => syncCommand({}, io()))).toBe(0);
+
+    // --- A rotates: exactly one commit, a new phrase, a new key ---
+    useMachine('machine-a');
+    expect(await run(() => syncCommand({}, io()))).toBe(0);
+    const commitsBefore = Number(git(remote, 'rev-list', '--count', 'main').trim());
+    const keyBefore = readFileSync(join(homeA, 'vault', 'key'));
+    const rotateIo = io();
+    expect(await run(() => rotateKeyCommand({ yes: true, passphrase: false }, rotateIo))).toBe(0);
+    expect(rotateIo.stdout[0]).toBe(`Vault key rotated for ${remote}: 2 conversation(s) and 2 machine(s) re-encrypted.`);
+    const newPhrase = rotateIo.stdout.find((line) => line.trim().split(' ').length === 24)!.trim();
+    expect(newPhrase).not.toBe(oldPhrase);
+    const keyAfter = readFileSync(join(homeA, 'vault', 'key'));
+    expect(keyAfter.equals(keyBefore)).toBe(false);
+    expect(phraseToKey(newPhrase).equals(keyAfter)).toBe(true);
+    expect(existsSync(join(homeA, 'vault', 'key.next'))).toBe(false);
+    const commitsAfterRotation = Number(git(remote, 'rev-list', '--count', 'main').trim());
+    expect(commitsAfterRotation).toBe(commitsBefore + 1);
+
+    // --- ac1: stale B is refused and publishes nothing ---
+    useMachine('machine-b');
+    appendFileSync(pathB, `${JSON.stringify({ type: 'user', sessionId: SESSION_B, cwd: cwdA, message: { role: 'user', content: LATE_TEXT } })}\n`);
+    const refusedIo = io();
+    expect(await run(() => saveCommand(pathB, {}, refusedIo))).toBe(1);
+    expect(refusedIo.stdout).toEqual([
+      `${SESSION_B}.jsonl: error: This machine's vault key was retired by a key rotation. Run: pan vault join ${remote} with the new recovery phrase or passphrase.`,
+    ]);
+    expect(Number(git(remote, 'rev-list', '--count', 'main').trim())).toBe(commitsAfterRotation);
+    const oldJoin = io();
+    expect(await run(() => joinCommand(remote, { phraseFile: oldPhraseFile }, oldJoin))).toBe(1);
+    expect(oldJoin.stderr).toEqual(['The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.']);
+    expect(Number(git(remote, 'rev-list', '--count', 'main').trim())).toBe(commitsAfterRotation);
+
+    // --- ac2: B re-joins with the new phrase and resumes a record saved before the rotation ---
+    const newPhraseFile = join(root, 'new-phrase.txt');
+    writeFileSync(newPhraseFile, newPhrase);
+    expect(await run(() => joinCommand(remote, { phraseFile: newPhraseFile }, io()))).toBe(0);
+    expect(readFileSync(join(homeB, 'vault', 'key')).equals(keyAfter)).toBe(true);
+    const cwdB = join(root, 'b-checkout');
+    mkdirSync(cwdB);
+    const resumeIo = io();
+    expect(await run(() => resumeCommand(vaultIdA, { launch: false, cwd: cwdB }, resumeIo))).toBe(0);
+    const newId = resumeIo.stdout.find((line) => line.includes('claude --resume'))!.match(/claude --resume ([0-9a-f-]{36})/)![1]!;
+    const projectsRoot = join(homeBUser, '.claude', 'projects');
+    const materialized = readFileSync(join(projectsRoot, readdirSync(projectsRoot)[0]!, `${newId}.jsonl`), 'utf8').split('\n').filter(Boolean);
+    expect(materialized).toHaveLength(linesA.length);
+    expect(materialized.map((line) => JSON.parse(line).message)).toEqual(linesA.map((line) => JSON.parse(line).message));
+    expect(materialized[1]).toContain(LINE_TEXT);
+
+    // B's own record went on under its new name: the refused line is saved now.
+    const saveIo = io();
+    expect(await run(() => saveCommand(pathB, {}, saveIo))).toBe(0);
+    expect(saveIo.stdout[0]).toMatch(/: noop/);
+    expect((await listOwned())[pathB]!.tail.lineCount).toBe(2);
+
+    // --- ac3: still no plaintext anywhere in the bare repository ---
+    expectNoPlaintext([LINE_TEXT, TITLE, B_TEXT, LATE_TEXT, cwdA, PROJECT, SESSION, SESSION_B, 'purple heron']);
+    const tree = git(remote, 'ls-tree', '-r', '--name-only', 'main');
+    expect(tree).not.toContain(vaultIdA);
+    expect(tree).not.toContain(keyBefore.toString('hex'));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(connectSpy).not.toHaveBeenCalled();
+    expect(new Set(childProcessCalls.commands)).toEqual(new Set(['git']));
   });
 });

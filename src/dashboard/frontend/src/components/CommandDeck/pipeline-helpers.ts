@@ -111,6 +111,7 @@ function isPlanApprovalPending(feature: ProjectFeature): boolean {
 
 export function isNeedsYouFeature(feature: ProjectFeature, derived: DerivedIssueState | undefined): boolean {
   if (derived?.attention === 'needs-you') return true;
+  if (derived?.attention === 'work-not-started') return true;
   if (derived?.state === 'ready') return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
   // The membership resolver distinguishes a real planned backlog from terminal
@@ -232,6 +233,9 @@ export function sublineFor(entry: BucketedFeature): string {
     : null;
 
   if (isNeedsYouFeature(feature, derived)) {
+    if (derived?.attention === 'work-not-started') {
+      return `work agent not started — ${derived.workStart?.error ?? 'run pan start'}`;
+    }
     if (derived?.state === 'ready') return 'approved and green — held for your merge';
     if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) {
       return 'waiting on your answer';
@@ -253,6 +257,8 @@ export function sublineFor(entry: BucketedFeature): string {
     return derived.pr?.checks === 'pending' ? 'in review · checks running' : 'reviewer checking the finished work';
   }
   if (derived?.state === 'merged') return 'merged';
+  if (derived?.workStart?.status === 'retrying' && derived.workStart.held) return 'work agent start held while the Deacon is frozen';
+  if (derived?.workStart?.status === 'retrying') return 'work agent start retrying';
   if (phase === 'work') return progress ?? 'writing code';
   if (phase === 'plan') return 'planning what to build';
   if (phase === 'ship') return 'lining up to ship';

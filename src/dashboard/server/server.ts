@@ -53,6 +53,9 @@ import { cloisterRouteLayer } from './routes/cloister.js'
 import { resourcesRouteLayer } from './routes/resources.js'
 import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
+import { environmentRouteLayer } from './routes/environment.js'
+import { pairingRouteLayer } from './routes/pairing.js'
+import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { voiceRouteLayer } from './routes/voice.js';
@@ -92,8 +95,7 @@ import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
 import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
-import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
-import { validateOrigin } from './routes/origin-validation.js';
+import { dashboardSessionPreflightRouteLayer, dashboardSessionRouteLayer } from './routes/dashboard-session.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { retryDashboardBind } from './server-bind.js';
 import { buildDashboardHealthResponse } from './health-response.js';
@@ -148,88 +150,6 @@ const healthRouteLayer = HttpRouter.add(
   Effect.promise(() => buildDashboardHealthResponse()).pipe(
     Effect.map((health) => jsonResponse(health.body, { status: health.httpStatus })),
   ),
-);
-
-function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
-  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function allowDashboardSessionCors(
-  response: HttpServerResponse.HttpServerResponse,
-  request: HttpServerRequest.HttpServerRequest,
-): HttpServerResponse.HttpServerResponse {
-  const origin = requestHeader(request, 'origin');
-  if (!origin) return response;
-  return HttpServerResponse.setHeader(
-    HttpServerResponse.setHeader(
-      HttpServerResponse.setHeader(
-        HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin),
-        'Access-Control-Allow-Credentials',
-        'true',
-      ),
-      'Access-Control-Allow-Headers',
-      'x-overdeck-internal-token, x-overdeck-csrf-token, authorization, content-type',
-    ),
-    'Vary',
-    'Origin',
-  );
-}
-
-function isHttpsRequest(request: HttpServerRequest.HttpServerRequest): boolean {
-  const forwardedProto = requestHeader(request, 'x-forwarded-proto');
-  if (forwardedProto?.split(',')[0]?.trim().toLowerCase() === 'https') return true;
-  return HttpServerRequest.toURL(request).pipe(Option.match({
-    onNone: () => false,
-    onSome: (url) => url.protocol === 'https:',
-  }));
-}
-
-const dashboardSessionPreflightRouteLayer = HttpRouter.add(
-  'OPTIONS',
-  '/api/dashboard/session',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    return allowDashboardSessionCors(
-      HttpServerResponse.setHeader(jsonResponse({ ok: true }), 'Access-Control-Allow-Methods', 'POST, OPTIONS'),
-      request,
-    );
-  }),
-);
-
-const dashboardSessionRouteLayer = HttpRouter.add(
-  'POST',
-  '/api/dashboard/session',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    const mintAuthError = rejectUnauthorizedDashboardSessionMintRequest(request);
-    const sessionAuthError = rejectUnauthorizedDashboardRequest(request);
-    if (mintAuthError && sessionAuthError) return mintAuthError;
-
-    let response = jsonResponse({ ok: true, csrfToken: dashboardCsrfToken() });
-    // Re-issue the durable session cookie on every successful mint — not only when
-    // the one-time internal token is present. We only reach here if at least one of
-    // mint/session auth passed, so the caller is already trusted; refreshing the
-    // cookie gives an in-use session a rolling Max-Age instead of letting it lapse.
-    response = HttpServerResponse.setHeader(
-      response,
-      'Set-Cookie',
-      dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
-    );
-
-    return allowDashboardSessionCors(
-      HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store'),
-      request,
-    );
-  }),
 );
 
 // ─── Static file route ────────────────────────────────────────────────────────
@@ -343,6 +263,8 @@ const staticRouteLayer = HttpRouter.add(
 // ─── Route composition ────────────────────────────────────────────────────────
 
 export const makeRoutesLayer = Layer.mergeAll(
+  // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
+  remoteRequestGateLayer,
   healthRouteLayer,
   dashboardSessionPreflightRouteLayer,
   dashboardSessionRouteLayer,
@@ -403,6 +325,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   internalEventsRouteLayer,
   restartGateRouteLayer,
   knowledgeViewerRouteLayer,
+  environmentRouteLayer,
+  pairingRouteLayer,
   staticRouteLayer,
 );
 

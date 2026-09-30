@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   getExtractionProvider,
   registerExtractionProvider,
   resolveExtractionProvider,
   resolveExtractionProviderSelection,
+  isExtractionProviderAuthError,
   type ExtractionProvider,
   type ExtractionProviderOptions,
   type ExtractionProviderResult,
@@ -154,5 +156,48 @@ describe('memory extraction providers', () => {
     await provider.extract<ExtractedPayload>('summarize', { type: 'object' });
 
     expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0 });
+  });
+
+  // PAN-4370 WI-3: the anthropic provider must not throw the SDK's generic
+  // "Could not resolve authentication method" when no client is injected and
+  // the environment has no credentials — it should raise a typed, actionable
+  // error before even constructing the SDK client.
+  it('rejects with ExtractionProviderAuthError (mentioning ANTHROPIC_API_KEY) when no client is injected and credentials are missing, without constructing an SDK client', async () => {
+    const provider = new AnthropicExtractionProvider(undefined, () => false);
+
+    await expect(provider.extract<ExtractedPayload>('summarize', { type: 'object' })).rejects.toSatisfy((error: unknown) => {
+      return isExtractionProviderAuthError(error) && error.message.includes('ANTHROPIC_API_KEY');
+    });
+  });
+
+  it('rejects with ExtractionProviderAuthError when an injected client throws an Anthropic AuthenticationError, and an injected client with no env key still succeeds', async () => {
+    const create = vi.fn(async () => {
+      throw new Anthropic.AuthenticationError(401, {}, 'invalid x-api-key', new Headers());
+    });
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await expect(provider.extract<ExtractedPayload>('summarize', { type: 'object' })).rejects.toSatisfy((error: unknown) => isExtractionProviderAuthError(error));
+
+    const okCreate = vi.fn(async () => ({
+      id: 'msg-4',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const okProvider = new AnthropicExtractionProvider({ messages: { create: okCreate } } as never);
+
+    const result = await okProvider.extract<ExtractedPayload>('summarize', { type: 'object' });
+    expect(result.data).toEqual({ summary: 'ok' });
+  });
+
+  it('rejects with ExtractionProviderAuthError on cliproxy HTTP 401, and a plain Error (not the auth class) on HTTP 400', async () => {
+    const unauthorizedFetch = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'invalid key' } }), { status: 401 }));
+    const unauthorizedProvider = new CliproxyExtractionProvider('http://127.0.0.1:8317', unauthorizedFetch as typeof fetch);
+
+    await expect(unauthorizedProvider.extract<ExtractedPayload>('summarize', { type: 'object' })).rejects.toSatisfy((error: unknown) => isExtractionProviderAuthError(error));
+
+    const badRequestFetch = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'unknown provider for model X' } }), { status: 400 }));
+    const badRequestProvider = new CliproxyExtractionProvider('http://127.0.0.1:8317', badRequestFetch as typeof fetch);
+
+    await expect(badRequestProvider.extract<ExtractedPayload>('summarize', { type: 'object' })).rejects.toSatisfy((error: unknown) => error instanceof Error && !isExtractionProviderAuthError(error));
   });
 });

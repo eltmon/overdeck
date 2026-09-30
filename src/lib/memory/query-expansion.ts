@@ -5,6 +5,7 @@ import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile } from './paths.js';
 import {
   extractWithProviderPolicy,
+  isExtractionProviderAuthError,
   type MemoryExtractionPolicyResult,
   type MemoryProviderSettings,
 } from './providers/index.js';
@@ -60,7 +61,7 @@ export interface QueryExpansionResult {
   expandedTerms: string[];
   cacheKey: string;
   status: 'expanded' | 'cache-hit' | 'fallback';
-  reason: null | 'cost-cap' | 'extraction-failed' | 'malformed-response';
+  reason: null | 'cost-cap' | 'extraction-failed' | 'malformed-response' | 'provider-auth-failed' | 'timeout';
 }
 
 export interface QueryExpansionLogEntry {
@@ -101,7 +102,7 @@ export async function expandMemoryQuery(input: QueryExpansionInput): Promise<Que
   try {
     const expanded = await expand(buildQueryExpansionPrompt(input), QUERY_EXPANSION_JSON_SCHEMA, { signal: input.signal });
     if (expanded.status === 'skipped') return await fallback(input, cacheKey, expanded.reason);
-    if (expanded.status === 'dropped') return await fallback(input, cacheKey, expanded.reason);
+    if (expanded.status === 'dropped') return await fallback(input, cacheKey, classifyDroppedExpansion(expanded.error, input.signal));
 
     const payloadResult = Schema.decodeUnknownResult(QueryExpansionPayload)(expanded.result.data);
     if (payloadResult._tag === 'Failure') return await fallback(input, cacheKey, 'malformed-response');
@@ -119,9 +120,15 @@ export async function expandMemoryQuery(input: QueryExpansionInput): Promise<Que
     setCachedExpansion(cacheKey, input.identity.sessionId, result, input.now ?? new Date());
     await logQueryExpansion(input, result);
     return result;
-  } catch {
-    return await fallback(input, cacheKey, 'extraction-failed');
+  } catch (error) {
+    return await fallback(input, cacheKey, classifyDroppedExpansion(error, input.signal));
   }
+}
+
+function classifyDroppedExpansion(error: unknown, signal: AbortSignal | undefined): QueryExpansionResult['reason'] {
+  if (signal?.aborted) return 'timeout';
+  if (isExtractionProviderAuthError(error)) return 'provider-auth-failed';
+  return 'extraction-failed';
 }
 
 export function buildQueryExpansionPrompt(input: QueryExpansionInput): string {

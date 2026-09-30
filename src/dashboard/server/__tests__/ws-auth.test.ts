@@ -48,17 +48,17 @@ describe('authorizeDashboardUpgrade', () => {
   it('accepts a trusted origin with a valid session cookie', () => {
     const cookie = requestCookie(dashboardSessionCookieHeader());
     const result = authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN, cookie }, 'GET');
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, credential: { kind: 'root-session' } });
   });
 
   it('accepts no origin with the internal token header', () => {
     const result = authorizeDashboardUpgrade({ [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' }, 'GET');
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, credential: { kind: 'internal-token' } });
   });
 
   it('accepts no origin with an Authorization Bearer internal token', () => {
     const result = authorizeDashboardUpgrade({ authorization: 'Bearer stable-internal-token' }, 'GET');
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, credential: { kind: 'internal-token' } });
   });
 
   it('rejects no origin with no credential (401)', () => {

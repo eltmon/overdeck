@@ -5,6 +5,7 @@ import {
   calculateExtractionCost,
   parseJsonPayload,
   recordExtractionCost,
+  ExtractionProviderAuthError,
   type ExtractionProvider,
   type ExtractionProviderOptions,
   type ExtractionProviderResult,
@@ -64,7 +65,11 @@ export class CliproxyExtractionProvider implements ExtractionProvider {
       // the actionable part the operator needs (drop it and the error is useless).
       const body = await response.text().catch(() => '');
       const detail = extractCliproxyErrorMessage(body);
-      throw new Error(`cliproxy extraction failed: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`);
+      const message = `cliproxy extraction failed: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`;
+      if (response.status === 401 || response.status === 403) {
+        throw new ExtractionProviderAuthError(this.name, message);
+      }
+      throw new Error(message);
     }
 
     const body = await response.json() as AnthropicCompatibleResponse;

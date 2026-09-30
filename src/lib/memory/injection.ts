@@ -6,7 +6,7 @@ import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } fro
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { readVerifiedPinFile } from './pin-path.js';
-import { searchMemory, type MemorySearchHit } from './search.js';
+import { buildPromptKeywordQuery, searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPath, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
 import { getProjectByKey, listPinnedDocs } from '../workspaces/resolver.js';
@@ -94,6 +94,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   }
 
   const expansion = await resolveQueryExpansion(input, now, surface);
+  const searchQuery = buildPromptKeywordQuery(expansion.query);
 
   const search = input.search ?? searchMemory;
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
@@ -107,11 +108,12 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
       ? (input.loadPinnedDocs ?? readPinnedDocCandidates)(input.identity).catch(() => [])
       : Promise.resolve([]),
     search({
-      query: expansion.query,
+      query: searchQuery,
       projectId: input.identity.projectId,
       workspaceId: input.identity.workspaceId,
       issueId: issueId ?? undefined,
       limit: 12,
+      matchMode: 'any',
     }).catch(() => []),
     // An issue turn gets sibling-ISSUE hits. A turn with no issue (main/scratch
     // workspace) has no siblings to define that way, so it gets same-project
@@ -119,21 +121,23 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     // (PAN-3286 FR-11, superseding the PAN-1990 D-6 skip).
     issueId !== null
       ? search({
-          query: expansion.query,
+          query: searchQuery,
           projectId: input.identity.projectId,
           workspaceId: input.identity.workspaceId,
           issueId,
           sibling: true,
           siblingTokenBudget: budgets.sibling,
           limit: 6,
+          matchMode: 'any',
         }).catch(() => [])
       : search({
-          query: expansion.query,
+          query: searchQuery,
           projectId: input.identity.projectId,
           crossWorkspace: true,
           excludeWorkspaceId: input.identity.workspaceId,
           siblingTokenBudget: budgets.sibling,
           limit: 6,
+          matchMode: 'any',
         }).catch(() => []),
   ]);
 
@@ -150,7 +154,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     return finalize(input, now, budgets, {
       outcome: expansion.status === 'fallback' && expansion.reason ? 'expansion-failed' : 'no-hits',
       reason: expansion.reason ?? 'no-memory-hits',
-      query: expansion.query,
+      query: searchQuery,
       expandedTerms: expansion.expandedTerms,
       expansion,
       candidates,
@@ -165,7 +169,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     return finalize(input, now, budgets, {
       outcome: 'context-too-large',
       reason: 'memory-context-exceeds-token-budget',
-      query: expansion.query,
+      query: searchQuery,
       expandedTerms: expansion.expandedTerms,
       expansion,
       candidates,
@@ -178,7 +182,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   return finalize(input, now, budgets, {
     outcome: selection.truncated ? 'budget-truncated' : 'injected',
     reason: selection.truncated ? 'memory-context-truncated-to-budget' : expansion.reason,
-    query: expansion.query,
+    query: searchQuery,
     expandedTerms: expansion.expandedTerms,
     expansion,
     candidates,
@@ -207,14 +211,20 @@ async function resolveQueryExpansion(
     if (surface !== 'user-prompt') return await expansion;
 
     return await withTimeout(expansion, PROMPT_TIME_EXPANSION_TIMEOUT_MS, () => controller?.abort());
-  } catch {
+  } catch (error) {
     return {
       query: input.prompt,
       expandedTerms: [],
       cacheKey: '',
       status: 'fallback',
-      reason: 'extraction-failed',
+      reason: error instanceof QueryExpansionTimeoutError ? 'timeout' : 'extraction-failed',
     };
+  }
+}
+
+class QueryExpansionTimeoutError extends Error {
+  constructor() {
+    super('query expansion timed out');
   }
 }
 
@@ -226,7 +236,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout:
       new Promise<T>((_, reject) => {
         timeout = setTimeout(() => {
           onTimeout();
-          reject(new Error('query expansion timed out'));
+          reject(new QueryExpansionTimeoutError());
         }, timeoutMs);
       }),
     ]);

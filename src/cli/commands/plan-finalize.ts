@@ -493,9 +493,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
       } else if (autoSpawnOnFinalize && workAgentDeferred) {
+        const deferCause = workAgentSkipReason === 'stack-unhealthy' ? 'the workspace docker stack being unhealthy' : 'spawn guardrails';
         console.log(chalk.yellow(workAgentRetryHeld === 'deacon-paused'
-          ? `⚠ Work agent start deferred by spawn guardrails; the retry is held while the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`
-          : '⚠ Work agent start deferred by spawn guardrails; it is retried automatically for up to 2 hours.'));
+          ? `⚠ Work agent start deferred by ${deferCause}; the retry is held while the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`
+          : `⚠ Work agent start deferred by ${deferCause}; it is retried automatically for up to 2 hours.`));
         if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
       } else if (autoSpawnOnFinalize) {
         console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn was skipped.'));

@@ -45,6 +45,9 @@ const offline = {
   readPr: async () => null,
   readBranch: async () => null,
   readPaneText: async () => '',
+  // PAN-4399: readWorkStartFacts opens the overdeck DB by default — stub it
+  // out so this file stays offline.
+  readWorkStart: () => null,
 };
 
 describe('the tracker owns closed', () => {

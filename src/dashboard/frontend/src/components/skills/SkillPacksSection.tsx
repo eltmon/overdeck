@@ -66,7 +66,7 @@ export interface SkillPacksSectionProps {
 }
 
 const ENDPOINT = '/api/skills/overrides';
-const ADD_COMMAND = 'pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3';
+const ADD_COMMAND = 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3';
 const short = (commit: string) => commit.slice(0, 7);
 
 const SOURCE_LABELS: Record<PackSkillSource, string> = {

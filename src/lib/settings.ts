@@ -9,6 +9,7 @@ export type OpenAIModel =
   | 'gpt-6-astra'
   | 'gpt-6-sol'
   | 'gpt-6-luna'
+  | 'gpt-6.1-sol'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
@@ -208,7 +209,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna']
+    ? ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google

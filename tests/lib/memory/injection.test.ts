@@ -492,7 +492,7 @@ describe('prompt-time memory injection', () => {
         });
       }));
 
-      const resultPromise = injectPromptTimeMemory({
+      const resultPromise = injectWithLog({
         prompt: 'timeout abort expansion prompt',
         identity,
         now: new Date('2026-05-16T22:30:00.000Z'),
@@ -506,9 +506,11 @@ describe('prompt-time memory injection', () => {
       await Promise.resolve();
       vi.advanceTimersByTime(751);
       await Promise.resolve();
+      const { decision } = await resultPromise;
 
       expect(expansion).toHaveBeenCalledOnce();
       expect(signalAborted).toBe(true);
+      expect(decision.expansion.reason).toBe('timeout');
     } finally {
       vi.useRealTimers();
     }
@@ -708,6 +710,29 @@ describe('prompt-time memory injection', () => {
       outcome: 'expansion-failed',
       expansion: { status: 'fallback', reason: 'extraction-failed' },
     });
+  });
+
+  // PAN-4370 WI-2: when expansion fails, search falls back to the raw prompt.
+  // A long raw prompt ANDed against FTS terms returns ~0 hits; the OR-mode
+  // keyword query (stopwords stripped) still finds a matching observation.
+  it('finds a matching observation via the OR-mode keyword query when expansion fails (PAN-4370)', async () => {
+    await insertRow({
+      content: 'Addressed blocking review findings after the verification gate failed',
+      doc_type: 'observation',
+    });
+
+    const { decision } = await injectWithLog({
+      prompt: 'Why did the verification gate block the review findings again?',
+      identity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'or-mode-fallback-1',
+      expansion: async () => ({ status: 'dropped' as const, reason: 'extraction-failed' as const, error: new Error('x') }),
+    });
+
+    expect(decision.hitCounts.observations).toBeGreaterThanOrEqual(1);
+    expect(['injected', 'budget-truncated']).toContain(decision.outcome);
+    expect(decision.expansion.status).toBe('fallback');
+    expect(decision.query).toBe('verification gate block review findings');
   });
 
   it('logs context-too-large when hits exist but no budget can include them', async () => {

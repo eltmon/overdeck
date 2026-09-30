@@ -5,11 +5,15 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import { verifyAccessToken } from '../../../lib/access-tokens.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
 export const DASHBOARD_SESSION_COOKIE = 'overdeck_session';
+/** A paired device's own revocable `odk_` session (PAN-3762). */
+export const DASHBOARD_DEVICE_COOKIE = 'overdeck_device';
 export const DASHBOARD_CSRF_HEADER = 'x-overdeck-csrf-token';
 // Session cookie lifetime. Without Max-Age the cookie was a *session* cookie that
 // died when the browser fully closed — so a reopened tab on a trusted origin had
@@ -100,6 +104,19 @@ export function dashboardSessionCookieHeader(options: { secure?: boolean } = {})
   return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DASHBOARD_SESSION_MAX_AGE_SECONDS}${secure}`;
 }
 
+/** Same attributes as the root session cookie; the value is the device's `odk_` token. */
+export function dashboardDeviceCookieHeader(token: string, options: { secure?: boolean } = {}): string {
+  const secure = options.secure ? '; Secure' : '';
+  return `${DASHBOARD_DEVICE_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DASHBOARD_SESSION_MAX_AGE_SECONDS}${secure}`;
+}
+
+function bearerToken(headers: HeaderMap): string | undefined {
+  const authorization = getHeaderFromMap(headers, 'authorization');
+  if (!authorization) return undefined;
+  const [scheme, token] = authorization.split(/\s+/);
+  return scheme?.toLowerCase() === 'bearer' && token ? token : undefined;
+}
+
 export function hasDashboardInternalTokenHeaders(headers: HeaderMap): boolean {
   const expected = getInternalToken();
   if (!expected) return false;
@@ -120,8 +137,29 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
   return hasDashboardInternalTokenHeaders(request.headers as HeaderMap);
 }
 
+/** Who a request authenticates as. Only a device credential is revocable. */
+export type DashboardCredential =
+  | { kind: 'internal-token' }
+  | { kind: 'root-session' }
+  | { kind: 'device'; deviceId: string };
+
+/** The `odk_` token a request presents: the device cookie, else an `Authorization: Bearer` header. */
+export function dashboardDeviceTokenFromHeaders(headers: HeaderMap): string | undefined {
+  return cookieValue(getHeaderFromMap(headers, 'cookie'), DASHBOARD_DEVICE_COOKIE) ?? bearerToken(headers);
+}
+
+export function resolveDashboardCredential(headers: HeaderMap): DashboardCredential | null {
+  if (hasDashboardInternalTokenHeaders(headers)) return { kind: 'internal-token' };
+  const cookie = getHeaderFromMap(headers, 'cookie');
+  if (constantTimeTokenEqual(cookieValue(cookie, DASHBOARD_SESSION_COOKIE), getDashboardSessionToken())) {
+    return { kind: 'root-session' };
+  }
+  const device = verifyAccessToken(dashboardDeviceTokenFromHeaders(headers));
+  return device.ok ? { kind: 'device', deviceId: device.record.id } : null;
+}
+
 export function hasDashboardAuthHeaders(headers: HeaderMap): boolean {
-  return hasDashboardInternalTokenHeaders(headers) || constantTimeTokenEqual(cookieValue(getHeaderFromMap(headers, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
+  return resolveDashboardCredential(headers) !== null;
 }
 
 export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
@@ -272,7 +310,7 @@ const runningInContainer = existsSync('/.dockerenv');
  * read ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For,
  * which a caller could spoof.
  */
-function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
+export function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
   const remoteAddress = (request as { remoteAddress?: unknown }).remoteAddress;
   const raw = remoteAddress && typeof remoteAddress === 'object' && '_tag' in remoteAddress
     ? Option.getOrElse(remoteAddress as Option.Option<string>, () => '')
@@ -287,6 +325,15 @@ function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
   return runningInContainer && peerIsLocalContainerNetwork(addr, networkInterfaces());
 }
 
+/**
+ * True when a reverse proxy forwarded the request. A local proxy (Tailscale
+ * Serve, cloudflared, Traefik) makes every visitor look like a loopback peer,
+ * so these headers mark a loopback request that did not start on this machine.
+ */
+export function hasProxyForwardingHeader(headers: HeaderMap): boolean {
+  return ['x-forwarded-for', 'x-forwarded-host', 'forwarded'].some((name) => getHeaderFromMap(headers, name) !== undefined);
+}
+
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
@@ -294,7 +341,10 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
-  if (!hasDashboardInternalToken(request) && !isLoopbackPeer(request)) {
+  // With dashboard.require_token_mint, a loopback peer is not enough: a local
+  // reverse proxy makes every remote visitor look like one (PAN-3762 D-3762-9).
+  const peerTrusted = !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request);
+  if (!hasDashboardInternalToken(request) && !peerTrusted) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
   return null;
