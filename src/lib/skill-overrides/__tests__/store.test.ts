@@ -58,6 +58,8 @@ vi.mock('../../overdeck/plan-artifact-commit.js', async importOriginal => ({
 }));
 
 import { invalidateProjectsConfigCache } from '../../projects.js';
+import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
+import { listPackCatalog } from '../catalog.js';
 import {
   issueSkillOverridesPath,
   listLowerLevelOverrides,
@@ -256,6 +258,16 @@ describe('pack states (PAN-4334)', () => {
     if (!skill) throw new Error(`missing pack skill ${name}`);
     return skill;
   };
+
+  it('carries the sageox disclosure on its pack row (PAN-2444)', async () => {
+    vi.mocked(listPackCatalog).mockResolvedValueOnce([{
+      id: 'sageox', url: 'https://github.com/eltmon/ox', ref: 'overdeck/host-managed', commit: 'd'.repeat(40),
+      adapter: 'plain', cached: false, manifest: null,
+    }]);
+    const list = await listSkillStates({});
+    expect(list.packs).toHaveLength(1);
+    expect(list.packs[0]).toMatchObject({ id: 'sageox', disclosure: SAGEOX_DISCLOSURE });
+  });
 
   it('lists every pack skill off by default', async () => {
     const list = await listSkillStates({});
