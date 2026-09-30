@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:28:01.628Z",
+  "updated": "2026-09-30T17:38:37.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-2351",
       "claimedAt": "2026-09-30T17:26:25.645Z",
       "doneAt": "2026-09-30T17:28:01.627Z"
+    },
+    "scope-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:37.067Z"
     }
   }
 }
