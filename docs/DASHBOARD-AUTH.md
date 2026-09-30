@@ -166,7 +166,7 @@ trust confined to one chokepoint — the mint — so the `require_token_mint`
 switch (PAN-3762, read from raw `config.yaml`) closes it everywhere at once by
 changing the mint alone, without touching four separate upgrade handlers.
 
-There is no `?token=` query parameter (D-10): tokens in URLs land in proxy and
+Tokens never travel in a URL query parameter (D-10): URLs land in proxy and
 access logs. Programmatic WebSocket clients (Node `ws`, Python `websockets`) set
 `Authorization: Bearer odk_…`; browsers use the session or device cookie.
 `GET /api/environment` reports this gate as `capabilities.terminalAuth: true`
