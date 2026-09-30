@@ -1,0 +1,522 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T16:35:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4438: Operator test-removal waiver has no writer since the Cut: pan verify waive-test-removal was deleted but the gate and docs still expect it",
+    "updated": "2026-09-30T16:39:52.625Z"
+  },
+  "plan": {
+    "id": "pan-4438",
+    "title": "Operator test-removal waiver has no writer since the Cut: pan verify waive-test-removal was deleted but the gate and docs still expect it",
+    "status": "proposed",
+    "uid": "d479b128-daf9-424d-b394-6808c601e04b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T16:35:21Z",
+    "updated": "2026-09-30T16:39:52.625Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4438",
+        "label": "PAN-4438",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "verification",
+      "test-skip-gate",
+      "operator-override",
+      "cli",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "The test-skip gate honors an operator waiver only when it covers the exact head under verification. Since the Cut (a1def1f8959) the only writer, `pan verify waive-test-removal`, is gone, and the reader looks in the workspace continue file, which is tracked on the feature branch: writing there dirties the tree (review request refuses it) and committing moves HEAD (the waiver pins the old sha). No waiver can be granted that the gate honors. PAN-4429 (PR #4431) is blocked on this.",
+      "Proposal": "Store the waiver untracked at <workspace>/.overdeck/test-removal-waiver.json and read it only from there (delete the continue-file reader). One lib writer, grantTestSkipWaiver, pins the waiver to the live snapshotWorkspaceHeads anchor. Two operator-only doors call it: `pan review waive-test-removal <id> --reason` (refuses any agent identity via verdictCallerFromEnv) and `GET/POST /api/issues/:id/test-removal-waiver` (POST requires a trusted Origin and the head the operator saw; 409 if it moved), surfaced as a control in the dashboard Test/Lint verification panel when the test-skip gate failed. Operators then run `pan review request <id>` to re-verify with no commit. Docs describe the verb, control, store path, and the forgery limit.",
+      "NonGoals": "- Reviving the `pan verify` verb group\n- Waiving an added .skip/.only/xit/xdescribe/xtest in any form\n- Signing or tamper-proofing the waiver file\n- Starting verification automatically on grant, or adding a new re-run button\n- Supporting remote (Fly) workspaces\n- Migrating or honoring continue-file D-test-removal-waived decisions\n- Changing the whole-diff balance or the deleted-subject exemption\n- Editing role prompts under roles/\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Store the waiver at <workspace>/.overdeck/test-removal-waiver.json, a sibling of .overdeck/verification/ rather than inside it.",
+        "rationale": "The operator's comment asked for an untracked workspace verification artifact and gave the verification/ path as an example. Files in .overdeck/verification/ are parsed as run artifacts (verification-cycles.ts:88) and pruned after 30 days (verification-artifact.ts:139), which would misread or silently delete a waiver."
+      },
+      {
+        "summary": "Delete the continue-file D-test-removal-waived reader instead of keeping it as a fallback.",
+        "rationale": "The issue allows 'before (or instead of)'. No usable waiver can exist there (the deadlock), and keeping it leaves a tracked location agents can write."
+      },
+      {
+        "summary": "Name the verb `pan review waive-test-removal <id> --reason` under the existing `pan review` group.",
+        "rationale": "`pan review` owns the review/verification loop (request, abort, restart); `pan verify` no longer exists and reviving a one-verb group adds surface."
+      },
+      {
+        "summary": "CLI operator check uses verdictCallerFromEnv(), which refuses flywheel-* as well as pipeline agents.",
+        "rationale": "The deleted verb was operator-conversation-only (conv-*); verdictCallerFromEnv is the existing, ancestor-aware classifier for operator overrides."
+      },
+      {
+        "summary": "Dashboard POST requires validateOrigin and the head the operator saw; a moved head returns 409.",
+        "rationale": "validateOrigin is the existing bar for dashboard mutations (lanes.ts); the expected-head check makes 'shows the head it pins to' a real guarantee."
+      },
+      {
+        "summary": "Place the dashboard control in the Command Deck Test/Lint VerificationGatesPanel, under the failed test-skip gate output.",
+        "rationale": "That panel is the issue's verification view that already renders the test-skip gate's evidence."
+      },
+      {
+        "summary": "Prove FR-9 with a real-git integration test and leave the live dashboard round trip to the test role.",
+        "rationale": "A temp-repo test exercises write-without-commit plus a green gate mechanically; the live `pan review request` path depends on dashboard state (approval, breaker) outside this issue."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six items across lib, CLI, dashboard server, frontend, tests and docs; all serve one operator override and share one writer, so splitting into sibling issues would leave doors without a store.",
+      "canonicalFilename": "2026-09-30-PAN-4438-operator-test-removal-waiver-has-no-writer-since-the-cut-pan-verify-waive-test-removal-was-deleted-but-the-gate-and-docs-still-expect-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "waiver-store",
+        "title": "Store the waiver untracked in the workspace and read it only from there",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4438",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cli-verb",
+            "waiver-route",
+            "gate-integration-test"
+          ],
+          "files_scope": [
+            "src/lib/cloister/test-skip-waiver.ts",
+            "src/lib/cloister/test-skip-run.ts",
+            "src/lib/cloister/verification-runner.ts",
+            ".gitignore",
+            "src/lib/cloister/__tests__/continue-readers-plan-home.test.ts",
+            "tests/unit/lib/cloister/test-skip-waiver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/test-skip-waiver.test.ts src/lib/cloister/__tests__/continue-readers-plan-home.test.ts tests/unit/lib/cloister/verification-runner-gate-output.test.ts tests/unit/lib/cloister/test-skip-gate.test.ts tests/unit/lib/cloister/verification-runner-plan-integrity.test.ts tests/unit/lib/cloister/verification-tests-on-ci.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "git check-ignore .overdeck/test-removal-waiver.json .overdeck/test-removal-waiver.json.tmp",
+            "git diff origin/main --numstat -- src/lib/cloister/verification-runner.ts"
+          ],
+          "expected_outputs": [
+            "all listed vitest files pass",
+            "typecheck and lint complete without errors",
+            "git check-ignore prints both paths and exits 0",
+            "numstat for verification-runner.ts shows equal added and removed line counts (1 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/cloister/test-skip-waiver.ts keep TestSkipWaiver and waiverCoversHead; delete TEST_SKIP_WAIVER_DECISION_PREFIX and the resolveProjectForIssue/readContinueStateForIssue imports; add TEST_SKIP_WAIVER_RELATIVE_PATH = join('.overdeck','test-removal-waiver.json'), testSkipWaiverPath, readTestSkipWaiver (null when absent/unparseable/missing string sha|reason|at), writeTestSkipWaiver (mkdir -p, write .tmp, rename). Change resolveActiveTestSkipWaiver to (workspacePath, head) reading only the store. Add async grantTestSkipWaiver({ issueId, reason, by, expectedHead?, now? }) returning { ok: true, waiver, workspacePath } or { ok: false, code, message } with codes, checked in this order: empty-reason (trimmed), remote-workspace (loadWorkspaceMetadata from src/lib/remote/workspace-metadata.ts, location==='remote', try/catch), no-workspace (getIssueWorkspacePath null or not existsSync), no-head (snapshotWorkspaceHeads undefined), head-moved (expectedHead.trim() !== anchor); success writes { sha: anchor, reason, at: now().toISOString(), by }. Rewrite the file header per the PRD. In test-skip-run.ts change evaluateTestSkipGate to (workspacePath, roots, head) and call resolveActiveTestSkipWaiver(workspacePath, head). In verification-runner.ts line 529 change the call in place to evaluateTestSkipGate(workspacePath, repoRoots, testSkipHead) with zero net lines (file is at its 961-line cap). Add `.overdeck/test-removal-waiver.json*` (covers the .tmp from the atomic write) to .gitignore after `.overdeck/verification/`. Delete only the PAN-4225 ac1 describe block and its import from continue-readers-plan-home.test.ts. Write tests/unit/lib/cloister/test-skip-waiver.test.ts per PRD WI-1 step 5, with more it( calls than the one removed. Fallback: if lint:circular flags the new remote/workspace-metadata or issue-projects import, move grantTestSkipWaiver into a new src/lib/cloister/test-skip-waiver-grant.ts and have both doors import it from there."
+        },
+        "items": [
+          {
+            "id": "waiver-store.ac1",
+            "title": "Given a waiver written with writeTestSkipWaiver for sha S, resolveActiveTestSkipWaiver(workspacePath, S) returns it, and returns null for a different head, for undefined, and for a malformed file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-store.ac2",
+            "title": "grantTestSkipWaiver returns code empty-reason, remote-workspace, no-workspace, no-head, or head-moved for each refusal case and creates no file; on success it persists the file with sha equal to the snapshotWorkspaceHeads anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-store.ac3",
+            "title": "Given only a D-test-removal-waived:<sha> decision in the workspace continue file, resolveActiveTestSkipWaiver returns null, and `git grep -n D-test-removal-waived src` returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-store.ac4",
+            "title": "`git check-ignore .overdeck/test-removal-waiver.json .overdeck/test-removal-waiver.json.tmp` exits 0 and prints both paths in the overdeck repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-store.ac5",
+            "title": "verification-runner.ts calls evaluateTestSkipGate with workspacePath as its first argument, and `git diff origin/main --numstat -- src/lib/cloister/verification-runner.ts` emits equal added and removed counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-integration-test",
+        "title": "Prove a stored waiver turns the test-skip gate green on a real repo without a commit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4438",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/lib/cloister/test-skip-waiver-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/test-skip-waiver-gate.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "test-skip-waiver-gate.test.ts passes",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create a temp git repo with async execFile (no execSync, no mocks of runTestSkipGate). Commit src/a.ts and src/a.test.ts with two it( calls, set refs/remotes/origin/main with git update-ref, add a .gitignore listing .overdeck/. On a feature branch remove one it( and commit. Assert evaluateTestSkipGate(repoDir, [{ repoKey: 'r', dir: repoDir, targetBranch: 'main' }], headSha) fails; write a waiver for headSha with writeTestSkipWaiver; assert git status --porcelain is empty, HEAD unchanged, and the gate returns failed:false, waiverApplied:true, evidence containing 'waiver: removed tests waived by operator'. Commit an unrelated change and assert the gate fails again with the old waiver. On a branch adding it.skip( with a waiver pinned to that head, assert failed:true with a [skip] violation."
+        },
+        "items": [
+          {
+            "id": "gate-integration-test.ac1",
+            "title": "Given a net test removal and a waiver pinned to HEAD, evaluateTestSkipGate returns failed:false with evidence containing 'waiver: removed tests waived by operator' while git status --porcelain stays empty and HEAD is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-integration-test.ac2",
+            "title": "After a new commit, the same waiver no longer applies and evaluateTestSkipGate returns failed:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-integration-test.ac3",
+            "title": "A diff adding it.skip( with a waiver pinned to its head returns failed:true with a [skip] violation in evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-verb",
+        "title": "Add operator-only `pan review waive-test-removal <id> --reason`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4438",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/review-waive-test-removal.ts",
+            "src/cli/commands/review-subcommands.ts",
+            "sync-sources/skills/pan-review/SKILL.md",
+            "tests/unit/cli/commands/review-waive-test-removal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/review-waive-test-removal.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build && node dist/cli/index.js review waive-test-removal --help",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "review-waive-test-removal.test.ts passes",
+            "typecheck and lint complete without errors",
+            "help output lists --reason <text>",
+            "lint-skills.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Register `waive-test-removal <id>` after the abort block in review-subcommands.ts with .requiredOption('--reason <text>', ...) and lazyAction(() => import('./review-waive-test-removal.js'), 'waiveTestRemovalCommand'). In the new module export waiveTestRemovalCommand(id, options, deps = { caller: verdictCallerFromEnv, grant: grantTestSkipWaiver }). Refuse caller.kind === 'agent' with the PRD's stderr message and process.exitCode = 1 before calling grant. Call grant({ issueId: id.toUpperCase(), reason: options.reason ?? '', by: caller.id ?? 'operator' }); on refusal print result.message and set exitCode 1; on success print the six PRD lines (short anchor, full pinned head, reason, stored path, expiry note, `Run pan review request <ISSUE> to re-run verification.`). Add the usage line, subcommand bullet and table row to sync-sources/skills/pan-review/SKILL.md. Tests inject deps; no real env or FS."
+        },
+        "items": [
+          {
+            "id": "cli-verb.ac1",
+            "title": "Given an agent caller (e.g. agent-pan-1 or flywheel-x), the command exits with code 1, prints 'operator-only', and never calls grant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac2",
+            "title": "Given an operator caller, the command calls grant with by equal to the conv id or 'operator' and prints the full pinned anchor and 'pan review request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac3",
+            "title": "When grant returns a refusal (empty-reason, no-workspace, head-moved), the command prints its message and exits with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac4",
+            "title": "`pan review waive-test-removal --help` renders the --reason option and scripts/lint-skills.sh accepts the new SKILL.md usage line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "waiver-route",
+        "title": "Add GET/POST /api/issues/:id/test-removal-waiver dashboard route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4438",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/test-removal-waiver.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/test-removal-waiver-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/test-removal-waiver-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all three vitest files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/server/routes/test-removal-waiver.ts directly under routes/. GET: parseIssueId (400), getIssueWorkspacePath, async snapshotWorkspaceHeads when the dir exists, respond { issueId, head, headShort (formatAnchorShort), waiver (readTestSkipWaiver or null), active (waiverCoversHead) }. POST: validateOrigin first (403 { error }), parse JSON { reason, head }, head must be a non-empty string (400 'head is required'), call grantTestSkipWaiver({ issueId, reason, by: 'dashboard', expectedHead: head }); map empty-reason→400, no-workspace→404, remote-workspace/no-head/head-moved→409 as { error, code }; success 201 { waiver, headShort }. Export testRemovalWaiverRouteLayer and add it to makeRoutesLayer in server.ts beside issuesRouteLayer. Add GET (READ) and POST (WRITE) rows to NO_LOSS_MATRIX after the GET /api/issues/:id/verification row. Tests follow lanes-route.test.ts with the lib modules mocked. No execSync."
+        },
+        "items": [
+          {
+            "id": "waiver-route.ac1",
+            "title": "POST without an Origin or Referer header returns 403 and grantTestSkipWaiver is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-route.ac2",
+            "title": "POST with an empty reason returns 400; POST when grant returns head-moved returns 409 with code head-moved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-route.ac3",
+            "title": "POST with a trusted Origin, reason and matching head returns 201 and calls grant with by 'dashboard' and expectedHead equal to the posted head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-route.ac4",
+            "title": "GET returns head, headShort and active:true only when the stored waiver sha equals the current anchor; NO_LOSS_MATRIX carries a READ row and a WRITE row for GET and POST /api/issues/:id/test-removal-waiver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "waiver-control",
+        "title": "Render a waiver control under the failed test-skip gate in the Test/Lint panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4438",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/TestRemovalWaiverControl.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/VerificationGatesPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/TestRemovalWaiverControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/SessionView/TestRemovalWaiverControl.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "TestRemovalWaiverControl.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In VerificationGatesPanel.tsx, when a gate named 'test-skip' is in `failing` (line 103), render <TestRemovalWaiverControl issueId={issueId} /> directly under that gate's output block (the failing.map at line 141). The new component: useQuery(['test-removal-waiver', issueId]) GETs /api/issues/:id/test-removal-waiver; useMutation POSTs { reason, head } as JSON and invalidates the query on success. Render heading 'Operator waiver — removed tests', 'Pins to <headShort>' (data-testid waiver-head) or 'Head unavailable — cannot grant' when head is null, a required textarea (waiver-reason), a Grant button (waiver-grant) disabled while the trimmed reason is empty, head is null, or the mutation is pending; when active show 'Waiver granted by <by> at <at> for <headShort>: <reason>' and 'Re-run verification: Request review, or pan review request <ISSUE>.'; on error show the server error text in var(--destructive). Use the panel's inline-style idiom; follow pan-style-guide (no Inter, no pill badges). Tests mock fetch."
+        },
+        "items": [
+          {
+            "id": "waiver-control.ac1",
+            "title": "Given a failed test-skip gate, the panel renders the control with 'Pins to <headShort>' from the GET response; other failed gates render no control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-control.ac2",
+            "title": "The Grant button is disabled while the reason is empty and, when clicked with a reason, POSTs a JSON body carrying that reason and the GET's head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-control.ac3",
+            "title": "A 409 response renders the server's error text; an active waiver renders the granted line and the 'pan review request' re-run hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "waiver-docs",
+        "title": "Document the verb, dashboard control and store in PIPELINE-GATES and the gate header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:35:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4438",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "src/lib/cloister/test-skip-gate.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! git grep -n \"pan verify waive-test-removal\" -- src docs sync-sources",
+            "grep -n \"pan review waive-test-removal\" docs/PIPELINE-GATES.md",
+            "grep -n \"test-removal-waiver.json\" docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "the negated git grep exits 0 (no match remains)",
+            "PIPELINE-GATES.md names the new verb",
+            "PIPELINE-GATES.md names the store path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Replace the 'Operator waiver (judgment)' bullet at docs/PIPELINE-GATES.md:162-169 with the text the PRD specifies: grant via `pan review waive-test-removal <id> --reason \"…\"` or the dashboard Test/Lint panel control (reason required, shows the pinned head, refuses a moved head); stored untracked at <workspace>/.overdeck/test-removal-waiver.json (sha, reason, at, by) so granting never dirties the tree or moves the branch; demotes removed-test only at the exact head and prints the waiver as evidence; expires when the head moves; never waives .skip/.only; both doors operator-only (CLI refuses any agent identity incl. the Flywheel, route requires a trusted Origin); a work agent with filesystem access could still write the file, which is why evidence names who granted it; re-run with `pan review request <id>`. In src/lib/cloister/test-skip-gate.ts lines 19-21 replace the old verb with `pan review waive-test-removal <id> --reason \"…\"` (or the dashboard Test/Lint panel), keeping the pointer to test-skip-waiver.ts."
+        },
+        "items": [
+          {
+            "id": "waiver-docs.ac1",
+            "title": "`git grep -n \"pan verify waive-test-removal\" -- src docs sync-sources` returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-docs.ac2",
+            "title": "docs/PIPELINE-GATES.md contains `pan review waive-test-removal`, `.overdeck/test-removal-waiver.json`, the dashboard Test/Lint panel control, and `pan review request`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "waiver-docs.ac3",
+            "title": "Given docs/PIPELINE-GATES.md, `grep -n 'write the file' docs/PIPELINE-GATES.md` returns the sentence stating a work agent could write the waiver file directly and that the gate evidence names who granted it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "waiver-store",
+        "to": "cli-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "waiver-store",
+        "to": "waiver-route",
+        "type": "blocks"
+      },
+      {
+        "from": "waiver-store",
+        "to": "gate-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "waiver-route",
+        "to": "waiver-control",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
