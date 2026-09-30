@@ -11,14 +11,40 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { listCandidateCheckouts } from './retired-hooks.js';
+import { listProjectsSync } from './projects.js';
 
 const execFileAsync = promisify(execFile);
+
+/** Each registered project root (listProjectsSync) plus every directory in <root>/workspaces/. */
+export function listCandidateCheckouts(projects = listProjectsSync()): string[] {
+  const checkouts: string[] = [];
+  for (const { config } of projects) {
+    const root = config.path;
+    if (!root || !existsSync(root)) continue;
+    checkouts.push(root);
+    const workspacesDir = join(root, 'workspaces');
+    let entries: string[];
+    try {
+      entries = readdirSync(workspacesDir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const dir = join(workspacesDir, entry);
+      try {
+        if (statSync(dir).isDirectory()) checkouts.push(dir);
+      } catch {
+        // vanished between readdir and stat
+      }
+    }
+  }
+  return checkouts;
+}
 
 export interface LegacyTldrCleanupDeps {
   /** Command line of a live pid, or null when it cannot be read. */

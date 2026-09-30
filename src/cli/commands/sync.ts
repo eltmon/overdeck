@@ -35,7 +35,7 @@ import { ensurePlaywrightIsolation, ensureExcalidrawMcp } from '../../lib/claude
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { retireTldrHooks } from '../../lib/retired-hooks.js';
-import { findLegacyTldrCheckouts } from '../../lib/legacy-tldr-cleanup.js';
+import { findLegacyTldrCheckouts, listCandidateCheckouts } from '../../lib/legacy-tldr-cleanup.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
@@ -415,7 +415,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // PAN-4429: unregister the retired TLDR hooks from settings.json (global and
   // checkout-local copies) BEFORE syncHooks' manifest prune deletes their
   // scripts, so Claude Code never points at a missing hook.
-  const retired = await timeAsync('retire-tldr-hooks', () => retireTldrHooks());
+  const retired = await timeAsync('retire-tldr-hooks', () => retireTldrHooks({ listCheckouts: listCandidateCheckouts }));
   if (retired.unregistered.length > 0) {
     console.log(chalk.cyan(`Unregistered ${retired.unregistered.length} retired TLDR hook(s)`));
   }

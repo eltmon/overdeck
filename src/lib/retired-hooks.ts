@@ -14,13 +14,12 @@
  * Never depends on jq or python3.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { atomicWriteJson, backupSettings, pruneBackups } from './claude-settings-file.js';
 import { BIN_DIR } from './paths.js';
-import { listProjectsSync } from './projects.js';
 import {
   RETIRED_HOOK_SCRIPT_NAMES,
   pruneRetiredOverdeckHooks,
@@ -39,32 +38,6 @@ export interface RetireResult {
   checkoutFilesUpdated: string[];
   /** Set when the global settings.json could not be parsed (left untouched). */
   warning?: string;
-}
-
-/** Each registered project root (listProjectsSync) plus every directory in <root>/workspaces/. */
-export function listCandidateCheckouts(projects = listProjectsSync()): string[] {
-  const checkouts: string[] = [];
-  for (const { config } of projects) {
-    const root = config.path;
-    if (!root || !existsSync(root)) continue;
-    checkouts.push(root);
-    const workspacesDir = join(root, 'workspaces');
-    let entries: string[];
-    try {
-      entries = readdirSync(workspacesDir);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      const dir = join(workspacesDir, entry);
-      try {
-        if (statSync(dir).isDirectory()) checkouts.push(dir);
-      } catch {
-        // vanished between readdir and stat
-      }
-    }
-  }
-  return checkouts;
 }
 
 function readJson(path: string): Record<string, unknown> | undefined {
@@ -108,7 +81,13 @@ function sweepCheckout(checkout: string, binDir: string): string[] {
  * `mcpServers.tldr` when its command ends with `tldr-mcp`.
  */
 export async function retireTldrHooks(
-  opts: { settingsPath?: string; binDir?: string; mcpPath?: string; checkouts?: string[] } = {},
+  opts: {
+    /** Checkouts whose local .claude/ copies are swept (legacy-tldr-cleanup's listCandidateCheckouts). */
+    listCheckouts: () => string[];
+    settingsPath?: string;
+    binDir?: string;
+    mcpPath?: string;
+  },
 ): Promise<RetireResult> {
   const result: RetireResult = { unregistered: [], deletedBins: [], mcpRemoved: false, checkoutFilesUpdated: [] };
 
@@ -138,7 +117,7 @@ export async function retireTldrHooks(
     }
   }
 
-  for (const checkout of opts.checkouts ?? listCandidateCheckouts()) {
+  for (const checkout of opts.listCheckouts()) {
     result.checkoutFilesUpdated.push(...sweepCheckout(checkout, binDir));
   }
 

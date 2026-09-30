@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { listCandidateCheckouts, retireTldrHooks } from '../retired-hooks.js';
+import { retireTldrHooks } from '../retired-hooks.js';
+import { listCandidateCheckouts } from '../legacy-tldr-cleanup.js';
 import { pruneRetiredOverdeckHooks } from '../retired-hooks-prune.js';
 
 // PAN-4429: TLDR's hooks are unregistered from settings.json before their
@@ -88,7 +89,7 @@ describe('retireTldrHooks', () => {
   it('unregisters, then deletes the bin files, and a second run is a no-op', async () => {
     writeSettings();
 
-    const first = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [] });
+    const first = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [] });
 
     expect(first.unregistered.sort()).toEqual(['PostToolUse:tldr-post-edit', 'PreToolUse:tldr-read-enforcer']);
     expect(first.deletedBins.sort()).toEqual([join(binDir, 'tldr-post-edit'), join(binDir, 'tldr-read-enforcer')]);
@@ -99,7 +100,7 @@ describe('retireTldrHooks', () => {
     expect(settings.hooks.Stop).toHaveLength(1);
 
     const bytes = readFileSync(settingsPath, 'utf-8');
-    const second = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [] });
+    const second = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [] });
     expect(second.unregistered).toEqual([]);
     expect(second.deletedBins).toEqual([]);
     expect(readFileSync(settingsPath, 'utf-8')).toBe(bytes);
@@ -108,7 +109,7 @@ describe('retireTldrHooks', () => {
   it('never rewrites an unparseable settings.json but still deletes the bin files', async () => {
     writeFileSync(settingsPath, '{ not json');
 
-    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [] });
+    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [] });
 
     expect(result.warning).toMatch(/not valid JSON/);
     expect(readFileSync(settingsPath, 'utf-8')).toBe('{ not json');
@@ -124,7 +125,7 @@ describe('retireTldrHooks', () => {
       },
     }));
 
-    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [] });
+    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [] });
 
     expect(result.mcpRemoved).toBe(true);
     expect(JSON.parse(readFileSync(mcpPath, 'utf-8')).mcpServers).toEqual({
@@ -136,7 +137,7 @@ describe('retireTldrHooks', () => {
     const config = { mcpServers: { tldr: { command: '/opt/other/tldr-server' } } };
     writeFileSync(mcpPath, JSON.stringify(config));
 
-    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [] });
+    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [] });
 
     expect(result.mcpRemoved).toBe(false);
     expect(JSON.parse(readFileSync(mcpPath, 'utf-8'))).toEqual(config);
@@ -152,7 +153,7 @@ describe('retireTldrHooks', () => {
     writeFileSync(join(claudeDir, 'settings.local.json'), '{ broken');
     writeFileSync(join(claudeDir, 'mcp.json'), JSON.stringify({ mcpServers: { tldr: { command: '.venv/bin/tldr-mcp' } } }));
 
-    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, checkouts: [checkout] });
+    const result = await retireTldrHooks({ settingsPath, binDir, mcpPath, listCheckouts: () => [checkout] });
 
     expect(result.checkoutFilesUpdated.sort()).toEqual([join(claudeDir, 'mcp.json'), join(claudeDir, 'settings.json')]);
     expect(JSON.parse(readFileSync(join(claudeDir, 'settings.json'), 'utf-8')).hooks.PreToolUse).toEqual([]);
@@ -161,7 +162,7 @@ describe('retireTldrHooks', () => {
   });
 
   it('does nothing under the test runner without an explicit settingsPath', async () => {
-    const result = await retireTldrHooks({ binDir });
+    const result = await retireTldrHooks({ binDir, listCheckouts: () => [] });
     expect(result).toEqual({ unregistered: [], deletedBins: [], mcpRemoved: false, checkoutFilesUpdated: [] });
     expect(existsSync(join(binDir, 'tldr-read-enforcer'))).toBe(true);
   });

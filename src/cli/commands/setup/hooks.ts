@@ -18,6 +18,7 @@ import { createHash } from 'crypto';
 import { readSettingsOrAbort, backupSettings, pruneBackups, atomicWriteJson, diffJson } from './safe-settings.js';
 import { SYNC_SOURCES } from '../../../lib/paths.js';
 import { retireTldrHooks } from '../../../lib/retired-hooks.js';
+import { listCandidateCheckouts } from '../../../lib/legacy-tldr-cleanup.js';
 
 const RTK_VERSION = '0.41.0';
 const RTK_RELEASE_TAG = `v${RTK_VERSION}`;
@@ -419,7 +420,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
     // The retired TLDR hook scripts and MCP entry go only after settings.json
     // no longer references them (PAN-4429).
-    const retired = await retireTldrHooks({ binDir });
+    const retired = await retireTldrHooks({ binDir, listCheckouts: listCandidateCheckouts });
     if (retired.deletedBins.length > 0 || retired.mcpRemoved) {
       console.log(chalk.green('✓ Removed retired TLDR hook scripts and MCP entry'));
     }
