@@ -2,7 +2,6 @@ import { exitCli } from '../../exit.js';
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import {
-  readFileSync,
   writeFileSync,
   existsSync,
   mkdirSync,
@@ -12,12 +11,13 @@ import {
   renameSync,
   rmSync,
 } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { arch as osArch, homedir, platform as osPlatform, tmpdir } from 'os';
 import { createHash } from 'crypto';
 import { readSettingsOrAbort, backupSettings, pruneBackups, atomicWriteJson, diffJson } from './safe-settings.js';
 import { SYNC_SOURCES } from '../../../lib/paths.js';
+import { retireTldrHooks } from '../../../lib/retired-hooks.js';
 
 const RTK_VERSION = '0.41.0';
 const RTK_RELEASE_TAG = `v${RTK_VERSION}`;
@@ -362,55 +362,16 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     }
   }
 
-  // 5. Check Python3 availability for TLDR
-  let python3Available = false;
-  try {
-    execSync('python3 --version', { stdio: 'pipe' });
-    python3Available = true;
-    console.log(chalk.green('✓ Python3 is available for TLDR'));
-  } catch {
-    console.log(chalk.yellow('⚠ Python3 not found - TLDR integration will be unavailable'));
-    console.log(chalk.dim('  Install Python3 to enable token-efficient code analysis\n'));
-  }
-
-  // 6. Configure TLDR MCP server in mcp.json (NOT settings.json)
-  if (python3Available) {
-    const mcpPath = join(dirname(settingsPath), 'mcp.json');
-    let mcpConfig: Record<string, any> = {};
-    try {
-      if (existsSync(mcpPath)) {
-        mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-      }
-    } catch {
-      mcpConfig = {};
-    }
-
-    if (!mcpConfig.mcpServers) {
-      mcpConfig.mcpServers = {};
-    }
-
-    if (mcpConfig.mcpServers.tldr) {
-      console.log(chalk.cyan('✓ TLDR MCP server already configured'));
-    } else {
-      mcpConfig.mcpServers.tldr = {
-        command: '.venv/bin/tldr-mcp',
-        args: ['--project', '.']
-      };
-      writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
-      console.log(chalk.green('✓ Configured TLDR MCP server in mcp.json'));
-    }
-  }
-
-  // 7. Delta-register missing hooks. Existing registrations are left alone so
+  // 5. Delta-register missing hooks. Existing registrations are left alone so
   // users can hand-customize matchers without the installer clobbering them.
   // The registration table lives in src/lib/claude-hooks-registration.ts,
   // shared with the desktop boot provisioner (PAN-2595). Per-entry rationale
   // (PAN-1402/PAN-2087 global registration, PAN-1024 auto-approve, PAN-1084
   // send-keys guard, PAN-1520 AskUserQuestion block) is documented there.
-  const { added, removed } = applyOverdeckHookRegistrations(settings, binDir, { python3Available });
+  const { added, removed } = applyOverdeckHookRegistrations(settings, binDir);
 
   if (removed.length > 0) {
-    console.log(chalk.yellow(`\n✓ Removed ${removed.length} stale panopticon/bin hook(s):`));
+    console.log(chalk.yellow(`\n✓ Removed ${removed.length} stale or retired hook(s):`));
     for (const entry of removed) console.log(chalk.dim(`  • ${entry}`));
   }
   if (added.length === 0) {
@@ -420,7 +381,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     for (const entry of added) console.log(chalk.dim(`  • ${entry}`));
   }
 
-  // 8. Install caveman hook files and compress scripts to ~/.overdeck/hooks/caveman/
+  // 6. Install caveman hook files and compress scripts to ~/.overdeck/hooks/caveman/
   try {
     const { setupCavemanHooks, setupCavemanCompressScripts } = await import('../../../lib/caveman/setup.js');
     const { Effect } = await import('effect');
@@ -442,7 +403,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
   await installRtk(binDir);
 
-  // 9. Write updated settings — PAN-1137: backup + atomic write + dry-run
+  // 7. Write updated settings — PAN-1137: backup + atomic write + dry-run
   if (dryRun) {
     console.log(chalk.cyan('\nProposed settings.json diff:'));
     console.log(diffJson(beforeSnapshot, settings));
@@ -455,9 +416,17 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     atomicWriteJson(settingsPath, settings);
     pruneBackups(settingsPath);
     console.log(chalk.green('✓ Updated Claude Code settings.json'));
+
+    // The retired TLDR hook scripts and MCP entry go only after settings.json
+    // no longer references them (PAN-4429).
+    const retired = await retireTldrHooks({ binDir });
+    if (retired.deletedBins.length > 0 || retired.mcpRemoved) {
+      console.log(chalk.green('✓ Removed retired TLDR hook scripts and MCP entry'));
+    }
+    if (retired.warning) console.log(chalk.yellow(`⚠ ${retired.warning}`));
   }
 
-  // 10. Success message
+  // 8. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
   console.log(chalk.dim('  • PreToolUse        - Records tool usage before tools run'));
@@ -468,10 +437,6 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   console.log(chalk.dim('  • PreCompact/Post   - Tracks compaction lifecycle'));
   console.log(chalk.dim('  • Notification      - Emits agent.waiting_started events'));
   console.log(chalk.dim('  • PermissionRequest - Surfaces permission prompts to dashboard'));
-  if (python3Available) {
-    console.log(chalk.dim('  • TLDR hooks        - Enforce token-efficient reads and post-edit updates'));
-    console.log(chalk.dim('  • TLDR MCP          - Token-efficient code analysis'));
-  }
   console.log(chalk.dim('  • Caveman           - Compressed output hooks (activate with agents.caveman.enabled: true)'));
   console.log(chalk.dim('  • RTK Bash filter   - Token-efficient Bash output hooks (activate with agents.rtk.enabled: true)'));
   console.log('');

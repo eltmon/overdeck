@@ -34,6 +34,7 @@ import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-syn
 import { ensurePlaywrightIsolation, ensureExcalidrawMcp } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
+import { retireTldrHooks } from '../../lib/retired-hooks.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
@@ -409,6 +410,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   } else {
     ctxSpinner.info('Context layers already up to date');
   }
+
+  // PAN-4429: unregister the retired TLDR hooks from settings.json (global and
+  // checkout-local copies) BEFORE syncHooks' manifest prune deletes their
+  // scripts, so Claude Code never points at a missing hook.
+  const retired = await timeAsync('retire-tldr-hooks', () => retireTldrHooks());
+  if (retired.unregistered.length > 0) {
+    console.log(chalk.cyan(`Unregistered ${retired.unregistered.length} retired TLDR hook(s)`));
+  }
+  if (retired.warning) console.log(chalk.yellow(`  ${retired.warning}`));
 
   // Sync hooks (bin scripts)
   const hooksSpinner = ora('Syncing hooks...').start();

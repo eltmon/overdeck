@@ -15,6 +15,8 @@
 
 import { join } from 'path';
 
+import { pruneRetiredOverdeckHooks } from './retired-hooks.js';
+
 export interface HookConfig {
   matcher: string; // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
   hooks: Array<{
@@ -70,8 +72,6 @@ export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'record-cost-event.js',
   'gh-issue-trailer-hook',
   'gh-issue-trailer-hook.js',
-  'tldr-read-enforcer',
-  'tldr-post-edit',
   'rtk-bash-filter',
   'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   'tmux-send-keys-guard',    // PAN-1084: blocks work agents from driving other agents' tmux sessions
@@ -81,8 +81,6 @@ export interface HookRegistration {
   hookType: HookType;
   scriptName: string;
   matcher?: string;
-  /** TLDR hooks only make sense when python3 exists on the machine. */
-  requiresPython3?: boolean;
 }
 
 /**
@@ -111,8 +109,6 @@ export const OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
   { hookType: 'PreCompact', scriptName: 'pre-compact-hook' },
   { hookType: 'PostCompact', scriptName: 'post-compact-hook' },
   { hookType: 'PermissionRequest', scriptName: 'permission-event-hook' },
-  { hookType: 'PreToolUse', scriptName: 'tldr-read-enforcer', matcher: 'Read', requiresPython3: true },
-  { hookType: 'PostToolUse', scriptName: 'tldr-post-edit', matcher: 'Edit|Write', requiresPython3: true },
 ];
 
 /**
@@ -232,16 +228,15 @@ export function addHookCommandIfMissing(
 /**
  * Apply the full Overdeck registration table to `settings` (mutated in place,
  * delta-only). Returns what changed so callers can decide whether to write.
+ * Entries for retired scripts (the TLDR hooks, PAN-4429) are pruned first.
  */
 export function applyOverdeckHookRegistrations(
   settings: ClaudeSettings,
   binDir: string,
-  opts: { python3Available: boolean },
 ): { added: string[]; removed: string[] } {
   const added: string[] = [];
-  const removed: string[] = [];
+  const removed: string[] = pruneRetiredOverdeckHooks(settings, binDir);
   for (const reg of OVERDECK_HOOK_REGISTRATIONS) {
-    if (reg.requiresPython3 && !opts.python3Available) continue;
     if (pruneLegacyPanopticonHook(settings, reg.hookType, reg.scriptName)) {
       removed.push(`${reg.hookType}:${reg.scriptName}`);
     }
