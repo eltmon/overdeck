@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4307",
   "created": "2026-09-30T16:35:20.478Z",
-  "updated": "2026-09-30T18:23:05.979Z",
+  "updated": "2026-09-30T18:38:59.744Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-30T18:22:59.170Z"
     },
     "settings-session-vault-panel": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4307",
-      "claimedAt": "2026-09-30T18:23:05.979Z"
+      "claimedAt": "2026-09-30T18:23:05.979Z",
+      "doneAt": "2026-09-30T18:38:59.744Z"
     }
   }
 }
