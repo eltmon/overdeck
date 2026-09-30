@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:37:26.464Z",
+  "updated": "2026-09-30T20:37:38.574Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "trusted-origins-store.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T20:37:26.464Z"
+    },
+    "trusted-origins-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:37:38.574Z"
     }
   }
 }
