@@ -33,11 +33,11 @@ export interface TestSkipGateEvaluation {
  * aggregate, so a skipped test in a secondary repo cannot slip past it.
  */
 export async function evaluateTestSkipGate(
-  issueId: string,
+  workspacePath: string,
   roots: readonly TestSkipRepoRoot[],
   head: string | undefined,
 ): Promise<TestSkipGateEvaluation> {
-  const waiver = resolveActiveTestSkipWaiver(issueId, head);
+  const waiver = resolveActiveTestSkipWaiver(workspacePath, head);
   const violations: TestSkipViolation[] = [];
   const errors: string[] = [];
   for (const root of roots) {

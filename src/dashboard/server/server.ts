@@ -38,6 +38,7 @@ import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
+import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
@@ -271,6 +272,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
+  testRemovalWaiverRouteLayer,
   pipelineMembershipRouteLayer,
   parkedRouteLayer,
   velocityRouteLayer,

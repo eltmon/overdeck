@@ -169,14 +169,21 @@ Two escapes exist for a genuine net removal:
   total. The subject is resolved by stripping a `__tests__/` segment and the
   `.test`/`.spec` infix, then matching `.ts`/`.tsx`/`.js`/`.jsx` among the
   diff's deleted files.
-- **Operator waiver (judgment).** `pan verify waive-test-removal <id> --reason "…"`
-  records the waiver (sha, reason, timestamp, operator) as a workspace
-  verification artifact, not a pipeline record. The gate demotes
-  `removed-test` to evidence only when the waiver's anchored sha equals the
-  head under verification, and prints the waiver as gate evidence. It
+- **Operator waiver (judgment).** Grant with `pan review waive-test-removal <id>
+  --reason "…"`, or from the dashboard Test/Lint panel's waiver control when the
+  `test-skip` gate has failed (reason required; the control shows the head it
+  pins to and refuses a head that moved since the page loaded). The waiver is
+  stored untracked at `<workspace>/.overdeck/test-removal-waiver.json` (sha,
+  reason, at, by), so granting one never dirties the tree or moves the branch.
+  The gate demotes `removed-test` to evidence only when the stored sha equals
+  the head under verification, and prints the waiver as gate evidence. It
   expires the moment the branch head moves, it never waives an added
-  `.skip`/`.only`, and it is operator-conversation-only — a pipeline agent
-  cannot waive the coverage loss it just produced.
+  `.skip`/`.only`, and both doors are operator-only — the CLI refuses any agent
+  identity (including the Flywheel), and the route requires a trusted Origin. A
+  work agent still has filesystem access to its own workspace and could write
+  the file directly; that limit is not solved, which is why the evidence line
+  names who granted it. After granting, run `pan review request <id>` to
+  re-run verification with no new commit.
 
 The test-skip gate stays local in both modes: it is a diff check, not a test
 run. CI runs vitest on every push; the `overdeck/test` commit status records
