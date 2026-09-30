@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:47:38.539Z",
+  "updated": "2026-09-30T01:47:39.538Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
       "claimedBy": "agent-pan-4429",
       "claimedAt": "2026-09-30T01:45:10.671Z",
       "doneAt": "2026-09-30T01:47:38.539Z"
+    },
+    "cost-metrics-bundle": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4429",
+      "claimedAt": "2026-09-30T01:47:39.537Z"
     }
   }
 }
