@@ -38,7 +38,7 @@ export function authorizeDashboardUpgrade(
   const origin = validateOriginHeaders(headers, method);
   if (!origin.ok) return { ok: false, status: 403, message: origin.error };
   if (!getInternalToken()) return { ok: false, status: 503, message: 'dashboard session token not configured' };
-  // PAN-2351 D-10: access tokens arrive only in the Authorization header, never a ?token= query.
+  // PAN-2351 D-10: access tokens arrive only in the Authorization header, never in the URL.
   const credential = resolveDashboardCredential(headers);
   if (!credential) return { ok: false, status: 401, message: 'Unauthorized' };
   if (!scopeSatisfies(credentialScopes(credential), requiredScope)) {
