@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4307",
   "created": "2026-09-30T16:35:20.478Z",
-  "updated": "2026-09-30T16:54:30.611Z",
+  "updated": "2026-09-30T16:55:00.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4307",
       "claimedAt": "2026-09-30T16:35:20.478Z",
       "doneAt": "2026-09-30T16:54:30.611Z"
+    },
+    "evict-live-skip-failed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4307",
+      "claimedAt": "2026-09-30T16:55:00.678Z"
     }
   }
 }
