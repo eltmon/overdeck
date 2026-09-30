@@ -212,6 +212,22 @@ describe('vault-service (PAN-4307 WI-4)', () => {
     expect(result).toEqual({ unavailable: 'Session Vault is off. Run: pan vault setup <git-url>' });
   });
 
+  it('getVaultServiceSnapshot reflects the live config even when the sync cycle never ran (peer dashboard, NFR-4)', async () => {
+    // Never call vi.advanceTimersByTimeAsync: the boot cycle never fires, matching
+    // a peer dashboard where startVaultService's background loop is real but the
+    // caller never lets it tick before asking for status.
+    const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, backend: 'dir:x', evict: true });
+    const openVaultContext = vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult);
+    startVaultService({ readVaultConfig, openVaultContext, createVaultSettlePoller: noopPoller });
+
+    const snapshot = await getVaultServiceSnapshot();
+    expect(snapshot.state).toBe('ready');
+    expect(snapshot.backend).toBe('dir:x');
+    expect(snapshot.evict).toBe(true);
+    expect(snapshot.running).toBe(true);
+    expect(snapshot.lastSync).toBeNull();
+  });
+
   it('reviewEvictionBatch computes the FR-9 shape from the local batch without opening the vault', async () => {
     const readVaultConfig = vi.fn().mockResolvedValue({ ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, evict: true });
     const openVaultContext = vi.fn();

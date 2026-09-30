@@ -286,7 +286,16 @@ export async function stopVaultService(): Promise<void> {
   await queueTail.catch(() => undefined);
 }
 
+/**
+ * FR-7: resolved fresh on every call, not just while the sync cycle is
+ * running, so a peer dashboard (background service never started, NFR-4)
+ * and a primary dashboard between cycles both report the vault's real
+ * on-disk state rather than a frozen "off" default.
+ */
 export async function getVaultServiceSnapshot(): Promise<VaultStatusResponse> {
+  const config = await deps.readVaultConfig();
+  const opened = await deps.openVaultContext();
+  applyOpenStatus(opened, config);
   const me = await ensureEnvironmentIdentity();
   return {
     state: snapshot.state,
