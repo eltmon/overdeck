@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:39:37.306Z",
+  "updated": "2026-09-30T01:39:49.063Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4429",
       "claimedAt": "2026-09-30T01:39:15.224Z",
       "doneAt": "2026-09-30T01:39:37.305Z"
+    },
+    "frontend-health-metrics": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4429",
+      "claimedAt": "2026-09-30T01:39:49.063Z"
     }
   }
 }
