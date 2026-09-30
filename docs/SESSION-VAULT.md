@@ -337,7 +337,8 @@ works the same way against the same on-disk vault.
 - **Sync cycle.** The primary dashboard also runs the vault's own sync loop: first cycle
   **5 seconds** after the dashboard starts, then every `syncIntervalSec`, with the engine's
   normal offline backoff when the backend is unreachable. A peer/isolated dashboard
-  (`OVERDECK_DISABLE_DEACON=1`, NFR-4) never starts this background service — it still reads
+  (`OVERDECK_DISABLE_DEACON=1`, NFR-4) never starts this background service unless
+  `OVERDECK_VAULT_IN_PEER=1` is set (below) — it still reads
   the real on-disk vault state through the routes below, it just never advances it.
 - **Eviction liveness (D-3).** When `vault.evict` is on, eligibility checks in Overdeck mode
   also ask whether the transcript's conversation (or, for an agent-owned transcript, the agent
@@ -351,9 +352,21 @@ works the same way against the same on-disk vault.
   `confirm` re-runs the same eligibility checks as `pan vault evict --confirm` but skips
   re-checking entries already marked `failed` (`skipFailed`), so one failing entry never
   blocks confirming the rest.
-- Browsing another machine's vaulted conversations from the dashboard and a "Continue here"
-  resume action are separate, not yet built ([PAN-4436](https://github.com/eltmon/overdeck/issues/4436),
-  [PAN-4437](https://github.com/eltmon/overdeck/issues/4437)).
+- **Browse copies** ([PAN-4436](https://github.com/eltmon/overdeck/issues/4436)). After each
+  sync cycle, every record another machine owns (Claude Code and Codex only) is decrypted to
+  `${OVERDECK_HOME}/vault/browse/` (files 0600, directory 0700) and shown in the conversation
+  list as `vault-<vaultId>`, marked `from <machine>`. The panel is read-only: in place of the
+  composer it shows `pan vault resume <vaultId>`, and `POST /api/conversations/:name/resume`
+  returns 409 (`code: 'vault-browse-copy'`). Browse copies never count toward cost totals or the
+  conversation ledger, and never appear in the Agents Directory, lanes, the lifecycle poller or
+  the pull-request sweep. A record that is tombstoned, now owned by this machine, or gone from
+  the vault loses its row and its file at the next sync. The browse cache is a derived copy,
+  not a transcript, so it is removed directly and never goes through the deletion door. While
+  the vault is off, browse rows stay as the last successful sync left them. "Continue here"
+  from the panel is [PAN-4437](https://github.com/eltmon/overdeck/issues/4437).
+- `OVERDECK_VAULT_IN_PEER=1` starts the vault service and the browse copies in a peer
+  dashboard. It exists for isolated UAT fixtures that own a throwaway `OVERDECK_HOME`; never
+  set it on a peer that shares the primary's home.
 
 ## Configuration
 
@@ -383,6 +396,8 @@ works the same way against the same on-disk vault.
 | `${OVERDECK_HOME}/vault/index.json` | Machine-local index: owned native paths with their tails, and the list cache. Never uploaded. |
 | `${OVERDECK_HOME}/vault/allowed-secrets.json` | Allowed line hashes per record. |
 | `${OVERDECK_HOME}/vault/eviction-batch.json` | Pending-deletion batch and declines. |
+| `${OVERDECK_HOME}/vault/browse/<vaultId>.jsonl`, `${OVERDECK_HOME}/vault/browse/rollout-<vaultId>.jsonl` | Decrypted browse copies of records another machine owns (Claude Code, Codex), 0600. Rebuilt from the vault; safe to lose. |
+| `${OVERDECK_HOME}/vault/browse/manifest.json` | Per browse copy: LOG chunks and bytes cached, plus the record metadata, so a refresh appends only new chunks. 0600. |
 | `${OVERDECK_HOME}/environment-id.json` | Machine identity shared with PAN-3762. |
 | `${OVERDECK_HOME}/vault/git.lock`, `index.json.lock`, `allowed-secrets.json.lock`, `eviction-batch.json.lock` | Cross-process lock files (O_EXCL, reclaimed after 30 s if a holder crashed). Every `pan vault` process shares the clone, the index, the allow-list and the batch, so each read-modify-write runs under its lock. |
 
@@ -457,11 +472,14 @@ src/lib/vault/evict.ts            pending-deletion batch and confirmation
 src/lib/vault/wip-capture.ts      WIP code snapshot: temp-index commit, bundle, scan, upload
 src/lib/vault/wip-apply.ts        apply a snapshot: verify, unbundle, checkout base, apply
 src/lib/vault/open.ts             openVaultContext: resolve backend + open, shared by CLI and dashboard
+src/lib/vault/browse.ts           browse cache: decrypted LOG copies of records other machines own
 src/cli/commands/vault/*.ts       the pan vault verbs
 
 src/dashboard/server/services/vault-service.ts          boot delay, sync loop, eviction-batch API, snapshot
 src/dashboard/server/services/vault-settle-poller.ts    15s liveness poll, debounceSec settle, shutdown flush
 src/dashboard/server/services/vault-liveness.ts         Overdeck-mode isLive: conversation/agent liveness doors
+src/dashboard/server/services/vault-browse-service.ts   after each sync: refresh browse cache, reconcile vault-<id> rows
+src/lib/overdeck/conversation-vault-rows.ts             browse-row door: upsert/remove vault-<id> conversation rows
 src/dashboard/server/routes/vault.ts                    the six /api/vault/* routes
 src/dashboard/frontend/.../sections/SessionVaultSection.tsx   Settings -> Session Vault panel
 ```
