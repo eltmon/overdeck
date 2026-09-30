@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:40:20.791Z",
+  "updated": "2026-09-30T20:40:33.100Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "anywhere-devices-panel.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T20:40:20.790Z"
+    },
+    "pair-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:40:33.100Z"
     }
   }
 }
