@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T01:54:13.056Z",
+  "updated": "2026-09-30T01:54:18.209Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
       "claimedBy": "agent-pan-4429",
       "claimedAt": "2026-09-30T01:53:18.391Z",
       "doneAt": "2026-09-30T01:54:13.055Z"
+    },
+    "tldr-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4429",
+      "claimedAt": "2026-09-30T01:54:18.209Z"
     }
   }
 }
