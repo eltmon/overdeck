@@ -1,0 +1,606 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T16:30:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4433: Dispatched review agents can stall forever with no output; nothing detects or re-dispatches them",
+    "updated": "2026-09-30T16:39:23.320Z"
+  },
+  "plan": {
+    "id": "pan-4433",
+    "title": "Dispatched review agents can stall forever with no output; nothing detects or re-dispatches them",
+    "status": "proposed",
+    "uid": "428d0738-c942-4752-858e-a294692425ed",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T16:30:16Z",
+    "updated": "2026-09-30T16:39:23.320Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4433",
+        "label": "PAN-4433",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review",
+      "deacon-lite",
+      "recovery",
+      "pipeline-journal",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "A review agent can be dispatched and never run. agent-pan-4383-review (quick mode) was dispatched 2026-09-29 14:37Z, wrote no transcript and no review.md, and sat idle ~21 h. Quick mode writes no review.dispatched, so the journal tail stayed verification.passed; recoverUndispatchedReviews skips because the parent pane is live, and recoverStalledReviews skips every verification.* tail. Convoy lanes have the same hole: any live agent-<issue>-review-* pane blocks recovery. The Cut (94255f055fe) deleted deacon-review-signals.ts, the only reader of reviewDeadlineAt, which used to retry reviewers whose warm-resume kickoff never started a turn.",
+      "Proposal": "Stamp every reviewer dispatch with AgentState.reviewDispatchedAt (captured before the spawn/resume call). Add roles.review.stallMinutes (default 15). A pure detector classifies a reviewer as silent when its run is current, the stamp is at least stallMs old, no report for the run was written since the stamp, and the reviewer's transcript (runtime getHeartbeat: the session JSONL mtime for Claude Code) has not been written at or after the stamp. A new deacon-lite routine recoverSilentReviewers, run after recoverUndispatchedReviews, journals review.stalled BEFORE acting, closes the silent pane, resets that reviewer's state dir, and re-dispatches once (lane: recoverMissingConvoyReviewers; parent: spawnReviewRoleForIssue force). A second failure for the same (run, reviewer) — silent again, or confirmed dead without a report — or a failed first re-dispatch journals review.stall-escalated and surfaces needs-you via surfaceIssueFeedbackNeedsYou with reviewer id, run and pane state. Also close one plausible cause: the parent warm resume treats messageDelivered === false as a failed resume, as convoy lanes already do. pan show renders both new journal types; PIPELINE-GATES, CONFIGURATION and REVIEW-AGENT-ARCHITECTURE docs describe the routine and the key.",
+      "NonGoals": "- Detecting a reviewer that started working (activity after the dispatch stamp) and later hung mid-review.\n- Recovering a first-time dead reviewer (pane gone) — still owned by recoverStalledReviews and recoverUndispatchedReviews.\n- Writing review.redispatched from the new routine (it would make recoverStalledReviews launch convoy lanes on a quick-mode issue).\n- Changing lastPipelineEntry or the tail rules of recoverStalledReviews / recoverUndispatchedReviews.\n- Posting, changing, or completing any review verdict or review status.\n- A dashboard Settings UI control for roles.review.stallMinutes (YAML + Settings API validation only).\n- Reviving or deleting reviewDeadlineAt, reviewRetryAttempt, or reviewMonitorSignaled.\n- Pausing the issue or killing the pane on escalation.\n- Any GitHub or tracker call from the patrol path.\n- Test/UAT role agents — review role only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Silence is measured from the dispatch stamp: no work activity at or after reviewDispatchedAt and no report since it, for at least stallMs.",
+        "rationale": "A convoy parent legitimately idles in STANDBY after reading its prompt; an 'idle for N minutes' reading would false-positive on it. Anchoring to dispatch catches the PAN-4383 never-started shape exactly."
+      },
+      {
+        "summary": "Add AgentState.reviewDispatchedAt instead of deriving dispatch time from reviewDeadlineAt minus a timeout constant.",
+        "rationale": "Deriving couples PARENT_REVIEW_TIMEOUT_MS and REVIEWER_TIMEOUT_MS across modules silently; an explicit stamp captured before the call is a fact at the moment of action."
+      },
+      {
+        "summary": "Use the transcript heartbeat alone (getRuntimeForAgent(id)?.getHeartbeat(id)) for activity — not isIdle, not idleAgeMs.",
+        "rationale": "The PAN-4383 reviewer's Claude session started (session-start-hook fired 4 s after spawn) but never wrote a transcript; the runtime mirror lastActivity is bumped by non-work events (agent.created projections, session start), so idleAgeMs could read it as active, and isIdle returns false with no runtime.json. The issue asks for no transcript activity."
+      },
+      {
+        "summary": "Config key roles.review.stallMinutes (positive integer, default 15 via a reviewStallMs accessor, not seeded into DEFAULT_ROLES).",
+        "rationale": "Review settings already live under roles.review (mode); camelCase matches minAgents/maxAgents; the Settings round-trip spreads role objects so the key survives without UI work."
+      },
+      {
+        "summary": "Journal review.stalled before the pane close and re-dispatch; any later failure escalates immediately.",
+        "rationale": "The journal entry is the durable once-only marker across deacon restarts, and escalation-on-failure guarantees a wiped state dir never leaves the issue silent."
+      },
+      {
+        "summary": "Use new journal types review.stalled / review.stall-escalated; never write review.redispatched from this routine.",
+        "rationale": "A review.redispatched tail makes recoverStalledReviews call recoverMissingConvoyReviewers, which would launch four lanes on a quick-mode issue."
+      },
+      {
+        "summary": "A confirmed-dead reviewer counts only as a SECOND failure (after this routine's own re-dispatch); first-time dead reviewers stay with the existing routines.",
+        "rationale": "Avoids double recovery with recoverStalledReviews / recoverUndispatchedReviews, while covering the case the new review.stalled tail hides from recoverUndispatchedReviews."
+      },
+      {
+        "summary": "Skip panes that are blocked (Herdr backendState 'blocked') or waiting-on-human; skip indeterminate liveness.",
+        "rationale": "Blocked panes already surface as needs-you (derived-issue-state.ts); re-dispatching would not answer a permission prompt; indeterminate is never death."
+      },
+      {
+        "summary": "Re-dispatch resets the silent reviewer's state dir so the door fresh-spawns; the parent uses spawnReviewRoleForIssue with force: true (restarting live lanes in full mode).",
+        "rationale": "The saved session is the prime suspect for a kickoff that never started; force gives one deterministic door, and restarting lanes is an accepted cost on a rare recovery path."
+      },
+      {
+        "summary": "Needs-you is surfaced through surfaceIssueFeedbackNeedsYou (activity warn entry), leaving the pane alive for inspection.",
+        "rationale": "It is the existing door verification-escalation and conflict-repair use; the journal-derived Needs-you surface from PAN-4383 (#4387) is not on main yet."
+      },
+      {
+        "summary": "Include the parent warm-resume messageDelivered guard (FR-8) in this issue.",
+        "rationale": "Convoy lanes already stop and fresh-spawn when the resumed prompt did not land; the parent lacks the guard, which is a plausible mechanism for a live, idle, transcript-less parent. One-line guard, same file has room."
+      },
+      {
+        "summary": "Attempt budget is one re-dispatch per (runId, reviewer id), counted from the journal.",
+        "rationale": "The run id embeds the head, so a new push gets a fresh budget; the journal survives restarts while in-memory state does not."
+      },
+      {
+        "summary": "Re-dispatch calls spawnReviewRoleForIssue / recoverMissingConvoyReviewers directly, not requestReviewThroughRoute; a gated (merge-conflict) result escalates.",
+        "rationale": "The route re-verifies the head (75 minutes on PAN-4383) although the run id proves the head is unchanged; conflict plus no approval is the PAN-4383/PAN-4384 deadlock the operator must see."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Nine source/test/doc files beyond the two new modules; all changes serve one recovery path and share the dispatch-stamp contract.",
+      "canonicalFilename": "2026-09-30-PAN-4433-dispatched-review-agents-can-stall-forever-with-no-output-nothing-detects-or-re-dispatches-them.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "dispatch-stamp",
+        "title": "Persist reviewDispatchedAt on every reviewer dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/agent-state-read.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/cloister/review-synthesis-recovery.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/review-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/lib/cloister/review-agent.test.ts passes including the new reviewDispatchedAt assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `reviewDispatchedAt?: string` to AgentState (agent-state-read.ts interface ~198 + the cleanAgentState whitelist ~242/289 — saveAgentState writes only whitelisted fields, so a field missing there is silently dropped), spawn-prep.ts options (~123) and spawn.ts spawnRun state (~239). At the five dispatch sites — review-agent.ts parent resume (~545) and fresh spawn (~592), review-convoy.ts lane resume (~205) and fresh spawnOptions (~235), review-synthesis-recovery.ts armRun (~142) — capture `const dispatchedAt = new Date().toISOString()` immediately BEFORE the resumeAgent/spawnRun call and persist it wherever that site writes reviewDeadlineAt. Leave reviewDeadlineAt untouched. Update the existing exact-object spawnRun assertions in tests/lib/cloister/review-agent.test.ts (~967, 1003, 1095, 1399) with `reviewDispatchedAt: expect.any(String)` and add fake-timer assertions for parent fresh spawn and parent resume."
+        },
+        "items": [
+          {
+            "id": "dispatch-stamp.ac1",
+            "title": "Given fake time T, when the review parent is fresh-spawned, then its saved state.json persists reviewDispatchedAt equal to T's ISO string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-stamp.ac2",
+            "title": "Given a saved resumable parent session, when the review is dispatched and resumeAgent succeeds, then the resumed state persists a reviewDispatchedAt captured before the resumeAgent call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-stamp.ac3",
+            "title": "When a convoy lane is fresh-spawned, spawnRun receives reviewDispatchedAt in its options and spawn.ts persists it on the lane's state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-stamp.ac4",
+            "title": "When a lane is warm-resumed or a synthesis parent is recovered, the saved state's reviewDispatchedAt is rewritten to the new dispatch time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stall-config",
+        "title": "Add roles.review.stallMinutes with validation and reviewStallMs accessor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/config-yaml-roles.test.ts",
+            "tests/lib/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/config-yaml-roles.test.ts tests/lib/settings-api.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass",
+            "file-size guard passes with schema.ts at or under its 1114-line cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add `stallMinutes?: number` (one doc-comment line) to RoleConfig in schema.ts (1098 lines, cap 1114 — keep to 2-3 lines). In roles.ts validateRoleFields, after the mode check, throw `config.yaml: roles.${role}.stallMinutes must be a positive integer` when defined and not a positive integer. Export `DEFAULT_REVIEW_STALL_MINUTES = 15` and `reviewStallMs(config)` from roles.ts returning `(config.roles?.review?.stallMinutes ?? 15) * 60_000`. Do NOT seed stallMinutes into DEFAULT_ROLES. In settings-api.ts validateRoleFields (~526) push `${fieldPath}.stallMinutes must be a positive integer` for the same condition."
+        },
+        "items": [
+          {
+            "id": "stall-config.ac1",
+            "title": "Config load rejects roles.review.stallMinutes values 0, -1 and 1.5 with the error 'roles.review.stallMinutes must be a positive integer' and accepts 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stall-config.ac2",
+            "title": "reviewStallMs returns 900000 when the key is absent and 300000 when stallMinutes is 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stall-config.ac3",
+            "title": "A Settings API update with roles.review.stallMinutes 0 returns the validation error, and a valid value persists through the settings round-trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parent-resume-delivery-guard",
+        "title": "Fresh-spawn the review parent when its warm resume did not deliver the prompt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-agent.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/review-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/lib/cloister/review-agent.test.ts passes including the messageDelivered cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In review-agent.ts parent resume (~545) change `if (resumeResult.success)` to `if (resumeResult.success && resumeResult.messageDelivered !== false)`. In the fall-through, when `resumeResult.messageDelivered === false || resumeResult.error?.includes('it appears healthy')`, `await Effect.runPromise(stopAgent(reviewAgentId))` (dynamic import from ../agents.js) before the existing state wipe + fresh spawnRun, mirroring review-convoy.ts ~222-231; log 'continue prompt was not confirmed in the resumed session' for the undelivered case."
+        },
+        "items": [
+          {
+            "id": "parent-resume-delivery-guard.ac1",
+            "title": "Given resumeAgent returns { success: true, messageDelivered: false } for the parent, when the review is dispatched, then stopAgent is called for agent-<issue>-review and spawnRun fresh-spawns the parent once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parent-resume-delivery-guard.ac2",
+            "title": "Given resumeAgent returns { success: true } without messageDelivered, when the review is dispatched, then no stopAgent call and no spawnRun call occur for the parent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-types-show",
+        "title": "Add review.stalled and review.stall-escalated journal types and render them in pan show",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/cli/commands/show.ts",
+            "src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "show-pipeline-journal.test.ts passes including both new entry types"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add `| 'review.stalled' | 'review.stall-escalated'` to PipelineJournalEntryType in pipeline-journal.ts. In show.ts summarizePipelineEntry add: review.stalled → `<reviewer> silent <N>m (pane <paneState>) — re-dispatched`; review.stall-escalated → `<reviewer> needs you — <reason> (pane <paneState>)`, using data.reviewer, data.silentForMs, data.paneState, data.reason with the fallbacks in the PRD."
+        },
+        "items": [
+          {
+            "id": "journal-types-show.ac1",
+            "title": "summarizePipelineEntry renders a review.stalled entry as a string containing the reviewer id, the silent minutes, and 'pane idle' for paneState idle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-types-show.ac2",
+            "title": "summarizePipelineEntry renders a review.stall-escalated entry as a string containing the reviewer id, 'needs you', the reason, and the pane state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "silent-detector",
+        "title": "Pure silent-reviewer detector module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "silent-recovery-routine"
+          ],
+          "files_scope": [
+            "src/lib/cloister/silent-reviewer-detect.ts",
+            "src/lib/cloister/__tests__/silent-reviewer-detect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/silent-reviewer-detect.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "silent-reviewer-detect.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/lib/cloister/silent-reviewer-detect.ts (no I/O) exporting SilentReviewerFacts, SilentVerdict, classifyReviewer(facts, stallMs, now), stallHistory(entries, runId, reviewer) and reviewerReportPaths({ workspace, runId, subRole?, reviewOutputPath? }). classifyReviewer rules in order: reportSinceDispatch → not silent 'reported'; now - dispatchedAtMs < stallMs → 'too-young'; lastTranscriptActivityMs !== null && >= dispatchedAtMs → 'active'; else silent with silentForMs = now - dispatchedAtMs. stallHistory counts review.stalled entries matching data.runId and data.reviewer, returns the last one's at in ms and whether a matching review.stall-escalated exists. reviewerReportPaths: lane → [reviewOutputPath ?? <ws>/.pan/review/<runId>/<subRole>.md]; parent → [<dir>/review.md, <dir>/synthesis.md]. Module header names PAN-4433 and docs/PIPELINE-GATES.md."
+        },
+        "items": [
+          {
+            "id": "silent-detector.ac1",
+            "title": "classifyReviewer returns { silent: true, silentForMs } for a stamp 16 minutes old with stallMs 15 minutes, no report, and lastTranscriptActivityMs null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-detector.ac2",
+            "title": "classifyReviewer returns silent for a warm-resumed reviewer whose last transcript write predates the stamp, and returns 'active' when the transcript was written one second after the stamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-detector.ac3",
+            "title": "classifyReviewer returns 'reported' when reportSinceDispatch is true and 'too-young' for a stamp 14 minutes old",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-detector.ac4",
+            "title": "stallHistory counts only review.stalled entries for the given runId and reviewer, and reports escalated true only for a matching review.stall-escalated entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "silent-recovery-routine",
+        "title": "recoverSilentReviewers deacon-lite routine: journal, re-dispatch once, escalate to needs-you",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/silent-reviewer-recovery.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "src/lib/cloister/__tests__/deacon-lite-recover-silent-reviewers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-recover-silent-reviewers.test.ts src/lib/cloister/__tests__/deacon-lite-recover-undispatched-review.test.ts src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint:circular) passes",
+            "all three deacon-lite recovery test files pass under fake timers"
+          ],
+          "readiness": "ready",
+          "acJustification": "Six ACs: the issue's three required scenarios plus the immediate-escalation path, the guard set, and the deacon-lite wiring order are each independently checkable and cannot be split from the routine they gate.",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (follow its numbered steps 1-8 exactly). Create src/lib/cloister/silent-reviewer-recovery.ts exporting recoverSilentReviewers(now = Date.now(), deps: Partial<SilentReviewerDeps> = {}) and __resetSilentReviewerStateForTests. Candidates: listAgentStates({ role: 'review' }) with issueId, workspace, reviewRunId and reviewDispatchedAt present. Gates: current run (deriveReviewRunHead8) equals reviewRunId; issue unpaused; decideResumeGate(..., 'autonomous') proceeds; no review.verdict for the run; no review.aborted since the stamp; not escalated; for stalledCount >= 1 the stamp must be newer than the last review.stalled. Facts from reviewerReportPaths (mtime >= stamp) and the transcript heartbeat (deps.transcriptActivityMs: dynamic import of runtimes/index.js, getRuntimeForAgent(id)?.getHeartbeat(id)?.timestamp; never idleAgeMs or isIdle); classifyReviewer must say silent. Pane via isAlive: indeterminate skip; blocked or waiting-on-human skip; confirmed dead only when stalledCount >= 1. Act under withReviewLifecycleGuard with a re-check. First failure: append review.stalled (attempt 1, reviewer, runId, paneState, dispatchedAt, silentForMs) BEFORE re-dispatch; lane → close pane, stopAgent, removeAgentStateDir, recoverMissingConvoyReviewers(issueId, { source: 'silent-reviewer-recovery' }); parent → close pane, stopAgent, removeAgentStateDir, Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch: feature/<id>, force: true, operatorRequested })). Any failure → review.stall-escalated with 're-dispatch failed: <msg>' + surfaceIssueFeedbackNeedsYou. Second failure → review.stall-escalated (attempt 2) + surfaceIssueFeedbackNeedsYou(issueId, 'review agent <id> produced no output for run <runId> after a re-dispatch (pane <paneState>)', { reviewer, runId, paneState, attempts: 2 }); never touch the pane. Never write review.redispatched. Dynamic-import review-agent.js, review-convoy.js, terminal-backends/launch.js and agents.js; import getAgentState from agents/agent-state-read.js. Wire `await recoverSilentReviewers()` into runDeaconLite right after recoverUndispatchedReviews, add it to deacon-lite's export line, and update the module header (four journal-driven recovery routines). Write the tests listed in PRD WI-6 (scenarios 1-6 + wiring order) with vi.useFakeTimers and vi.setSystemTime."
+        },
+        "items": [
+          {
+            "id": "silent-recovery-routine.ac1",
+            "title": "Normal review: given a reviewer stamped 20 minutes ago whose transcript was written after the stamp (or whose report was written after the stamp), when recoverSilentReviewers runs, then it appends no journal entry and calls no re-dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-recovery-routine.ac2",
+            "title": "Stuck then re-dispatched: given a live idle quick parent stamped 16 minutes ago with no transcript and no report, when recoverSilentReviewers runs twice at the same time, then exactly one review.stalled entry (attempt 1, reviewer, paneState idle) is appended and redispatchParent is called once; a lane variant calls redispatchLane instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-recovery-routine.ac3",
+            "title": "Stuck twice: given a prior review.stalled for the run and reviewer and a re-dispatched reviewer that stays silent (or is confirmed dead with reason pane-dead) for 16 more fake minutes, when the routine runs, then it appends one review.stall-escalated (attempt 2), emits needs-you with a reason containing the reviewer id and pane state, does not re-dispatch, and a later tick emits nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-recovery-routine.ac4",
+            "title": "Given the first re-dispatch returns success false (including gated), when the routine runs, then the same tick appends review.stall-escalated with a re-dispatch failed reason and emits needs-you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-recovery-routine.ac5",
+            "title": "Given each guard — stamp 14 minutes old, indeterminate liveness, backendState blocked, paused issue, stale run id, review.verdict for the run, first-time confirmed-dead reviewer, or a report whose mtime predates the stamp paired with a fresh transcript write — the routine appends no journal entry and calls no re-dispatch; an injected stallMs of 300000 produces a review.stalled entry at 6 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silent-recovery-routine.ac6",
+            "title": "runDeaconLite invokes recoverSilentReviewers after recoverUndispatchedReviews, and the routine never appends a review.redispatched entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-silent-reviewers",
+        "title": "Document the silent-reviewer routine, journal types and roles.review.stallMinutes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:30:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4433",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/CONFIGURATION.md",
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'recoverSilentReviewers' docs/PIPELINE-GATES.md",
+            "grep -n 'stallMinutes' docs/CONFIGURATION.md"
+          ],
+          "expected_outputs": [
+            "PIPELINE-GATES.md shows the eighth routine, both journal-table rows and the new subsection",
+            "CONFIGURATION.md shows the stallMinutes paragraph and YAML example"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. docs/PIPELINE-GATES.md: add review.stalled and review.stall-escalated rows to the 'Entry types and who writes them' table (~1001); add routine 8 recoverSilentReviewers (cloister/silent-reviewer-recovery.ts, PAN-4433) to the deacon-lite list (~1073-1090) and change 'none of the seven routines' to eight; add a subsection after the recoverUndispatchedReviews section (~1215) covering the PAN-4383 shape, the dispatch-stamp predicate, stallMinutes default 15, pane rules, journal-before-act, lane/parent doors (force restarts lanes in full mode), the once-per-(run, reviewer) budget, needs-you escalation, and why it never writes review.redispatched; amend the sentence at ~1175 ('A quick-mode review writes no review.dispatched entry, so a dead quick reviewer is not recovered either') to say a live-but-silent quick reviewer is now recovered by recoverSilentReviewers. docs/CONFIGURATION.md 'Review Mode and Reviewer Models' (~265): paragraph + YAML example for roles.review.stallMinutes. docs/REVIEW-AGENT-ARCHITECTURE.md (~166): one sentence that deacon-lite re-dispatches a reviewer that never started (once per run) and escalates the second failure, still never completing a review."
+        },
+        "items": [
+          {
+            "id": "docs-silent-reviewers.ac1",
+            "title": "docs/PIPELINE-GATES.md lists eight deacon-lite routines including recoverSilentReviewers and has table rows naming the writer of review.stalled and review.stall-escalated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-silent-reviewers.ac2",
+            "title": "docs/PIPELINE-GATES.md contains a recoverSilentReviewers subsection that states the 15-minute default, the re-dispatch-once rule, the needs-you escalation, and that the routine never writes review.redispatched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-silent-reviewers.ac3",
+            "title": "docs/CONFIGURATION.md shows a roles.review.stallMinutes YAML example and states it must be a positive integer defaulting to 15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dispatch-stamp",
+        "to": "silent-recovery-routine",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-stamp",
+        "to": "parent-resume-delivery-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "stall-config",
+        "to": "silent-recovery-routine",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-types-show",
+        "to": "silent-recovery-routine",
+        "type": "blocks"
+      },
+      {
+        "from": "silent-detector",
+        "to": "silent-recovery-routine",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-types-show",
+        "to": "silent-detector",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
