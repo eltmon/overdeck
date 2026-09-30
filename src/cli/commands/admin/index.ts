@@ -121,8 +121,9 @@ export async function registerAdminCommands(
   // pan admin tldr — TLDR daemon management
   admin
     .command('tldr [action] [workspace]')
-    .description('TLDR daemon: status, start, stop, warm, install')
+    .description('TLDR daemon: status, start, stop, warm, install, dedupe')
     .option('--json', 'Output as JSON')
+    .option('--dry-run', 'Report legacy workspace venv copies without changing them')
     .action(async (action, workspace, options) => {
       (await import('./tldr-handler.js')).tldrCommand(action || 'status', workspace, options);
     });

@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 
 interface TldrOptions {
   json?: boolean;
+  dryRun?: boolean;
 }
 
 /**
@@ -32,6 +33,9 @@ export async function tldrCommand(action: string, workspace?: string, options: T
       break;
     case 'install':
       await installCommand(options);
+      break;
+    case 'dedupe':
+      await dedupeCommand(options);
       break;
     case 'help':
     default:
@@ -407,6 +411,48 @@ async function installCommand(options: TldrOptions): Promise<void> {
   }
 }
 
+const GIB = 1024 ** 3;
+
+/**
+ * Convert every legacy workspace venv copy into a symlink to the
+ * project-root venv, reclaiming the duplicated disk (PAN-1674).
+ */
+async function dedupeCommand(options: TldrOptions): Promise<void> {
+  const projectRoot = process.cwd();
+  const dryRun = Boolean(options.dryRun);
+  const { dedupeWorkspaceVenvs } = await import('../../../lib/workspace-manager/tldr-venv-dedupe.js');
+
+  let entries;
+  try {
+    entries = await dedupeWorkspaceVenvs(projectRoot, { dryRun });
+  } catch (error) {
+    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : String(error)}`));
+    return exitCli(1);
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify(entries, null, 2));
+    return;
+  }
+
+  let reclaimedBytes = 0;
+  let convertedCount = 0;
+  for (const entry of entries) {
+    const name = basename(entry.workspacePath);
+    if (entry.action === 'skipped') {
+      console.log(chalk.dim(`- ${name}: skipped${entry.reason ? ` (${entry.reason})` : ''}`));
+      continue;
+    }
+    reclaimedBytes += entry.bytes;
+    convertedCount += 1;
+    const verb = entry.action === 'converted' ? 'converted' : 'would convert';
+    console.log(`${chalk.green('✓')} ${name}: ${verb} (${(entry.bytes / GIB).toFixed(1)} GiB)`);
+  }
+
+  const summaryVerb = dryRun ? 'Would reclaim' : 'Reclaimed';
+  console.log(`${summaryVerb} ${(reclaimedBytes / GIB).toFixed(1)} GiB from ${convertedCount} workspaces`);
+}
+
 function showHelp(): void {
   console.log(chalk.bold('pan admin tldr - TLDR daemon management\n'));
   console.log('Commands:');
@@ -415,14 +461,17 @@ function showHelp(): void {
   console.log('  ' + chalk.cyan('stop [workspace]') + '    Stop TLDR daemon (main or workspace)');
   console.log('  ' + chalk.cyan('warm [workspace]') + '    Manually trigger index warm (all layers + embeddings)');
   console.log('  ' + chalk.cyan('install') + '             Build the project-root TLDR venv once');
+  console.log('  ' + chalk.cyan('dedupe [--dry-run]') + '  Convert legacy workspace venv copies into shared links');
   console.log('  ' + chalk.cyan('help') + '                Show this help\n');
   console.log('Options:');
-  console.log('  ' + chalk.cyan('--json') + '              Output as JSON\n');
+  console.log('  ' + chalk.cyan('--json') + '              Output as JSON');
+  console.log('  ' + chalk.cyan('--dry-run') + '           Preview `dedupe` without changing anything\n');
   console.log('Examples:');
   console.log('  pan admin tldr status');
   console.log('  pan admin tldr start');
   console.log('  pan admin tldr start feature-pan-123');
   console.log('  pan admin tldr warm feature-pan-123');
   console.log('  pan admin tldr install');
+  console.log('  pan admin tldr dedupe --dry-run');
   console.log('  pan admin tldr stop\n');
 }
