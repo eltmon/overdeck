@@ -44,6 +44,24 @@ describe('summarizePipelineEntry', () => {
       .toBe('head=aaaa1111 needs you — unreachable');
   });
 
+  it('names the silent reviewer, how long, and its pane (PAN-4433)', () => {
+    expect(summarizePipelineEntry(entry('review.stalled', {
+      reviewer: 'agent-pan-4383-review',
+      silentForMs: 16 * 60_000,
+      paneState: 'idle',
+    }))).toBe('agent-pan-4383-review silent 16m (pane idle) — re-dispatched');
+    expect(summarizePipelineEntry(entry('review.stalled', { reviewer: 'agent-pan-4383-review' })))
+      .toBe('agent-pan-4383-review silent (pane ?) — re-dispatched');
+  });
+
+  it('names the escalated reviewer, the reason, and its pane (PAN-4433)', () => {
+    expect(summarizePipelineEntry(entry('review.stall-escalated', {
+      reviewer: 'agent-pan-4383-review-security',
+      reason: 'silent again after re-dispatch',
+      paneState: 'pane-dead',
+    }))).toBe('agent-pan-4383-review-security needs you — silent again after re-dispatch (pane pane-dead)');
+  });
+
   it('names who asked for the review', () => {
     expect(summarizePipelineEntry(entry('review.requested', undefined, 'pan-done'))).toBe('pan-done');
   });
