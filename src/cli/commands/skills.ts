@@ -9,6 +9,7 @@
  *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
+ *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
  * it imports only Commander types and chalk statically. The
@@ -24,6 +25,8 @@ interface PackAddOptions { ref: string; adapter?: string; yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
 interface PackGcOptions { maxAgeDays?: string }
+interface SageoxStatusOptions { project?: string; json?: boolean }
+interface SageoxUploadOptions { project: string }
 
 type PackPreview = import('../../lib/skill-packs/sources.js').PackPreview;
 type NotAppliedLabels = (capabilities: PackPreview['manifest']['capabilities']) => string[];
@@ -140,15 +143,22 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     console.error('--codex-home is required for --harness codex');
     process.exit(1);
   }
-  const launch = await import('../../lib/skill-overrides/launch.js');
+  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }] = await Promise.all([
+    import('../../lib/skill-overrides/launch.js'),
+    import('../../lib/sageox/launch.js'),
+  ]);
   const ctx = { cwd: options.cwd, issueId: options.issue };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
+  // PAN-2444: SageOx wiring fails closed; when it is off, its skills are not mounted either.
+  const sageox = await resolveSageoxLaunch(ctx, options.harness);
+  for (const warning of sageox.warnings) console.error(warning);
+  const exclude = new Set(sageox.active ? [] : [SAGEOX_PACK_ID]);
   if (options.harness === 'claude-code') {
-    const json = launch.claudeSkillSettingsJson(disabled);
+    const json = launch.claudeSkillSettingsJson(disabled, sageox.settings);
     const link = options.pluginLink;
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
-      await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link), async () => {
+      await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link, exclude), async () => {
         const { rm } = await import('node:fs/promises');
         await rm(link, { force: true });
       });
@@ -159,7 +169,7 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
   }
   const codexHome = options.codexHome as string;
   await launch.writeCodexSkillOverrides(codexHome, disabled);
-  await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome), async () => {
+  await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome, exclude), async () => {
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
@@ -368,6 +378,61 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
   console.log(`Removed ${removedMounts.length} mount(s) and ${removedLinks.length} dangling launch link(s).`);
 }
 
+// ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
+
+export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions): Promise<void> {
+  const [{ listSageoxUploads }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
+    import('../../lib/sageox/config.js'),
+    import('../../lib/skill-overrides/store.js'),
+    import('../../lib/skill-overrides/resolve.js'),
+    import('../../lib/skill-packs/sources.js'),
+  ]);
+  const uploads = await listSageoxUploads();
+  if (options.project && !uploads.some(row => row.projectKey === options.project)) {
+    console.error(chalk.red(`unknown project: ${options.project}`));
+    process.exit(1);
+  }
+  const selected = options.project ? uploads.filter(row => row.projectKey === options.project) : uploads;
+  const registered = (await getPack('sageox')) !== null;
+  const projects = await Promise.all(selected.map(async ({ projectKey, upload }) => {
+    const pack = resolvePackToggle('sageox', await loadSkillOverrideLayers({ projectKey }));
+    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload };
+  }));
+  if (options.json) {
+    console.log(JSON.stringify({ registered, projects }, null, 2));
+    return;
+  }
+  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox https://github.com/eltmon/ox --ref <ref>'));
+  const width = Math.max(7, ...projects.map(row => row.project.length));
+  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  UPLOAD`));
+  for (const row of projects) {
+    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload ? 'enabled' : 'disabled'}`);
+  }
+}
+
+export async function skillsPackSageoxUploadCommand(state: string, options: SageoxUploadOptions): Promise<void> {
+  if (state !== 'on' && state !== 'off') {
+    console.error(chalk.red('state must be on or off'));
+    process.exit(1);
+  }
+  const { setSageoxUpload, SageoxConfigError } = await import('../../lib/sageox/config.js');
+  let result;
+  try {
+    result = await setSageoxUpload(options.project, state === 'on');
+  } catch (error) {
+    if (error instanceof SageoxConfigError) {
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+    throw error;
+  }
+  const value = state === 'on' ? 'enabled' : 'disabled';
+  console.log(`sageox upload: ${value} for project ${options.project}${result.changed ? '' : ' (unchanged)'}`);
+  if (state === 'on') {
+    console.log('Redacted session transcripts and metadata from this project will be uploaded to the SageOx cloud ledger when the sageox pack is on.');
+  }
+}
+
 /** Registers `pan skills` and its subcommands. */
 export function registerSkillsCommands(program: Command): void {
   const skills = program.command('skills').description('List skills and set per-level on/off overrides');
@@ -400,4 +465,11 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackSyncCommand);
   pack.command('gc').description('Remove unused skill pack mounts and dangling launch links')
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
+
+  const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
+  sageox.command('status').description('Show, per project, the sageox pack state and the upload state')
+    .option('--project <key>', 'Only this project').option('--json', 'Output as JSON')
+    .action(skillsPackSageoxStatusCommand);
+  sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
+    .requiredOption('--project <key>', 'Project key').action(skillsPackSageoxUploadCommand);
 }

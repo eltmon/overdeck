@@ -10,6 +10,7 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { SAGEOX_DISCLOSURE } from '../sageox/disclosure.js';
 
 export type PackAdapterId = 'plain' | 'claude-plugin';
 
@@ -44,25 +45,39 @@ export interface PackManifest {
 
 export interface KnownPack {
   id: string;
-  kind: 'pack' | 'integration';
   url?: string;
   adapter?: PackAdapterId;
+  /** Directory the `plain` adapter scans instead of `skills/`. */
+  skillsRoot?: string;
   optIn?: readonly string[];
-  note?: string;
+  /** One-line statement of what leaves the machine, shown on the pack row. */
+  disclosure?: string;
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
   mattpocock: {
     id: 'mattpocock',
-    kind: 'pack',
     url: 'https://github.com/eltmon/skills',
     adapter: 'claude-plugin',
     optIn: ['setup-matt-pocock-skills'],
   },
   sageox: {
     id: 'sageox',
-    kind: 'integration',
-    note: 'SageOx is an integration, not a skill pack; see https://github.com/eltmon/overdeck/issues/2444',
+    url: 'https://github.com/eltmon/ox',
+    adapter: 'plain',
+    skillsRoot: 'extensions/skills',
+    optIn: [
+      'ox-cli-init',
+      'ox-cli-attest',
+      'ox-cli-skill-manager',
+      'ox-cli-pr-header',
+      'ox-cli-plan',
+      'ox-cli-cart',
+      'ox-cli-cart-start',
+      'ox-cli-cart-done',
+      'ox-cli-cart-drop',
+    ],
+    disclosure: SAGEOX_DISCLOSURE,
   },
 };
 
@@ -222,13 +237,13 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
 export async function readPackManifest(
   root: string,
   adapter: PackAdapterId,
-  opts: { optIn?: readonly string[] } = {},
+  opts: { optIn?: readonly string[]; skillsRoot?: string } = {},
 ): Promise<PackManifest> {
   const plugin = await readPluginJson(root, adapter === 'claude-plugin');
   const skillDirs =
     adapter === 'claude-plugin'
       ? await claudePluginSkillDirs(root, plugin ?? {})
-      : await scanSkillDirs(root, 'skills');
+      : await scanSkillDirs(root, opts.skillsRoot ?? 'skills');
   const optIn = new Set(opts.optIn ?? []);
 
   const skills: PackSkill[] = [];

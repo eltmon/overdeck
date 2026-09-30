@@ -287,11 +287,7 @@ describe('pack lifecycle', () => {
     expect(await getPack('demo')).toEqual({ id: 'demo', url: up.url, ref: 'v1', commit: first });
   });
 
-  it('refuses integrations, reserved, invalid and registered ids before any git call', async () => {
-    await expect(addPack({ id: 'sageox', url: up.url, ref: 'main' }, accept)).rejects.toMatchObject({
-      code: 'integration',
-      message: expect.stringContaining('issues/2444'),
-    });
+  it('refuses reserved, invalid and registered ids before any git call', async () => {
     await expect(addPack({ id: 'grilling', url: up.url, ref: 'main', reservedIds: ['grilling'] }, accept)).rejects.toMatchObject({
       code: 'bad-id',
     });
@@ -304,6 +300,9 @@ describe('pack lifecycle', () => {
 
   it('reports git failures as PackSourceError git', async () => {
     await expect(addPack({ id: 'demo', url: join(up.scratch, 'missing.git'), ref: 'main' }, accept)).rejects.toMatchObject({
+      code: 'git',
+    });
+    await expect(addPack({ id: 'sageox', url: join(up.scratch, 'missing.git'), ref: 'main' }, accept)).rejects.toMatchObject({
       code: 'git',
     });
   });
