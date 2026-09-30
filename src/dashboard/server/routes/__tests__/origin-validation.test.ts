@@ -2,7 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { _resetTrustedOriginsForTests, getTrustedOrigins, validateOriginHeaders } from '../origin-validation.js';
+import { addSavedTrustedOrigin } from '../../../../lib/remote-access/trusted-origins.js';
+import {
+  _resetTrustedOriginsForTests,
+  getTrustedOrigins,
+  invalidateTrustedOriginsCache,
+  validateOriginHeaders,
+} from '../origin-validation.js';
 
 const ORIGIN_ENV_KEYS = [
   'OVERDECK_TRAEFIK_ENABLED',
@@ -97,6 +103,29 @@ describe('getTrustedOrigins', () => {
     const origins = getTrustedOrigins();
     expect(origins).toContain('https://foo.example');
     expect(origins).not.toContain('https://overdeck.localhost');
+  });
+
+  it('trusts saved origins even when the launch env configures Traefik (PAN-4445 D-4)', () => {
+    const home = makeHome();
+    writeFileSync(join(home, 'trusted-origins.json'), JSON.stringify({ version: 1, origins: ['https://desk.tailnet.ts.net'] }), 'utf8');
+    process.env['OVERDECK_TRAEFIK_ENABLED'] = '1';
+    process.env['OVERDECK_TRAEFIK_DOMAIN'] = 'env-domain.localhost';
+    const origins = getTrustedOrigins();
+    expect(origins).toContain('https://desk.tailnet.ts.net');
+    expect(origins).toContain('https://env-domain.localhost');
+  });
+
+  it('trusts a newly saved origin after invalidation, without resetting env (PAN-4445 FR-3)', async () => {
+    makeHome();
+    const headers = { origin: 'https://desk.tailnet.ts.net' };
+    expect(validateOriginHeaders(headers, 'POST')).toEqual({ ok: false, error: 'Invalid origin' });
+
+    const result = await addSavedTrustedOrigin('https://desk.tailnet.ts.net', getTrustedOrigins());
+    expect(result).toEqual({ ok: true, origin: 'https://desk.tailnet.ts.net', added: true });
+    expect(validateOriginHeaders(headers, 'POST')).toEqual({ ok: false, error: 'Invalid origin' });
+
+    invalidateTrustedOriginsCache();
+    expect(validateOriginHeaders(headers, 'POST')).toEqual({ ok: true });
   });
 });
 
