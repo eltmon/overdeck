@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:43:39.636Z",
+  "updated": "2026-09-30T17:43:54.202Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "ws-upgrade-scopes.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T17:43:39.636Z"
+    },
+    "mint-pairing-hardening.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:54.201Z"
     }
   }
 }
