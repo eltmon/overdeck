@@ -318,6 +318,40 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
    `--clear` empties the batch without deleting or declining anything.
 4. `pan vault restore <id>` rebuilds an evicted transcript byte for byte at its original
    path (or `--to <path>`); it refuses to overwrite an existing file.
+5. In the dashboard, Settings → Session Vault shows the same batch; "Yes, delete these"
+   confirms only the entries shown as verified.
+
+## Dashboard (Overdeck mode)
+
+Running under Overdeck ([PAN-4307](https://github.com/eltmon/overdeck/issues/4307)), the
+primary dashboard settles conversations automatically and syncs on a timer, and Settings →
+Session Vault gives eviction review a UI. This layer is additive: every command above still
+works the same way against the same on-disk vault.
+
+- **Auto-settle.** A poller checks every active managed conversation (`claude-code`, `codex`)
+  every 15 seconds. Growth (re-)arms a `debounceSec` timer (from `vault/config.json`) that
+  settles the transcript once it has been quiet that long, so a busy conversation is not
+  settled mid-turn. Session end and dashboard shutdown force an immediate settle regardless of
+  the debounce, bounded by a 10-second flush budget on shutdown; anything not settled in time
+  is picked up by the next boot's sync cycle.
+- **Sync cycle.** The primary dashboard also runs the vault's own sync loop: first cycle 5
+  seconds after the dashboard starts, then every `syncIntervalSec`, with the engine's normal
+  offline backoff when the backend is unreachable. A peer/isolated dashboard
+  (`OVERDECK_DISABLE_DEACON=1`, NFR-4) never starts this background service — it still reads
+  the real on-disk vault state through the routes below, it just never advances it.
+- **Eviction liveness (D-3).** When `vault.evict` is on, eligibility checks in Overdeck mode
+  also ask whether the transcript's conversation (or, for an agent-owned transcript, the agent
+  itself) is still alive, via the conversation/agent liveness doors — never
+  `src/lib/agents/liveness.ts` alone. A live conversation or agent is never eligible, and a
+  liveness check that throws counts as live. No dashboard timer deletes anything on its own;
+  eviction still requires the explicit confirm, from the CLI or the panel.
+- **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`, and
+  `POST /api/vault/eviction-batch/{confirm,decline,clear,reoffer}`. `confirm` re-runs the same
+  eligibility checks as `pan vault evict --confirm` but skips re-checking entries already
+  marked `failed` (`skipFailed`), so one failing entry never blocks confirming the rest.
+- Browsing another machine's vaulted conversations from the dashboard and a "Continue here"
+  resume action are separate, not yet built ([PAN-4436](https://github.com/eltmon/overdeck/issues/4436),
+  [PAN-4437](https://github.com/eltmon/overdeck/issues/4437)).
 
 ## Configuration
 
@@ -420,7 +454,14 @@ src/lib/vault/seed.ts             seeded digest for harnesses without native res
 src/lib/vault/evict.ts            pending-deletion batch and confirmation
 src/lib/vault/wip-capture.ts      WIP code snapshot: temp-index commit, bundle, scan, upload
 src/lib/vault/wip-apply.ts        apply a snapshot: verify, unbundle, checkout base, apply
+src/lib/vault/open.ts             openVaultContext: resolve backend + open, shared by CLI and dashboard
 src/cli/commands/vault/*.ts       the pan vault verbs
+
+src/dashboard/server/services/vault-service.ts          boot delay, sync loop, eviction-batch API, snapshot
+src/dashboard/server/services/vault-settle-poller.ts    15s liveness poll, debounceSec settle, shutdown flush
+src/dashboard/server/services/vault-liveness.ts         Overdeck-mode isLive: conversation/agent liveness doors
+src/dashboard/server/routes/vault.ts                    the six /api/vault/* routes
+src/dashboard/frontend/.../sections/SessionVaultSection.tsx   Settings -> Session Vault panel
 ```
 
 `tests/unit/lib/vault/import-graph.test.ts` fails the build if anything reachable from
