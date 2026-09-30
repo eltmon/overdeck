@@ -905,8 +905,10 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
   return (
     <div className={styles.composerFooter}>
       <div className={styles.composerBox} role="status" data-testid="vault-read-only-notice">
-        <p>{`Read-only copy from ${label}.`}</p>
-        <p>To continue it here, run: <code>{`pan vault resume ${vaultId}`}</code></p>
+        <div className={`${styles.composerEditor} ${styles.composerEditable}`}>
+          <p>{`Read-only copy from ${label}.`}</p>
+          <p>To continue it here, run: <code>{`pan vault resume ${vaultId}`}</code></p>
+        </div>
       </div>
     </div>
   );
