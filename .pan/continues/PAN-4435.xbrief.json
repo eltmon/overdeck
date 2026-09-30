@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T21:11:52.530Z",
+  "updated": "2026-09-30T21:12:04.910Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "dashboard-schema.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T21:11:52.530Z"
+    },
+    "dashboard-schema.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:04.910Z"
     }
   }
 }
