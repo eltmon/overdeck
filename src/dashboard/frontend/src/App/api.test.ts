@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { describeConversationHitOpenFailure, fetchConversationMessageLocator } from './api';
+import { conversationHitNeedsLocator, describeConversationHitOpenFailure, fetchConversationMessageLocator } from './api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -33,5 +33,13 @@ describe('fetchConversationMessageLocator (PAN-3982)', () => {
     }, new Error('Unable to locate matching message (404)'));
 
     expect(message).toContain('subagent deadbeef01');
+  });
+});
+
+describe('conversationHitNeedsLocator (PAN-4358)', () => {
+  it('is false only when byteOffset is null (a title-only hit)', () => {
+    expect(conversationHitNeedsLocator({ byteOffset: null })).toBe(false);
+    expect(conversationHitNeedsLocator({ byteOffset: 0 })).toBe(true);
+    expect(conversationHitNeedsLocator({ byteOffset: 1234 })).toBe(true);
   });
 });

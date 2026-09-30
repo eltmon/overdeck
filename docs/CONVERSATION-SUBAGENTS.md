@@ -70,7 +70,7 @@ Claude Code can deliver typed input — the dashboard composer or `pan tell` —
 
 Conversation search indexes subagent transcripts too. Their chunks keep `session_id = agent-<id>` (the file basename) and also store `chunks.parent_session_id`, the parent session UUID taken from the `<parent-uuid>/subagents/` path. Schema v2 of the embeddings DB added the column and backfilled it once at open from `file_cursors`, with no re-embedding.
 
-A palette hit on a subagent chunk reports `conversationId` as the parent conversation's name (or the parent UUID when the parent has no conversation row), plus `parentSessionId` and the bare `subagentId`. The palette labels it `Subagent of …` and shows a distinct icon. Opening it:
+A subagent chunk groups into its parent conversation's row (PAN-4358): the grouped row's `conversationId` is the parent conversation's name (or the parent UUID when the parent has no conversation row). When the subagent chunk is that row's best match, the row also carries `parentSessionId` and the bare `subagentId`, the palette labels it `Subagent of …`, and shows a distinct icon. Opening it:
 
 1. fetches `GET /api/conversations/:name/message-locator?byteOffset=N&agentId=<bare id>`, which resolves the offset inside the subagent transcript;
 2. opens the parent conversation pane with `targetSubagentId` beside the usual message target;

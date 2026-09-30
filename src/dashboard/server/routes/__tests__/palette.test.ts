@@ -14,8 +14,16 @@ vi.mock('../../../../lib/memory/fts-db.js', () => ({
   runMemoryFtsStatement: vi.fn(),
 }));
 
-vi.mock('../../../../lib/overdeck/conversations.js', () => ({
-  getConversationByClaudeSessionId: vi.fn(),
+// PAN-4358 review: palette.ts batch-resolves every distinct root session id
+// in one call instead of one getConversationByClaudeSessionId() call per root.
+vi.mock('../../../../lib/overdeck/conversation-batch-lookup.js', () => ({
+  resolveConversationsByClaudeSessionIds: vi.fn(() => new Map()),
+}));
+
+// PAN-4358: title search reads overdeck.db directly; mock it so this suite
+// never opens the real DB, and so each test controls its title matches.
+vi.mock('../../../../lib/overdeck/conversation-title-search.js', () => ({
+  searchConversationTitles: vi.fn(() => []),
 }));
 
 vi.mock('../../../../lib/config-yaml.js', async () => {
@@ -37,7 +45,8 @@ vi.mock('../../../../lib/conversation-search/embedding-provider.js', async () =>
 import { getConversationSearchConfig } from '../../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../../lib/conversation-search/embedding-provider.js';
 import { runMemoryFtsStatement } from '../../../../lib/memory/fts-db.js';
-import { getConversationByClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
+import { resolveConversationsByClaudeSessionIds } from '../../../../lib/overdeck/conversation-batch-lookup.js';
+import { searchConversationTitles } from '../../../../lib/overdeck/conversation-title-search.js';
 import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../../lib/database/conversation-embeddings-db.js';
@@ -81,8 +90,9 @@ describe('palette conversation search', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-palette-search-'));
     vi.mocked(listProjectsSync).mockReturnValue([]);
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockClear().mockReturnValue(new Map());
     vi.mocked(runMemoryFtsStatement).mockResolvedValue([]);
+    vi.mocked(searchConversationTitles).mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -143,10 +153,9 @@ describe('palette conversation search', () => {
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
 
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue({
-      name: 'managed-conversation',
-      projectKey: 'target-key',
-    } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      ['session-a', { name: 'managed-conversation', projectKey: 'target-key', title: null, archived: false }],
+    ]));
     vi.mocked(listProjectsSync).mockReturnValue([{
       key: 'target-key',
       config: { name: 'Target Project', path: 'foreign-project' },
@@ -183,11 +192,9 @@ describe('palette conversation search', () => {
       key: 'target-key',
       config: { name: 'Target Project', path: 'foreign-project' },
     } as ReturnType<typeof listProjectsSync>[number]]);
-    vi.mocked(getConversationByClaudeSessionId).mockImplementation((sessionId: string) => (
-      sessionId === parentSessionId
-        ? { name: 'parent-conv', projectKey: 'target-key' } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>
-        : null
-    ));
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      [parentSessionId, { name: 'parent-conv', projectKey: 'target-key', title: null, archived: false }],
+    ]));
 
     const db = openEmbeddingsDb(config.dbPath, dimensions);
     expect(db.available).toBe(true);
@@ -210,7 +217,7 @@ describe('palette conversation search', () => {
       projectKey: 'Target Project',
     });
 
-    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map());
     const unregistered = await runPaletteSearch('needle', 5);
     expect(unregistered.conversations[0]).toMatchObject({
       conversationId: parentSessionId,
@@ -290,5 +297,210 @@ describe('palette conversation search', () => {
       displayContent: 'remember the needle',
     });
     expect(result.memory[0]?.excerptSegments).toContainEqual({ kind: 'match', value: 'needle' });
+  });
+
+  it('groups two chunk hits from one session into one conversation row with hitCount 2 (PAN-4358)', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const sessionFile = join(projectDir, 'session-two-hits.jsonl');
+    writeFileSync(
+      sessionFile,
+      jsonlMessage('assistant', 'The needle appears in the first message.')
+      + jsonlMessage('assistant', 'The needle appears again in the second message.'),
+    );
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    await indexConversationFile({
+      filePath: sessionFile,
+      config,
+      db,
+      provider,
+      now: () => '2026-06-02T01:01:00.000Z',
+    });
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations).toHaveLength(1);
+    expect(result.conversations[0]).toMatchObject({ conversationId: 'session-two-hits', hitCount: 2 });
+  });
+
+  it('resolves every distinct root session id in one batched lookup call, regardless of hit count (PAN-4358 review)', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const sessionFiles = ['session-batch-a', 'session-batch-b', 'session-batch-c'].map((name) => {
+      const filePath = join(projectDir, `${name}.jsonl`);
+      writeFileSync(filePath, jsonlMessage('assistant', `The needle appears in ${name}.`));
+      return filePath;
+    });
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    for (const filePath of sessionFiles) {
+      await indexConversationFile({
+        filePath,
+        config,
+        db,
+        provider,
+        now: () => '2026-06-02T01:01:00.000Z',
+      });
+    }
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations).toHaveLength(3);
+    expect(resolveConversationsByClaudeSessionIds).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(resolveConversationsByClaudeSessionIds).mock.calls[0]?.[0]).toEqual(
+      expect.arrayContaining(['session-batch-a', 'session-batch-b', 'session-batch-c']),
+    );
+  });
+
+  it('ranks a title-only match first with no message target (PAN-4358)', async () => {
+    vi.mocked(getConversationSearchConfig).mockReturnValue({
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(tmpDir!, 'embeddings.db'),
+    });
+    vi.mocked(searchConversationTitles).mockReturnValue([{
+      conversationId: 'title-only-conv',
+      projectKey: null,
+      title: 'Personal portfolio deployment to GitHub',
+      archived: false,
+      sessionId: null,
+      cwd: '/home/eltmon/Projects/portfolio',
+      lastActivityAt: '2026-06-02T00:00:00.000Z',
+    }]);
+
+    const result = await runPaletteSearch('portfolio', 5);
+    expect(result.conversations[0]).toMatchObject({
+      conversationId: 'title-only-conv',
+      matchTier: 'title',
+      byteOffset: null,
+      role: '',
+      hitCount: 0,
+    });
+  });
+
+  it('returns title matches when conversation search is disabled (PAN-4358)', async () => {
+    vi.mocked(getConversationSearchConfig).mockReturnValue({
+      enabled: false,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(tmpDir!, 'embeddings.db'),
+    });
+    vi.mocked(searchConversationTitles).mockReturnValue([{
+      conversationId: 'title-only-conv',
+      projectKey: null,
+      title: 'Personal portfolio deployment to GitHub',
+      archived: false,
+      sessionId: null,
+      cwd: '/home/eltmon/Projects/portfolio',
+      lastActivityAt: '2026-06-02T00:00:00.000Z',
+    }]);
+
+    const result = await runPaletteSearch('portfolio', 5);
+    expect(result.conversations).toHaveLength(1);
+    expect(result.conversations[0]).toMatchObject({ conversationId: 'title-only-conv', matchTier: 'title' });
+  });
+
+  it('carries archived: true and the title from the batched conversation lookup (PAN-4358)', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const sessionFile = join(projectDir, 'session-archived.jsonl');
+    writeFileSync(sessionFile, jsonlMessage('assistant', 'The needle appears in this fixture transcript.'));
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+    vi.mocked(resolveConversationsByClaudeSessionIds).mockReturnValue(new Map([
+      ['session-archived', { name: 'session-archived', projectKey: null, title: 'T', archived: true }],
+    ]));
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    await indexConversationFile({
+      filePath: sessionFile,
+      config,
+      db,
+      provider,
+      now: () => '2026-06-02T01:01:00.000Z',
+    });
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations[0]).toMatchObject({ archived: true, title: 'T' });
+  });
+
+  it('ranks a prose match above a path-only match (PAN-4358 AC3)', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const pathSessionFile = join(projectDir, 'session-path.jsonl');
+    writeFileSync(pathSessionFile, jsonlMessage('assistant', 'see /home/u/needle/x for details'));
+    const textSessionFile = join(projectDir, 'session-text.jsonl');
+    writeFileSync(textSessionFile, jsonlMessage('assistant', 'we found needle in the logs today'));
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    for (const filePath of [pathSessionFile, textSessionFile]) {
+      await indexConversationFile({
+        filePath,
+        config,
+        db,
+        provider,
+        now: () => '2026-06-02T01:01:00.000Z',
+      });
+    }
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations.map((c) => c.conversationId)).toEqual(['session-text', 'session-path']);
+    expect(result.conversations[1]).toMatchObject({ matchTier: 'path' });
   });
 });

@@ -1,0 +1,188 @@
+{
+  "version": "1",
+  "issueId": "PAN-4358",
+  "created": "2026-09-29T03:41:33.107Z",
+  "updated": "2026-09-30T16:57:09.889Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-09-30T16:17:20.941Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-09-30T16:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-09-30T16:57:09.889Z"
+    }
+  ],
+  "items": {
+    "match-classifier": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:41:33.107Z",
+      "doneAt": "2026-09-29T03:45:01.339Z"
+    },
+    "conversation-grouper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:45:06.908Z",
+      "doneAt": "2026-09-29T03:47:39.763Z"
+    },
+    "title-search": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:47:45.258Z",
+      "doneAt": "2026-09-29T03:51:48.918Z"
+    },
+    "palette-server-grouping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:51:53.899Z",
+      "doneAt": "2026-09-29T03:58:01.296Z"
+    },
+    "palette-grouped-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T03:58:05.730Z",
+      "doneAt": "2026-09-29T04:07:57.817Z"
+    },
+    "open-title-only-hit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T04:08:01.984Z",
+      "doneAt": "2026-09-29T04:10:28.796Z"
+    },
+    "docs-conversation-search": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4358",
+      "claimedAt": "2026-09-29T04:10:36.559Z",
+      "doneAt": "2026-09-29T04:12:16.864Z"
+    },
+    "match-classifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:23:44.181Z"
+    },
+    "match-classifier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:24:06.243Z"
+    },
+    "match-classifier.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:24:19.965Z"
+    },
+    "match-classifier.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:24:32.768Z"
+    },
+    "conversation-grouper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:24:49.212Z"
+    },
+    "conversation-grouper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:25:02.167Z"
+    },
+    "conversation-grouper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:25:16.787Z"
+    },
+    "conversation-grouper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:25:29.889Z"
+    },
+    "conversation-grouper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:25:43.219Z"
+    },
+    "title-search.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:26:01.894Z"
+    },
+    "title-search.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:26:17.215Z"
+    },
+    "title-search.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:26:32.264Z"
+    },
+    "title-search.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:26:45.400Z"
+    },
+    "palette-server-grouping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:01.776Z"
+    },
+    "palette-server-grouping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:15.164Z"
+    },
+    "palette-server-grouping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:30.009Z"
+    },
+    "palette-server-grouping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:51.194Z"
+    },
+    "palette-server-grouping.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:13.619Z"
+    },
+    "palette-grouped-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:39.125Z"
+    },
+    "palette-grouped-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:58.510Z"
+    },
+    "palette-grouped-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:29:12.599Z"
+    },
+    "palette-grouped-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:29:31.431Z"
+    },
+    "open-title-only-hit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:29:53.789Z"
+    },
+    "open-title-only-hit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:30:27.023Z"
+    },
+    "open-title-only-hit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:04.172Z"
+    },
+    "docs-conversation-search.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:37.572Z"
+    },
+    "docs-conversation-search.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:31:53.111Z"
+    },
+    "docs-conversation-search.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:32:08.562Z"
+    }
+  },
+  "agentModel": "claude-sonnet-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-09-30T16:57:09Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4358\n\n# Review — PAN-4358\n## Verdict: CHANGES REQUESTED — per-root conversation lookups over the 300-chunk pool block the dashboard event loop ~250–500 ms per palette search (NFR-1 budget ~50 ms)\n\n## Context\n- Run ID: agent-pan-4358-review-66aaf3fa\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4358/.pan/review/agent-pan-4358-review-66aaf3fa/context.json\n- Branch / workspace: feature/pan-4358 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4358\n- PR: https://github.com/eltmon/overdeck/pull/4375\n- HEAD reviewed: 66aaf3faf40ed1cb336622421e4c3b5c6cb5a112\n- Base / prior cycle SHA: merge-base 76fba679f85 (origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [performance] Resolving 300 chunk hits runs up to ~250–450 full-scan SQLite lookups synchronously on the dashboard server — `src/dashboard/server/routes/palette.ts:361`\n- Severity: ! (fails explicit in-scope NFR-1; material event-loop blocking)\n- Classification / requirement scope: implementation defect, in_pr_scope. The PRD's WI-4 prescribed `resolve: (root) => toIdentity(routeableConversation(root, cache))` (per-root memoized lookup), so the spec design contributes; NFR-1 (\"Grouping and classification of a 300-chunk pool add no more than ~50 ms\") is the requirement it breaks. Spec correction: WI-4 should resolve all distinct roots in one batched query.\n- Trigger and changed-code connection: `searchConversations()` now asks `searchConversationChunks()` for `CONVERSATION_CHUNK_POOL = 300` fused hits (was `limit` = 15 from the palette). `groupConversationHits()` calls `resolve(root)` for each hit; the memoized `routeableConversation()` calls `getConversationByClaudeSessionId()` once per **distinct root session**. That function (`src/lib/overdeck/conversations.ts:640`) runs `WHERE EXISTS (SELECT 1 FROM conversation_files cf WHERE cf.conversation_id = c.id AND cf.locator = ?)`; `EXPLAIN QUERY PLAN` on the live DB is `SCAN c` + `SEARCH cf USING INDEX conv_files_conv_idx (conversation_id=?)` — there is no index on `cf.locator`, so every miss scans all 3157 conversation rows. Chunk sessions for agents/specialists/unregistered Claude sessions mostly have no conversation row, so misses dominate.\n- Expected / observed / impact: expected ≤~50 ms added (NFR-1). Observed, running the same WHERE clause with better-sqlite3 read-only against the live `~/.overdeck/overdeck.db` over the distinct roots of the real BM25 top-300 from the live `embeddings.db`:\n  - `eltmon`: 255 roots, 71 with a conversation row → 310 ms\n  - `review`: 152 roots, 102 with a row → 237 ms\n  - `deploy`: 125 roots, 8 with a row → 268 ms\n  - `portfolio`: 15 roots → 33 ms\n  - a miss costs ~1.6 ms (300 misses: 494 ms); a hit ~0.2 ms.\n  The vector top-300 adds its own distinct roots, so real totals are higher (estimated 0.3–0.6 s). Baseline made ≤15 lookups (~25 ms). All of this is synchronous better-sqlite3 work on the dashboard server, so every HTTP request, WebSocket frame and poll stalls for that time after each 120 ms-debounced keystroke in Ctrl+K (`useDebouncedValue(query, 120)`, `CommandPalette.tsx:341`); a client-side abort does not stop the server work.\n- Evidence: read-only probe scripts (better-sqlite3, `readonly: true`) against the live DBs; query plan above. Limits: probe used `SELECT c.*` rather than `LEGACY_CONVERSATION_SELECT` (same WHERE clause and plan, so the column list does not change the scan cost); vector-pool roots were not measured, so the numbers are a lower bound. The title search itself is cheap (0.8–3.5 ms).\n- Fix: before calling `groupConversationHits()`, collect the distinct root session ids of `hits` and resolve them with one query, e.g.\n  `SELECT cf.locator, c.name, c.project_key, c.title, c.archived_at FROM conversation_files cf JOIN conversations c ON c.id = cf.conversation_id WHERE cf.locator IN (…)` (chunked to SQLite's parameter limit), pre-filling the `routeableConversations` cache (misses → `{ name: root, projectKey: null, title: null, archived: false }`). That is one scan of `conversation_files` (~5k rows, ~1–2 ms) instead of hundreds of scans of `conversations`. Put the batch helper in a new module (not `conversations.ts`, which is at its file-size cap). Add a palette test asserting one batched lookup regardless of hit count, and amend WI-4 in the PRD accordingly.\n\n## Non-blocking Findings\n\n- ~ **[requirements] PR's frontend tests are not run by CI** — `package.json` `test:frontend-subset` is an explicit file list; `palette-conversation-hits.test.ts` (new), `CommandPalette.test.tsx` and `App/api.test.ts` are not in it, and `vitest.config.ts` excludes `src/dashboard/frontend/**`. FR-7/FR-8/FR-9 evidence therefore relies on local runs only. Add the three files to `test:frontend-subset`. (Pre-existing pattern for the two older files; the new file is this PR's.)\n- ~ **[correctness] Misleading source chip for titled conversations with no Claude session** — `palette.ts` title-only branch sets `sessionId = titleMatch.sessionId ?? identity.conversationId`. For a conversation with no `claude-code` file (codex/pi/etc.), `describeConversationHit()` sees `conversationId === rootSessionId`, so `isDashboardConversation` is false and the chip reads `Claude session 20260919` (first 8 chars of the conversation name). Opening still works (`App.tsx:498` uses `conversationId` first). Fix: treat title-only rows (`byteOffset === null`) as dashboard conversations, or compare against a null session id.\n- ~ **[correctness] Non-ASCII uppercase letters in titles miss the SQL prefilter** — `conversation-title-search.ts` uses `lower(c.title) LIKE ?`; SQLite folds ASCII only, while `queryTerms()` lowercases with Unicode rules. A title like \"ÉTUDE…\" never reaches `titleMatchesQuery` for query `étude`. Rare; could drop `lower()`-based prefiltering for non-ASCII terms or do the fold in JS over a broader prefilter.\n- ≉ **[correctness] CodeRabbit: stale target on a reused pane (`App.tsx:543`)** — traced: `AgentPane.onTargetMessageHandled` clears `targetMessageId/Index/Nonce` once applied, and the subagent effect is keyed on the nonce. The residual case is a target not yet applied when the same conversation is reopened through a title-only row. Clearing the target fields in the title-only `updatePane` call is a cheap hardening; not a demonstrated defect.\n- ? **[correctness] FR-6 when `getHandle()` throws** — `searchConversationChunks()` calls `getHandle()` synchronously; a throw would reject `Promise.all` in `searchConversations()` and drop title matches. `createConversationEmbeddingProvider()` returns unavailable providers instead of throwing and `openEmbeddingsDb()` wraps its open in try/catch, so no reachable throw was found. A test with a throwing handle would establish impact.\n- Spec note (not a finding): issue AC1 says a title match returns \"the first conversation result\". With several title matches only one can be first; on live data \"portfolio\" matches two titles and the newer one (\"Portfolio tablet layout fixes…\") sorts first in newest-first order. The PRD reads AC1 as \"title tier first\", which the code meets. The operator's own examples \"eltmon\"/\"personal site\" still do not match conversation 2832 by design (D9; \"eltmon\" is not in its title).\n\n## Coverage\n\nChanged-file ledger:\n| File | Status |\n| --- | --- |\n| src/dashboard/server/routes/palette.ts | Reviewed — blocker above; wire contract matches PRD; title-only mapping reviewed |\n| src/dashboard/server/services/conversation-search-service.ts | Reviewed — `candidateLimit` passthrough; stat dedup correct (NFR-3 met) |\n| src/lib/conversation-search/match-context.ts | Reviewed — matches D4/WI-1 algorithm |\n| src/lib/conversation-search/group-hits.ts | Reviewed — D1/D2/D3 ordering and tiering correct |\n| src/lib/overdeck/conversation-title-search.ts | Reviewed — D9/D10 SQL, LIKE escaping, exclusions, ISO conversion (live columns are integer ms) |\n| src/dashboard/frontend/src/components/palette-conversation-hits.ts | Reviewed — label/chips/tier/openRequest per WI-5 |\n| src/dashboard/frontend/src/components/CommandPalette.tsx | Reviewed — tier-first comparator, conversations bypass client filter, 1047 lines ≤ 1124 cap |\n| src/dashboard/frontend/src/App.tsx | Reviewed — locator skipped for null byteOffset; 1009 lines ≤ 1019 cap |\n| src/dashboard/frontend/src/App/api.ts | Reviewed — `conversationHitNeedsLocator` guard |\n| src/dashboard/server/routes/__tests__/palette.test.ts | Reviewed — grouping, title-only, disabled search, archived, path-vs-prose cases |\n| src/lib/conversation-search/__tests__/group-hits.test.ts | Reviewed (via CI) |\n| src/lib/conversation-search/__tests__/match-context.test.ts | Reviewed (via CI) |\n| src/lib/overdeck/__tests__/conversation-title-search.test.ts | Reviewed (via CI) |\n| src/dashboard/frontend/src/components/palette-conversation-hits.test.ts | Reviewed; run locally |\n| src/dashboard/frontend/src/components/CommandPalette.test.tsx | Reviewed; run locally |\n| src/dashboard/frontend/src/App/api.test.ts | Reviewed; run locally |\n| docs/USAGE.md, docs/DESKTOP-APP.md, docs/CONVERSATION-SUBAGENTS.md | Reviewed — FR-10 content present |\n| .pan/drafts/PAN-4358.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4358.xbrief.json | Not applicable to runtime — planning artifacts; PRD read as the requirement source |\n\nDimensions:\n- Correctness: grouping, tiering, title matching, null-byteOffset open path traced end to end; advisories above.\n- Security: no new trust boundary. Title search uses bound parameters with LIKE escaping; term count capped at 8; route auth/origin checks unchanged. No findings.\n- Performance: blocking finding above. Classification (300 × string scan) and title SQL (≤3.5 ms live) are fine; `filterLiveHits` now stats each path once.\n- Requirements/UX: see matrix.\n\nRequirement / AC matrix:\n| Req / AC | Status | Evidence |\n| --- | --- | --- |\n| FR-1 title tier first, archived and chunkless included | Met | group-hits.ts tier order; palette.test \"ranks a title-only match first\"; live SQL returns conv 2832 for \"portfolio\" |\n| FR-2 one row per conversation | Met | group key = resolved conversation name; palette.test hitCount 2 case |\n| FR-3 excerpt/hitCount/title/archived/matchTier | Met | toPaletteConversationHit; archived test |\n| FR-4 limit caps conversations, pool 300 | Met | CONVERSATION_CHUNK_POOL; group-hits limit test |\n| FR-5 path tier below text | Met | match-context + palette.test AC3 case |\n| FR-6 titles when search disabled/fails | Met (disabled/embed-failure paths); throw-in-getHandle unverified (? above) | palette.test disabled case; service resolves [] on ranker failure |\n| FR-7 title label, hits chip, archived chip | Met | palette-conversation-hits.test (local run) |\n| FR-8 newest-first keeps tiers | Met | comparator + CommandPalette.test (local run) |\n| FR-9 title-only opens without locator | Met | App.tsx guard + api.test (local run) |\n| FR-10 docs | Met | three doc diffs |\n| NFR-1 ≤~50 ms grouping | **Unmet** | blocker above |\n| NFR-2 no child processes / execSync | Met | single sync SQLite query |\n| NFR-3 stat each path once | Met | filterLiveHits diff |\n| NFR-4 file-size caps | Met | CommandPalette 1047 ≤ 1124; App.tsx 1009 ≤ 1019; conversations.ts untouched |\n| NFR-5 no new cycle | Met | lint-group (core/state) green on HEAD; new module does not import CommandPalette |\n| Issue AC1 title match first | Met (tier-first reading; see spec note) | as FR-1 |\n| Issue AC2 no duplicates | Met | as FR-2 |\n| Issue AC3 prose above path-only | Met within pool (D7) | as FR-5 |\n| Issue AC4 unit tests | Met | new test files |\n| Issue AC5 USAGE.md docs | Met | docs/USAGE.md subsection |\n| Non-goals (8) | Respected | no chunker/indexer/schema change, no title FTS/index, no unarchive action, memory results unchanged, buildMarkedExcerpt unchanged, no allowlist growth |\n\n## Verification\n- CI on exact HEAD 66aaf3fa (`gh pr checks 4375`): `test-shard (1/4..4/4)`, `test`, `lint`, `lint-group (core|effect|skills|state)`, `build (22)`, `test-e2e`, `overdeck/test` (verification gate: typecheck+lint) — all pass. `lint-group (effect)` runs `npm run lint:effect-diagnostics` (scripts/run-lint-group.mjs:16) — pass, so no NEW effect diagnostics.\n- `windows (pwsh-autocrlf-false)` was pending at review time — unverified; does not affect the verdict.\n- Local: `npx vitest run src/components/palette-conversation-hits.test.ts src/components/CommandPalette.test.tsx src/App/api.test.ts` (frontend package) — 3 files, 45 tests passed.\n- Local backend focused run was attempted but timed out in the shared CPU admission queue; backend test files are covered by the CI test shards above instead.\n- Performance probes: read-only better-sqlite3 against live `~/.overdeck/overdeck.db` and `~/.panopticon/conversations/embeddings.db` (numbers in the blocker). No tracked files edited; probe scripts deleted.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4358/.pan/review/agent-pan-4358-review-66aaf3fa/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4358 -m \"Fixed review issues\"`"
+    }
+  ]
+}
