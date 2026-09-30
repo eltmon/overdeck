@@ -19,6 +19,7 @@ import {
   Gauge,
   Globe,
   Trash2,
+  KeyRound,
 } from 'lucide-react';
 import { type BackgroundAiFeature } from './types';
 import { type NavItem } from './primitives';
@@ -56,6 +57,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'close-out', label: 'Close-out', icon: Trash2 },
   { id: 'remote', label: 'Remote', icon: Globe },
+  { id: 'access-tokens', label: 'Access Tokens', icon: KeyRound },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },
