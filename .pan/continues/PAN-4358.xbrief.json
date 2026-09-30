@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4358",
   "created": "2026-09-29T03:41:33.107Z",
-  "updated": "2026-09-29T04:32:08.563Z",
+  "updated": "2026-09-30T16:17:20.941Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-09-30T16:17:20.941Z"
+    }
+  ],
   "items": {
     "match-classifier": {
       "status": "completed",
@@ -163,5 +169,6 @@
       "status": "completed",
       "doneAt": "2026-09-29T04:32:08.562Z"
     }
-  }
+  },
+  "agentModel": "claude-sonnet-5"
 }
