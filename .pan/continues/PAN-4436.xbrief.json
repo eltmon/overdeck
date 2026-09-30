@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:35:40.415Z",
+  "updated": "2026-09-30T20:35:53.541Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "browse-rows-raw-readers.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T20:35:40.415Z"
+    },
+    "browse-rows-list-and-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:35:53.541Z"
     }
   }
 }
