@@ -3,6 +3,10 @@
  * The store and launch library are mocked; their own tests cover persistence.
  */
 import { Command } from 'commander';
+import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
@@ -37,6 +41,14 @@ const mocks = vi.hoisted(() => {
     applyClaudePacks: vi.fn(),
     applyCodexPacks: vi.fn(),
     writeCodexPackBlock: vi.fn(),
+    applyDeftForLaunch: vi.fn(),
+    launchMountsDeft: vi.fn(),
+    listSkillCatalog: vi.fn(),
+    listProjectsAsync: vi.fn(),
+    resolveProjectKeyForCwdAsync: vi.fn(),
+    readDeftIntegration: vi.fn(),
+    enableDeftManaged: vi.fn(),
+    disableDeftManaged: vi.fn(),
     getPack: vi.fn(),
     resolveSageoxLaunch: vi.fn(),
     loadSkillOverrideLayers: vi.fn(),
@@ -74,7 +86,23 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   getPack: mocks.getPack,
 }));
 
-vi.mock('../../../lib/skill-overrides/catalog.js', () => ({ listPackCatalog: mocks.listPackCatalog }));
+vi.mock('../../../lib/skill-overrides/catalog.js', () => ({
+  listPackCatalog: mocks.listPackCatalog,
+  listSkillCatalog: mocks.listSkillCatalog,
+}));
+
+// The deft verbs must never reach the real projects.yaml.
+vi.mock('../../../lib/projects.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../lib/projects.js')>()),
+  listProjectsAsync: mocks.listProjectsAsync,
+  resolveProjectKeyForCwdAsync: mocks.resolveProjectKeyForCwdAsync,
+}));
+
+vi.mock('../../../lib/deft/project-mode.js', () => ({
+  readDeftIntegration: mocks.readDeftIntegration,
+  enableDeftManaged: mocks.enableDeftManaged,
+  disableDeftManaged: mocks.disableDeftManaged,
+}));
 
 vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../lib/skill-overrides/launch.js')>()),
@@ -82,6 +110,8 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   writeCodexSkillOverrides: mocks.writeCodexSkillOverrides,
   applyClaudePacks: mocks.applyClaudePacks,
   applyCodexPacks: mocks.applyCodexPacks,
+  applyDeftForLaunch: mocks.applyDeftForLaunch,
+  launchMountsDeft: mocks.launchMountsDeft,
 }));
 
 vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock, gcMounts: mocks.gcMounts }));
@@ -115,6 +145,8 @@ beforeEach(() => {
   mocks.setSkillOverride.mockResolvedValue({});
   mocks.applyClaudePacks.mockResolvedValue([]);
   mocks.applyCodexPacks.mockResolvedValue([]);
+  mocks.applyDeftForLaunch.mockResolvedValue({ hideSkills: [], deny: [], provenance: '', warnings: [] });
+  mocks.launchMountsDeft.mockResolvedValue(false);
   mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
 });
 
@@ -302,6 +334,65 @@ describe('pan skills launch-settings', () => {
   });
 });
 
+describe('pan skills launch-settings: deft (PAN-3943)', () => {
+  const deftResult = {
+    hideSkills: ['deft-directive-glossary', 'grilling'],
+    deny: ['Bash(deft:*)'],
+    provenance: '[launcher] deft: pack master (eeeeeeeeeeee); project directive; kill switch',
+    warnings: ['[launcher] WARNING: deft: something'],
+  };
+
+  it('merges hidden pointer skills and the deny list into the Claude settings JSON', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.launchMountsDeft.mockResolvedValue(true);
+    mocks.applyDeftForLaunch.mockResolvedValue(deftResult);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--issue', 'PAN-1', '--plugin-link', '/k/launch/a/skill-packs');
+    expect(mocks.applyDeftForLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/k/launch/a/deft.env', true);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      skillOverrides: { grilling: 'off', 'deft-directive-glossary': 'off' },
+      permissions: { deny: ['Bash(deft:*)'] },
+    });
+    expect(errors).toEqual([deftResult.warnings[0], deftResult.provenance]);
+  });
+
+  it('runs no Deft step for a Claude launch without a plugin link', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');
+    expect(mocks.applyDeftForLaunch).not.toHaveBeenCalled();
+    expect(stdout.join('')).toBe('');
+  });
+
+  it('fails open: warns, removes the env file, and still prints the settings JSON', async () => {
+    const { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'deft-fail-open-'));
+    mkdirSync(join(dir, 'launch', 'a'), { recursive: true });
+    const envFile = join(dir, 'launch', 'a', 'deft.env');
+    writeFileSync(envFile, 'DEFT_DIRECTIVE_DISABLE=1\n');
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyDeftForLaunch.mockRejectedValue(new Error('git timed out'));
+    try {
+      await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', join(dir, 'launch', 'a', 'skill-packs'));
+      expect(errors).toContain('[launcher] WARNING: deft integration not applied: git timed out');
+      expect(existsSync(envFile)).toBe(false);
+      expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+      expect(mocks.applyClaudePacks).toHaveBeenCalled();
+      expect(process.exit).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('hides pointer skills in the Codex override block and never passes a deny list', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyDeftForLaunch.mockResolvedValue(deftResult);
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.applyDeftForLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch/overdeck-deft.env', false);
+    expect(mocks.writeCodexSkillOverrides).toHaveBeenCalledWith('/ch', ['grilling', 'deft-directive-glossary']);
+  });
+});
+
 describe('pan skills launch-settings SageOx wiring (PAN-2444)', () => {
   const env = { OX_HOST_MANAGED: '1', OX_HOST_NETWORK: 'off' };
   const events = ['SessionStart', 'PreCompact', 'PostToolUse', 'Stop', 'SessionEnd', 'UserPromptSubmit'];
@@ -406,7 +497,13 @@ describe('pan skills pack', () => {
 
   it('rejects an unknown adapter before any work', async () => {
     await expect(run(...addArgs, '--adapter', 'npm')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('--adapter must be plain, claude-plugin, or deft-readonly');
     expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('accepts the deft-readonly adapter', async () => {
+    await run(...addArgs, '--adapter', 'deft-readonly', '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(expect.objectContaining({ adapter: 'deft-readonly' }), expect.any(Function));
   });
 
   it('lists packs as JSON offline without an update check', async () => {
@@ -465,6 +562,125 @@ describe('pan skills pack', () => {
     await run('pack', 'gc');
     expect(mocks.gcMounts).toHaveBeenCalledWith({ maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
     expect(logs.join('\n')).toContain('Removed 1 mount(s) and 0 dangling launch link(s).');
+  });
+});
+
+describe('pan skills deft (PAN-3943)', () => {
+  const DIRECTIVE_FILES: Record<string, string> = {
+    'AGENTS.md': '# Agents\n\n<!-- deft:managed-section v3 -->\nDeft rules.\n',
+    'package.json': JSON.stringify({ name: 'app', devDependencies: { '@deftai/directive': '^0.119.10' } }),
+    '.claude/skills/deft-directive-glossary/SKILL.md': '---\nname: deft-directive-glossary\n---\n',
+  };
+  let root: string;
+  let isTTY: boolean | undefined;
+
+  function fixture(files: Record<string, string>): string {
+    const dir = fs.mkdtempSync(path.join(tmpdir(), 'deft-cli-'));
+    for (const [file, content] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), content);
+    }
+    return dir;
+  }
+
+  function treeHash(dir: string): string {
+    const hash = createHash('sha256');
+    const walk = (rel: string): void => {
+      for (const name of fs.readdirSync(path.join(dir, rel)).sort()) {
+        const file = path.join(rel, name);
+        if (fs.statSync(path.join(dir, file)).isDirectory()) walk(file);
+        else hash.update(file).update('\0').update(fs.readFileSync(path.join(dir, file))).update('\0');
+      }
+    };
+    walk('');
+    return hash.digest('hex');
+  }
+
+  function useProject(files: Record<string, string>): void {
+    root = fixture(files);
+    mocks.listProjectsAsync.mockResolvedValue([{ key: 'tst', config: { name: 'Test', path: root } }]);
+  }
+
+  async function runUnchanged(...args: string[]): Promise<void> {
+    const before = treeHash(root);
+    try {
+      await run(...args);
+    } finally {
+      expect(treeHash(root)).toBe(before);
+    }
+  }
+
+  beforeEach(() => {
+    isTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    mocks.listSkillCatalog.mockResolvedValue([{ name: 'pan-swarm', description: '' }, { name: 'grilling', description: '' }]);
+    mocks.listPacks.mockResolvedValue([]);
+    mocks.readDeftIntegration.mockResolvedValue(null);
+    mocks.enableDeftManaged.mockResolvedValue(undefined);
+    mocks.resolveProjectKeyForCwdAsync.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('refuses a project that is not a Directive project and writes nothing', async () => {
+    useProject({ 'README.md': '# app\n' });
+    await expect(runUnchanged('deft', 'enable', '--project', 'tst', '--yes')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('tst is not a Directive project; Overdeck never runs directive init');
+    expect(mocks.enableDeftManaged).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing without --yes on a non-TTY', async () => {
+    useProject(DIRECTIVE_FILES);
+    await expect(runUnchanged('deft', 'enable', '--project', 'tst')).rejects.toThrow('exit 1');
+    expect(logs.join('\n')).toMatch(/Not written: re-run with --yes to accept plan [0-9a-f]{12}\./);
+    expect(mocks.enableDeftManaged).not.toHaveBeenCalled();
+  });
+
+  it('stores the digest of the printed plan with --yes', async () => {
+    useProject(DIRECTIVE_FILES);
+    await runUnchanged('deft', 'enable', '--project', 'tst', '--yes');
+    const printed = logs[0] ?? '';
+    expect(printed).toContain('Directive project: yes');
+    const digest = createHash('sha256').update(`${printed}\n`).digest('hex');
+    expect(mocks.enableDeftManaged).toHaveBeenCalledWith('tst', digest);
+    expect(logs.at(-1)).toBe(`Managed mode on for tst (plan ${digest.slice(0, 12)}); applies at next launch.`);
+  });
+
+  it('disables managed mode and reports when it was not on', async () => {
+    useProject(DIRECTIVE_FILES);
+    mocks.disableDeftManaged.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await runUnchanged('deft', 'disable', '--project', 'tst');
+    await runUnchanged('deft', 'disable', '--project', 'tst');
+    expect(mocks.disableDeftManaged).toHaveBeenCalledWith('tst');
+    expect(logs).toEqual(['Managed mode off for tst; project files untouched.', 'Managed mode was not on for tst.']);
+  });
+
+  it('prints status as JSON with the pointer skills and report rows', async () => {
+    useProject(DIRECTIVE_FILES);
+    mocks.listPacks.mockResolvedValue([
+      { id: 'deft', url: 'https://github.com/eltmon/directive', ref: 'master', commit: 'f'.repeat(40), adapter: 'deft-readonly' },
+    ]);
+    await runUnchanged('deft', 'status', '--project', 'tst', '--json');
+    const status = JSON.parse(logs.join('\n'));
+    expect(status.detection.pointerSkills).toEqual(['deft-directive-glossary']);
+    expect(status.pack).toMatchObject({ id: 'deft', ref: 'master' });
+    expect(status.skillMap.mounted).toEqual(['cost', 'debug', 'design-critique', 'gh-arch', 'glossary', 'probe', 'write-skill']);
+    expect(status.managed).toBeNull();
+    expect(status.report.rows).toHaveLength(11);
+    expect(status.report.skillOverlaps).toContainEqual({ deft: 'swarm', overdeck: 'pan-swarm' });
+  });
+
+  it('prints the add command in human status when the pack is not registered', async () => {
+    useProject(DIRECTIVE_FILES);
+    mocks.readDeftIntegration.mockResolvedValue({ mode: 'managed', plan_digest: 'a'.repeat(64), enabled_at: '2026-09-29T00:00:00.000Z' });
+    await runUnchanged('deft', 'status', '--project', 'tst');
+    const out = logs.join('\n');
+    expect(out).toContain('not registered — pan skills pack add deft https://github.com/eltmon/directive --ref <ref>');
+    expect(out).toContain('managed since 2026-09-29T00:00:00.000Z');
+    expect(out).toContain('Notes:');
   });
 });
 

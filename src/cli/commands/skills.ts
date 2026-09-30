@@ -6,10 +6,11 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]      (PAN-4334)
+ *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
+ *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
  * it imports only Commander types and chalk statically. The
@@ -17,6 +18,8 @@
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
+import { registerSkillsDeftCommands } from './skills-deft.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
@@ -143,9 +146,10 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     console.error('--codex-home is required for --harness codex');
     process.exit(1);
   }
-  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }] = await Promise.all([
+  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }, { dirname, join }] = await Promise.all([
     import('../../lib/skill-overrides/launch.js'),
     import('../../lib/sageox/launch.js'),
+    import('node:path'),
   ]);
   const ctx = { cwd: options.cwd, issueId: options.issue };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
@@ -154,8 +158,16 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
   for (const warning of sageox.warnings) console.error(warning);
   const exclude = new Set(sageox.active ? [] : [SAGEOX_PACK_ID]);
   if (options.harness === 'claude-code') {
-    const json = launch.claudeSkillSettingsJson(disabled, sageox.settings);
     const link = options.pluginLink;
+    // A Claude launch without a launch key (no plugin link) runs no Deft step.
+    const deft = link
+      ? await applyDeftFailOpen(join(dirname(link), 'deft.env'), async envFile =>
+        launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)))
+      : launch.EMPTY_DEFT_LAUNCH;
+    const json = launch.claudeSkillSettingsJson(mergeSkillNames(disabled, deft.hideSkills), {
+      ...sageox.settings,
+      deny: deft.deny,
+    });
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
       await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link, exclude), async () => {
@@ -168,11 +180,35 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     return;
   }
   const codexHome = options.codexHome as string;
-  await launch.writeCodexSkillOverrides(codexHome, disabled);
+  const deft = await applyDeftFailOpen(join(codexHome, 'overdeck-deft.env'), async envFile =>
+    launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)));
+  await launch.writeCodexSkillOverrides(codexHome, mergeSkillNames(disabled, deft.hideSkills));
   await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome, exclude), async () => {
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
+}
+
+function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {
+  return [...new Set([...disabled, ...hidden])];
+}
+
+/** NFR-2: a Deft error removes the env file and leaves the launch as it would be without Deft. */
+async function applyDeftFailOpen(
+  envFile: string,
+  apply: (envFile: string) => Promise<DeftLaunchResult>,
+): Promise<DeftLaunchResult> {
+  try {
+    const result = await apply(envFile);
+    for (const warning of result.warnings) console.error(warning);
+    if (result.provenance) console.error(result.provenance);
+    return result;
+  } catch (error) {
+    console.error(`[launcher] WARNING: deft integration not applied: ${error instanceof Error ? error.message : String(error)}`);
+    const { rm } = await import('node:fs/promises');
+    await rm(envFile, { force: true }).catch(() => undefined);
+    return { hideSkills: [], deny: [], provenance: '', warnings: [] };
+  }
 }
 
 async function applyPacksFailOpen(apply: () => Promise<string[]>, clear: () => Promise<void>): Promise<void> {
@@ -245,8 +281,13 @@ async function packConfirm(yes: boolean | undefined, note?: string): Promise<(pr
 }
 
 export async function skillsPackAddCommand(id: string, url: string, options: PackAddOptions): Promise<void> {
-  if (options.adapter !== undefined && options.adapter !== 'plain' && options.adapter !== 'claude-plugin') {
-    console.error(chalk.red('--adapter must be plain or claude-plugin'));
+  if (
+    options.adapter !== undefined &&
+    options.adapter !== 'plain' &&
+    options.adapter !== 'claude-plugin' &&
+    options.adapter !== 'deft-readonly'
+  ) {
+    console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
     process.exit(1);
   }
   const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
@@ -451,7 +492,7 @@ export function registerSkillsCommands(program: Command): void {
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
   pack.command('add <id> <url>').description('Register a git skill pack at the commit a ref resolves to (enables nothing)')
-    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain or claude-plugin')
+    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')
@@ -472,4 +513,6 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackSageoxStatusCommand);
   sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
     .requiredOption('--project <key>', 'Project key').action(skillsPackSageoxUploadCommand);
+
+  registerSkillsDeftCommands(skills);
 }

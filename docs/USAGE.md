@@ -388,12 +388,17 @@ pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]
+pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]
 pan skills pack update <id> [--ref <ref>] [--yes]
 pan skills pack list [--json] [--offline]
 pan skills pack remove <id>
 pan skills pack sync [id]
 pan skills pack gc [--max-age-days <n>]
+
+# Deft Directive: detection, ownership report, and managed mode (read-only toward the project)
+pan skills deft status [--project <key>] [--json]
+pan skills deft enable --project <key> [--yes]
+pan skills deft disable --project <key>
 ```
 
 ### Release Commands
