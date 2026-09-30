@@ -154,6 +154,8 @@ describe('recoverSilentReviewers — stuck then re-dispatched', () => {
     expect(deps.redispatchParent).toHaveBeenCalledWith(ISSUE, workspace, expect.objectContaining({ id: PARENT }));
     expect(deps.surfaceNeedsYou).not.toHaveBeenCalled();
     expect(entries('review.stall-escalated')).toHaveLength(0);
+    // D6: never review.redispatched — recoverStalledReviews would launch lanes on a quick issue.
+    expect(entries('review.redispatched')).toHaveLength(0);
     expect(mocks.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({ source: 'review', level: 'warn', issueId: ISSUE }));
 
     // A second tick at the same time sees the fresh dispatch stamp: too young.
@@ -384,6 +386,15 @@ describe('recoverSilentReviewers — report freshness', () => {
     await tick();
 
     expect(deps.redispatchParent).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a reviewer with an old report but a fresh transcript write alone', async () => {
+    writeReport('review.md', NOW - 30 * MINUTE);
+    deps.transcriptActivityMs.mockResolvedValue(NOW - 10 * MINUTE);
+
+    expect(await tick()).toEqual([]);
+    expect(entries('review.stalled')).toHaveLength(0);
+    expect(deps.redispatchParent).not.toHaveBeenCalled();
   });
 
   it('counts a synthesis written since the stamp for the parent', async () => {
