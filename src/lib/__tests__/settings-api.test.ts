@@ -427,6 +427,9 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('require_token_mint: true');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
     expect(mockInvalidateRemoteAccessConfig).toHaveBeenCalledOnce();
+    expect(mockInvalidateRemoteAccessConfig.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockWriteFile.mock.invocationCallOrder[0],
+    );
   });
 
   it('never deletes the dashboard block when a save omits it (D-3: security flag)', async () => {

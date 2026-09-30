@@ -174,6 +174,19 @@ describe('remote request gate (PAN-3762)', () => {
     await setRequireTokenMint(false);
     expect(rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }))).toBeNull();
   });
+
+  it('applies require_token_mint after invalidation without a restart', async () => {
+    const loopbackMint = () => rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }));
+
+    await setRequireTokenMint(false);
+    expect(loopbackMint()).toBeNull();
+
+    await setRequireTokenMint(true);
+    expect(loopbackMint()?.status).toBe(401);
+
+    await setRequireTokenMint(false);
+    expect(loopbackMint()).toBeNull();
+  });
 });
 
 describe('remote request gate scopes (PAN-2351)', () => {
