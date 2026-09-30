@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4307",
   "created": "2026-09-30T16:35:20.478Z",
-  "updated": "2026-09-30T19:00:35.186Z",
+  "updated": "2026-09-30T19:00:45.851Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "vault-liveness.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T19:00:35.185Z"
+    },
+    "vault-liveness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T19:00:45.851Z"
     }
   }
 }
