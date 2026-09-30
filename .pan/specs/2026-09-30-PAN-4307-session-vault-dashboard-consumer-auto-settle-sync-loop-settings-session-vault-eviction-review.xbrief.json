@@ -4,17 +4,17 @@
     "created": "2026-09-30T16:29:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4307: Session Vault: dashboard consumer (automatic settlement, sync loop, Settings → Session Vault)",
-    "updated": "2026-09-30T16:34:02.961Z"
+    "updated": "2026-09-30T16:34:53.222Z"
   },
   "plan": {
     "id": "pan-4307",
     "title": "Session Vault: dashboard consumer (auto-settle, sync loop, Settings → Session Vault eviction review)",
-    "status": "proposed",
+    "status": "running",
     "uid": "591f2a1b-0656-4787-89b4-e1a1f19d55a9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T16:29:21Z",
-    "updated": "2026-09-30T16:34:02.961Z",
+    "updated": "2026-09-30T16:34:53.222Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4307",
@@ -800,5 +800,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

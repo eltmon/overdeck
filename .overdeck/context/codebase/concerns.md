@@ -327,6 +327,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   index/worktree/stash (temp `GIT_INDEX_FILE` seeded from a *copy* of the real index —
   an empty one drops force-added ignored files), async `execFile` only, and skip when the
   (base, tree) pair is unchanged.
+- **The conversation transcript watch is per-viewer, not global** — `watchConversation`
+  (`dashboard/server/services/conversation/watch.ts`) starts only inside a `/ws/rpc`
+  `subscribeConversationMessages` subscription (`ws-rpc.ts` `streamClaudeTranscript`,
+  `Effect.acquireRelease`). Background work that must react to transcript growth (Session Vault
+  auto-settle, PAN-4307) needs its own poller; ended conversations never stream and load over
+  HTTP `/messages`.
 - **Vault git `casRefs` publishes every untracked object in the clone** — `casRefsSerialized`
   (`src/lib/vault/store/git.ts`) runs `git add -A -- .`, so objects left untracked by an
   earlier failed settle ride along with the next successful ref write. Anything that must
@@ -342,4 +348,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   global file. Writers that must touch only named keys use a path-scoped
   `parseDocument` + `setIn` edit instead (PAN-4400 model presets).
 
-<!-- last-verified: 2026-09-29 -->
+<!-- last-verified: 2026-09-30 -->
