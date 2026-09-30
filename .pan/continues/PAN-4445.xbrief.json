@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:38:52.208Z",
+  "updated": "2026-09-30T20:39:04.380Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "trusted-origin-route.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T20:38:52.208Z"
+    },
+    "anywhere-status-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:39:04.380Z"
     }
   }
 }
