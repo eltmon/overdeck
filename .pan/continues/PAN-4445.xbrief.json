@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:42:36.344Z",
+  "updated": "2026-09-30T20:42:48.829Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "docs-remote-access.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T20:42:36.344Z"
+    },
+    "docs-remote-access.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:42:48.828Z"
     }
   }
 }
