@@ -22,7 +22,9 @@ import {
 } from 'lucide-react';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
+import { requestSettingsSection } from '../lib/settingsSection';
 import { DeaconStatus } from './CommandDeck/DeaconStatus';
+import { AnywhereStatusCard } from './Settings/anywhere/AnywhereStatusCard';
 import { TldrServiceStatus } from './TldrServiceStatus';
 
 async function fetchHealth(): Promise<readonly AgentHealthSnapshot[]> {
@@ -218,7 +220,12 @@ function AgentCard({ agent }: { agent: AgentHealthSnapshot }) {
   );
 }
 
-export function HealthDashboard() {
+interface HealthDashboardProps {
+  /** Opens Settings; the Anywhere status card uses it for its fix buttons (PAN-4445). */
+  onOpenSettings?: () => void;
+}
+
+export function HealthDashboard({ onOpenSettings }: HealthDashboardProps = {}) {
   const {
     data: systemHealth,
     isLoading: isHealthLoading,
@@ -288,6 +295,14 @@ export function HealthDashboard() {
           <div className="mt-2 text-sm text-muted-foreground">System health is unavailable.</div>
         )}
       </section>
+
+      <AnywhereStatusCard
+        onAction={(action) => {
+          if (action.kind === 'none') return;
+          requestSettingsSection(action.kind === 'pair-dialog' ? 'anywhere' : action.section);
+          onOpenSettings?.();
+        }}
+      />
 
       <DeaconStatus />
       <TldrServiceStatus />
