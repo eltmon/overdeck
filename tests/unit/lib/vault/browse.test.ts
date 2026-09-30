@@ -152,6 +152,18 @@ describe('vault browse cache: refreshBrowseCache', () => {
     expect(JSON.parse(readFileSync(join(vaultBrowseDir(), 'manifest.json'), 'utf8')).entries).toEqual({});
   });
 
+  it('sweeps decrypted files a lost manifest no longer lists', async () => {
+    const { vaultId } = await saveClaude();
+    await refreshBrowseCache({ store, keys, rows: [await rowFor(vaultId)] });
+    const path = join(vaultBrowseDir(), `${vaultId}.jsonl`);
+    rmSync(join(vaultBrowseDir(), 'manifest.json'));
+    writeFileSync(join(vaultBrowseDir(), '.123.abcd.tmp'), 'partial');
+    const result = await refreshBrowseCache({ store, keys, rows: [await rowFor(vaultId, { tombstone: true })] });
+    expect(result).toEqual({ copies: [], removed: [vaultId], failed: [] });
+    expect(existsSync(path)).toBe(false);
+    expect(readdirSync(vaultBrowseDir())).toEqual(['manifest.json']);
+  });
+
   it('writes nothing for a vault id that is not a UUID', async () => {
     const { vaultId } = await saveClaude();
     const result = await refreshBrowseCache({ store, keys, rows: [await rowFor(vaultId, { vaultId: '../x' })] });

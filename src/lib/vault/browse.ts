@@ -13,7 +13,7 @@
  * pulls in runtime storage).
  */
 import { randomBytes } from 'node:crypto';
-import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
 import { vaultDir } from './config.js';
 import { decodeChunk, readSessionRecord, refName, type SessionRecord } from './format.js';
@@ -28,6 +28,7 @@ type BrowseHarness = (typeof BROWSE_HARNESSES)[number];
 
 const MANIFEST_FILENAME = 'manifest.json';
 const VAULT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const BROWSE_FILE_PATTERN = /^(?:rollout-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/;
 
 export interface BrowseCopy {
   vaultId: string;
@@ -244,6 +245,19 @@ export async function refreshBrowseCache(options: {
     await removeBrowseFile(vaultBrowseFilePath(vaultId, 'codex'));
     delete manifest.entries[vaultId];
     result.removed.push(vaultId);
+  }
+
+  // A lost or corrupt manifest forgets files; sweep any decrypted copy (or
+  // leftover temp file) that no kept or failed entry accounts for.
+  const keptPaths = new Set(result.copies.map((copy) => copy.path));
+  for (const name of await readdir(vaultBrowseDir())) {
+    if (name === MANIFEST_FILENAME) continue;
+    const vaultId = BROWSE_FILE_PATTERN.exec(name)?.[1];
+    const path = join(vaultBrowseDir(), name);
+    if (vaultId && (failed.has(vaultId) || keptPaths.has(path))) continue;
+    if (!vaultId && !name.endsWith('.tmp')) continue;
+    await removeBrowseFile(path);
+    if (vaultId && !kept.has(vaultId) && !result.removed.includes(vaultId)) result.removed.push(vaultId);
   }
 
   await writeAtomic(manifestPath(), `${JSON.stringify(manifest)}\n`);
