@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4429",
   "created": "2026-09-30T00:40:13.741Z",
-  "updated": "2026-09-30T02:27:06.321Z",
+  "updated": "2026-09-30T02:27:17.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "cli-status-tldr.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T02:27:06.321Z"
+    },
+    "cli-sidecar-daemon.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T02:27:17.539Z"
     }
   }
 }
