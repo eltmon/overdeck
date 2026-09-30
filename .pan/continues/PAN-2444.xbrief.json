@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-30T00:50:58.786Z",
+  "updated": "2026-09-30T00:51:11.223Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,10 @@
     "docs-sageox.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T00:50:58.786Z"
+    },
+    "live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:51:11.223Z"
     }
   }
 }
