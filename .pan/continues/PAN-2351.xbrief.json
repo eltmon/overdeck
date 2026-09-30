@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:46:36.047Z",
+  "updated": "2026-09-30T17:46:49.733Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "access-token-routes.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T17:46:36.046Z"
+    },
+    "pan-token-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:46:49.733Z"
     }
   }
 }
