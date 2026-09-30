@@ -204,11 +204,17 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
-  if (!suite.pull_requests || suite.pull_requests.length === 0) return;
 
   const repo = payload.repository!.full_name;
 
-  for (const pr of suite.pull_requests) {
+  const failing = Boolean(suite.conclusion) && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion!.toUpperCase());
+  const listed = suite.pull_requests ?? [];
+  const prs = listed.length > 0 || !failing
+    ? listed
+    : await resolvePullRequestsForHead(listed, suite.head_branch, suite.head_sha, 'check_suite');
+  if (prs.length === 0) return;
+
+  for (const pr of prs) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 

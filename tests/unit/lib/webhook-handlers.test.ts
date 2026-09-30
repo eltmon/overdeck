@@ -196,6 +196,31 @@ describe('handleCheckSuite', () => {
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
     expect(mockBumpIssuePrTabCacheGeneration).not.toHaveBeenCalled();
   });
+
+  it('resolves a failing suite with empty pull_requests by head (PAN-4432)', async () => {
+    mockGetPrFacts.mockResolvedValue({
+      open: true,
+      number: 9,
+      headSha: 'abc123',
+      headBranch: 'feature/pan-77',
+    });
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch: 'feature/pan-77',
+        head_sha: 'abc123',
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-77',
+      prNumber: 9,
+      source: 'check_suite',
+    }));
+  });
 });
 
 describe('handleCheckRun', () => {
