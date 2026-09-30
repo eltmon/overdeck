@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-30T00:47:18.397Z",
+  "updated": "2026-09-30T00:47:31.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,10 @@
     "ox-probe.ac2": {
       "status": "completed",
       "doneAt": "2026-09-30T00:47:18.397Z"
+    },
+    "ox-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:47:31.269Z"
     }
   }
 }
