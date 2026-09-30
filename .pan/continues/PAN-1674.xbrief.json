@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1674",
   "created": "2026-09-29T23:41:57.389Z",
-  "updated": "2026-09-30T00:08:48.358Z",
+  "updated": "2026-09-30T00:11:53.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-30T00:08:43.987Z"
     },
     "workspace-disk-floor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1674",
-      "claimedAt": "2026-09-30T00:08:48.357Z"
+      "claimedAt": "2026-09-30T00:08:48.357Z",
+      "doneAt": "2026-09-30T00:11:53.861Z"
     }
   }
 }
