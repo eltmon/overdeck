@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:41:09.192Z",
+  "updated": "2026-09-30T20:41:21.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "status-card.ac1": {
       "status": "completed",
       "doneAt": "2026-09-30T20:41:09.191Z"
+    },
+    "status-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:41:21.297Z"
     }
   }
 }
