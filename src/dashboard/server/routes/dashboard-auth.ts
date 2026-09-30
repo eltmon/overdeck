@@ -5,7 +5,7 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { verifyAccessToken } from '../../../lib/access-tokens.js';
+import { verifyAccessToken, type AccessTokenScope } from '../../../lib/access-tokens.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -137,11 +137,21 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
   return hasDashboardInternalTokenHeaders(request.headers as HeaderMap);
 }
 
-/** Who a request authenticates as. Only a device credential is revocable. */
+/**
+ * Who a request authenticates as. `internal-token` and `root-session` are root
+ * credentials and imply `admin`. `device` and `token` are registry credentials:
+ * they carry their record's scopes and are revocable.
+ */
 export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
-  | { kind: 'device'; deviceId: string };
+  | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
+  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[] };
+
+/** The scopes a credential grants: `['admin']` for root credentials, else the record's scopes. */
+export function credentialScopes(credential: DashboardCredential): readonly string[] {
+  return credential.kind === 'internal-token' || credential.kind === 'root-session' ? ['admin'] : credential.scopes;
+}
 
 /** The `odk_` token a request presents: the device cookie, else an `Authorization: Bearer` header. */
 export function dashboardDeviceTokenFromHeaders(headers: HeaderMap): string | undefined {
@@ -154,8 +164,16 @@ export function resolveDashboardCredential(headers: HeaderMap): DashboardCredent
   if (constantTimeTokenEqual(cookieValue(cookie, DASHBOARD_SESSION_COOKIE), getDashboardSessionToken())) {
     return { kind: 'root-session' };
   }
-  const device = verifyAccessToken(dashboardDeviceTokenFromHeaders(headers));
-  return device.ok ? { kind: 'device', deviceId: device.record.id } : null;
+  const cookieToken = cookieValue(cookie, DASHBOARD_DEVICE_COOKIE);
+  const verified = verifyAccessToken(cookieToken ?? bearerToken(headers));
+  if (!verified.ok) return null;
+  const { record } = verified;
+  if (record.kind === 'token') {
+    // PAN-2351 D-9: a token authenticates only from the Bearer header.
+    return cookieToken === undefined ? { kind: 'token', tokenId: record.id, scopes: record.scopes } : null;
+  }
+  // A record with no kind is a device (PAN-2351 FR-10).
+  return { kind: 'device', deviceId: record.id, scopes: record.scopes };
 }
 
 export function hasDashboardAuthHeaders(headers: HeaderMap): boolean {
@@ -195,7 +213,10 @@ export function rejectUnsafeDashboardMutationRequest(
     return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
   }
 
-  if (hasDashboardInternalToken(request)) return null;
+  // Header-borne credentials cannot be sent by a cross-site form, so they skip
+  // the Origin and CSRF checks (PAN-2351 FR-9). A token never arrives by cookie.
+  const credentialKind = resolveDashboardCredential(headers)?.kind;
+  if (credentialKind === 'internal-token' || credentialKind === 'token') return null;
 
   const origin = getHeaderFromMap(headers, 'origin');
   if (origin && !hasTrustedExactOrigin(headers)) {
