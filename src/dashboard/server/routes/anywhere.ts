@@ -10,15 +10,32 @@
  *   Loopback addresses are refused with 400; they are already trusted for this
  *   port and never help another device (D-6).
  *
+ * - `GET /api/anywhere/status` returns the Anywhere status card's data
+ *   (`lib/remote-access/anywhere-status.ts`): machine identity, trusted
+ *   addresses, the active paired-device count, the vault state and the
+ *   problems with their fix actions. Any dashboard credential may read it.
+ *
  * No response is cacheable.
  */
 import { Effect, Layer, Result } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import { listAccessTokens } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import {
+  computeAnywhereProblems,
+  readAnywhereVaultState,
+  type AnywhereStatus,
+} from '../../../lib/remote-access/anywhere-status.js';
+import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnsafeDashboardMutationRequest, resolveDashboardCredential } from './dashboard-auth.js';
+import {
+  rejectUnauthorizedDashboardRequest,
+  rejectUnsafeDashboardMutationRequest,
+  resolveDashboardCredential,
+} from './dashboard-auth.js';
 import { getTrustedOrigins, invalidateTrustedOriginsCache, type HeaderMap } from './origin-validation.js';
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
@@ -76,4 +93,38 @@ const addTrustedOriginRoute = HttpRouter.add(
   }),
 );
 
-export const anywhereRouteLayer = Layer.mergeAll(addTrustedOriginRoute);
+async function buildAnywhereStatus(): Promise<AnywhereStatus> {
+  let machine: AnywhereStatus['machine'] = null;
+  let identityError: string | null = null;
+  try {
+    const identity = await ensureEnvironmentIdentity();
+    machine = { environmentId: identity.environmentId, label: identity.label };
+  } catch (error) {
+    identityError = (error as Error).message;
+  }
+  const addresses = getTrustedOrigins().map((origin) => ({ origin, loopback: isLoopbackOrigin(origin) }));
+  const records = await listAccessTokens();
+  // A record with no kind is a device (PAN-2351 FR-10).
+  const active = records.filter((record) => (record.kind ?? 'device') === 'device' && !record.revokedAt).length;
+  const vault = await readAnywhereVaultState();
+  return {
+    machine,
+    addresses,
+    devices: { active },
+    vault,
+    problems: computeAnywhereProblems({ identityError, addresses, vault }),
+  };
+}
+
+const anywhereStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/anywhere/status',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    return noStore(jsonResponse(yield* Effect.promise(() => buildAnywhereStatus())));
+  }),
+);
+
+export const anywhereRouteLayer = Layer.mergeAll(addTrustedOriginRoute, anywhereStatusRoute);
