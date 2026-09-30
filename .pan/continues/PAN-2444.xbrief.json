@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-30T00:46:38.095Z",
+  "updated": "2026-09-30T00:46:51.909Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "known-pack-sageox.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T00:46:38.095Z"
+    },
+    "known-pack-sageox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T00:46:51.909Z"
     }
   }
 }
