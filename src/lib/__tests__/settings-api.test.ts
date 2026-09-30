@@ -7,6 +7,13 @@ const mockReadFile = vi.fn();
 const mockWriteFile = vi.fn();
 const mockClearConfigCache = vi.fn();
 const mockMergeConfigs = vi.fn(() => ({ config: {}, explicitlyDisabled: new Set() }));
+const mockReadRemoteAccessConfig = vi.fn(() => ({ requireTokenMint: false }));
+const mockInvalidateRemoteAccessConfig = vi.fn();
+
+vi.mock('../remote-access/config.js', () => ({
+  readRemoteAccessConfig: () => mockReadRemoteAccessConfig(),
+  invalidateRemoteAccessConfig: () => mockInvalidateRemoteAccessConfig(),
+}));
 
 vi.mock('fs/promises', () => ({
   readFile: (...args: unknown[]) => mockReadFile(...args),
@@ -175,6 +182,7 @@ describe('loadSettingsApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLoadConfig.mockReturnValue(baseConfig());
+    mockReadRemoteAccessConfig.mockReturnValue({ requireTokenMint: false });
   });
 
   it('loads conversation compaction settings from config', async () => {
@@ -221,6 +229,13 @@ describe('loadSettingsApi', () => {
 
     mockLoadConfig.mockReturnValue(baseConfig({ ui: { openInEditorCommand: null, theme: 'ledger' } }));
     expect(loadSettingsApi().ui?.theme).toBe('ledger');
+  });
+
+  it('reports dashboard.require_token_mint from the enforced value, not the merged config (D-1)', async () => {
+    mockReadRemoteAccessConfig.mockReturnValue({ requireTokenMint: true });
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().dashboard).toEqual({ require_token_mint: true });
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -397,7 +412,32 @@ describe('saveSettingsApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLoadConfig.mockReturnValue(baseConfig());
+    mockReadRemoteAccessConfig.mockReturnValue({ requireTokenMint: false });
     mockReadFile.mockResolvedValue('# user comment\nmodels:\n  providers:\n    anthropic: true\n  overrides:\n    issue-agent:implementation: glm-5.1\n');
+  });
+
+  it('writes dashboard.require_token_mint and invalidates the enforcement cache (D-3, D-4)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, dashboard: { require_token_mint: true } });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('dashboard:');
+    expect(written).toContain('require_token_mint: true');
+    expect(mockClearConfigCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateRemoteAccessConfig).toHaveBeenCalledOnce();
+  });
+
+  it('never deletes the dashboard block when a save omits it (D-3: security flag)', async () => {
+    mockReadFile.mockResolvedValue('dashboard:\n  require_token_mint: true\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, dashboard: undefined });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('require_token_mint: true');
   });
 
   it('round-trips config.yaml comments while writing roles, memory settings, and dropping overrides', async () => {
@@ -1193,6 +1233,31 @@ describe('validateSettingsApi', () => {
     // Echoing back the theme unchanged (the ordinary whole-document round
     // trip) is unaffected.
     expect(validateSettingsApi({ ...validSettings, ui: { theme: 'broadsheet' } }).valid).toBe(true);
+  });
+
+  it('accepts a valid dashboard.require_token_mint boolean', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    expect(validateSettingsApi({ ...validSettings, dashboard: { require_token_mint: true } }).valid).toBe(true);
+  });
+
+  it('rejects a non-object dashboard with 400-worthy errors (FR-6)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({ ...validSettings, dashboard: 'yes' as unknown as ApiSettingsConfig['dashboard'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('dashboard must be an object');
+  });
+
+  it('rejects a non-boolean dashboard.require_token_mint (FR-6)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({
+      ...validSettings,
+      dashboard: { require_token_mint: 'yes' as unknown as boolean },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('dashboard.require_token_mint must be a boolean');
   });
 });
 

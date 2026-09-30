@@ -42,7 +42,7 @@ export function readRemoteAccessConfig(): RemoteAccessConfig {
   return cached;
 }
 
-/** Test-only: forget the cached value so the next read re-parses config.yaml. */
-export function _resetRemoteAccessConfigForTests(): void {
+/** Forget the cached value so the next read re-parses config.yaml. */
+export function invalidateRemoteAccessConfig(): void {
   cached = undefined;
 }
