@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4438",
   "created": "2026-09-30T16:41:39.289Z",
-  "updated": "2026-09-30T18:01:38.317Z",
+  "updated": "2026-09-30T18:18:33.739Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-30T18:18Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-09-30T18:18:33.739Z"
+    }
+  ],
   "items": {
     "waiver-store": {
       "status": "completed",
@@ -133,5 +139,14 @@
       "status": "completed",
       "doneAt": "2026-09-30T18:01:38.317Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-30T18:18:33Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4438 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (302850ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4438/.overdeck/verification/2026-09-30T18-04-07-071Z-66967e61.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4438/.overdeck/verification/2026-09-30T18-04-07-071Z-66967e61.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4438 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4438 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
 }
