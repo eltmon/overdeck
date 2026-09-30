@@ -131,7 +131,7 @@ async function resolve(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex'
   const root = await deps.gitRoot(ctx.cwd);
   if (!root) return { active: false, warnings: [`${WARN} SageOx not applied: ${ctx.cwd} is not in a git repository`] };
   if (!(await isDirectory(join(root, '.sageox')))) {
-    return { active: false, warnings: [`${WARN} SageOx not applied: no .sageox/ at ${root}; run OX_HOST_MANAGED=1 ox init there once`] };
+    return { active: false, warnings: [`${WARN} SageOx not applied: no .sageox/ at ${root}; run OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init there once`] };
   }
   const probe = await deps.probe();
   if (!probe.ok) {
