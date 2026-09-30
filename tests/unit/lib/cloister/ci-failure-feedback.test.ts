@@ -162,6 +162,7 @@ function makeGhMocks(logExcerpt = 'FAIL: assertion failed') {
 describe('relayCiFailureFeedback', () => {
   it('writes feedback and messages the work agent', async () => {
     makeGhMocks();
+    const surfaceNeedsYou = vi.fn(async () => undefined);
 
     const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
@@ -171,7 +172,7 @@ describe('relayCiFailureFeedback', () => {
       headRef: 'feature/pan-1801',
       prUrl: 'https://github.com/test-owner/test-repo/pull/42',
       source: 'check_run:test',
-    });
+    }, { surfaceNeedsYou });
 
     expect(result.agentMessageSent).toBe(true);
     expect(result.feedbackPath).toBe('/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md');
@@ -186,6 +187,54 @@ describe('relayCiFailureFeedback', () => {
       specialist: 'ci-monitor',
       outcome: 'failed',
     }));
+    expect(surfaceNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('surfaces needs-you when the CI FAILED message is not delivered (PAN-4432)', async () => {
+    makeGhMocks();
+    mockMessageAgent.mockResolvedValue({ delivered: false, queuedToMail: false, reason: 'pane gone' });
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+
+    const result = await relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+      source: 'check_run:test',
+    }, { surfaceNeedsYou });
+
+    expect(result.agentMessageSent).toBe(false);
+    expect(surfaceNeedsYou).toHaveBeenCalledTimes(1);
+    expect(surfaceNeedsYou).toHaveBeenCalledWith(
+      'PAN-1801',
+      expect.stringContaining('pane gone'),
+      expect.objectContaining({ specialist: 'ci-monitor' }),
+    );
+  });
+
+  it('surfaces needs-you when messaging the agent throws (PAN-4432)', async () => {
+    makeGhMocks();
+    mockMessageAgent.mockRejectedValue(new Error('x'));
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+
+    await relayCiFailureFeedback({
+      issueId: 'PAN-1801',
+      repo: 'test-owner/test-repo',
+      prNumber: 42,
+      headSha: 'abc123def456',
+      headRef: 'feature/pan-1801',
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+      source: 'check_run:test',
+    }, { surfaceNeedsYou });
+
+    expect(surfaceNeedsYou).toHaveBeenCalledTimes(1);
+    expect(surfaceNeedsYou).toHaveBeenCalledWith(
+      'PAN-1801',
+      expect.stringContaining('x'),
+      expect.objectContaining({ specialist: 'ci-monitor' }),
+    );
   });
 
   it('labels failures inherited from main', async () => {
@@ -227,6 +276,7 @@ describe('relayCiFailureFeedback', () => {
   });
 
   it('skips feedback when no work agent exists', async () => {
+    const log = vi.spyOn(console, 'log');
     mockGetAgentStateSync.mockReturnValue(null);
 
     const result = await relayCiFailureFeedback({
@@ -241,9 +291,11 @@ describe('relayCiFailureFeedback', () => {
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('no work agent'));
   });
 
   it('skips feedback for non-work agent roles', async () => {
+    const log = vi.spyOn(console, 'log');
     mockGetAgentStateSync.mockReturnValue({
       id: 'agent-pan-1801',
       issueId: 'PAN-1801',
@@ -265,6 +317,7 @@ describe('relayCiFailureFeedback', () => {
 
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('agent role is review'));
   });
 
   it('still messages the agent when gh log fetch fails', async () => {
@@ -871,6 +924,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
   });
 
   it('ignores a red test job reported for a head the PR has moved past', async () => {
+    const log = vi.spyOn(console, 'log');
     makeGhMocks();
     const readPrFacts = vi.fn(async () => facts({ headSha: 'newer0000000', checks: 'red', testChecks: 'red' }));
 
@@ -878,9 +932,11 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
 
     expect(result.testGateFailed).toBeUndefined();
     expect(readPipelineJournal(workspacePath)).toEqual([]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('the PR head is now'));
   });
 
   it('leaves a verification.tests: local project to the local gate', async () => {
+    const log = vi.spyOn(console, 'log');
     makeGhMocks();
     mockFindProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: projectPath, verification: { tests: 'local' } });
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
@@ -895,5 +951,6 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(result.testGateFailed).toBeUndefined();
     expect(passRecorded).toBe(false);
     expect(readPipelineJournal(workspacePath)).toEqual([]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('tests are not in CI mode'));
   });
 });
