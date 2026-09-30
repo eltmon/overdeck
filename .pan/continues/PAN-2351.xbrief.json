@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T16:52:17.842Z",
+  "updated": "2026-09-30T16:52:23.601Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-2351",
       "claimedAt": "2026-09-30T16:43:28.608Z",
       "doneAt": "2026-09-30T16:52:17.842Z"
+    },
+    "gate-scope-enforcement": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2351",
+      "claimedAt": "2026-09-30T16:52:23.601Z"
     }
   }
 }
