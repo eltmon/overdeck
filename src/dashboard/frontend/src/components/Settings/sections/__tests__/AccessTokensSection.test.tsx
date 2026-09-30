@@ -28,14 +28,17 @@ const RECORD_B = {
   revokedAt: '2026-08-20T00:00:00.000Z',
 };
 
-function renderSection() {
+function renderSection(opts: { formData?: SettingsConfig; onSettingsChange?: (next: SettingsConfig) => void } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <DialogProvider>
-        <AccessTokensSection formData={{} as SettingsConfig} onSettingsChange={vi.fn()} />
+        <AccessTokensSection
+          formData={opts.formData ?? ({} as SettingsConfig)}
+          onSettingsChange={opts.onSettingsChange ?? vi.fn()}
+        />
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -256,5 +259,42 @@ describe('AccessTokensSection — create-token dialog (PAN-4435 WI-5)', () => {
     const notice = await within(dialog).findByTestId('access-tokens-forbidden');
     expect(notice.textContent).toContain('scoped tokens may not create access tokens');
     expect(notice.textContent).toContain("Only this machine's own dashboard session");
+  });
+});
+
+describe('AccessTokensSection — require_token_mint toggle row (PAN-4435 WI-6)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('calls onSettingsChange with dashboard.require_token_mint true, leaving other fields unchanged, when toggled from off', async () => {
+    mockFetch();
+    const onSettingsChange = vi.fn();
+    const formData = { ui: { theme: 'broadsheet' } } as unknown as SettingsConfig;
+    renderSection({ formData, onSettingsChange });
+    await screen.findByText('ci-bot');
+
+    fireEvent.click(screen.getByRole('switch'));
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ui: { theme: 'broadsheet' },
+      dashboard: { require_token_mint: true },
+    });
+  });
+
+  it('renders the "a new browser on this machine then needs" sentence', async () => {
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    expect(screen.getByText(/a new browser on this machine then needs/)).toBeInTheDocument();
+  });
+
+  it('renders the toggle aria-checked="false" when formData has no dashboard key', async () => {
+    mockFetch();
+    renderSection({ formData: {} as SettingsConfig });
+    await screen.findByText('ci-bot');
+
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
   });
 });

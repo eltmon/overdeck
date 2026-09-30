@@ -5,6 +5,7 @@ import { useConfirm } from '../../DialogProvider';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 import { type SettingsConfig } from '../types';
 import { CreateAccessTokenDialog } from './CreateAccessTokenDialog';
+import { RequireTokenMintRow } from './RequireTokenMintRow';
 import {
   ACCESS_TOKENS_FORBIDDEN_EXPLANATION,
   AccessTokensForbiddenError,
@@ -39,7 +40,7 @@ function formatTimestamp(iso: string | null): string {
   return new Date(iso).toLocaleString();
 }
 
-export function AccessTokensSection({ formData: _formData, onSettingsChange: _onSettingsChange }: AccessTokensSectionProps) {
+export function AccessTokensSection({ formData, onSettingsChange }: AccessTokensSectionProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [error, setError] = useState<Error | null>(null);
@@ -88,6 +89,8 @@ export function AccessTokensSection({ formData: _formData, onSettingsChange: _on
         Scoped API tokens let a script, sidecar or another machine call this dashboard with{' '}
         <code>Authorization: Bearer odk_…</code>.
       </p>
+
+      <RequireTokenMintRow formData={formData} onSettingsChange={onSettingsChange} />
 
       <button
         type="button"
