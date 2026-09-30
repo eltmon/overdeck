@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4436",
+  "created": "2026-09-30T19:37:03.917Z",
+  "updated": "2026-09-30T19:37:03.917Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ledger-costs-extract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4436",
+      "claimedAt": "2026-09-30T19:37:03.917Z"
+    }
+  }
+}
