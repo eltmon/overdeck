@@ -174,6 +174,50 @@ describe('AddProjectDialog', () => {
     expect(takeAddProjectReturnTo()).toBeUndefined();
   });
 
+  it('show with initialUrl opens clone mode with the URL filled in and resolves it (PAN-4437)', async () => {
+    routeFetch();
+    act(() => useAddProjectDialog.getState().show('clone', undefined, { initialUrl: 'https://github.com/acme/widget.git' }));
+    renderHost();
+
+    expect(screen.getByLabelText('Repository URL')).toHaveValue('https://github.com/acme/widget.git');
+    await waitFor(() => {
+      const resolveBodies = fetchMock.mock.calls
+        .filter(([url]) => url === '/api/projects/resolve')
+        .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { url?: string });
+      expect(resolveBodies.some((body) => body.url === 'https://github.com/acme/widget.git')).toBe(true);
+    });
+  });
+
+  it("a create calls show's extra onCreated once, after the host's (PAN-4437)", async () => {
+    const user = userEvent.setup();
+    routeFetch();
+    const order: string[] = [];
+    const extra = vi.fn(() => order.push('extra'));
+    act(() => useAddProjectDialog.getState().show('clone', undefined, { initialUrl: 'acme/widget', onCreated: extra }));
+    renderHost(() => order.push('host'));
+
+    const cta = screen.getByRole('button', { name: 'Clone repository' });
+    await waitFor(() => expect(cta).toBeEnabled());
+    await user.click(cta);
+
+    await waitFor(() => expect(extra).toHaveBeenCalledTimes(1));
+    expect(extra).toHaveBeenCalledWith(expect.objectContaining({ key: 'widget' }));
+    expect(order).toEqual(['host', 'extra']);
+    expect(useAddProjectDialog.getState().open).toBe(false);
+  });
+
+  it('hide clears the prefilled URL so a plain show opens empty (PAN-4437)', () => {
+    routeFetch();
+    act(() => useAddProjectDialog.getState().show('clone', undefined, { initialUrl: 'acme/widget', onCreated: () => {} }));
+    act(() => useAddProjectDialog.getState().hide());
+    expect(useAddProjectDialog.getState().initialUrl).toBeUndefined();
+    expect(useAddProjectDialog.getState().onCreatedExtra).toBeUndefined();
+
+    act(() => useAddProjectDialog.getState().show('clone'));
+    renderHost();
+    expect(screen.getByLabelText('Repository URL')).toHaveValue('');
+  });
+
   it('start step copy contains no simple-mode banned words', async () => {
     routeFetch();
     act(() => useAddProjectDialog.getState().show());
