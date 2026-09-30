@@ -4,17 +4,17 @@
     "created": "2026-09-30T16:24:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2351: Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
-    "updated": "2026-09-30T16:28:24.959Z"
+    "updated": "2026-09-30T16:29:19.966Z"
   },
   "plan": {
     "id": "pan-2351",
     "title": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
-    "status": "proposed",
+    "status": "running",
     "uid": "239f84e5-4582-4898-a4c0-83c7c7ad80ed",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T16:24:34Z",
-    "updated": "2026-09-30T16:28:24.959Z",
+    "updated": "2026-09-30T16:29:19.966Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2351",
@@ -936,5 +936,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
