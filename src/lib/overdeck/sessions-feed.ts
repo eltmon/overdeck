@@ -311,7 +311,7 @@ function branchSql(source: SessionsFeedSource, filter: ConversationFilter): Bran
           LIMIT 1
         )
         LEFT JOIN discovered_sessions ds ON ds.session_id = cf.locator
-        WHERE c.archived_at IS NOT NULL
+        WHERE c.archived_at IS NOT NULL AND c.origin <> 'vault'
       ) af
       ${where}
     `,
