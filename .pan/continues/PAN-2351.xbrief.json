@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2351",
   "created": "2026-09-30T16:29:39.203Z",
-  "updated": "2026-09-30T17:40:56.439Z",
+  "updated": "2026-09-30T17:41:11.072Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "credential-scopes.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T17:40:56.438Z"
+    },
+    "credential-scopes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:11.072Z"
     }
   }
 }
