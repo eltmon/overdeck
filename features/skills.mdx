@@ -392,15 +392,15 @@ The Skills page shows the same text on the `sageox` pack row.
 
    The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
 
-3. **In each repository you choose**, log in and initialize SageOx yourself, once. Overdeck never runs these commands. Host-managed `ox init` writes only `.sageox/`:
+3. **In each repository you choose**, log in and initialize SageOx yourself, once. Overdeck never runs these commands. Host-managed `ox init` writes only `.sageox/` (no `AGENTS.md`/`CLAUDE.md` markers, no hook files, no git hooks). It registers the repository with SageOx, so it needs the network:
 
    ```bash
    ox login
-   OX_HOST_MANAGED=1 ox init
-   ox status        # without OX_HOST_MANAGED: lets the ox daemon clone the project's ledger once
+   OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init
+   ox status        # wait until it shows the project's ledger
    ```
 
-   Session recording writes into a local clone of the project's SageOx ledger. Only the ox daemon clones it, and it needs the network, so run one plain `ox` command in the repo after `ox init` and wait for `ox status` to show the ledger. With uploads off, Overdeck keeps `ox` offline and no daemon runs, so without this clone SageOx records nothing.
+   Session recording writes into a local clone of the project's SageOx ledger. The ox daemon that `ox init` starts clones it; wait until `ox status` shows the ledger. With uploads off, Overdeck keeps `ox` offline and no daemon runs, so without this clone SageOx records nothing.
 
 4. **Turn the pack on** for that project (or one issue):
 
