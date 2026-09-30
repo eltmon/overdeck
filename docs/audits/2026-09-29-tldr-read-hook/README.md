@@ -33,6 +33,7 @@ measure llm-tldr's other features or every summarize-first design.
 - The injected outlines themselves added about 159K tokens.
 - Each re-read cost on average 1.12 extra model turns. An extra turn re-read about
   179K tokens of conversation context (mostly from the prompt cache).
+- About 97% of the extra turns' input tokens were prompt-cache reads.
 - Cost of the extra turns: 9.9M input-token equivalents. Best-case savings: 3.5M.
   For every token the hook saved, the extra turns cost about 2.8. Net: -6.4M.
 - Timing: the hook took about 250 ms per blocked read on this machine, before the

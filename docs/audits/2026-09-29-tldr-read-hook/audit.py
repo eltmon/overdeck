@@ -126,6 +126,8 @@ for r in rows:
 out['extra_turns_total'] = sum(r['extra_turns'] for r in rows)
 out['extra_turns_mean_per_reread'] = round(out['extra_turns_total'] / max(1, n - oc['summary_only']), 2)
 out['extra_turn_context_tokens_mean'] = round(statistics.mean([(r['extra_in']+r['extra_cr']+r['extra_cw'])/r['extra_turns'] for r in rows if r['extra_turns']]))
+tr_in = sum(r['extra_in'] + r['extra_cr'] + r['extra_cw'] for r in rows)
+out['extra_turn_cache_read_share'] = round(sum(r['extra_cr'] for r in rows) / tr_in, 3) if tr_in else None
 out['cost_extra_turns_input_equiv_tokens'] = round(extra_cost)
 out['saving_upper_bound_input_equiv_tokens'] = round(save)
 out['net_input_equiv_tokens'] = round(save - extra_cost)

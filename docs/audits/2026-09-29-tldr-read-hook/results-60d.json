@@ -1,7 +1,7 @@
 {
   "window_days": 60,
-  "transcripts_scanned": 6564,
-  "sessions_with_denials": 148,
+  "transcripts_scanned": 6568,
+  "sessions_with_denials": 151,
   "denials": 414,
   "first_denial": "2026-08-09T21:24:07.400Z",
   "last_denial": "2026-09-29T22:24:33.128Z",
@@ -27,6 +27,7 @@
   "extra_turns_total": 411,
   "extra_turns_mean_per_reread": 1.12,
   "extra_turn_context_tokens_mean": 179454,
+  "extra_turn_cache_read_share": 0.969,
   "cost_extra_turns_input_equiv_tokens": 9927166,
   "saving_upper_bound_input_equiv_tokens": 3504649,
   "net_input_equiv_tokens": -6422516,
