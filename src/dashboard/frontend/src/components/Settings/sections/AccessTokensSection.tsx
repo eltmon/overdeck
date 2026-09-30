@@ -4,37 +4,22 @@ import { KeyRound } from 'lucide-react';
 import { useConfirm } from '../../DialogProvider';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 import { type SettingsConfig } from '../types';
-
-export interface AccessTokenRecord {
-  id: string;
-  name: string;
-  scopes: string[];
-  createdAt: string;
-  lastUsedAt: string | null;
-  revokedAt?: string;
-}
+import { CreateAccessTokenDialog } from './CreateAccessTokenDialog';
+import {
+  ACCESS_TOKENS_FORBIDDEN_EXPLANATION,
+  AccessTokensForbiddenError,
+  throwForAccessTokensResponse,
+  type AccessTokenRecord,
+} from './accessTokensShared';
 
 interface AccessTokensSectionProps {
   formData: SettingsConfig;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
 }
 
-/** A 403 from any access-token route (PAN-4435 D-8). */
-export class AccessTokensForbiddenError extends Error {}
-
-const FORBIDDEN_EXPLANATION =
-  'This browser is signed in as a paired device or with a scoped token. Only this machine\'s own dashboard session can create or revoke access tokens; use `pan token` on this machine instead.';
-
-async function throwForResponse(res: Response, fallback: string): Promise<never> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  const message = body?.error ?? fallback;
-  if (res.status === 403) throw new AccessTokensForbiddenError(message);
-  throw new Error(message);
-}
-
 async function fetchAccessTokens(): Promise<AccessTokenRecord[]> {
   const res = await fetch('/api/access-tokens', { credentials: 'include' });
-  if (!res.ok) return throwForResponse(res, `Failed to load access tokens (${res.status})`);
+  if (!res.ok) return throwForAccessTokensResponse(res, `Failed to load access tokens (${res.status})`);
   const body = await res.json() as { tokens: AccessTokenRecord[] };
   return body.tokens;
 }
@@ -46,7 +31,7 @@ async function revokeAccessToken(id: string): Promise<void> {
     credentials: 'include',
     headers: await dashboardMutationJsonHeaders(),
   });
-  if (!res.ok) return throwForResponse(res, `Failed to revoke access token (${res.status})`);
+  if (!res.ok) return throwForAccessTokensResponse(res, `Failed to revoke access token (${res.status})`);
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -58,6 +43,7 @@ export function AccessTokensSection({ formData: _formData, onSettingsChange: _on
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [error, setError] = useState<Error | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: tokens, error: queryError } = useQuery({
     queryKey: ['access-tokens'],
@@ -103,9 +89,18 @@ export function AccessTokensSection({ formData: _formData, onSettingsChange: _on
         <code>Authorization: Bearer odk_…</code>.
       </p>
 
+      <button
+        type="button"
+        data-testid="access-token-create"
+        onClick={() => setCreateOpen(true)}
+        className="mb-4 text-xs px-3 py-1.5 rounded-md border border-border bg-background hover:bg-muted/50"
+      >
+        Create token
+      </button>
+
       {forbidden && (
         <p role="alert" data-testid="access-tokens-forbidden" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive mb-4">
-          {forbidden.message} {FORBIDDEN_EXPLANATION}
+          {forbidden.message} {ACCESS_TOKENS_FORBIDDEN_EXPLANATION}
         </p>
       )}
       {otherError && (
@@ -155,6 +150,12 @@ export function AccessTokensSection({ formData: _formData, onSettingsChange: _on
           ))}
         </tbody>
       </table>
+
+      <CreateAccessTokenDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => void queryClient.invalidateQueries({ queryKey: ['access-tokens'] })}
+      />
     </section>
   );
 }

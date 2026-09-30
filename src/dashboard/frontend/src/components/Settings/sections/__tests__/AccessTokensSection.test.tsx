@@ -48,6 +48,9 @@ function mockFetch(opts: {
   onDelete?: (id: string) => void;
   deleteStatus?: number;
   deleteError?: string;
+  onCreate?: (body: { name: string; scopes: string[] }) => void;
+  createStatus?: number;
+  createError?: string;
 } = {}) {
   const tokens = opts.tokens ?? [RECORD_A, RECORD_B];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -57,6 +60,17 @@ function mockFetch(opts: {
         return new Response(JSON.stringify({ error: opts.listError ?? 'forbidden' }), { status: opts.listStatus });
       }
       return new Response(JSON.stringify({ tokens }), { status: 200 });
+    }
+    if (url === '/api/access-tokens' && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { name: string; scopes: string[] };
+      if (opts.createStatus && opts.createStatus !== 200) {
+        return new Response(JSON.stringify({ error: opts.createError ?? 'forbidden' }), { status: opts.createStatus });
+      }
+      opts.onCreate?.(body);
+      return new Response(JSON.stringify({
+        token: 'odk_plaintext_example',
+        record: { id: 'tok-new', name: body.name, scopes: body.scopes, createdAt: '2026-09-06T00:00:00.000Z', lastUsedAt: null },
+      }), { status: 200 });
     }
     if (url.startsWith('/api/access-tokens/') && init?.method === 'DELETE') {
       const id = decodeURIComponent(url.split('/').pop() ?? '');
@@ -144,5 +158,103 @@ describe('AccessTokensSection', () => {
     const remoteIndex = ids.indexOf('remote');
     expect(remoteIndex).toBeGreaterThanOrEqual(0);
     expect(ids[remoteIndex + 1]).toBe('access-tokens');
+  });
+});
+
+describe('AccessTokensSection — create-token dialog (PAN-4435 WI-5)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function openDialog() {
+    fireEvent.click(screen.getByTestId('access-token-create'));
+    return screen.getByRole('dialog');
+  }
+
+  it('keeps Create disabled with a blank name or no scope checked', async () => {
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    const dialog = openDialog();
+    const createButton = within(dialog).getByRole('button', { name: 'Create' });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'my-script' } });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'tell' }));
+    expect(createButton).not.toBeDisabled();
+  });
+
+  it('posts { name, scopes } and shows the returned plaintext token', async () => {
+    const onCreate = vi.fn();
+    mockFetch({ onCreate });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    const dialog = openDialog();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'my-script' } });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'tell' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ name: 'my-script', scopes: ['tell'] }));
+    expect(await within(dialog).findByTestId('access-token-plaintext')).toHaveValue('odk_plaintext_example');
+  });
+
+  it('copies the plaintext token to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    const dialog = openDialog();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'my-script' } });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'tell' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    await within(dialog).findByTestId('access-token-plaintext');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('odk_plaintext_example'));
+    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument();
+  });
+
+  it('clears the plaintext and the name field after Close and reopening', async () => {
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    let dialog = openDialog();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'my-script' } });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'tell' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    await within(dialog).findByTestId('access-token-plaintext');
+
+    // Close via the header's X button (the only button while the plaintext view is shown).
+    fireEvent.click(within(dialog).getAllByRole('button')[0]);
+
+    dialog = openDialog();
+    expect(within(dialog).queryByTestId('access-token-plaintext')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox')).toHaveValue('');
+  });
+
+  it('shows the forbidden notice inside the dialog on a 403 from create', async () => {
+    mockFetch({ createStatus: 403, createError: 'scoped tokens may not create access tokens' });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    const dialog = openDialog();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'my-script' } });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'tell' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const notice = await within(dialog).findByTestId('access-tokens-forbidden');
+    expect(notice.textContent).toContain('scoped tokens may not create access tokens');
+    expect(notice.textContent).toContain("Only this machine's own dashboard session");
   });
 });
