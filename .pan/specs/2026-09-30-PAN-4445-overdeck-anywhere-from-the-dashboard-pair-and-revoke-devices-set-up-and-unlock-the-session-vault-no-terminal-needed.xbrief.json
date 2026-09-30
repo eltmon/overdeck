@@ -1,0 +1,788 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T19:24:27Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4445: Overdeck Anywhere from the dashboard: pair and revoke devices, set up and unlock the Session Vault, no terminal needed",
+    "updated": "2026-09-30T19:26:46.319Z"
+  },
+  "plan": {
+    "id": "pan-4445",
+    "title": "Overdeck Anywhere from the dashboard: pair and revoke devices, set up and unlock the Session Vault, no terminal needed",
+    "status": "proposed",
+    "uid": "39115d6b-c5bf-482b-8d4a-0ca0738ac0f6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T19:24:27Z",
+    "updated": "2026-09-30T19:26:46.319Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4445",
+        "label": "PAN-4445",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4445.md",
+        "label": "PRD draft (.pan/drafts/PAN-4445.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4446",
+        "label": "PAN-4446 (sibling: Session Vault from the dashboard)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "overdeck-anywhere",
+      "dashboard",
+      "settings",
+      "pairing",
+      "remote-access",
+      "security"
+    ],
+    "metadata": {
+      "sizeJustification": "The Session Vault half of the issue was split into sibling PAN-4446 (blocked by PAN-4307). What remains is one vertical feature: a trusted-origin store, two routes in one new route file, and three frontend components mounted in one new Settings section plus the Health page.",
+      "canonicalFilename": "2026-09-30-PAN-4445-overdeck-anywhere-from-the-dashboard-pair-and-revoke-devices-set-up-and-unlock-the-session-vault-no-terminal-needed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Pairing and device revocation work only through `pan pair` / `pan devices`, and adding the address other devices use (OVERDECK_TRUSTED_ORIGINS) needs a terminal and a dashboard restart. The server routes for pairing and devices exist (PAN-3762) but have no screens, and nothing in the dashboard tells the operator whether this machine is reachable, how many devices are paired, or what state the Session Vault is in.",
+      "Proposal": "Add a persisted trusted-origin list (~/.overdeck/trusted-origins.json) merged into getTrustedOrigins() in every launch mode, a root-session-only POST /api/anywhere/trusted-origins, and GET /api/anywhere/status (machine identity, addresses, active device count, vault state, and problems with fix actions). Build Settings -> Anywhere with a Devices panel (list with scopes and last seen, in-app-confirmed Revoke), a Pair-a-device dialog (address pick/add, pairing link, QR, expiry), and an Anywhere status card also shown on the Health page. The dashboard calls the same pairing/devices routes the CLI calls. Session Vault setup/join/unlock/sync controls ship in sibling PAN-4446, in PAN-4307's Settings -> Session Vault section; the card links there.",
+      "NonGoals": "- Session Vault setup, join, unlock, passphrase and Sync now from the dashboard (sibling PAN-4446)\n- A vault lock action, and dashboard-driven vault key rotation\n- Removing or editing saved trusted addresses from the UI\n- Changing `pan pair` / `pan devices` output, or adding a trusted-origin CLI verb\n- The Access Tokens Settings section and the require_token_mint toggle (PAN-4435)\n- Browse copies and Continue here (PAN-4436, PAN-4437)\n- Automatic endpoint discovery (PAN-4403) and the TTS daemon's OVERDECK_TRUSTED_ORIGINS read\n- Letting a paired device, an access token or the internal token (pipeline agents) create pairing links or add trusted addresses\n- Any UI text that tells the operator to run a `pan` command"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the Session Vault half into sibling issue PAN-4446, blocked by PAN-4307; PAN-4445 keeps devices, trusted origins and the status card.",
+        "rationale": "The combined scope exceeds the plan-size gate (more than 25 files, more than 6 subsystems), and the vault half builds on files that the unmerged PAN-4307 (PR #4444) adds, while this half depends on nothing in flight. The full vault design is in the PRD's sibling section."
+      },
+      {
+        "summary": "Vault setup controls go into PAN-4307's Settings -> Session Vault section, not a second vault panel under Anywhere.",
+        "rationale": "PAN-4307 already adds a state-aware session-vault section; two vault panels would duplicate a surface. The Anywhere card links to it with requestSettingsSection('session-vault')."
+      },
+      {
+        "summary": "Persist saved trusted origins in ~/.overdeck/trusted-origins.json and merge them into getTrustedOrigins() in every launch mode.",
+        "rationale": "config.yaml writes go through the capped settings-api.ts and PAN-4435 is adding dashboard.* keys concurrently; a dedicated file avoids both, and merging outside the bare-launch branch keeps Traefik/env launches trusting saved origins."
+      },
+      {
+        "summary": "Only the root session may add a trusted origin; internal token, devices and scoped tokens get 403. Loopback origins are refused.",
+        "rationale": "Mirrors PAN-2351 D-11 for pairing credentials and makes 'never exposed to pipeline agents' mechanically checkable, since agents hold only the internal token. Loopback origins are already trusted for this port."
+      },
+      {
+        "summary": "Define 'unlock' as joining with the passphrase or recovery phrase on a machine whose backend is configured but whose key is missing or retired; there is no lock action.",
+        "rationale": "No `pan vault unlock` verb exists; the vault key is a file, and deleting it to 'lock' would be destructive."
+      },
+      {
+        "summary": "The rotation-pending problem has no fix button; it states the fact and links the docs.",
+        "rationale": "Dashboard-driven key rotation is a separate, rare, high-risk operation outside this issue's scope."
+      },
+      {
+        "summary": "Extend configuration/remote-access.mdx instead of creating a configuration/anywhere.mdx page.",
+        "rationale": "remote-access.mdx is already the Configuration page for pairing and devices; the root anywhere.mdx is the plans-and-pricing page."
+      },
+      {
+        "summary": "Use qrcode-generator 2.0.4 (MIT, zero dependencies, ships types) for the QR code, rendered as a data-URL <img>.",
+        "rationale": "No QR library exists in the repo; this one is small, typed and avoids innerHTML."
+      },
+      {
+        "summary": "Vault state for the status card uses openVaultContext() when PAN-4307's src/lib/vault/open.ts is on main, otherwise readVaultConfig() + key.next + loadVaultKey().",
+        "rationale": "Keeps this issue independent of PAN-4307's merge order while giving the same states once it lands."
+      }
+    ],
+    "items": [
+      {
+        "id": "trusted-origins-store",
+        "title": "Persist saved trusted origins and merge them into getTrustedOrigins()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4445",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "trusted-origin-route",
+            "anywhere-status-route",
+            "pair-dialog"
+          ],
+          "files_scope": [
+            "src/lib/remote-access/loopback.ts",
+            "src/lib/remote-access/trusted-origins.ts",
+            "src/cli/commands/pair.ts",
+            "src/dashboard/server/routes/origin-validation.ts",
+            "tests/unit/lib/remote-access/trusted-origins.test.ts",
+            "src/dashboard/server/routes/__tests__/origin-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote-access/trusted-origins.test.ts src/dashboard/server/routes/__tests__/origin-validation.test.ts tests/unit/cli/pair.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three vitest files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/remote-access/loopback.ts (import-free isLoopbackOrigin, the body of pan pair's isLoopbackBase) and have src/cli/commands/pair.ts re-export it as isLoopbackBase. Create src/lib/remote-access/trusted-origins.ts with trustedOriginsPath(), normalizeTrustedOrigin(), readSavedTrustedOriginsSync() (documented sync caller: getTrustedOrigins) and addSavedTrustedOrigin(raw, alreadyTrusted) writing {version:1, origins} atomically via temp file + rename. In origin-validation.ts add the saved origins to the set immediately above the NODE_ENV development block, outside the !hasEnvOriginConfig branch, and export invalidateTrustedOriginsCache(). Write the tests listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "trusted-origins-store.ac1",
+            "title": "Given an empty OVERDECK_HOME, when addSavedTrustedOrigin('https://desk.tailnet.ts.net/some/path', []) runs, then it returns { ok: true, origin: 'https://desk.tailnet.ts.net', added: true } and trusted-origins.json persists that origin; a second call returns added: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origins-store.ac2",
+            "title": "Given 'http://localhost:3011', 'ftp://x' or 'not a url', addSavedTrustedOrigin returns { ok: false } with reason 'loopback' or 'invalid' and writes no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origins-store.ac3",
+            "title": "Given a saved origin and OVERDECK_TRAEFIK_ENABLED=1 in the environment, getTrustedOrigins() returns a list that includes the saved origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origins-store.ac4",
+            "title": "Given getTrustedOrigins() was already cached, when a new origin is saved and invalidateTrustedOriginsCache() is called, then validateOriginHeaders with that Origin on a POST returns { ok: true } without resetting env",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origins-store.ac5",
+            "title": "tests/unit/cli/pair.test.ts passes unchanged, and isLoopbackBase is exported from pair.ts as a re-export of isLoopbackOrigin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-scopes",
+        "title": "Include scopes in GET /api/devices rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/__tests__/devices-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/devices-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "devices-routes.test.ts passes including the scopes assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In deviceView() in src/dashboard/server/routes/pairing.ts add `scopes: [...record.scopes],` after name. Extend devices-routes.test.ts with a scopes assertion."
+        },
+        "items": [
+          {
+            "id": "device-scopes.ac1",
+            "title": "Given a device created with scopes ['admin'], GET /api/devices returns that row with scopes ['admin']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-scopes.ac2",
+            "title": "The GET /api/devices response body still contains no tokenHash field for any row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trusted-origin-route",
+        "title": "Add root-session-only POST /api/anywhere/trusted-origins",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4445",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pair-dialog",
+            "playwright-devices"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/anywhere-trusted-origins.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/anywhere-trusted-origins.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "anywhere-trusted-origins.test.ts and the no-loss-matrix tests pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/server/routes/anywhere.ts with POST /api/anywhere/trusted-origins exactly as the PRD snippet: rejectUnsafeDashboardMutationRequest, then 403 unless resolveDashboardCredential(...).kind === 'root-session', then addSavedTrustedOrigin(origin, getTrustedOrigins()), 400 on invalid/loopback, invalidateTrustedOriginsCache() and an activity entry when added. Export anywhereRouteLayer and register it in server.ts next to pairingRouteLayer. Add the no-loss-matrix row after the DELETE /api/devices/:id row. Tests use the devices-routes.test.ts harness with OVERDECK_DASHBOARD_SESSION_TOKEN for the root session."
+        },
+        "items": [
+          {
+            "id": "trusted-origin-route.ac1",
+            "title": "Given a root-session cookie, CSRF header and trusted Origin, POST /api/anywhere/trusted-origins with { origin: 'https://desk.tailnet.ts.net' } returns 200 { origin, added: true } and a following validateOriginHeaders call with that Origin returns { ok: true } in the same process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origin-route.ac2",
+            "title": "Given the internal-token header, a device cookie, or a Bearer scoped token, the route returns 403 and trusted-origins.json is not created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origin-route.ac3",
+            "title": "Given a root session, { origin: 'http://127.0.0.1:9' } or {} returns 400 and writes no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trusted-origin-route.ac4",
+            "title": "NO_LOSS_MATRIX contains a row with surface 'POST /api/anywhere/trusted-origins' and the no-loss-matrix tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-status-route",
+        "title": "Add GET /api/anywhere/status with problems and fix actions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/anywhere-status.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/remote-access/anywhere-status.test.ts",
+            "src/dashboard/server/__tests__/anywhere-status-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote-access/anywhere-status.test.ts src/dashboard/server/__tests__/anywhere-status-route.test.ts tests/unit/lib/overdeck",
+            "npx vitest run tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "anywhere-status and anywhere-status-route tests pass",
+            "vault import-graph test still passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/lib/remote-access/anywhere-status.ts exporting the AnywhereStatus/AnywhereProblem/AnywhereAction types, readAnywhereVaultState() and the pure computeAnywhereProblems(). Implementation checkpoint D-9: run `git ls-tree origin/main src/lib/vault/open.ts`; if present use openVaultContext() (off->off, key-missing|key-mismatch->locked, rotation-pending->rotation-pending, open->ready), otherwise readVaultConfig() + stat key.next + loadVaultKey(); state the branch taken in the commit message. Add GET /api/anywhere/status to routes/anywhere.ts (machine from ensureEnvironmentIdentity with caught error, addresses from getTrustedOrigins + isLoopbackOrigin, active devices from listAccessTokens, vault, problems; Cache-Control no-store) and its no-loss-matrix row. Use the exact problem codes, messages and actions in the PRD."
+        },
+        "items": [
+          {
+            "id": "anywhere-status-route.ac1",
+            "title": "computeAnywhereProblems returns no-reachable-address with action pair-dialog when every address has loopback: true, vault-locked with action settings-section/session-vault when vault.state is 'locked', vault-rotation-pending with action none and a docsUrl, and [] when nothing is wrong",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-route.ac2",
+            "title": "Given no vault config readAnywhereVaultState returns state 'off'; given a backend and no key file it returns state 'locked' with that backend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-route.ac3",
+            "title": "Given one active and one revoked device, an authorized GET /api/anywhere/status returns devices.active 1, lists http://127.0.0.1:<port> with loopback: true, and sets Cache-Control: no-store; an unauthenticated request returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-route.ac4",
+            "title": "No problem message returned by the route contains the text 'pan ' followed by a verb, and NO_LOSS_MATRIX has a 'GET /api/anywhere/status' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-devices-panel",
+        "title": "Add Settings -> Anywhere section with the Devices panel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/DevicesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "DevicesPanel.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create anywhereApi.ts (DeviceRow, AnywhereStatus types; fetchDevices, revokeDevice, fetchAnywhereStatus, issuePairingLink, addTrustedAddress returning {status, body}; mutations use dashboardMutationJsonHeaders). Add { id: 'anywhere', label: 'Anywhere', icon: Smartphone } before the 'remote' nav entry, create AnywhereSection (SettingsSection id 'anywhere') mounted immediately before <RemoteSection in SettingsPage.tsx, and DevicesPanel (react-query ['anywhere-devices'] every 5 s; name, scopes, created, last seen, revoked time; Revoke through useConfirm with variant 'destructive', then invalidate ['anywhere-devices'] and ['anywhere-status']; toast.error on failure). Append the new test file to the root package.json test:frontend-subset list."
+        },
+        "items": [
+          {
+            "id": "anywhere-devices-panel.ac1",
+            "title": "Given GET /api/devices returns one active and one revoked device, DevicesPanel renders both names, the active device's scopes, a Revoke button only on the active row, and 'Revoked' on the other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-devices-panel.ac2",
+            "title": "When Revoke is clicked and the in-app confirm is accepted, the panel sends DELETE /api/devices/dev-1; when the confirm is declined it sends no DELETE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-devices-panel.ac3",
+            "title": "SETTINGS_NAV_ITEMS contains an 'anywhere' entry immediately before 'remote', and SettingsPage renders an element with id 'anywhere'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-dialog",
+        "title": "Add the Pair-a-device dialog with address check, link and QR code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/PairDeviceDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/package.json",
+            "bun.lock",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "PairDeviceDialog.test.tsx passes",
+            "typecheck and lint complete without errors",
+            "bun.lock lists qrcode-generator"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add qrcode-generator ^2.0.4 to src/dashboard/frontend/package.json, run bun install at the workspace root and commit bun.lock in the same commit. Add a 'Pair a device' button to AnywhereSection (with pairDialogOpen/onPairDialogChange so the status card can open it). Build PairDeviceDialog: address step (select of non-loopback addresses from ['anywhere-status'], 'Another address…' input, 'Not trusted yet' + 'Add to trusted addresses' calling addTrustedAddress, inline 400/403 errors, a 'Use this machine only' choice labelled 'Works only on this machine'); link step (POST /api/pairing/credentials {}, link = origin + pairingPath, read-only input, Copy, QR via qrcode(0,'M').createDataURL(6, 8) in <img alt='Pairing QR code'>, expiry countdown, 'New link' after expiry, and the 403 explanation text with no QR). Refetch ['anywhere-devices'] every 3 s while open and show 'Paired: <name>' when the active count rises. Append the test file to test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "pair-dialog.ac1",
+            "title": "Given a trusted reachable address https://desk.tailnet.ts.net and a 200 pairing response with pairingPath '/#pair=odp_test', clicking Create pairing link renders an input with value 'https://desk.tailnet.ts.net/#pair=odp_test' and an <img alt='Pairing QR code'>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-dialog.ac2",
+            "title": "Given a typed address that is not in addresses, the dialog renders 'Add to trusted addresses', and clicking it sends POST /api/anywhere/trusted-origins with { origin } in the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-dialog.ac3",
+            "title": "Given POST /api/pairing/credentials returns 403, the dialog renders the text 'Pairing links can be created only from a browser on this machine' and no QR image",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-card",
+        "title": "Add the Anywhere status card to Settings and the Health page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereStatusCard.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/HealthDashboard.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx src/components/HealthDashboard.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AnywhereStatusCard.test.tsx and HealthDashboard.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Build AnywhereStatusCard({ onAction }) reading ['anywhere-status'] every 30 s with data-component='anywhere-status-card': This machine, Reachable at, Paired devices, Session Vault (off -> 'Not set up' + Set up button with settings-section/session-vault; locked; rotation-pending; ready with backend), and one row per problem (pair-dialog -> 'Add an address'; settings-section -> 'Open Session Vault'; none+docsUrl -> 'How to fix' link in a new tab; none -> no button). Render it first in AnywhereSection (pair-dialog opens the dialog; settings-section calls requestSettingsSection). Add optional onOpenSettings to HealthDashboard, render the card between the Host health section and <DeaconStatus />, and pass onOpenSettings from AppRoutes.tsx. Import nothing from PAN-4307's files. Append the test file to test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "status-card.ac1",
+            "title": "Given a status whose problems contain no-reachable-address, the card renders its message and an 'Add an address' button whose click calls onAction({ kind: 'pair-dialog' })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-card.ac2",
+            "title": "Given vault.state 'off', the card renders 'Not set up' and a Set up button whose click calls onAction({ kind: 'settings-section', section: 'session-vault' })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-card.ac3",
+            "title": "Given a vault-rotation-pending problem, the card renders a 'How to fix' link to its docsUrl and no button, and no rendered text matches /\\bpan (vault|pair|devices)\\b/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-card.ac4",
+            "title": "HealthDashboard renders [data-component='anywhere-status-card'] after the Host health section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-devices",
+        "title": "Playwright: pair, list and revoke a device from Settings -> Anywhere",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4445-anywhere-devices.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4445-anywhere-devices.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-4445-anywhere-devices.spec.ts passes and writes test-results/pan-4445/pair-dialog.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Following pan-3762-pairing.spec.ts: one startIsolatedDashboard(), a root browser context and a separate fresh device context (never a shared profile). Root: Settings -> Anywhere, card shows 0 paired devices, Pair a device -> 'Use this machine only' -> Create pairing link, read the #pair=odp_ link, screenshot. Device: goto(link), assert overdeck_device cookie and no overdeck_session. Root: within 10 s the panel lists one device and the card shows 1; Revoke and confirm. Device: request.get('/api/devices') returns 401 on the first call after revoke (not /api/issues, which the loopback gate allows). Root: the row shows Revoked and the card shows 0. Also add https://desk.example.test through 'Another address…' -> Add to trusted addresses and assert the card's Reachable at lists it without a restart."
+        },
+        "items": [
+          {
+            "id": "playwright-devices.ac1",
+            "title": "Given an isolated dashboard, when the root context creates a pairing link in Settings -> Anywhere and a fresh context opens it, then the Devices panel lists the new device and the status card shows Paired devices 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-devices.ac2",
+            "title": "When the root context revokes that device in the UI, the device context's next GET /api/devices returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-devices.ac3",
+            "title": "When https://desk.example.test is added through the dialog, the status card's Reachable at renders it without a dashboard restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-access",
+        "title": "Document dashboard pairing, trusted addresses and the Anywhere status card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:24:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'From the dashboard' configuration/remote-access.mdx",
+            "grep -n 'Anywhere status' configuration/remote-access.mdx",
+            "grep -n 'trusted-origins.json' configuration/remote-access.mdx",
+            "grep -n 'POST /api/anywhere/trusted-origins' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In configuration/remote-access.mdx: add a 'From the dashboard' subsection to 'Pair a device' (Settings -> Anywhere -> Pair a device, pick or add the address, scan the QR or open the link; only a browser on the machine can create links); rewrite 'Open the dashboard at a non-default address' (Add to trusted addresses applies immediately, stored in ~/.overdeck/trusted-origins.json, merged with OVERDECK_TRUSTED_ORIGINS, loopback cannot be added); extend 'List and revoke devices' with the Settings panel; add an 'Anywhere status' section listing what the card shows, where it appears (Settings -> Anywhere and the Health page) and each problem with its fix. In docs/DASHBOARD-AUTH.md document POST /api/anywhere/trusted-origins (root session only; 403 for internal token, device and token; 400 for loopback/invalid), GET /api/anywhere/status, and that saved origins merge into getTrustedOrigins() in every launch mode."
+        },
+        "items": [
+          {
+            "id": "docs-remote-access.ac1",
+            "title": "configuration/remote-access.mdx contains a 'From the dashboard' subsection that names Settings -> Anywhere -> Pair a device and states that only a browser on the machine can create pairing links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac2",
+            "title": "configuration/remote-access.mdx contains an 'Anywhere status' section and names ~/.overdeck/trusted-origins.json as where added addresses persist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac3",
+            "title": "docs/DASHBOARD-AUTH.md names POST /api/anywhere/trusted-origins and states it returns 403 for the internal token, devices and scoped tokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trusted-origins-store",
+        "to": "trusted-origin-route",
+        "type": "blocks"
+      },
+      {
+        "from": "trusted-origins-store",
+        "to": "anywhere-status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "trusted-origin-route",
+        "to": "anywhere-status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "device-scopes",
+        "to": "anywhere-devices-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-devices-panel",
+        "to": "pair-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "trusted-origin-route",
+        "to": "pair-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-status-route",
+        "to": "pair-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-dialog",
+        "to": "status-card",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-status-route",
+        "to": "status-card",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-dialog",
+        "to": "playwright-devices",
+        "type": "blocks"
+      },
+      {
+        "from": "status-card",
+        "to": "playwright-devices",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
