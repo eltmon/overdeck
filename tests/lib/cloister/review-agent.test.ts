@@ -704,6 +704,33 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     }
   });
 
+  // PAN-4433: a resumed parent whose kickoff never landed is live, idle and
+  // transcript-less; stop it and fresh-spawn, as convoy lanes already do.
+  it('stops the parent and fresh-spawns when a warm resume did not deliver the prompt', async () => {
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? { id, status: 'running' } : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: false });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-1982-review');
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockStopAgent.mock.invocationCallOrder[0]).toBeLessThan(mockSpawnRun.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps a resumed parent when the resume reports no delivery flag', async () => {
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? { id, status: 'running' } : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result.message).toContain('Review resumed');
+    expect(mockStopAgent).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');

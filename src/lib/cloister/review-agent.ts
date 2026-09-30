@@ -474,7 +474,7 @@ async function spawnReviewRoleForIssueBody(
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, stopAgent, wipeAgentStateDirs } = await import('../agents.js');
     const workAgentState = getAgentState(`agent-${opts.issueId.toLowerCase()}`);
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
@@ -544,7 +544,7 @@ async function spawnReviewRoleForIssueBody(
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
       const resumeDispatchedAt = new Date().toISOString();
       const resumeResult = await resumeAgent(reviewAgentId, prompt);
-      if (resumeResult.success) {
+      if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
           const resumed = getAgentState(reviewAgentId);
@@ -584,7 +584,15 @@ async function spawnReviewRoleForIssueBody(
         }
         return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
       }
-      console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeResult.error}`);
+      const resumeError = resumeResult.messageDelivered === false
+        ? 'continue prompt was not confirmed in the resumed session'
+        : resumeResult.error;
+      console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeError}`);
+      // PAN-4433: a live parent whose kickoff never landed sits idle forever; stop it
+      // before the fresh spawn, the same guard convoy lanes have (PAN-2743).
+      if (resumeResult.messageDelivered === false || resumeResult.error?.includes('it appears healthy')) {
+        await Effect.runPromise(stopAgent(reviewAgentId));
+      }
     }
     // Fresh review: wipe any stale review state (harness/model changed, or the resume above
     // failed) so the new session does not inherit a mismatched saved session id.
