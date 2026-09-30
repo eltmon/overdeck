@@ -1,0 +1,486 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T16:29:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4432: CI test-failure relay never fires: red test shards stall PRs with no route back to the agent",
+    "updated": "2026-09-30T16:32:39.267Z"
+  },
+  "plan": {
+    "id": "pan-4432",
+    "title": "CI test-failure relay never fires: red test shards stall PRs with no route back to the agent",
+    "status": "proposed",
+    "uid": "aeb4e0e6-1743-42e4-8800-5237452ac3a8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T16:29:41Z",
+    "updated": "2026-09-30T16:32:39.267Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4432",
+        "label": "PAN-4432",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "webhooks",
+      "ci",
+      "verification",
+      "effect",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The PAN-3965 CI test-failure relay has never fired. Root cause (verified in planning, see PRD): src/dashboard/server/routes/webhooks.ts forks webhook dispatch with Effect.forkChild and returns the response; in Effect 4 the child is interrupted before it starts, so no GitHub webhook handler has run since the Effect 4 upgrade. Evidence: 116k '[webhook] Received' log lines and zero handler-body log lines; zero project.ci_suite_observed events against 22k check_suite deliveries; a scratch reproduction against the repo's effect 4.0.0-beta.73. The only other relay caller (polling reconciliation) was deleted in PAN-3917. Red test shards therefore stall PRs with idle agents.",
+      "Proposal": "Run dispatch as a detached promise with a logging catch (the fix). Then, per the issue's acceptance: resolve check_run and failing check_suite payloads with an empty pull_requests array from the head branch, accepted only at the same head SHA; log every relay decision not to deliver; raise needs-you when the plain CI FAILED message is not delivered; document it in docs/PIPELINE-GATES.md and docs/EXTERNAL-EVENT-STREAM.md.",
+      "NonGoals": "- No polling or Deacon backstop for webhooks missed while the dashboard is down (follow-up PAN-4439)\n- No change to the relay's attempt budget, escalation rule, or verification feedback door\n- No metering of the relay's raw execFile('gh') calls through runGh\n- No disabling or gating of the webhook handlers the fix revives (review auto-start, postMergeLifecycle/finishStrike, CI observation, resource refresh)\n- No commit-to-PR lookup (GET /repos/{repo}/commits/{sha}/pulls); fork PRs are not supported by the fallback\n- No needs-you for a red check on a feature PR that has no work-agent row\n- No new journal entry types or state files; observability is log lines only\n- No raise of any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat the Effect.forkChild interruption in routes/webhooks.ts as the root cause and fix it first; the issue's two suspects are not the primary cause",
+        "rationale": "A scratch reproduction with the repo's effect 4.0.0-beta.73 shows the forked dispatch never starts, and live evidence (zero handler log lines across 116k webhooks, zero project.ci_suite_observed events against 22k check_suite deliveries) confirms no handler runs"
+      },
+      {
+        "summary": "Use `void dispatchWebhook(...).catch(console.error)` rather than Effect.forkDetach",
+        "rationale": "It is the fire-and-forget idiom already used in dashboard routes (routes/hooks.ts, routes/resources/snapshot.ts), and it removes the watcher fiber that would otherwise die the same way and hide errors"
+      },
+      {
+        "summary": "Ship the empty pull_requests fallback anyway, resolving by head branch and confirming by head SHA",
+        "rationale": "The issue's acceptance criteria require it; Overdeck PRs come from feature/strike/bypass branches in the same repo where head_branch is set, so a commits/{sha}/pulls lookup is unnecessary"
+      },
+      {
+        "summary": "Fix dispatch for every event type and do not gate the revived handlers",
+        "rationale": "The bug is in the shared dispatcher; the revived behaviors (review auto-start, post-merge lifecycle, CI observation) are documented features with existing coalescing and idempotency guards"
+      },
+      {
+        "summary": "Generic-path needs-you only when a work agent exists and the message was not delivered",
+        "rationale": "A red check on an operator's own feature branch with no agent is not an operator alert; the test-gate path already raises needs-you through the verification feedback door"
+      },
+      {
+        "summary": "No polling backstop in this issue; record it as a follow-up",
+        "rationale": "A backstop has cross-process idempotency questions (the Deacon runs the relay in a child process with its own memo) and is not in the issue's acceptance criteria"
+      },
+      {
+        "summary": "The live canary (project.ci_suite_observed after the next main push) is a post-merge check, not an xBRIEF AC",
+        "rationale": "Work, review and test roles run before merge against the currently deployed dashboard and cannot observe the fixed build"
+      }
+    ],
+    "items": [
+      {
+        "id": "webhook-dispatch",
+        "title": "Run GitHub webhook dispatch as a detached promise that logs failures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/webhooks.ts",
+            "tests/unit/dashboard/routes/webhooks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/dashboard/routes/webhooks.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "webhooks.test.ts passes including the two new PAN-4432 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-4432.md). ROOT CAUSE of PAN-4432: in src/dashboard/server/routes/webhooks.ts (anchor 'Dispatch handlers asynchronously so DB work', lines 169-181) replace the two Effect.forkChild calls (dispatch fiber + watcher fiber) with `void dispatchWebhook(eventType, payload).catch((err: unknown) => { console.error(`[webhook] Dispatch failed for ${eventType}:`, err); });`. In Effect 4 a forkChild child is interrupted when the handler returns, before it starts, so no webhook handler has ever run. Do NOT use Effect.forkDetach and do NOT keep the watcher fiber. Change the import to `import { Effect, Option } from 'effect';` (drop Exit, Fiber; leave pre-existing unused Option). Add one header sentence: handlers run detached after the 200 response; a failed dispatch logs `[webhook] Dispatch failed`. Add two tests to describe('runWebhookHandler') in tests/unit/dashboard/routes/webhooks.test.ts: (1) a valid signed check_run body calls the handleCheckRun mock once with the parsed payload after `await new Promise((r) => setImmediate(r))`; (2) a rejecting handleCheckRun mock yields a 200 response and console.error('[webhook] Dispatch failed for check_run:', err). No fake timers needed."
+        },
+        "items": [
+          {
+            "id": "webhook-dispatch.ac1",
+            "title": "Given a valid signed check_run webhook body, when runWebhookHandler returns and one setImmediate turn passes, then the handleCheckRun mock has been called once with the parsed payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-dispatch.ac2",
+            "title": "Given a handleCheckRun mock that rejects with Error('boom'), when the webhook is posted, then the response status is 200 and console.error is called with '[webhook] Dispatch failed for check_run:' and that error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-dispatch.ac3",
+            "title": "grep -n forkChild src/dashboard/server/routes/webhooks.ts returns no matches and the file imports neither Exit nor Fiber from effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "check-run-empty-prs",
+        "title": "Resolve a check_run with an empty pull_requests array by head branch and head SHA",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "webhook-handlers.test.ts passes including the four new handleCheckRun PAN-4432 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/webhook-handlers.ts: extend WebhookPayload.check_run with `head_sha?: string` and `check_suite?: { head_branch?: string | null; head_sha?: string }`. Add module-private `resolvePullRequestsForHead(listed, headBranch, headSha, label)` exactly as in the PRD: return listed when non-empty; else issueIdFromBranch(headBranch) (log '[webhook] <label>: no pull_requests and no issue branch' and return [] when absent); lazily import fetchIssuePullRequest from './overdeck/pull-requests.js' and call getPrFacts(issueId, { fetchGitHubPr: fetchIssuePullRequest }); accept only facts.open && facts.number != null && facts.headSha === headSha, returning [{ number, head: { ref: facts.headBranch ?? headBranch, sha: headSha } }]; log and return [] otherwise; catch → console.warn and []. In handleCheckRun replace line 203 `if (!run.pull_requests || run.pull_requests.length === 0) return;` with: compute actionable = conclusion in FAILING_CHECK_CONCLUSIONS or (SUCCESS and isCiTestCheckName(run.name)); call the resolver only when listed is empty, actionable, and not advisory; return when the result is empty; loop over the result (loop body unchanged). Tests in describe('handleCheckRun') of tests/unit/lib/webhook-handlers.test.ts, add vi.mock for '../../../src/lib/overdeck/pull-requests.js' ({ fetchIssuePullRequest: vi.fn() }); four tests as listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "check-run-empty-prs.ac1",
+            "title": "Given a failing test-shard check_run with pull_requests [] , check_suite.head_branch 'feature/pan-77' and head_sha 'abc123', and the forge reports PR 9 open at 'abc123', then relayCiFailureFeedback is called with issueId 'PAN-77', prNumber 9, headSha 'abc123', headRef 'feature/pan-77'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-empty-prs.ac2",
+            "title": "Given the same payload but the forge reports the open PR at head 'def456', then relayCiFailureFeedback is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-empty-prs.ac3",
+            "title": "Given an in_progress check_run with conclusion null and pull_requests [], then getPrFacts is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-empty-prs.ac4",
+            "title": "Given a failing check_run with pull_requests [] and check_suite.head_branch null, then neither getPrFacts nor relayCiFailureFeedback is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "check-suite-empty-prs",
+        "title": "Apply the empty pull_requests fallback to failing check_suite payloads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "webhook-handlers.test.ts passes including the new handleCheckSuite PAN-4432 test and every existing handleCheckSuite test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In handleCheckSuite (src/lib/webhook-handlers.ts) replace line 172 `if (!suite.pull_requests || suite.pull_requests.length === 0) return;` with: failing = conclusion in FAILING_CHECK_CONCLUSIONS; prs = listed when non-empty or not failing, else await resolvePullRequestsForHead(listed, suite.head_branch, suite.head_sha, 'check_suite'); return when prs is empty; loop over prs. Leave the project-CI observation block above it unchanged. A default-branch suite (head_branch 'main') makes no forge read because issueIdFromBranch rejects it. Add test 'resolves a failing suite with empty pull_requests by head (PAN-4432)'. The existing 'ignores a check suite with no pull requests' test (no head_branch) must pass unchanged."
+        },
+        "items": [
+          {
+            "id": "check-suite-empty-prs.ac1",
+            "title": "Given a failing check_suite with pull_requests [], head_branch 'feature/pan-77', head_sha 'abc123', and the forge reports PR 9 open at 'abc123', then relayCiFailureFeedback is called with source 'check_suite' and prNumber 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-suite-empty-prs.ac2",
+            "title": "Given a failing check_suite with pull_requests [] and no head_branch, then relayCiFailureFeedback is not called and the existing 'ignores a check suite with no pull requests' test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-suite-empty-prs.ac3",
+            "title": "Given a default-branch check_suite with head_branch 'main' and empty pull_requests, then getPrFacts is not called and the project CI observation test still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-skip-logging",
+        "title": "Log a reason line for every relay decision not to deliver CI feedback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/ci-failure-feedback.ts",
+            "tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "wc -l tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "ci-failure-feedback.test.ts passes",
+            "the test file is at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/cloister/ci-failure-feedback.ts add one console.log with prefix '[ci-failure-feedback]' before each silent return, using the exact templates in the PRD table: assessCiTestGateFailure line 235 (not a feature head: 'head <ref> is not a feature branch'), line 236 ('tests are not in CI mode for <projectPath>'), line 251 ('PR test checks are <testChecks>'), line 253 ('the PR head is now <sha8>'); relayCiFailureFeedbackInQueue lines 627-629 ('no work agent' or 'agent role is <role>'). Move `const head8 = opts.headSha.slice(0, 8);` above line 235. No restructuring. Tests: do not add it() blocks; add a vi.spyOn(console, 'log') assertion with expect.stringContaining to the existing tests 'skips feedback when no work agent exists' ('no work agent'), 'skips feedback for non-work agent roles' ('agent role is review'), 'ignores a red test job reported for a head the PR has moved past' ('the PR head is now'), 'leaves a verification.tests: local project to the local gate' ('tests are not in CI mode'). Keep the test file at or under 1000 lines; never raise scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "relay-skip-logging.ac1",
+            "title": "Given no work-agent row and no test-gate failure, when the relay runs, then console.log is called with a string containing '[ci-failure-feedback]' and 'no work agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-skip-logging.ac2",
+            "title": "Given a review-role agent row, when the relay runs, then console.log is called with a string containing 'agent role is review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-skip-logging.ac3",
+            "title": "Given the PR head has moved past the reported head, when the relay runs, then console.log is called with a string containing 'the PR head is now'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-skip-logging.ac4",
+            "title": "Given a verification.tests: local project, when the relay runs, then console.log is called with a string containing 'tests are not in CI mode', and wc -l of ci-failure-feedback.test.ts prints at most 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-generic-needs-you",
+        "title": "Surface needs-you when the plain CI FAILED message is not delivered",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/ci-failure-feedback.ts",
+            "tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "wc -l tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "ci-failure-feedback.test.ts passes including the new needs-you test",
+            "the test file is at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In the generic path at the end of relayCiFailureFeedbackInQueue (anchor 'SPECIALIST FEEDBACK: ci-monitor reported CI FAILED'), when messageAgent returns delivered !== true or throws, after the existing console.warn call `await surfaceNeedsYou(issueId, `CI failure feedback for ${opts.headSha.slice(0, 8)} was not delivered to ${agentId}: ${reason}`, { specialist: 'ci-monitor', feedbackPath: fileResult.filePath, via: 'ci' }, deps);` with reason = outcome?.reason ?? 'no delivery outcome' or the thrown error's message. Call it once per failed delivery, never when delivered. Add test 'surfaces needs-you when the CI FAILED message is not delivered (PAN-4432)' in describe('relayCiFailureFeedback'): makeGhMocks(), mockMessageAgent resolves { delivered: false, queuedToMail: false, reason: 'pane gone' }, deps.surfaceNeedsYou = vi.fn(async () => undefined); assert agentMessageSent false and surfaceNeedsYou called once with 'PAN-1801', a string containing 'pane gone', and objectContaining({ specialist: 'ci-monitor' }). In the existing 'writes feedback and messages the work agent' test pass the same mock and assert it was not called."
+        },
+        "items": [
+          {
+            "id": "relay-generic-needs-you.ac1",
+            "title": "Given messageAgent resolves { delivered: false, reason: 'pane gone' }, when the relay handles a non-test CI failure, then it returns agentMessageSent false and deps.surfaceNeedsYou is called once with 'PAN-1801', a reason containing 'pane gone', and details containing specialist 'ci-monitor'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-generic-needs-you.ac2",
+            "title": "Given messageAgent resolves { delivered: true }, when the relay runs, then deps.surfaceNeedsYou is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-generic-needs-you.ac3",
+            "title": "Given messageAgent throws Error('x'), when the relay runs, then deps.surfaceNeedsYou is called once with a reason containing 'x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ci-relay",
+        "title": "Document detached webhook dispatch, the empty pull_requests fallback, and relay needs-you",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T16:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/EXTERNAL-EVENT-STREAM.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Dispatch failed for' docs/PIPELINE-GATES.md",
+            "grep -n 'ci_suite_observed' docs/EXTERNAL-EVENT-STREAM.md"
+          ],
+          "expected_outputs": [
+            "PIPELINE-GATES.md prints a match inside the CI relay bullet",
+            "the ci_suite_observed catalog row mentions the check_suite webhook handler"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. docs/PIPELINE-GATES.md, bullet starting 'A red CI test job reaches the work agent through' (line 27): insert after its first sentence the PRD's text about detached dispatch, '[webhook] Dispatch failed for <event>', and resolving an empty pull_requests payload from the head branch accepted only at the same head SHA; after the feedback-door sentence add the PRD's text about the plain CI FAILED path raising needs-you, the '[ci-failure-feedback]' reason lines, and that a webhook missed while the dashboard is down is not replayed. docs/EXTERNAL-EVENT-STREAM.md line 103 (project.ci_suite_observed row): append '(emitted by the `check_suite` webhook handler)' to the description. No Mintlify page changes: configuration/remote-access.mdx only states the route's auth."
+        },
+        "items": [
+          {
+            "id": "docs-ci-relay.ac1",
+            "title": "docs/PIPELINE-GATES.md's CI relay bullet contains the strings 'Dispatch failed for' and 'head SHA' and states that a webhook missed while the dashboard is down is not replayed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-relay.ac2",
+            "title": "grep -n 'needs-you' docs/PIPELINE-GATES.md returns a line in the CI relay bullet saying an undelivered plain CI FAILED message raises a needs-you row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-relay.ac3",
+            "title": "docs/EXTERNAL-EVENT-STREAM.md's project.ci_suite_observed row contains the words 'check_suite' and 'webhook handler'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "check-run-empty-prs",
+        "to": "check-suite-empty-prs",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-skip-logging",
+        "to": "relay-generic-needs-you",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-30-PAN-4432-ci-test-failure-relay-never-fires-red-test-shards-stall-prs-with-no-route-back-to-the-agent.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
