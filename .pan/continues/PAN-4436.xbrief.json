@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:35:02.550Z",
+  "updated": "2026-09-30T20:35:15.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "browse-rows-door.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T20:35:02.549Z"
+    },
+    "browse-rows-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T20:35:15.530Z"
     }
   }
 }
