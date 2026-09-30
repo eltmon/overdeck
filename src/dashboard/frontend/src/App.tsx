@@ -37,6 +37,7 @@ import { usePanesStore } from './lib/panesStore';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 import {
+  conversationHitNeedsLocator,
   describeConversationHitOpenFailure,
   fetchBackendHealth,
   fetchCliproxyStatus,
@@ -504,16 +505,22 @@ export default function App() {
       // A subagent hit opens its parent conversation, targeting the subagent
       // transcript; the conversation panel selects it once listed (PAN-3982).
       const subagentId = hit.subagentId ?? undefined;
-      const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset, subagentId);
+      // A title-only hit (PAN-4358) has no byte offset to resolve — open the
+      // conversation pane without a message target instead of 404ing.
+      const locator = conversationHitNeedsLocator(hit)
+        ? await fetchConversationMessageLocator(conversationName, hit.byteOffset, subagentId)
+        : null;
       const nonce = Date.now();
-      setPendingConversationTarget({
-        conversationName,
-        messageId: locator.messageId,
-        messageIndex: locator.messageIndex,
-        nonce,
-        label: hit.label || 'Agent',
-        subagentId,
-      });
+      if (locator) {
+        setPendingConversationTarget({
+          conversationName,
+          messageId: locator.messageId,
+          messageIndex: locator.messageIndex,
+          nonce,
+          label: hit.label || 'Agent',
+          subagentId,
+        });
+      }
       setActiveTab('command-deck');
       setSelectedProjectKey(projectKey);
       setConversationRoute(conversationName, 'conversation');
@@ -525,13 +532,23 @@ export default function App() {
         conversationId: conversationName,
         viewMode: 'conversation',
       });
-      usePanesStore.getState().updatePane(projectKey, paneId, {
-        viewMode: 'conversation',
-        targetMessageId: locator.messageId,
-        targetMessageIndex: locator.messageIndex,
-        targetMessageNonce: nonce,
-        targetSubagentId: subagentId,
-      });
+      usePanesStore.getState().updatePane(projectKey, paneId, locator
+        ? {
+          viewMode: 'conversation',
+          targetMessageId: locator.messageId,
+          targetMessageIndex: locator.messageIndex,
+          targetMessageNonce: nonce,
+          targetSubagentId: subagentId,
+        }
+        // Clear a reused pane's stale target explicitly (PAN-4358 review
+        // hardening) rather than leaving a prior target unconsumed.
+        : {
+          viewMode: 'conversation',
+          targetMessageId: undefined,
+          targetMessageIndex: undefined,
+          targetMessageNonce: undefined,
+          targetSubagentId: undefined,
+        });
     } catch (err) {
       toast.error(describeConversationHitOpenFailure(hit, err));
     }
