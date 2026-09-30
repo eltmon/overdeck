@@ -1,6 +1,9 @@
 import { useState } from 'react';
 
+import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
+import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
+import type { AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 
@@ -18,6 +21,10 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
     setLocalOpen(next);
     onPairDialogChange?.(next);
   };
+  const handleAction = (action: AnywhereAction) => {
+    if (action.kind === 'pair-dialog') setOpen(true);
+    else if (action.kind === 'settings-section') requestSettingsSection(action.section);
+  };
 
   return (
     <SettingsSection
@@ -34,7 +41,10 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         </button>
       )}
     >
-      <DevicesPanel />
+      <div className="space-y-4">
+        <AnywhereStatusCard onAction={handleAction} />
+        <DevicesPanel />
+      </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
     </SettingsSection>
   );
