@@ -30,7 +30,7 @@ npm-debug.log*
 .env.local
 
 # Python virtual environments (TLDR)
-.venv/
+.venv
 .tldr/
 
 # Test coverage
