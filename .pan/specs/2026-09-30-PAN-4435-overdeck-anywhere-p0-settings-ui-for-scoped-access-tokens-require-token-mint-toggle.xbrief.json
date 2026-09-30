@@ -1,0 +1,723 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T19:20:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4435: Overdeck Anywhere P0: Settings UI for scoped access tokens + require_token_mint toggle",
+    "updated": "2026-09-30T19:24:29.824Z"
+  },
+  "plan": {
+    "id": "pan-4435",
+    "title": "Overdeck Anywhere P0: Settings UI for scoped access tokens + require_token_mint toggle",
+    "status": "proposed",
+    "uid": "b0d16e02-1a81-42ee-be67-8b63f1298321",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-30T19:20:49Z",
+    "updated": "2026-09-30T19:24:29.824Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4435",
+        "label": "PAN-4435",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4435.md",
+        "label": "PRD draft (.pan/drafts/pan-4435.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2351",
+        "label": "PAN-2351 (scoped tokens, merged)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "settings",
+      "auth",
+      "remote-access",
+      "access-tokens",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "PAN-2351 shipped scoped access tokens (routes GET/POST /api/access-tokens, DELETE /api/access-tokens/:id, pan token) but the dashboard has no UI for them. dashboard.require_token_mint is enforced but lives only in raw config.yaml, has no schema entry, no Settings toggle, and is cached for the process lifetime, so changing it needs a restart.",
+      "Proposal": "Add an Access Tokens Settings section (list, one-time-plaintext create dialog, confirmed revoke, 403 explanation) and a 'Require a token to sign in' toggle row in it. Add a dashboard schema module (schema-dashboard.ts), a non-throwing normalizer, and the settings-api GET/PUT mapping, with GET reporting the enforced value and PUT preserving the block when absent. saveSettingsApi calls a renamed invalidateRemoteAccessConfig() so the toggle applies without a restart. Docs updated in remote-access.mdx and DASHBOARD-AUTH.md; verified in an isolated Playwright context against a throwaway dashboard.",
+      "NonGoals": "- Changing who may create or revoke tokens, or the scope model (PAN-2351 owns both)\n- Letting a paired device create or revoke tokens, or hiding the toggle from device sessions\n- Reading require_token_mint from a project .pan.yaml, or watching config.yaml for hand edits\n- Showing or managing paired devices in the Access Tokens section\n- A /ws/terminal heartbeat (PAN-4434)\n- New HTTP routes or edits to src/dashboard/server/routes/settings.ts (at its size cap)\n- Raising any scripts/file-size-allowlist.txt cap\n- Committed screenshots\n- Storing or logging the plaintext token anywhere outside the create dialog's component state"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Settings GET reports require_token_mint from readRemoteAccessConfig(), not from the merged config",
+        "rationale": "The merged config folds in project .pan.yaml, which enforcement never reads; a security toggle must show the enforced value (D-1)."
+      },
+      {
+        "summary": "Invalid require_token_mint values normalize to false and never throw",
+        "rationale": "Matches the existing enforcement reader exactly and avoids failing the whole config load (D-2)."
+      },
+      {
+        "summary": "PUT without a dashboard block leaves config.yaml's dashboard block untouched",
+        "rationale": "Delete-on-absent (the remote pattern) would let any client that omits the block silently turn the security flag off (D-3)."
+      },
+      {
+        "summary": "Rename _resetRemoteAccessConfigForTests to invalidateRemoteAccessConfig and call it from saveSettingsApi",
+        "rationale": "One variant per operation; every save path invalidates; routes/settings.ts is at its size cap (D-4)."
+      },
+      {
+        "summary": "Frontend scope list is a local constant with a root-vitest parity test",
+        "rationale": "The frontend cannot import src/lib; moving six strings into @overdeck/contracts would touch the security module and the contracts build (D-5)."
+      },
+      {
+        "summary": "One 'Access Tokens' nav entry after 'Remote'; the toggle row is the section's first row",
+        "rationale": "The issue names one nav entry; the flag is the access-control setting the tokens exist for (D-6)."
+      },
+      {
+        "summary": "UAT evidence goes in the PR body, not committed screenshots",
+        "rationale": "An images/ path would push the plan past the six-subsystem lint limit (D-9)."
+      }
+    ],
+    "items": [
+      {
+        "id": "dashboard-schema",
+        "title": "Add the dashboard.require_token_mint schema entry and normalizer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema-dashboard.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/domain-mergers.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/__tests__/dashboard-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/dashboard-config.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "dashboard-config.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-1. Create src/lib/config-yaml/schema-dashboard.ts with DashboardYamlConfig { require_token_mint?: boolean } and NormalizedDashboardConfig { requireTokenMint: boolean } (modelled on schema-cpu.ts). In schema.ts import both types and add `dashboard?: DashboardYamlConfig` to YamlConfig after `remote?` (line ~696) and `dashboard?: NormalizedDashboardConfig` to NormalizedConfig after `remote?` (line ~1042); add at most 7 lines (cap 1114). Add mergeDashboardConfig to domain-mergers.ts after mergeRemoteConfig: when the source has a dashboard object containing require_token_mint, set result.dashboard = { requireTokenMint: value === true }; never throw (D-2). Call it in merge.ts on the line after mergeRemoteConfig(result, config). Write dashboard-config.test.ts calling mergeConfigs."
+        },
+        "items": [
+          {
+            "id": "dashboard-schema.ac1",
+            "title": "Given config { dashboard: { require_token_mint: true } }, mergeConfigs returns config.dashboard equal to { requireTokenMint: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-schema.ac2",
+            "title": "Given require_token_mint set to \"yes\" or 1, mergeConfigs returns { requireTokenMint: false } and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-schema.ac3",
+            "title": "Given no dashboard key, mergeConfigs returns config.dashboard as undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-schema.ac4",
+            "title": "Given mergeConfigs(project, global) with global false and project true, the result defaults to requireTokenMint false (global wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-schema.ac5",
+            "title": "bash scripts/lint-file-size.sh exits 0 with schema.ts at or under 1114 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-mapping",
+        "title": "Map dashboard.require_token_mint through the settings GET/PUT API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "settings-api.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed with settings-api.ts at or under 1508 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "live-toggle-invalidation",
+            "require-token-mint-toggle",
+            "settings-uat"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-2 and decisions D-1, D-3. In src/lib/settings-api.ts: add `dashboard?: { require_token_mint?: boolean }` to ApiSettingsConfig after `remote?`; in loadSettingsApi return `dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint }` (import from './remote-access/config.js' — the enforced value, not the merged config); in writeYamlConfigPreservingComments touch ['dashboard'] only when isRecord(config.dashboard), via setBlockMergePreserving, and NEVER delete the block when absent; in saveSettingsApi yamlConfig add `dashboard: settings.dashboard`; in updateSettingsApi merge `dashboard: { ...current.dashboard, ...updates.dashboard }`; in validateSettingsApi push 'dashboard must be an object' or 'dashboard.require_token_mint must be a boolean'. Implementation checkpoint: if lint-file-size fails for settings-api.ts, move the validator into src/lib/settings-api-dashboard.ts as validateDashboardSettings(value): string[]; never raise the cap. Tests in settings-api.test.ts mock '../remote-access/config.js'."
+        },
+        "items": [
+          {
+            "id": "settings-api-mapping.ac1",
+            "title": "Given readRemoteAccessConfig reports requireTokenMint true, loadSettingsApi returns dashboard equal to { require_token_mint: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-mapping.ac2",
+            "title": "When saveSettingsApi receives dashboard { require_token_mint: true }, the written YAML persists dashboard.require_token_mint: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-mapping.ac3",
+            "title": "When saveSettingsApi receives no dashboard block and config.yaml already has dashboard.require_token_mint: true, the written YAML preserves that key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-mapping.ac4",
+            "title": "validateSettingsApi rejects dashboard { require_token_mint: 'yes' } with 'dashboard.require_token_mint must be a boolean' and dashboard 'x' with 'dashboard must be an object'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-toggle-invalidation",
+        "title": "Invalidate the remote-access config cache on every Settings save",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/config.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts",
+            "tests/unit/lib/remote-access/config.test.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts tests/unit/lib/remote-access/config.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-3 and D-4. Rename _resetRemoteAccessConfigForTests to invalidateRemoteAccessConfig in src/lib/remote-access/config.ts (no test-only twin), rewrite its doc comment and the module header restart sentence as the PRD gives, and update every caller in tests/unit/lib/remote-access/config.test.ts and src/dashboard/server/__tests__/remote-request-gate.test.ts. In saveSettingsApi call invalidateRemoteAccessConfig() on the line after clearConfigCache(). Do not add any line to src/dashboard/server/routes/settings.ts (at its size cap). Add the settings-api test (called once, after writeFile) and the gate test 'applies require_token_mint after invalidation without a restart'."
+        },
+        "items": [
+          {
+            "id": "live-toggle-invalidation.ac1",
+            "title": "When saveSettingsApi completes, it calls invalidateRemoteAccessConfig exactly once, after writeFile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-toggle-invalidation.ac2",
+            "title": "Given config.yaml flips require_token_mint false → true → false with invalidateRemoteAccessConfig() after each write, the loopback POST /api/dashboard/session check returns null, then status 401, then null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-toggle-invalidation.ac3",
+            "title": "git grep _resetRemoteAccessConfigForTests returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-toggle-invalidation.ac4",
+            "title": "src/dashboard/server/routes/settings.ts is unchanged (git diff origin/main -- that file is empty)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "access-tokens-section",
+        "title": "Add the Access Tokens Settings section with list, revoke and 403 notice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AccessTokensSection.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-4 and D-6, D-8. Add nav item { id: 'access-tokens', label: 'Access Tokens', icon: KeyRound } after 'remote' in settingsPageConstants.ts. Create sections/AccessTokensSection.tsx (props formData, onSettingsChange) modelled on CloseOutSection.tsx: react-query ['access-tokens'] from GET /api/access-tokens; table Name/Scopes/Created/Last used/Revoked with toLocaleString times, 'Never' for null lastUsedAt, '—' for no revokedAt; Revoke button only on non-revoked rows, confirmed via useConfirm (destructive) and sent as DELETE with ensureDashboardSession + dashboardMutationJsonHeaders; any 403 renders role=alert data-testid=access-tokens-forbidden with the server error plus the D-8 sentence. Render it after <RemoteSection> in SettingsPage.tsx. Append the new test file to package.json test:frontend-subset. Tests wrap renders in QueryClientProvider and DialogProvider and mock lib/wsTransport. Never use window.confirm/alert. No pill badges (pan-style-guide)."
+        },
+        "items": [
+          {
+            "id": "access-tokens-section.ac1",
+            "title": "Given two token records, the section renders each name, its scopes as comma text, 'Never' for a null lastUsedAt and the revoked time for a revoked record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-section.ac2",
+            "title": "When the operator clicks Revoke and confirms, the section sends DELETE /api/access-tokens/<id> and re-fetches the list; a revoked row renders no Revoke button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-section.ac3",
+            "title": "Given a 403 from GET or DELETE, the section renders access-tokens-forbidden with the server error and \"Only this machine's own dashboard session\" and does not crash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-section.ac4",
+            "title": "package.json test:frontend-subset contains src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-tokens-section.ac5",
+            "title": "SETTINGS_NAV_ITEMS contains an access-tokens entry right after remote and the page renders a section with id access-tokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-token-dialog",
+        "title": "Add the create-token dialog that shows the plaintext exactly once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CreateAccessTokenDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/accessTokenScopes.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "tests/unit/dashboard/access-token-scopes-parity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "npx vitest run tests/unit/dashboard/access-token-scopes-parity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AccessTokensSection.test.tsx passes",
+            "parity test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-5 and D-5, D-7. Create sections/accessTokenScopes.ts (ACCESS_TOKEN_SCOPE_OPTIONS, the six scopes with descriptions from the PRD) and tests/unit/dashboard/access-token-scopes-parity.test.ts asserting its ids equal ACCESS_TOKEN_SCOPES from src/lib/access-tokens.ts. Create sections/CreateAccessTokenDialog.tsx (props open, onClose, onCreated): name input maxLength 200, one checkbox per scope, Create disabled until trimmed name and >=1 scope; POST /api/access-tokens { name, scopes }; on success keep { token, record } in component state only, show 'Copy this token now. It is not shown again.', a read-only input data-testid=access-token-plaintext and a Copy button (navigator.clipboard.writeText). Close/Escape clears form and created state and calls mutation.reset(). 400 shows the error inline; 403 shows the D-8 notice. Never put the plaintext in the query cache, storage or console. Add a 'Create token' button (data-testid=access-token-create) to AccessTokensSection.tsx that opens it and invalidates ['access-tokens'] via onCreated."
+        },
+        "items": [
+          {
+            "id": "create-token-dialog.ac1",
+            "title": "Given a blank name or no checked scope, the Create button renders disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-token-dialog.ac2",
+            "title": "When the operator creates a token, the dialog posts { name, scopes } and renders the returned odk_ plaintext in access-token-plaintext; Copy calls navigator.clipboard.writeText with it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-token-dialog.ac3",
+            "title": "After Close and reopening the dialog, no element contains the plaintext and the name field is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-token-dialog.ac4",
+            "title": "Given a 403 on create, the dialog renders the forbidden explanation instead of crashing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-token-dialog.ac5",
+            "title": "The parity test passes: ACCESS_TOKEN_SCOPE_OPTIONS ids equal ACCESS_TOKEN_SCOPES in the same order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "require-token-mint-toggle",
+        "title": "Add the Require a token to sign in toggle row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/RequireTokenMintRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AccessTokensSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-6. Add `dashboard?: { require_token_mint?: boolean }` to SettingsConfig in Settings/types.ts after `remote?`. Create sections/RequireTokenMintRow.tsx (props formData, onSettingsChange) with label 'Require a token to sign in', the exact FR-9 description (including 'a new browser on this machine then needs the #overdeck_token= link or pairing to sign in'), and Shared/Toggle bound to formData.dashboard?.require_token_mint ?? false; onChange calls onSettingsChange({ ...formData, dashboard: { ...formData.dashboard, require_token_mint: checked } }). Render it as the first row of AccessTokensSection."
+        },
+        "items": [
+          {
+            "id": "require-token-mint-toggle.ac1",
+            "title": "When the operator toggles the row on, onSettingsChange receives dashboard.require_token_mint true with every other formData field unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "require-token-mint-toggle.ac2",
+            "title": "Given formData without a dashboard block, the toggle renders aria-checked=\"false\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "require-token-mint-toggle.ac3",
+            "title": "The row renders the sentence 'a new browser on this machine then needs the #overdeck_token= link or pairing to sign in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Access Tokens section and the live require_token_mint toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q 'Settings → Access Tokens' configuration/remote-access.mdx",
+            "! grep -q 'read once at startup' configuration/remote-access.mdx",
+            "grep -q invalidateRemoteAccessConfig docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "each grep exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-7 for the exact text. In configuration/remote-access.mdx: add the Settings → Access Tokens paragraph after the pan token list block; replace the 'read once at startup, so restart' sentence with the Settings/global-only text; delete the PAN-4435 'What comes next' bullet. In docs/DASHBOARD-AUTH.md (~lines 288-292) replace the 'cached for the process lifetime ... tracked by PAN-4435' text with the invalidateRemoteAccessConfig text."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/remote-access.mdx renders a paragraph naming Settings → Access Tokens, Create token, the one-time plaintext and Revoke",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/remote-access.mdx states 'A Settings change applies at once' and that the key is read only from the global ~/.overdeck/config.yaml, and no longer contains 'read once at startup' or an issues/4435 link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/DASHBOARD-AUTH.md names invalidateRemoteAccessConfig and no longer contains 'cached for the process lifetime'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-uat",
+        "title": "Verify token lifecycle and the live toggle in an isolated browser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-30T19:20:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4435",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npm run build",
+            "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:<port>/api/dashboard/session"
+          ],
+          "expected_outputs": [
+            "build completes without errors",
+            "curl prints 401 with the toggle on and 200 with it off"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4435.md WI-8. Verification only: edit a file only to fix a defect this check finds. npm run build, then start node dist/dashboard/server.js under Node 22 on a free port with OVERDECK_HOME set to a new temp directory (minimal config.yaml enabling one provider) and its own OVERDECK_INTERNAL_TOKEN — never the operator's ~/.overdeck or live dashboard. Use an isolated Playwright browser context on http://127.0.0.1:<port>/settings#access-tokens and run the four ordered steps in the PRD. A fresh context opened while the toggle is on shows the HTTP 401 session banner by design. If the server cannot start, report the blocker with pan tell. Paste the results into the PR body."
+        },
+        "items": [
+          {
+            "id": "settings-uat.ac1",
+            "title": "In an isolated Playwright context, creating token uat-sidecar renders its plaintext once; after Close and a reload the row is listed and no element contains the plaintext",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-uat.ac2",
+            "title": "Revoking uat-sidecar through the confirm dialog renders a time in the Revoked column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-uat.ac3",
+            "title": "With the toggle turned on in Settings and no restart, a loopback POST /api/dashboard/session with no credential returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-uat.ac4",
+            "title": "With the toggle turned off again from the same page, the same POST returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-uat.ac5",
+            "title": "The PR body records the four steps and the observed 401 and 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dashboard-schema",
+        "to": "settings-api-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-mapping",
+        "to": "live-toggle-invalidation",
+        "type": "blocks"
+      },
+      {
+        "from": "access-tokens-section",
+        "to": "create-token-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "create-token-dialog",
+        "to": "require-token-mint-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-mapping",
+        "to": "require-token-mint-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "live-toggle-invalidation",
+        "to": "settings-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "require-token-mint-toggle",
+        "to": "settings-uat",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-30-PAN-4435-overdeck-anywhere-p0-settings-ui-for-scoped-access-tokens-require-token-mint-toggle.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
