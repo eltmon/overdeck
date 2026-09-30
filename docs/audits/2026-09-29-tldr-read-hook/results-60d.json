@@ -1,0 +1,52 @@
+{
+  "window_days": 60,
+  "transcripts_scanned": 6564,
+  "sessions_with_denials": 148,
+  "denials": 414,
+  "first_denial": "2026-08-09T21:24:07.400Z",
+  "last_denial": "2026-09-29T22:24:33.128Z",
+  "outcomes": {
+    "partial": 297,
+    "bash": 56,
+    "full": 14,
+    "summary_only": 47
+  },
+  "outcome_pct": {
+    "partial": 71.7,
+    "bash": 13.5,
+    "full": 3.4,
+    "summary_only": 11.4
+  },
+  "bytes_withheld": 4172333,
+  "bytes_reread_via_read_stripped": 2255783,
+  "bytes_reread_via_bash": 694252,
+  "bytes_summary_injected": 634625,
+  "pct_withheld_that_came_back": 70.7,
+  "denials_reread_ge_80pct": 241,
+  "median_file_bytes": 6743.0,
+  "extra_turns_total": 411,
+  "extra_turns_mean_per_reread": 1.12,
+  "extra_turn_context_tokens_mean": 179454,
+  "cost_extra_turns_input_equiv_tokens": 9927166,
+  "saving_upper_bound_input_equiv_tokens": 3504649,
+  "net_input_equiv_tokens": -6422516,
+  "net_tokens_kept_out_of_context": 284442,
+  "summary_tokens_injected": 158656,
+  "denials_by_model": {
+    "claude-sonnet-5": 183,
+    "MiniMax-M3": 57,
+    "kimi-k2.7-code": 39,
+    "claude-opus-5-5": 37,
+    "k3-256k": 31,
+    "k3": 26,
+    "claude-opus-5": 8,
+    "claude-haiku-4-5-20251001": 7,
+    "stealth/ox-alpha": 7,
+    "claude-fable-5-1": 5,
+    "claude-fable-5": 5,
+    "gpt-5.6-sol": 4,
+    "<synthetic>": 3,
+    "claude-sonnet-5-5": 1,
+    "claude-sonnet-4-6": 1
+  }
+}

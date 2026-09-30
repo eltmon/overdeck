@@ -290,7 +290,7 @@ export async function skillsPackUpdateCommand(id: string, options: PackUpdateOpt
 }
 
 export async function skillsPackListCommand(options: PackListOptions): Promise<void> {
-  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels }] = await Promise.all([
+  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels, KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/catalog.js'),
     import('../../lib/skill-packs/adapters.js'),
@@ -313,7 +313,8 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
     return;
   }
   if (rows.length === 0) {
-    console.log('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3');
+    const url = KNOWN_PACKS['mattpocock']?.url;
+    console.log(`No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3`);
     return;
   }
   console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));

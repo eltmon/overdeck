@@ -10,6 +10,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Lock, Search, LayoutGrid } from 'lucide-react';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -113,6 +114,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     label: 'OpenAI',
     models: [
       { id: 'gpt-6-astra', label: 'GPT-6 Astra (272K context)', provider: 'openai', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
       { id: 'gpt-6-sol', label: 'GPT-6 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'gpt-6-luna', label: 'GPT-6 Luna (272K context)', provider: 'openai', costDisplay: '$0.3/1M', costPer1MTokens: 0.3, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (272K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },

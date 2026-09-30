@@ -149,6 +149,6 @@ describe('SkillPacksSection', () => {
   it('renders the add command when there are no packs', () => {
     renderSection({ level: 'global', packs: [] });
     expect(screen.getByText('No skill packs. Add one from the CLI:')).toBeTruthy();
-    expect(screen.getByText('pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3')).toBeTruthy();
+    expect(screen.getByText('pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3')).toBeTruthy();
   });
 });
