@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4438",
   "created": "2026-09-30T16:41:39.289Z",
-  "updated": "2026-09-30T17:59:07.814Z",
+  "updated": "2026-09-30T17:59:22.337Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "waiver-route.ac3": {
       "status": "completed",
       "doneAt": "2026-09-30T17:59:07.814Z"
+    },
+    "waiver-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:59:22.337Z"
     }
   }
 }
