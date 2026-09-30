@@ -9,6 +9,7 @@
  * out of scope.
  *
  * Pure: no I/O. The caller (silent-reviewer-recovery.ts) gathers the facts.
+ * See docs/PIPELINE-GATES.md.
  */
 import { join } from 'node:path';
 

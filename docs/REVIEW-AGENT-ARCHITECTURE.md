@@ -164,6 +164,9 @@ changes code, the next full review runs every lane again.
 3. **Each lane reviews independently.** A lane reads the supplied review context
    and writes its assigned report. The launcher reports lane completion to the
    parent; deacon-lite only nudges a stuck reviewer, it never completes one.
+   A reviewer that was dispatched but never started is re-dispatched once per
+   run, and a second failure surfaces as needs-you (`recoverSilentReviewers`,
+   PAN-4433); deacon-lite still never completes a review.
 4. **The parent synthesizes evidence.** Once all terminal lane reports are
    available, the parent reads them and writes `.pan/review/<runId>/synthesis.md`.
 5. **The parent posts one PR review.** Approve, or request changes with the
