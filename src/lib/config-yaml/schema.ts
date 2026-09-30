@@ -9,6 +9,7 @@ import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
+import type { DashboardYamlConfig, NormalizedDashboardConfig } from './schema-dashboard.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
@@ -694,6 +695,9 @@ export interface YamlConfig {
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
   remote?: RemoteConfig;
+
+  /** Dashboard access settings (PAN-4435). */
+  dashboard?: DashboardYamlConfig;
 }
 
 /**
@@ -1040,6 +1044,9 @@ export interface NormalizedConfig {
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */
   remote?: NormalizedRemoteConfig;
+
+  /** Dashboard access settings (PAN-4435). */
+  dashboard?: NormalizedDashboardConfig;
 }
 
 /**

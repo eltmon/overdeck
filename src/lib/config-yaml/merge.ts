@@ -18,6 +18,7 @@ import {
   isComplianceMode,
   isFeatureRegistryClassificationProvider,
   mergeCavemanConfig,
+  mergeDashboardConfig,
   mergeDocsConfig,
   mergeRemoteConfig,
   mergeRtkConfig,
@@ -956,6 +957,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge remote work-agent provisioning settings
     mergeRemoteConfig(result, config);
+
+    // Merge dashboard access settings (PAN-4435)
+    mergeDashboardConfig(result, config);
 
     // Merge conversationSearch configuration
     if (config.conversationSearch) {
