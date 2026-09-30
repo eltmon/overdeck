@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { computeAnywhereProblems, readAnywhereVaultState } from '../../../../src/lib/remote-access/anywhere-status.js';
-import { createVaultKey, saveVaultKey } from '../../../../src/lib/vault/identity.js';
+import { writeVaultConfig } from '../../../../src/lib/vault/config.js';
+import { HEADER_REF_NAME, encryptRef, newVaultHeader } from '../../../../src/lib/vault/format.js';
+import { createVaultKey, deriveSubkeys, saveVaultKey } from '../../../../src/lib/vault/identity.js';
+import { DIR_BACKEND_PREFIX } from '../../../../src/lib/vault/open.js';
+import { DirVaultStore } from '../../../../src/lib/vault/store/dir.js';
 
 const reachable = [{ origin: 'http://127.0.0.1:3011', loopback: true }, { origin: 'https://desk.tailnet.ts.net', loopback: false }];
 const loopbackOnly = [{ origin: 'http://127.0.0.1:3011', loopback: true }];
@@ -55,14 +59,18 @@ describe('computeAnywhereProblems (PAN-4445 D-8)', () => {
   });
 });
 
-describe('readAnywhereVaultState (PAN-4445 D-9 fallback)', () => {
+describe('readAnywhereVaultState (PAN-4445 D-9, openVaultContext)', () => {
   let home: string;
+  let backendDir: string;
+  let backend: string;
   let savedHome: string | undefined;
 
   beforeEach(() => {
     savedHome = process.env['OVERDECK_HOME'];
     home = mkdtempSync(join(tmpdir(), 'anywhere-vault-test-'));
-    process.env['OVERDECK_HOME'] = home;
+    backendDir = join(home, 'backend');
+    backend = `${DIR_BACKEND_PREFIX}${backendDir}`;
+    process.env['OVERDECK_HOME'] = join(home, '.overdeck');
   });
 
   afterEach(() => {
@@ -72,9 +80,10 @@ describe('readAnywhereVaultState (PAN-4445 D-9 fallback)', () => {
     vi.restoreAllMocks();
   });
 
-  function writeVaultConfig(config: unknown): void {
-    mkdirSync(join(home, 'vault'), { recursive: true });
-    writeFileSync(join(home, 'vault', 'config.json'), typeof config === 'string' ? config : JSON.stringify(config), 'utf8');
+  /** A vault header in a `dir:` backend, readable by `key`. */
+  async function writeHeader(key: Buffer): Promise<void> {
+    const store = await DirVaultStore.open(backendDir);
+    await store.casRef(HEADER_REF_NAME, null, await encryptRef(HEADER_REF_NAME, newVaultHeader(), deriveSubkeys(key)));
   }
 
   it('is off with no vault config', async () => {
@@ -82,31 +91,44 @@ describe('readAnywhereVaultState (PAN-4445 D-9 fallback)', () => {
   });
 
   it('is locked with a backend and no key', async () => {
-    writeVaultConfig({ backend: 'git@example.com:me/vault.git' });
-    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'locked', backend: 'git@example.com:me/vault.git' });
+    await writeHeader(createVaultKey());
+    await writeVaultConfig({ backend });
+    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'locked', backend });
   });
 
-  it('is ready with a backend and a key', async () => {
-    writeVaultConfig({ backend: 'git@example.com:me/vault.git' });
+  it('is locked when this machine holds a key that does not open the vault', async () => {
+    await writeHeader(createVaultKey());
     await saveVaultKey(createVaultKey());
-    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'ready', backend: 'git@example.com:me/vault.git' });
+    await writeVaultConfig({ backend });
+    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'locked', backend });
+  });
+
+  it('is ready with a key that opens the vault', async () => {
+    const key = createVaultKey();
+    await writeHeader(key);
+    await saveVaultKey(key);
+    await writeVaultConfig({ backend });
+    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'ready', backend });
   });
 
   it('is rotation-pending while key.next exists', async () => {
-    writeVaultConfig({ backend: 'git@example.com:me/vault.git' });
-    await saveVaultKey(createVaultKey());
-    writeFileSync(join(home, 'vault', 'key.next'), createVaultKey());
-    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'rotation-pending', backend: 'git@example.com:me/vault.git' });
+    const key = createVaultKey();
+    await writeHeader(key);
+    await saveVaultKey(key);
+    await writeVaultConfig({ backend });
+    writeFileSync(join(home, '.overdeck', 'vault', 'key.next'), createVaultKey());
+    await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'rotation-pending', backend });
   });
 
   it('strips a user and password from the backend URL', async () => {
-    writeVaultConfig({ backend: 'https://me:secret@example.com/vault.git' });
+    await writeVaultConfig({ backend: 'https://me:secret@example.com/vault.git' });
     const vault = await readAnywhereVaultState();
-    expect(vault.backend).toBe('https://example.com/vault.git');
+    expect(vault).toEqual({ state: 'locked', backend: 'https://example.com/vault.git' });
   });
 
   it('is locked, with a warning, when the vault config is unreadable', async () => {
-    writeVaultConfig('{not json');
+    mkdirSync(join(home, '.overdeck', 'vault'), { recursive: true });
+    writeFileSync(join(home, '.overdeck', 'vault', 'config.json'), '{not json', 'utf8');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     await expect(readAnywhereVaultState()).resolves.toEqual({ state: 'locked', backend: null });
     expect(String(warn.mock.calls[0]?.[0])).toContain('[anywhere] vault state unreadable');

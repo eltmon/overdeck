@@ -8,11 +8,8 @@
  * list. Each carries an `action` the UI maps to a button; a message never
  * tells the operator to run a `pan` command.
  */
-import { stat } from 'node:fs/promises';
-
 import { readVaultConfig } from '../vault/config.js';
-import { loadVaultKey } from '../vault/identity.js';
-import { nextKeyPath } from '../vault/rotate.js';
+import { openVaultContext } from '../vault/open.js';
 
 export type AnywhereVaultState = 'off' | 'locked' | 'rotation-pending' | 'ready';
 
@@ -51,31 +48,30 @@ function displayBackend(backend: string): string {
   }
 }
 
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
-  }
-}
-
 /**
- * The vault state for the status card (D-9 fallback: `src/lib/vault/open.ts`
- * is not on main yet). No backend ⇒ `off`; a `key.next` ⇒ `rotation-pending`;
- * no key ⇒ `locked`; otherwise `ready`. Anything unreadable ⇒ `locked` plus a
- * warning.
+ * The vault state for the status card (PAN-4445 D-9: `openVaultContext()`,
+ * the same resolution `GET /api/vault/status` uses). `off → off`,
+ * `key-missing | key-mismatch → locked`, `rotation-pending → rotation-pending`,
+ * `open → ready`. Anything unreadable ⇒ `locked` plus a warning.
  */
 export async function readAnywhereVaultState(): Promise<AnywhereStatus['vault']> {
   let backend: string | null = null;
   try {
+    // Read first so an error opening the store still reports the backend.
     const config = await readVaultConfig();
-    if (!config.backend) return { state: 'off', backend: null };
-    backend = displayBackend(config.backend);
-    if (await fileExists(nextKeyPath())) return { state: 'rotation-pending', backend };
-    if ((await loadVaultKey()) === null) return { state: 'locked', backend };
-    return { state: 'ready', backend };
+    backend = config.backend ? displayBackend(config.backend) : null;
+    const opened = await openVaultContext();
+    switch (opened.status) {
+      case 'off':
+        return { state: 'off', backend: null };
+      case 'rotation-pending':
+        return { state: 'rotation-pending', backend: displayBackend(opened.backend) };
+      case 'key-missing':
+      case 'key-mismatch':
+        return { state: 'locked', backend: displayBackend(opened.backend) };
+      case 'open':
+        return { state: 'ready', backend };
+    }
   } catch (error) {
     console.warn(`[anywhere] vault state unreadable: ${(error as Error).message}`);
     return { state: 'locked', backend };
