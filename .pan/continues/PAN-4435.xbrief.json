@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4435",
   "created": "2026-09-30T19:25:19.083Z",
-  "updated": "2026-09-30T20:14:33.871Z",
+  "updated": "2026-09-30T20:32:40.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-30T20:14:25.385Z"
     },
     "create-token-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4435",
-      "claimedAt": "2026-09-30T20:14:33.871Z"
+      "claimedAt": "2026-09-30T20:14:33.871Z",
+      "doneAt": "2026-09-30T20:32:40.197Z"
     }
   }
 }
