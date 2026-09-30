@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4436",
   "created": "2026-09-30T19:37:03.917Z",
-  "updated": "2026-09-30T20:14:25.665Z",
+  "updated": "2026-09-30T20:14:26.716Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,7 +60,7 @@
     "docs-browse-copies": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4436",
-      "claimedAt": "2026-09-30T20:07:16.871Z"
+      "claimedAt": "2026-09-30T20:14:26.716Z"
     },
     "vault-browse-service": {
       "status": "completed",
