@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4445",
   "created": "2026-09-30T19:27:37.009Z",
-  "updated": "2026-09-30T20:28:51.237Z",
+  "updated": "2026-09-30T20:33:08.889Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -55,6 +55,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4445",
       "claimedAt": "2026-09-30T20:28:51.237Z"
+    },
+    "docs-remote-access": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4445",
+      "claimedAt": "2026-09-30T20:33:08.889Z"
     }
   }
 }
