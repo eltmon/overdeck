@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4307",
   "created": "2026-09-30T16:35:20.478Z",
-  "updated": "2026-09-30T19:03:37.327Z",
+  "updated": "2026-09-30T19:04:05.526Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "vault-settle-poller.ac5": {
       "status": "completed",
       "doneAt": "2026-09-30T19:03:37.327Z"
+    },
+    "vault-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T19:04:05.526Z"
     }
   }
 }
