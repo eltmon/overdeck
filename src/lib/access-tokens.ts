@@ -3,8 +3,15 @@
  *
  * The single read/write door for `${OVERDECK_HOME}/access-tokens.json`. Each
  * record is one revocable credential: a paired device (`kind: 'device'`) or an
- * API token (`kind: 'token'`). Tokens are `odk_<64 hex>`; only their SHA-256
- * hex digest is stored, and comparison is constant-time.
+ * API token (`kind: 'token'`). A record with no `kind` is a device. Tokens are
+ * `odk_<64 hex>`; only their SHA-256 hex digest is stored, and comparison is
+ * constant-time.
+ *
+ * Every record carries scopes from `ACCESS_TOKEN_SCOPES`. `admin` satisfies
+ * every scope, `operate` satisfies `tell`, and the three `read:*` scopes are
+ * independent grants (`scopeSatisfies`). Pairing always grants `['admin']`.
+ * `createAccessToken` accepts only known scopes, but a record read from the
+ * file may hold any string: an unknown scope parses and satisfies nothing.
  *
  * The file is written atomically (temp file in the same directory, then
  * rename) with mode 0600. It is a file, not a database table, because the
@@ -30,8 +37,10 @@ export const ACCESS_TOKENS_FILENAME = 'access-tokens.json';
 export const ACCESS_TOKEN_PREFIX = 'odk_';
 export const ACCESS_TOKEN_REFRESH_MS = 5_000;
 const LAST_USED_THROTTLE_MS = 60_000;
+const MAX_NAME_LENGTH = 200;
 
-export type AccessTokenScope = 'admin';
+export const ACCESS_TOKEN_SCOPES = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'admin'] as const;
+export type AccessTokenScope = (typeof ACCESS_TOKEN_SCOPES)[number];
 export type AccessTokenKind = 'device' | 'token';
 
 export interface AccessTokenRecord {
@@ -67,6 +76,32 @@ let snapshot: Snapshot = { records: [], fingerprint: null, error: null };
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let writeQueue: Promise<unknown> = Promise.resolve();
 const lastUsedWrittenAt = new Map<string, number>();
+
+/** True when `granted` covers `required`: admin covers all, operate covers tell. */
+export function scopeSatisfies(granted: readonly string[], required: AccessTokenScope): boolean {
+  if (granted.includes('admin') || granted.includes(required)) return true;
+  return required === 'tell' && granted.includes('operate');
+}
+
+function isAccessTokenScope(value: string): value is AccessTokenScope {
+  return (ACCESS_TOKEN_SCOPES as readonly string[]).includes(value);
+}
+
+/** Parse `read:events,tell` (or an array). Throws naming the first unknown scope; rejects an empty set. */
+export function parseAccessTokenScopes(input: string | readonly string[]): AccessTokenScope[] {
+  const entries = (typeof input === 'string' ? input.split(',') : input).map((scope) => scope.trim()).filter((scope) => scope !== '');
+  const scopes: AccessTokenScope[] = [];
+  for (const entry of entries) {
+    if (!isAccessTokenScope(entry)) {
+      throw new Error(`Unknown access-token scope "${entry}"; expected one of ${ACCESS_TOKEN_SCOPES.join(', ')}`);
+    }
+    if (!scopes.includes(entry)) scopes.push(entry);
+  }
+  if (scopes.length === 0) {
+    throw new Error(`Access-token scopes must name at least one of ${ACCESS_TOKEN_SCOPES.join(', ')}`);
+  }
+  return scopes;
+}
 
 /** Absolute path of the registry under the current OVERDECK_HOME. */
 export function accessTokensPath(): string {
@@ -206,11 +241,21 @@ export async function createAccessToken(input: {
   scopes: AccessTokenScope[];
   kind?: AccessTokenKind;
 }): Promise<{ token: string; record: PublicAccessTokenRecord }> {
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  if (name === '' || name.length > MAX_NAME_LENGTH) {
+    throw new Error(`Access-token name must be a non-empty string of at most ${MAX_NAME_LENGTH} characters`);
+  }
+  let scopes: AccessTokenScope[];
+  try {
+    scopes = parseAccessTokenScopes(input.scopes);
+  } catch (error) {
+    throw new Error(`Invalid access-token scopes: ${(error as Error).message}`);
+  }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
     id: randomUUID(),
-    name: input.name,
-    scopes: [...input.scopes],
+    name,
+    scopes,
     tokenHash: hashToken(token),
     createdAt: new Date().toISOString(),
     lastUsedAt: null,
