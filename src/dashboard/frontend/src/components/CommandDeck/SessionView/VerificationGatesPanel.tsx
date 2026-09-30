@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CircleCheck, CircleX, Loader2, Circle } from 'lucide-react';
 import styles from '../styles/command-deck.module.css';
 import { LoadingBoundary } from '../../primitives/LoadingBoundary';
+import { TestRemovalWaiverControl } from './TestRemovalWaiverControl';
 
 /**
  * VerificationGatesPanel (PAN-2665) — the Test/Lint tree node's live view.
@@ -155,6 +156,7 @@ export function VerificationGatesPanel({ issueId, fallbackTranscript }: { issueI
             maxHeight: 320,
             overflowY: 'auto',
           }}>{(gate.output || gate.error || '').trim()}</pre>
+          {gate.name === 'test-skip' && <TestRemovalWaiverControl issueId={issueId} />}
         </div>
       ))}
     </div>
