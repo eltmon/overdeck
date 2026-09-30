@@ -143,6 +143,7 @@ function deviceView(record: PublicAccessTokenRecord) {
   return {
     id: record.id,
     name: record.name,
+    scopes: [...record.scopes],
     createdAt: record.createdAt,
     lastUsedAt: record.lastUsedAt,
     revokedAt: record.revokedAt ?? null,
