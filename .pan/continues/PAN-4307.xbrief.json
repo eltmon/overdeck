@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4307",
   "created": "2026-09-30T16:35:20.478Z",
-  "updated": "2026-09-30T19:02:09.662Z",
+  "updated": "2026-09-30T19:02:20.899Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "vault-service.ac4": {
       "status": "completed",
       "doneAt": "2026-09-30T19:02:09.662Z"
+    },
+    "vault-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T19:02:20.899Z"
     }
   }
 }
