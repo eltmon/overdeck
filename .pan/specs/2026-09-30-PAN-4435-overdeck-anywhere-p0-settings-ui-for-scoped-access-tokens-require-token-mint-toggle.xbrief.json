@@ -4,17 +4,17 @@
     "created": "2026-09-30T19:20:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4435: Overdeck Anywhere P0: Settings UI for scoped access tokens + require_token_mint toggle",
-    "updated": "2026-09-30T19:24:29.824Z"
+    "updated": "2026-09-30T19:24:58.696Z"
   },
   "plan": {
     "id": "pan-4435",
     "title": "Overdeck Anywhere P0: Settings UI for scoped access tokens + require_token_mint toggle",
-    "status": "proposed",
+    "status": "running",
     "uid": "b0d16e02-1a81-42ee-be67-8b63f1298321",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T19:20:49Z",
-    "updated": "2026-09-30T19:24:29.824Z",
+    "updated": "2026-09-30T19:24:58.696Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4435",
@@ -719,5 +719,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
