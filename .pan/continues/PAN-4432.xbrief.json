@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4432",
   "created": "2026-09-30T16:34:03.069Z",
-  "updated": "2026-09-30T17:26:16.662Z",
+  "updated": "2026-09-30T17:26:25.807Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4432",
       "claimedAt": "2026-09-30T17:15:30.165Z",
       "doneAt": "2026-09-30T17:26:16.662Z"
+    },
+    "relay-generic-needs-you": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4432",
+      "claimedAt": "2026-09-30T17:26:25.807Z"
     }
   }
 }
