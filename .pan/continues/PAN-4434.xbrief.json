@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4434",
   "created": "2026-10-01T21:15:30.449Z",
-  "updated": "2026-10-01T21:41:35.455Z",
+  "updated": "2026-10-01T21:42:27.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "ws-terminal-wiring.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T21:41:35.455Z"
+    },
+    "xterminal-frame-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:42:27.778Z"
     }
   }
 }
