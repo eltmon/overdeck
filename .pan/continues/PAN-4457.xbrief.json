@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4457",
   "created": "2026-10-01T21:43:35.334Z",
-  "updated": "2026-10-01T23:34:45.331Z",
+  "updated": "2026-10-01T23:34:56.952Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "review-door-refresh.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T23:34:45.330Z"
+    },
+    "review-door-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:56.952Z"
     }
   }
 }
