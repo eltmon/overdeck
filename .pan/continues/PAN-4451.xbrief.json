@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:58:37.619Z",
+  "updated": "2026-10-01T13:58:49.721Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "blocker-wake-tick.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T13:58:37.618Z"
+    },
+    "blocker-wake-tick.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:49.721Z"
     }
   }
 }
