@@ -1,0 +1,49 @@
+---
+title: pan devices
+description: List or revoke the devices paired with this machine's dashboard
+---
+
+# `pan devices`
+
+Manage the devices paired with this machine's dashboard. Released in v0.64.0. Settings →
+Anywhere's **Revoke** has the same effect (next release, v0.65.0). See
+[Remote access](/configuration/remote-access#list-and-revoke-devices).
+
+## list
+
+```bash
+pan devices list [--json]
+```
+
+Lists paired devices with columns `ID NAME CREATED LAST USED REVOKED`.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print the device array as JSON. |
+
+With no paired devices: `No paired devices. Pair one with \`pan pair\`.`
+
+It needs the running dashboard: without one it prints the not-running message and exits 1.
+
+## revoke
+
+```bash
+pan devices revoke <id>
+```
+
+Revoke a paired device and close its live connections.
+
+Through the dashboard it prints:
+
+```
+Revoked device "<name>" (<id>); its live connections were closed.
+```
+
+With no dashboard running it writes the revocation into `~/.overdeck/access-tokens.json`
+and prints:
+
+```
+Dashboard not running; revoked in the registry. No live connections were open.
+```
+
+An unknown id prints `No paired device with id <id>.` and exits 1.
