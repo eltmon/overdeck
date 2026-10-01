@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4457",
   "created": "2026-10-01T21:43:35.334Z",
-  "updated": "2026-10-01T23:33:06.563Z",
+  "updated": "2026-10-01T23:33:19.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "issue-row-badge.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T23:33:06.563Z"
+    },
+    "workspace-row-badge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:19.341Z"
     }
   }
 }
