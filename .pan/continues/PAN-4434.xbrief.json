@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4434",
   "created": "2026-10-01T21:15:30.449Z",
-  "updated": "2026-10-01T21:28:16.479Z",
+  "updated": "2026-10-01T21:30:48.055Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-01T21:28:08.490Z"
     },
     "xterminal-pong": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4434",
-      "claimedAt": "2026-10-01T21:28:16.479Z"
+      "claimedAt": "2026-10-01T21:28:16.479Z",
+      "doneAt": "2026-10-01T21:30:48.055Z"
     }
   }
 }
