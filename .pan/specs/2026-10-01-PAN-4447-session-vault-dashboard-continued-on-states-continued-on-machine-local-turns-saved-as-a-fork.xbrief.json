@@ -4,17 +4,17 @@
     "created": "2026-10-01T21:12:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4447: Session Vault: dashboard continued-on states (\"Continued on <machine>\", \"Local turns saved as a fork\")",
-    "updated": "2026-10-01T21:14:08.225Z"
+    "updated": "2026-10-01T21:14:53.276Z"
   },
   "plan": {
     "id": "pan-4447",
     "title": "Session Vault: dashboard continued-on states (\"Continued on <machine>\", \"Local turns saved as a fork\")",
-    "status": "proposed",
+    "status": "running",
     "uid": "23da25b4-7d1a-495f-aa07-a0b154ca4b3b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T21:12:22Z",
-    "updated": "2026-10-01T21:14:08.225Z",
+    "updated": "2026-10-01T21:14:53.276Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4447",
@@ -631,5 +631,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
