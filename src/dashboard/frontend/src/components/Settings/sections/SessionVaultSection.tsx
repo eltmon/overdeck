@@ -5,7 +5,7 @@ import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { SettingsSection } from '../primitives';
 import { SessionVaultJoinForm } from './SessionVaultJoinForm';
 import { SessionVaultSetupForm } from './SessionVaultSetupForm';
-import { postVault } from './sessionVaultShared';
+import { BUTTON_CLASS, postVault } from './sessionVaultShared';
 
 type VaultState = 'off' | 'rotation-pending' | 'key-missing' | 'key-mismatch' | 'ready';
 
@@ -66,6 +66,7 @@ interface ConfirmRefused {
 }
 
 const STATUS_QUERY_KEY = ['vault-status'];
+const AUTO_SYNC_DOCS = 'https://overdeck.ai/configuration/session-vault#save-and-sync';
 const BATCH_QUERY_KEY = ['vault-eviction-batch'];
 
 function formatBytes(bytes: number): string {
@@ -85,6 +86,29 @@ async function fetchVaultEvictionBatch(): Promise<EvictionBatchResponse> {
   const res = await fetch('/api/vault/eviction-batch');
   if (!res.ok) throw new Error(`Failed to fetch vault eviction batch (${res.status})`);
   return res.json();
+}
+
+/** FR-11: one sync now, through the primary dashboard's vault queue; the response is the fresh status. */
+function SyncNowButton() {
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { status, body } = await postVault('sync');
+      if (status === 200 && body) queryClient.setQueryData(STATUS_QUERY_KEY, body);
+      else toast.error((body as { error?: string } | null)?.error ?? `Sync failed (${status}).`);
+    } catch (error) {
+      toast.error(`Sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+  return (
+    <button type="button" disabled={syncing} onClick={() => void handleSync()} className={BUTTON_CLASS}>
+      {syncing ? 'Syncing…' : 'Sync now'}
+    </button>
+  );
 }
 
 function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; onChanged: (message?: string) => void }) {
@@ -112,7 +136,7 @@ function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; 
             {status.lastSync && (
               <>
                 {' · '}Last sync:{' '}
-                <span className="text-foreground" title={status.lastSync.at}>{formatRelativeTime(status.lastSync.at)}</span>
+                <span data-testid="vault-last-sync" className="text-foreground" title={status.lastSync.at}>{formatRelativeTime(status.lastSync.at)}</span>
                 {status.lastSync.offline && <span className="text-muted-foreground"> · Offline</span>}
               </>
             )}
@@ -127,6 +151,15 @@ function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; 
               </p>
             )),
           )}
+          {status.running && (
+            <div className="pt-1">
+              <SyncNowButton />
+            </div>
+          )}
+          <p className="text-muted-foreground">
+            Sync runs automatically every few minutes in the primary dashboard. Change the interval in the docs:{' '}
+            <a href={AUTO_SYNC_DOCS} target="_blank" rel="noreferrer" className="underline hover:text-foreground">Session Vault configuration</a>.
+          </p>
         </>
       )}
       {!status.running && (

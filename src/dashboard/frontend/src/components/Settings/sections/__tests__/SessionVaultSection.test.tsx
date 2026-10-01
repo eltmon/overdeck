@@ -72,6 +72,7 @@ function mockFetch(options: {
   batch?: typeof MIXED_BATCH;
   onConfirm?: (body: unknown) => { status: number; body: unknown };
   onDecline?: (body: unknown) => unknown;
+  onSync?: () => { status: number; body: unknown };
 }) {
   const status = options.status ?? READY_STATUS;
   const batch = options.batch ?? MIXED_BATCH;
@@ -95,6 +96,10 @@ function mockFetch(options: {
     }
     if (url === '/api/vault/eviction-batch/clear' && init?.method === 'POST') {
       return new Response(JSON.stringify({ ...batch, entries: [] }), { status: 200 });
+    }
+    if (url === '/api/vault/sync' && init?.method === 'POST' && options.onSync) {
+      const result = options.onSync();
+      return new Response(JSON.stringify(result.body), { status: result.status });
     }
     if (url === '/api/vault/eviction-batch/reoffer' && init?.method === 'POST') {
       return new Response(JSON.stringify(batch), { status: 200 });
@@ -129,6 +134,36 @@ describe('SessionVaultSection', () => {
     await waitFor(() => expect(screen.getByText('Unlock this machine')).toBeTruthy());
     expect((screen.getByLabelText('Git URL') as HTMLInputElement).value).toBe('dir:/tmp/vault');
     expect(screen.queryByText(/Run: pan vault join/)).toBeNull();
+  });
+
+  it('ready and running: "Sync now" posts /api/vault/sync and renders the returned last sync time', async () => {
+    const synced = { ...READY_STATUS, lastSync: { ...READY_STATUS.lastSync, at: '2026-10-01T12:00:00.000Z' } };
+    const onSync = vi.fn(() => ({ status: 200, body: synced }));
+    mockFetch({ status: { ...READY_STATUS, lastSync: null } as unknown as typeof READY_STATUS, onSync });
+    renderSection();
+
+    const button = await screen.findByRole('button', { name: 'Sync now' });
+    expect(screen.queryByTestId('vault-last-sync')).toBeNull();
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByTestId('vault-last-sync').getAttribute('title')).toBe('2026-10-01T12:00:00.000Z'));
+    expect(onSync).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: 'Session Vault configuration' }).getAttribute('href')).toBe('https://overdeck.ai/configuration/session-vault#save-and-sync');
+  });
+
+  it('ready but not running: no "Sync now" button, and the primary-dashboard line instead', async () => {
+    mockFetch({ status: { ...READY_STATUS, running: false } });
+    renderSection();
+
+    await waitFor(() => expect(screen.getByText('Background sync runs only in the primary dashboard.')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Sync now' })).toBeNull();
+  });
+
+  it('a 409 from Sync now shows the server error as a toast', async () => {
+    mockFetch({ onSync: () => ({ status: 409, body: { error: 'Background sync runs only in the primary dashboard.', code: 'sync-not-running' } }) });
+    renderSection();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sync now' }));
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('Background sync runs only in the primary dashboard.'));
   });
 
   it('renders a verified and a failed entry with their status', async () => {
