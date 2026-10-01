@@ -1,0 +1,442 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-01T21:10:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4434: Overdeck Anywhere P0: /ws/terminal app-level heartbeat (ping/pong control frames)",
+    "updated": "2026-10-01T21:14:25.021Z"
+  },
+  "plan": {
+    "id": "pan-4434",
+    "title": "Overdeck Anywhere P0: /ws/terminal app-level heartbeat (ping/pong control frames)",
+    "status": "proposed",
+    "uid": "348290c6-1214-44c7-8617-55bf9d43b82e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-01T21:10:38Z",
+    "updated": "2026-10-01T21:14:25.021Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4434",
+        "label": "PAN-4434",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4434.md",
+        "label": "PRD draft (.pan/drafts/PAN-4434.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "websocket",
+      "terminal",
+      "overdeck-anywhere",
+      "heartbeat"
+    ],
+    "narratives": {
+      "Problem": "Proxies such as Cloudflare close a WebSocket after ~100 s without traffic. /ws/rpc and /events/stream already send 15 s heartbeats, but /ws/terminal sends nothing while a terminal is idle, so idle terminals behind such proxies drop, and the server cannot detect half-open terminal sockets.",
+      "Proposal": "Add src/dashboard/server/ws-terminal-heartbeat.ts: for connections that opt in with ?heartbeat=1, send the control frame \\u0000{\"type\":\"ping\"} every 20 s from connection onward; any inbound message resets a missed counter and two consecutive silent intervals call ws.terminate(). ws-terminal.ts drops {\"type\":\"ping\"}/{\"type\":\"pong\"} client messages at its single ws.on('message') entry point so they never reach the PTY. XTerminal.tsx (after extracting its control-frame parse into components/terminal/terminalControlFrames.ts to stay under its file-size cap) opts in with heartbeat=1, answers pings with {\"type\":\"pong\"}, and stops writing unknown parsed control frames into xterm. Three docs describe the shipped heartbeat.",
+      "NonGoals": "- No ws.ping() protocol-level pings and no change to /ws/rpc, /ws/voice, /ws/autopreso or /events/stream heartbeats\n- No server reply to a client ping; it is only dropped\n- No heartbeat or heartbeat termination for connections without heartbeat=1, and no forced reload of stale bundles\n- No change to the upgrade/auth block of ws-terminal.ts, ws-auth.ts or route-scopes.ts\n- No change to terminalReconnectPolicy.ts; a terminated socket reconnects through the existing path\n- No raise of any scripts/file-size-allowlist.txt cap\n- No edit to the separate OKF knowledge bundle repo\n- No special handling of suspended background tabs: they stop answering pings, are terminated after 40-60 s and reconnect on resume; this is intended"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The heartbeat is opt-in via the ?heartbeat=1 query parameter, which XTerminal always sends",
+        "rationale": "Current XTerminal writes unrecognized \\u0000 control frames into xterm and never pongs; after pan reload, open tabs reconnect with the stale bundle (StaleBuildChip only prompts), so an unconditional heartbeat would paint ping text every 20 s and terminate those terminals every 40-60 s. A query param (not an attach field) is needed because attach is read only after a respawn wait of up to 95 s."
+      },
+      {
+        "summary": "Ping/pong client messages are dropped once at the ws.on('message') entry point instead of in each of the four handlers",
+        "rationale": "All four handlers (pre-attach, Herdr, hub-join, local) fall through to a PTY/bridge write; one filter before dispatch covers them all and keeps pongs out of the pre-attach message/byte budget, while parseControlMessage is still widened as the issue asks."
+      },
+      {
+        "summary": "The client drops parsed control frames of unknown type but keeps passing malformed \\u0000 messages through to xterm",
+        "rationale": "Prevents future control frames from rendering as text without risking loss of a live PTY chunk that happens to start with NUL."
+      },
+      {
+        "summary": "Docs scope covers DASHBOARD-ARCHITECTURE.md plus DASHBOARD-AUTH.md and configuration/remote-access.mdx",
+        "rationale": "The latter two currently say /ws/terminal has no heartbeat and list PAN-4434 as pending; leaving them would contradict shipped code."
+      }
+    ],
+    "items": [
+      {
+        "id": "heartbeat-module",
+        "title": "Add the /ws/terminal heartbeat module with fake-timer tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:10:38Z",
+        "metadata": {
+          "issueLabel": "pan-4434",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "ws-terminal-wiring"
+          ],
+          "files_scope": [
+            "src/dashboard/server/ws-terminal-heartbeat.ts",
+            "src/dashboard/server/__tests__/ws-terminal-heartbeat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-terminal-heartbeat.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ws-terminal-heartbeat.test.ts passes all six named cases",
+            "typecheck completes without errors",
+            "no new circular import reported",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/ws-terminal-heartbeat.ts exactly as PRD W1 shows: constants TERMINAL_HEARTBEAT_INTERVAL_MS=20_000, TERMINAL_HEARTBEAT_MAX_MISSED=2, TERMINAL_HEARTBEAT_QUERY_PARAM='heartbeat', wantsTerminalHeartbeat(url), and startTerminalHeartbeat(ws, sendPing) implementing the D-5 tick rule (missed resets on any inbound message, terminate at 2 consecutive silent ticks, otherwise send ping; clear on close/error). It must not import ws-terminal.ts. Add ws-terminal-heartbeat.test.ts with the six named cases from PRD W1 using vi.useFakeTimers() and a FakeSocket extends EventEmitter with terminate = vi.fn()."
+        },
+        "items": [
+          {
+            "id": "heartbeat-module.ac1",
+            "title": "Given fake timers and a socket that receives a message before each tick, when 60 000 ms elapse, then sendPing is called 3 times and terminate is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-module.ac2",
+            "title": "Given a silent tick followed by an inbound message, when two more ticks pass with the second silent, then terminate is not called; when a fourth consecutive silent tick passes, then terminate is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-module.ac3",
+            "title": "Given no inbound messages, when 40 000 ms elapse, then terminate is called once and when 120 000 ms elapse the timer has stopped so terminate stays at one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-module.ac4",
+            "title": "Given a sendPing that answers each ping with a pong message, when 600 000 ms of fake time elapse, then 30 pings are recorded, no gap between outbound pings exceeds 20 000 ms, and terminate is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-module.ac5",
+            "title": "When the socket emits close or error, then no further ping is sent and wantsTerminalHeartbeat returns true only for heartbeat=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-terminal-wiring",
+        "title": "Wire the opt-in heartbeat into ws-terminal.ts and drop ping/pong input",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:10:38Z",
+        "metadata": {
+          "issueLabel": "pan-4434",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/__tests__/ws-terminal-heartbeat-wiring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-terminal-heartbeat-wiring.test.ts src/dashboard/server/__tests__/ws-terminal-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/ws-terminal.ts follow PRD W2: import startTerminalHeartbeat and wantsTerminalHeartbeat, widen ClientControlMessage with ping and pong, make parseControlMessage return ping/pong, start the heartbeat right after the 'WebSocket connected for session' log only when wantsTerminalHeartbeat(url) is true (sending sendControl(ws, { type: 'ping' })), and drop ping/pong at the top of the single ws.on('message') listener before messageHandler or the pre-attach buffer. Do not edit the four handlers or the upgrade block. Add ws-terminal-heartbeat-wiring.test.ts with a real loopback server and mocked node-pty, tmux and resolveTerminalAttachTarget as PRD W2 specifies. The test also spies startTerminalHeartbeat (case 3) and fires the fake pty's stored onExit callback in afterEach so the 5 s ptyDiagInterval never leaks."
+        },
+        "items": [
+          {
+            "id": "ws-terminal-wiring.ac1",
+            "title": "Given a connection to /ws/terminal?session=x&heartbeat=1 that has attached and sent ready, when the client sends {\"type\":\"pong\"}, {\"type\":\"ping\"} and \"x\", then the mocked pty.write receives \"x\" and never receives either heartbeat message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-terminal-wiring.ac2",
+            "title": "Given a pong sent before the attach message, when the client then attaches and sends \"y\", then pty.write receives \"y\" and the pong is never written or buffered as input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-terminal-wiring.ac3",
+            "title": "Given startTerminalHeartbeat wrapped in a vi.fn spy, when a client connects with heartbeat=1, then the spy is called once before the client sends attach; when a client connects without the parameter and attaches, then the spy is called zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xterminal-frame-extract",
+        "title": "Extract the XTerminal control-frame types and parse into terminalControlFrames.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:10:38Z",
+        "metadata": {
+          "issueLabel": "pan-4434",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/terminal/terminalControlFrames.ts",
+            "src/dashboard/frontend/src/components/terminal/terminalControlFrames.test.ts",
+            "src/dashboard/frontend/src/components/XTerminal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/terminal/terminalControlFrames.test.ts src/dashboard/frontend/src/components/XTerminal.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "file-size guard exits 0",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Behavior-preserving refactor per PRD W3: create components/terminal/terminalControlFrames.ts with TERMINAL_CONTROL_PREFIX, TerminalSnapshotMessage, TerminalSizeMessage, TerminalControlFrame and parseTerminalControlFrame; delete the two interfaces from XTerminal.tsx, import from the new module, and replace the startsWith('\\u0000') + JSON.parse try/catch block with parseTerminalControlFrame. Add terminalControlFrames.test.ts covering snapshot, size and malformed input."
+        },
+        "items": [
+          {
+            "id": "xterminal-frame-extract.ac1",
+            "title": "Given a '\\u0000' snapshot or size frame, when parseTerminalControlFrame parses it, then it returns the typed object, and for '\\u0000{not json' it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-frame-extract.ac2",
+            "title": "When grep -n 'interface TerminalSnapshotMessage' runs on XTerminal.tsx, then it prints nothing, and the unchanged XTerminal.test.tsx passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-frame-extract.ac3",
+            "title": "When bash scripts/lint-file-size.sh runs, then it exits 0 with XTerminal.tsx below its 1075-line count on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xterminal-pong",
+        "title": "Make XTerminal opt in with heartbeat=1 and answer ping frames with pong",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:10:38Z",
+        "metadata": {
+          "issueLabel": "pan-4434",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx",
+            "src/dashboard/frontend/src/components/terminal/terminalControlFrames.ts",
+            "src/dashboard/frontend/src/components/XTerminal.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/XTerminal.test.tsx src/dashboard/frontend/src/components/terminal/terminalControlFrames.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "git diff --numstat origin/main -- src/dashboard/frontend/src/components/XTerminal.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "XTerminal.test.tsx passes including the three new cases",
+            "typecheck completes without errors",
+            "file-size guard exits 0",
+            "numstat shows deletions >= insertions for XTerminal.tsx",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4: add TerminalPingMessage and TERMINAL_PONG_MESSAGE to terminalControlFrames.ts and extend the union; in XTerminal.tsx append &heartbeat=1 to the wsUrl template on the same line, and in the control-frame branch after the size branch add: on ping send TERMINAL_PONG_MESSAGE and return, then 'if (control !== null) return;' so unknown parsed control frames never reach xterm while malformed JSON still falls through. Add the three named cases to XTerminal.test.tsx."
+        },
+        "items": [
+          {
+            "id": "xterminal-pong.ac1",
+            "title": "When XTerminal connects, then the MockWebSocket URL contains heartbeat=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-pong.ac2",
+            "title": "Given an open socket, when onmessage receives '\\u0000{\"type\":\"ping\"}', then send is called with '{\"type\":\"pong\"}' exactly once and the terminal write mock never receives the ping text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-pong.ac3",
+            "title": "Given an open socket, when onmessage receives '\\u0000{\"type\":\"future\"}', then the terminal write mock never receives it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-pong.ac4",
+            "title": "When git diff --numstat origin/main runs on XTerminal.tsx after this item, then it prints deletions greater than or equal to insertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-heartbeat",
+        "title": "Document the /ws/terminal ping/pong heartbeat in the architecture, auth and remote-access docs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:10:38Z",
+        "metadata": {
+          "issueLabel": "pan-4434",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "grep -n 'heartbeat=1' docs/DASHBOARD-ARCHITECTURE.md docs/DASHBOARD-AUTH.md configuration/remote-access.mdx",
+            "grep -n 'has none yet' docs/DASHBOARD-AUTH.md || true"
+          ],
+          "expected_outputs": [
+            "heartbeat=1 matches in all three files",
+            "'has none yet' prints nothing"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5: add a bullet to the Terminal architecture list in docs/DASHBOARD-ARCHITECTURE.md describing the opt-in ping/pong heartbeat (20 s ping, pong reply, two silent intervals terminate, ping/pong never reach the PTY, XTerminal always opts in, and why a data frame is used); replace the 'has none yet' sentence in the docs/DASHBOARD-AUTH.md Heartbeats paragraph; remove the PAN-4434 not-yet-shipped bullet from configuration/remote-access.mdx and add one sentence about idle terminals surviving proxy idle timeouts with the heartbeat=1 opt-in for programmatic clients."
+        },
+        "items": [
+          {
+            "id": "docs-heartbeat.ac1",
+            "title": "When grep -n 'heartbeat=1' runs on docs/DASHBOARD-ARCHITECTURE.md, docs/DASHBOARD-AUTH.md and configuration/remote-access.mdx, then it prints a match in each of the three files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-heartbeat.ac2",
+            "title": "When grep -n 'has none yet' runs on docs/DASHBOARD-AUTH.md, then it prints nothing, and the Heartbeats paragraph states that /ws/terminal sends a ping control frame every 20 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-heartbeat.ac3",
+            "title": "Given the Terminal architecture list in docs/DASHBOARD-ARCHITECTURE.md, then it contains a bullet naming the \\u0000{\"type\":\"ping\"} frame, the {\"type\":\"pong\"} reply, the two-interval terminate rule and ws-terminal-heartbeat.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-heartbeat.ac4",
+            "title": "When configuration/remote-access.mdx renders, then the not-yet-shipped list no longer contains the PAN-4434 heartbeat bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "heartbeat-module",
+        "to": "ws-terminal-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "xterminal-frame-extract",
+        "to": "xterminal-pong",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-01-PAN-4434-overdeck-anywhere-p0-ws-terminal-app-level-heartbeat-ping-pong-control-frames.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
