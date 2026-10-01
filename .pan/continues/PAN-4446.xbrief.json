@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4446",
   "created": "2026-10-01T21:18:31.027Z",
-  "updated": "2026-10-01T22:27:03.304Z",
+  "updated": "2026-10-01T22:27:55.970Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "vault-routes.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T22:27:03.304Z"
+    },
+    "vault-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:27:55.970Z"
     }
   }
 }
