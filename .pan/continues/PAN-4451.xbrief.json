@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:59:56.775Z",
+  "updated": "2026-10-01T14:00:11.510Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "blocker-wake-patrol.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T13:59:56.775Z"
+    },
+    "show-blocked-entries.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:00:11.509Z"
     }
   }
 }
