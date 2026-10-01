@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4437",
   "created": "2026-09-30T19:30:30.547Z",
-  "updated": "2026-10-01T13:49:27.830Z",
+  "updated": "2026-10-01T14:15:38.250Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4437",
       "claimedAt": "2026-10-01T13:41:14.533Z",
       "doneAt": "2026-10-01T13:49:27.829Z"
+    },
+    "continue-inspect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:15:38.249Z"
     }
   }
 }
