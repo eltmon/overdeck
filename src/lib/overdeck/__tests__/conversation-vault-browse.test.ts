@@ -30,6 +30,7 @@ const {
   getConversationByName,
   listConversations,
   listVaultBrowseConversations,
+  setConversationClaudeSessionId,
   setConversationProjectKey,
 } = await import('../conversations.js');
 const { removeVaultBrowseRow, upsertVaultBrowseRow, vaultBrowseReadOnlyMessage } = await import('../conversation-vault-rows.js');
@@ -42,6 +43,7 @@ const { vaultBrowseFilePath } = await import('../../vault/browse.js');
 const { handleConversationResume } = await import('../conversation-runtime.js');
 const { handleConversationMessage } = await import('../conversation-message.js');
 const { conversationHarnessAlive } = await import('../conversation-liveness.js');
+const { replaceListCache, setOwnedTail } = await import('../../vault/local-index.js');
 
 async function readResponse(response: HttpServerResponse.HttpServerResponse): Promise<{ status: number; body: Record<string, unknown> }> {
   return { status: response.status, body: JSON.parse(await HttpServerResponse.toWeb(response).text()) as Record<string, unknown> };
@@ -332,5 +334,38 @@ describe('origin column top-ups (PAN-4436 WI-3)', () => {
     closeOverdeckDatabase();
     getOverdeckDatabase(dbPath);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('vault continuity on list rows (PAN-4447)', () => {
+  it('conversation-list-continuity.ac1/ac3: a local row owned elsewhere gets vaultContinuity on both pages', async () => {
+    const name = 'local-continuity-14';
+    createConversation({ name, tmuxSession: `conv-${name}`, cwd: CWD, workspaceId: null });
+    setConversationClaudeSessionId(name, 'session-continuity-14');
+    const recordId = vaultId(14);
+    await setOwnedTail(join(TEST_HOME, 'session-continuity-14.jsonl'), {
+      vaultId: recordId, harness: 'claude-code', tail: { lineCount: 1, byteOffset: 10, lastHashes: [] },
+    });
+    await replaceListCache([
+      { vaultId: recordId, title: 'continued elsewhere', harness: 'claude-code', ownerLabel: 'laptop', ownerIsHere: false, updatedAt: new Date().toISOString(), tombstone: false },
+    ]);
+
+    invalidateConversationListEnrichmentCache();
+    const page1 = await getConversationListWithVaultCopies(500, 0) as Array<Record<string, unknown>>;
+    const row = page1.find((r) => r.name === name);
+    expect(row?.vaultContinuity).toEqual({ kind: 'continued-elsewhere', vaultId: recordId, ownerLabel: 'laptop' });
+
+    invalidateConversationListEnrichmentCache();
+    const page2 = await getConversationListWithVaultCopies(500, 1) as Array<Record<string, unknown>>;
+    expect(page2.length).toBeGreaterThan(0);
+    for (const r of page2) expect(r).toHaveProperty('vaultContinuity');
+  });
+
+  it('conversation-list-continuity.ac2: browse rows get vaultContinuity null', async () => {
+    invalidateConversationListEnrichmentCache();
+    const rows = await getConversationListWithVaultCopies(500, 0) as Array<Record<string, unknown>>;
+    const browseRows = rows.filter((r) => r.origin === 'vault');
+    expect(browseRows.length).toBeGreaterThan(0);
+    for (const r of browseRows) expect(r.vaultContinuity).toBeNull();
   });
 });
