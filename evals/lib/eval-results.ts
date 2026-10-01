@@ -208,10 +208,14 @@ function reviewSeverityLines(records: EvalCaseRecord[]): string[] {
       const count = (metric: string) => group.filter((r) => r.metrics[metric] === 1).length;
       const found = count('recall');
       const blocking = count('blockingRecall');
+      const sufficient = group.filter((r) => r.metrics.excerptSufficient === 1);
+      const sufficientFound = sufficient.filter((r) => r.metrics.recall === 1).length;
       return {
         model,
         effort,
-        line: `- ${model} (${effort}): recall ${found}/${group.length}; blocking recall ${blocking}/${group.length}; rated blocking when found ${blocking}/${found}`,
+        line:
+          `- ${model} (${effort}): recall ${found}/${group.length}; blocking recall ${blocking}/${group.length}; ` +
+          `rated blocking when found ${blocking}/${found}; excerpt-sufficient recall ${sufficientFound}/${sufficient.length}`,
       };
     })
     .sort((a, b) => a.model.localeCompare(b.model) || a.effort.localeCompare(b.effort))

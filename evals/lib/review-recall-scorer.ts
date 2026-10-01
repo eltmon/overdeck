@@ -20,6 +20,11 @@ export interface ReviewRecallCase {
     lines: number[];
     /** 3-6 distinctive lowercase terms from the finding. */
     keywords: string[];
+    /**
+     * `outside-excerpt` = the real reviewer needed files or PRD text the fixture does not carry
+     * (see evals/README.md requirements-lane diagnosis); absent = excerpt.
+     */
+    evidence?: 'excerpt' | 'outside-excerpt';
   };
 }
 
@@ -89,6 +94,9 @@ export function parseReviewRecallCase(data: unknown): ReviewRecallCase {
     b.keywords.length === 0
   ) {
     fail(label, 'blocker needs title, file, integer lines and non-empty keywords');
+  }
+  if (b.evidence !== undefined && b.evidence !== 'excerpt' && b.evidence !== 'outside-excerpt') {
+    fail(label, 'blocker.evidence must be excerpt or outside-excerpt');
   }
   return c as ReviewRecallCase;
 }

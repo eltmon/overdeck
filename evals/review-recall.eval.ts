@@ -41,7 +41,12 @@ evalite<ReviewRecallCase, ReviewRecallOutput>('review recall (E2)', {
       maxTokens: 32_000,
     });
     const { score, ...metrics } = scoreReviewRecall(report, c);
-    appendEvalRecord(recordFromRun('review-recall', c.id, run, score, { ...metrics }));
+    appendEvalRecord(
+      recordFromRun('review-recall', c.id, run, score, {
+        ...metrics,
+        excerptSufficient: c.blocker.evidence === 'outside-excerpt' ? 0 : 1,
+      }),
+    );
     return { ...metrics, report, run };
   },
   scorers: [

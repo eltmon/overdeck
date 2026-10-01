@@ -264,6 +264,13 @@ describe('evals/lib/review-recall-scorer', () => {
       expect(() => parseReviewRecallCase(reviewCase({ diff: 'x'.repeat(60_001) }))).toThrow(/over 60000/);
       expect(() => parseReviewRecallCase({ ...reviewCase(), lane: 'security' })).toThrow(/lane must be one of/);
     });
+
+    it('accepts blocker.evidence outside-excerpt or absent and rejects any other value', () => {
+      const withEvidence = (evidence: unknown) => ({ ...reviewCase(), blocker: { ...reviewCase().blocker, evidence } });
+      expect(parseReviewRecallCase(withEvidence('outside-excerpt')).blocker.evidence).toBe('outside-excerpt');
+      expect(parseReviewRecallCase(reviewCase()).blocker.evidence).toBeUndefined();
+      expect(() => parseReviewRecallCase(withEvidence('maybe'))).toThrow(/blocker\.evidence must be excerpt or outside-excerpt/);
+    });
   });
 
   describe('committed fixtures', () => {
@@ -287,6 +294,16 @@ describe('evals/lib/review-recall-scorer', () => {
         // Committed diffs stay small so the branch diff fits the verification gate's git buffer.
         expect(c.diff.length, c.id).toBeLessThanOrEqual(15_000);
       }
+    });
+
+    // The requirements-lane diagnosis (evals/README.md): these real blockers need files or PRD text the excerpt lacks.
+    it('marks exactly the four diagnosed requirements-lane cases as outside-excerpt', () => {
+      expect(cases.filter((c) => c.blocker.evidence === 'outside-excerpt').map((c) => c.id).sort()).toEqual([
+        '3979-the-new-docs-sentence-names',
+        '4230-prd-readers-still-look-only',
+        '4252-model-calls-md-line-references',
+        '4321-resume-switch-model-and-fork',
+      ]);
     });
 
     it('scores recall 1 for each case when its own blocker is reported as a canonical heading', () => {
