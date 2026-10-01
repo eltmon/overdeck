@@ -56,10 +56,9 @@ const MIXED_BATCH = {
   deletableBytes: 1024,
 };
 
-function renderSection() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+function renderSection(queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+})) {
   return render(
     <QueryClientProvider client={queryClient}>
       <SessionVaultSection />
@@ -68,18 +67,19 @@ function renderSection() {
 }
 
 function mockFetch(options: {
-  status?: typeof READY_STATUS | typeof OFF_STATUS;
+  status?: typeof READY_STATUS | typeof OFF_STATUS | (() => typeof READY_STATUS | typeof OFF_STATUS);
+  onSetup?: () => { status: number; body: unknown };
   batch?: typeof MIXED_BATCH;
   onConfirm?: (body: unknown) => { status: number; body: unknown };
   onDecline?: (body: unknown) => unknown;
   onSync?: () => { status: number; body: unknown };
 }) {
-  const status = options.status ?? READY_STATUS;
+  const currentStatus = () => (typeof options.status === 'function' ? options.status() : options.status ?? READY_STATUS);
   const batch = options.batch ?? MIXED_BATCH;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
     if (url === '/api/vault/status' && (!init || init.method === undefined)) {
-      return new Response(JSON.stringify(status), { status: 200 });
+      return new Response(JSON.stringify(currentStatus()), { status: 200 });
     }
     if (url === '/api/vault/eviction-batch' && (!init || init.method === undefined)) {
       return new Response(JSON.stringify(batch), { status: 200 });
@@ -96,6 +96,10 @@ function mockFetch(options: {
     }
     if (url === '/api/vault/eviction-batch/clear' && init?.method === 'POST') {
       return new Response(JSON.stringify({ ...batch, entries: [] }), { status: 200 });
+    }
+    if (url === '/api/vault/setup' && init?.method === 'POST' && options.onSetup) {
+      const result = options.onSetup();
+      return new Response(JSON.stringify(result.body), { status: result.status });
     }
     if (url === '/api/vault/sync' && init?.method === 'POST' && options.onSync) {
       const result = options.onSync();
@@ -125,6 +129,69 @@ describe('SessionVaultSection', () => {
     expect(screen.queryByText(/Run: pan vault setup/)).toBeNull();
     expect(screen.queryByText('Machines')).toBeNull();
     expect(screen.queryByText('Pending deletion')).toBeNull();
+  });
+
+  it('FR-9: the recovery dialog survives a status refetch to ready and closes only after "I wrote it down" and Done', async () => {
+    const phrase = Array.from({ length: 24 }, (_, i) => `w${i}`).join(' ');
+    let state: typeof READY_STATUS | typeof OFF_STATUS = OFF_STATUS;
+    mockFetch({
+      status: () => state,
+      onSetup: () => {
+        state = READY_STATUS;
+        return {
+          status: 200,
+          body: { status: 'created', backend: 'dir:/tmp/vault', machine: { label: 'this-host', environmentId: 'e' }, recoveryPhrase: phrase, passphrase: { stored: true, generated: 'one two three four five six' } },
+        };
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    renderSection(queryClient);
+
+    await waitFor(() => expect(screen.getByText('Set up a new vault')).toBeTruthy());
+    fireEvent.change(screen.getAllByLabelText('Git URL')[0]!, { target: { value: 'dir:/tmp/vault' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set up vault' }));
+    await screen.findByTestId('vault-recovery-phrase');
+
+    // A poll or window refocus re-reads the status: the vault is now ready and the setup form unmounts.
+    await queryClient.invalidateQueries({ queryKey: ['vault-status'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sync now' })).toBeTruthy());
+    expect(screen.queryByText('Set up a new vault')).toBeNull();
+    expect((screen.getByTestId('vault-recovery-phrase') as HTMLTextAreaElement).value).toBe(phrase);
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+    fireEvent.click(screen.getByLabelText('I wrote it down'));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByTestId('vault-recovery-phrase')).toBeNull();
+  });
+
+  it('a success line clears on the next vault state change after the one it reported', async () => {
+    let state: typeof READY_STATUS | typeof OFF_STATUS = OFF_STATUS;
+    mockFetch({ status: () => state });
+    const joined = { status: 'joined', backend: 'dir:/tmp/vault', machine: { label: 'this-host', environmentId: 'e' }, records: 2, offline: false, via: 'passphrase' };
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString() === '/api/vault/join' && init?.method === 'POST') {
+        state = READY_STATUS;
+        return new Response(JSON.stringify(joined), { status: 200 });
+      }
+      return baseFetch(input, init);
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    renderSection(queryClient);
+
+    await waitFor(() => expect(screen.getByText('Join an existing vault')).toBeTruthy());
+    fireEvent.change(screen.getAllByLabelText('Git URL')[1]!, { target: { value: 'dir:/tmp/vault' } });
+    fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: 'quiet harbor lantern 42 mosaic' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sync now' })).toBeTruthy());
+    expect(screen.getByTestId('vault-notice').textContent).toBe('Joined as this-host. 2 saved conversation(s) listed.');
+
+    state = { ...READY_STATUS, state: 'key-mismatch' } as unknown as typeof READY_STATUS;
+    await queryClient.invalidateQueries({ queryKey: ['vault-status'] });
+    await waitFor(() => expect(screen.getByText('Unlock this machine')).toBeTruthy());
+    expect(screen.queryByTestId('vault-notice')).toBeNull();
   });
 
   it('state key-missing shows "Unlock this machine" and no "Run: pan vault join" text', async () => {

@@ -2,9 +2,11 @@
  * "Set up a new vault" form and the shown-once recovery dialog (PAN-4446 WI-7).
  *
  * Posts to `POST /api/vault/setup`. The recovery phrase and a generated
- * passphrase come back once and live in this component's state only (D-11):
- * no query cache, no toast, no storage. The dialog closes only after the
- * operator checks "I wrote it down".
+ * passphrase come back once and are handed to the section through
+ * `onCreated`; they live in React state only (D-11): no query cache, no toast,
+ * no storage. The section renders `RecoveryDialog` outside its state-dependent
+ * branch, because the next status refetch reports `ready` and unmounts this
+ * form. The dialog closes only after the operator checks "I wrote it down".
  */
 import { useState } from 'react';
 import { BUTTON_CLASS, INPUT_CLASS, postVault, vaultErrorMessage } from './sessionVaultShared';
@@ -28,13 +30,13 @@ interface SetupResponse {
   passphrase?: { stored: boolean; generated?: string | null; error?: string | null };
 }
 
-interface ShownOnce {
+export interface ShownOnce {
   recoveryPhrase: string;
   generated: string | null;
   passphraseError: string | null;
 }
 
-function RecoveryDialog({ secrets, onDone }: { secrets: ShownOnce; onDone: () => void }) {
+export function RecoveryDialog({ secrets, onDone }: { secrets: ShownOnce; onDone: () => void }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const closeIfAcknowledged = () => {
     if (acknowledged) onDone();
@@ -104,14 +106,16 @@ function RecoveryDialog({ secrets, onDone }: { secrets: ShownOnce; onDone: () =>
   );
 }
 
-/** `onDone` receives a line for the section to show when there is one; a setup changes the state and unmounts this form. */
-export function SessionVaultSetupForm({ onDone }: { onDone: (message?: string) => void }) {
+/**
+ * `onDone` receives a line for the section to show when there is one; a setup changes the state and unmounts this form.
+ * `onCreated` receives the shown-once secrets of a new vault; the section owns the dialog that shows them.
+ */
+export function SessionVaultSetupForm({ onDone, onCreated }: { onDone: (message?: string) => void; onCreated: (secrets: ShownOnce) => void }) {
   const [url, setUrl] = useState('');
   const [choice, setChoice] = useState<PassphraseChoice>('generate');
   const [custom, setCustom] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shownOnce, setShownOnce] = useState<ShownOnce | null>(null);
 
   const customTooShort = choice === 'custom' && custom.length < PASSPHRASE_MIN_LENGTH;
   const canSubmit = url.trim() !== '' && !customTooShort && !running;
@@ -128,7 +132,7 @@ export function SessionVaultSetupForm({ onDone }: { onDone: (message?: string) =
       } else if (status === 200 && result?.status === 'created') {
         setCustom('');
         if (result.recoveryPhrase) {
-          setShownOnce({
+          onCreated({
             recoveryPhrase: result.recoveryPhrase,
             generated: result.passphrase?.stored ? result.passphrase.generated ?? null : null,
             passphraseError: result.passphrase && !result.passphrase.stored ? result.passphrase.error ?? null : null,
@@ -146,11 +150,6 @@ export function SessionVaultSetupForm({ onDone }: { onDone: (message?: string) =
     } finally {
       setRunning(false);
     }
-  };
-
-  const handleDone = () => {
-    setShownOnce(null);
-    onDone();
   };
 
   return (
@@ -198,7 +197,6 @@ export function SessionVaultSetupForm({ onDone }: { onDone: (message?: string) =
         {running ? 'Setting up…' : 'Set up vault'}
       </button>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      {shownOnce && <RecoveryDialog secrets={shownOnce} onDone={handleDone} />}
     </div>
   );
 }

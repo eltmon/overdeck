@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SessionVaultSetupForm } from '../SessionVaultSetupForm';
+import { RecoveryDialog, SessionVaultSetupForm } from '../SessionVaultSetupForm';
 
 vi.mock('../../../../lib/wsTransport', () => ({
   ensureDashboardSession: vi.fn().mockResolvedValue(undefined),
@@ -29,7 +29,7 @@ describe('SessionVaultSetupForm (PAN-4446 WI-7)', () => {
   it('ac1: the default form posts { url, passphrase: { mode: generate } } to /api/vault/setup', async () => {
     const fetchMock = mockSetup(200, { status: 'already-set-up', backend: REMOTE });
     const onDone = vi.fn();
-    render(<SessionVaultSetupForm onDone={onDone} />);
+    render(<SessionVaultSetupForm onDone={onDone} onCreated={vi.fn()} />);
     expect((screen.getByRole('button', { name: 'Set up vault' }) as HTMLButtonElement).disabled).toBe(true);
 
     submit();
@@ -41,7 +41,7 @@ describe('SessionVaultSetupForm (PAN-4446 WI-7)', () => {
     await waitFor(() => expect(onDone).toHaveBeenCalledWith('This machine is already set up with this vault.'));
   });
 
-  it('ac2: a created response shows the phrase once and Done stays disabled until "I wrote it down" is checked', async () => {
+  it('ac2: a created response hands the shown-once secrets to onCreated and does not call onDone', async () => {
     mockSetup(200, {
       status: 'created',
       backend: REMOTE,
@@ -50,30 +50,35 @@ describe('SessionVaultSetupForm (PAN-4446 WI-7)', () => {
       passphrase: { stored: true, generated: 'one two three four five six' },
     });
     const onDone = vi.fn();
-    render(<SessionVaultSetupForm onDone={onDone} />);
+    const onCreated = vi.fn();
+    render(<SessionVaultSetupForm onDone={onDone} onCreated={onCreated} />);
     submit();
 
-    const phrase = await screen.findByTestId('vault-recovery-phrase');
-    expect((phrase as HTMLTextAreaElement).value).toBe(PHRASE);
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ recoveryPhrase: PHRASE, generated: 'one two three four five six', passphraseError: null }));
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('ac2: the recovery dialog shows the phrase and Done stays disabled until "I wrote it down" is checked', () => {
+    const onDone = vi.fn();
+    render(<RecoveryDialog secrets={{ recoveryPhrase: PHRASE, generated: 'one two three four five six', passphraseError: null }} onDone={onDone} />);
+
+    expect((screen.getByTestId('vault-recovery-phrase') as HTMLTextAreaElement).value).toBe(PHRASE);
     expect((screen.getByTestId('vault-generated-passphrase') as HTMLInputElement).value).toBe('one two three four five six');
     const done = screen.getByRole('button', { name: 'Done' }) as HTMLButtonElement;
     expect(done.disabled).toBe(true);
 
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).not.toBeNull();
     expect(onDone).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText('I wrote it down'));
     expect(done.disabled).toBe(false);
     fireEvent.click(done);
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByText(PHRASE)).toBeNull();
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it('ac3: a 422 foreign-vault response shows the join hint instead of the server message', async () => {
     mockSetup(422, { status: 'error', code: 'foreign-vault', message: `${REMOTE} is already a vault protected by another key. Run: pan vault join ${REMOTE}` });
-    render(<SessionVaultSetupForm onDone={vi.fn()} />);
+    render(<SessionVaultSetupForm onDone={vi.fn()} onCreated={vi.fn()} />);
     submit();
 
     await waitFor(() => expect(screen.getByText('This remote already holds a vault. Use “Join an existing vault” below.')).toBeTruthy());
@@ -82,7 +87,7 @@ describe('SessionVaultSetupForm (PAN-4446 WI-7)', () => {
 
   it('a custom passphrase posts mode custom and the button waits for 16 characters', async () => {
     const fetchMock = mockSetup(200, { status: 'already-set-up', backend: REMOTE });
-    render(<SessionVaultSetupForm onDone={vi.fn()} />);
+    render(<SessionVaultSetupForm onDone={vi.fn()} onCreated={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Git URL'), { target: { value: REMOTE } });
     fireEvent.click(screen.getByLabelText('My own'));
     const button = screen.getByRole('button', { name: 'Set up vault' }) as HTMLButtonElement;

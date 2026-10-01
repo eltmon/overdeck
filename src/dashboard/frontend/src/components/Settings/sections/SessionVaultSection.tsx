@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { SettingsSection } from '../primitives';
 import { SessionVaultJoinForm } from './SessionVaultJoinForm';
-import { SessionVaultSetupForm } from './SessionVaultSetupForm';
+import { RecoveryDialog, SessionVaultSetupForm, type ShownOnce } from './SessionVaultSetupForm';
 import { BUTTON_CLASS, postVault } from './sessionVaultShared';
 
 type VaultState = 'off' | 'rotation-pending' | 'key-missing' | 'key-mismatch' | 'ready';
@@ -111,11 +111,15 @@ function SyncNowButton() {
   );
 }
 
-function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; onChanged: (message?: string) => void }) {
+function VaultStatusBlock({ status, onChanged, onCreated }: {
+  status: VaultStatusResponse;
+  onChanged: (message?: string) => void;
+  onCreated: (secrets: ShownOnce) => void;
+}) {
   if (status.state === 'off') {
     return (
       <div className="space-y-6">
-        <SessionVaultSetupForm onDone={onChanged} />
+        <SessionVaultSetupForm onDone={onChanged} onCreated={onCreated} />
         <SessionVaultJoinForm mode="join" backend={null} onDone={onChanged} />
       </div>
     );
@@ -202,12 +206,33 @@ export function SessionVaultSection() {
   });
 
   const refetchBatch = () => void queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEY });
-  const [vaultNotice, setVaultNotice] = useState<string | null>(null);
+  /** The line a setup or join reported; `shownIn` is the state it landed in, so the next state change clears it. */
+  const [vaultNotice, setVaultNotice] = useState<{ message: string; shownIn: VaultState | null } | null>(null);
+  /**
+   * FR-9, D-11: the shown-once recovery phrase and generated passphrase. Held here, not in the
+   * setup form: the next status refetch reports `ready` and unmounts the form, and the dialog
+   * must stay until the operator checks "I wrote it down" and clicks Done.
+   */
+  const [shownOnce, setShownOnce] = useState<ShownOnce | null>(null);
   /** A setup or join changed the vault: show its line (if any) and re-read the status. */
   const handleVaultChanged = (message?: string) => {
-    setVaultNotice(message ?? null);
+    setVaultNotice(message ? { message, shownIn: null } : null);
     void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY });
   };
+  const handleRecoveryDone = () => {
+    setShownOnce(null);
+    handleVaultChanged();
+  };
+
+  const currentState = status?.state;
+  useEffect(() => {
+    if (!currentState) return;
+    setVaultNotice((notice) => {
+      if (!notice) return notice;
+      if (notice.shownIn === null) return { ...notice, shownIn: currentState };
+      return notice.shownIn === currentState ? notice : null;
+    });
+  }, [currentState]);
 
   /** Runs a batch-mutating POST, reporting a toast on rejection instead of an unhandled promise. */
   async function postVaultBatch(path: string, body: Record<string, unknown> | undefined, failureMessage: string): Promise<{ status: number; body: unknown } | null> {
@@ -283,9 +308,10 @@ export function SessionVaultSection() {
           Failed to load vault status: {statusError instanceof Error ? statusError.message : String(statusError)}
         </div>
       ) : (
-        status && <VaultStatusBlock status={status} onChanged={handleVaultChanged} />
+        status && <VaultStatusBlock status={status} onChanged={handleVaultChanged} onCreated={setShownOnce} />
       )}
-      {vaultNotice && <p data-testid="vault-notice" className="mt-2 text-xs text-muted-foreground">{vaultNotice}</p>}
+      {vaultNotice && <p data-testid="vault-notice" className="mt-2 text-xs text-muted-foreground">{vaultNotice.message}</p>}
+      {shownOnce && <RecoveryDialog secrets={shownOnce} onDone={handleRecoveryDone} />}
 
       {status && status.state !== 'off' && (
         <div className="mt-6 space-y-6">
