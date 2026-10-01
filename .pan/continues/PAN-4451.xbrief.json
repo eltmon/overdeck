@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T14:01:54.615Z",
+  "updated": "2026-10-01T14:02:06.391Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "agent-blocker-instructions.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T14:01:54.615Z"
+    },
+    "agent-blocker-instructions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:02:06.391Z"
     }
   }
 }
