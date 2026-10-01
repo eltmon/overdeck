@@ -5,7 +5,12 @@ import { createScorer, evalite } from 'evalite';
 import { appendEvalRecord, recordFromRun } from './lib/eval-results.js';
 import { loadFixtureDir } from './lib/fixtures.js';
 import { loadPromptFile, runPromptScenario, type PromptScenarioRun } from './lib/prompt-harness.js';
-import { parseReviewRecallCase, scoreReviewRecall, type ReviewRecallCase } from './lib/review-recall-scorer.js';
+import {
+  parseReviewRecallCase,
+  scoreReviewRecall,
+  type ReviewRecallCase,
+  type ReviewRecallScores,
+} from './lib/review-recall-scorer.js';
 
 const cases = loadFixtureDir('evals/fixtures/review-recall').map((f) => parseReviewRecallCase(f.data));
 
@@ -22,13 +27,10 @@ ${c.diff}
 \`\`\``;
 }
 
-interface ReviewRecallOutput {
-  recall: 0 | 1;
-  precision: number | null;
-  blockingCount: number;
+type ReviewRecallOutput = Omit<ReviewRecallScores, 'score'> & {
   report: string;
   run: PromptScenarioRun;
-}
+};
 
 evalite<ReviewRecallCase, ReviewRecallOutput>('review recall (E2)', {
   data: cases.map((c) => ({ input: c })),
@@ -38,25 +40,24 @@ evalite<ReviewRecallCase, ReviewRecallOutput>('review recall (E2)', {
       user: buildReviewRecallUserPrompt(c),
       maxTokens: 32_000,
     });
-    const scores = scoreReviewRecall(report, c);
-    appendEvalRecord(
-      recordFromRun('review-recall', c.id, run, scores.score, {
-        recall: scores.recall,
-        precision: scores.precision,
-        blockingCount: scores.blockingCount,
-      }),
-    );
-    return { recall: scores.recall, precision: scores.precision, blockingCount: scores.blockingCount, report, run };
+    const { score, ...metrics } = scoreReviewRecall(report, c);
+    appendEvalRecord(recordFromRun('review-recall', c.id, run, score, { ...metrics }));
+    return { ...metrics, report, run };
   },
   scorers: [
     createScorer<ReviewRecallCase, ReviewRecallOutput>({
       name: 'recall',
-      description: 'A blocking finding cites the known blocker file near its line or with two blocker keywords.',
+      description: 'Any finding, at any severity, cites the known blocker file near its line or with two blocker keywords.',
       scorer: ({ output }) => output.recall,
     }),
     createScorer<ReviewRecallCase, ReviewRecallOutput>({
+      name: 'blocking recall',
+      description: 'A blocking (! or ⊗) heading finding matches the known blocker — what production review gating counts.',
+      scorer: ({ output }) => output.blockingRecall,
+    }),
+    createScorer<ReviewRecallCase, ReviewRecallOutput>({
       name: 'precision',
-      description: 'Share of blocking findings that match the known blocker (0 when the report has no blocking findings).',
+      description: 'Share of findings, at any severity, that match the known blocker (0 when the report has no findings).',
       scorer: ({ output }) => output.precision ?? 0,
     }),
   ],

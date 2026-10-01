@@ -175,27 +175,79 @@ describe('evals/lib/review-recall-scorer', () => {
   });
 
   describe('scoreReviewRecall', () => {
-    it('returns recall 1 when a blocking finding cites the blocker file 10 lines away', () => {
+    it('returns recall, blocking recall and severity 1 when a blocking finding cites the blocker file 10 lines away', () => {
       const report = '## Findings\n\n### ! Ledger race — `src/lib/vault/store/git.ts:242`\nDetails.\n';
-      expect(scoreReviewRecall(report, reviewCase())).toEqual({ recall: 1, precision: 1, blockingCount: 1, score: 1 });
+      expect(scoreReviewRecall(report, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 1,
+        blockingSeverity: 1,
+        precision: 1,
+        findingCount: 1,
+        blockingCount: 1,
+        score: 1,
+      });
     });
 
-    it('returns recall 0 when the same finding is non-blocking', () => {
+    it('returns recall 1 but blocking recall 0 when the same finding is non-blocking', () => {
       const report = '## Non-blocking Notes\n\n### ~ Ledger race — `src/lib/vault/store/git.ts:242`\nDetails.\n';
-      expect(scoreReviewRecall(report, reviewCase())).toEqual({ recall: 0, precision: null, blockingCount: 0, score: 0 });
+      expect(scoreReviewRecall(report, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 0,
+        blockingSeverity: 0,
+        precision: 1,
+        findingCount: 1,
+        blockingCount: 0,
+        score: 1,
+      });
     });
 
-    it('returns precision 0.5 when one of two blocking findings matches', () => {
-      expect(scoreReviewRecall(MIXED_REPORT, reviewCase())).toEqual({ recall: 1, precision: 0.5, blockingCount: 2, score: 1 });
+    it('scores the MIXED_REPORT blocking match, with precision over findings of any severity', () => {
+      expect(scoreReviewRecall(MIXED_REPORT, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 1,
+        blockingSeverity: 1,
+        precision: 0.2,
+        findingCount: 5,
+        blockingCount: 2,
+        score: 1,
+      });
     });
 
-    it('returns precision null, recall 0 and no blocking findings for a None report', () => {
+    // The run's Opus 5.5 rep-2 report for case 1428: found, but rated advisory — the floor the run hit.
+    it('scores a found-but-advisory blocker as recall 1, blocking recall 0, blocking severity 0 (PAN-4406)', () => {
+      const report = `## Non-blocking Notes
+
+### ~ Blocking tmux check runs before cheap in-memory filters — \`src/lib/cloister/stuck-remediation.ts:79\`
+**Problem:** \`sessionExistsSync\` is almost certainly a synchronous \`tmux has-session\` subprocess. It runs for every running work agent on every patrol tick.
+`;
+      const c = reviewCase({
+        id: '1428-per-agent-bd-ready-subprocess',
+        lane: 'performance',
+        blocker: {
+          title: 'Per-agent bd ready subprocess on every patrol',
+          file: 'src/lib/cloister/stuck-remediation.ts',
+          lines: [90],
+          keywords: ['bd ready', 'subprocess', 'patrol'],
+        },
+      });
+      expect(scoreReviewRecall(report, c)).toMatchObject({ recall: 1, blockingRecall: 0, blockingSeverity: 0, score: 1 });
+    });
+
+    it('returns recall 0, blocking severity null and precision null for a None report', () => {
       expect(scoreReviewRecall('## Findings\n\nNone', reviewCase())).toEqual({
         recall: 0,
+        blockingRecall: 0,
+        blockingSeverity: null,
         precision: null,
+        findingCount: 0,
         blockingCount: 0,
         score: 0,
       });
+    });
+
+    it('returns blocking severity null when findings exist but none matches', () => {
+      const report = '### ! Race — `src/lib/vault/store/sqlite.ts:252`\nUnrelated.\n';
+      expect(scoreReviewRecall(report, reviewCase())).toMatchObject({ recall: 0, blockingRecall: 0, blockingSeverity: null, precision: 0 });
     });
   });
 

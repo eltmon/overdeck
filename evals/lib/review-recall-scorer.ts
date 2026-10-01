@@ -1,5 +1,6 @@
-// E2 review recall: does a review lane's report contain a blocking finding that matches
-// the known blocker a real review convoy raised on the same diff? Pure: no fs, no network.
+// E2 review recall: does a review lane's report contain a finding that matches the known
+// blocker a real review convoy raised on the same diff, and does it rate it blocking?
+// Pure: no fs, no network.
 
 export type ReviewLane = 'correctness' | 'performance' | 'requirements';
 
@@ -230,17 +231,33 @@ export function findingMatchesBlocker(
   );
 }
 
-export function scoreReviewRecall(
-  report: string,
-  c: ReviewRecallCase,
-): { recall: 0 | 1; precision: number | null; blockingCount: number; score: number } {
-  const blocking = parseFindings(report).filter((f) => f.blocking);
-  const matching = blocking.filter((f) => findingMatchesBlocker(f, c.blocker)).length;
-  const recall: 0 | 1 = matching > 0 ? 1 : 0;
+export interface ReviewRecallScores {
+  /** Any finding (heading or bullet, any glyph) matches the blocker. */
+  recall: 0 | 1;
+  /** A blocking (! or ⊗) heading finding matches: what production review gating counts. */
+  blockingRecall: 0 | 1;
+  /** Given recall, whether the model rated the blocker blocking; null when it did not find it. */
+  blockingSeverity: 0 | 1 | null;
+  /** Matching findings / all findings, any severity; null when the report has no findings. */
+  precision: number | null;
+  findingCount: number;
+  blockingCount: number;
+  /** = recall */
+  score: number;
+}
+
+export function scoreReviewRecall(report: string, c: ReviewRecallCase): ReviewRecallScores {
+  const findings = parseFindings(report);
+  const matching = findings.filter((f) => findingMatchesBlocker(f, c.blocker));
+  const recall: 0 | 1 = matching.length > 0 ? 1 : 0;
+  const blockingRecall: 0 | 1 = matching.some((f) => f.blocking) ? 1 : 0;
   return {
     recall,
-    precision: blocking.length === 0 ? null : matching / blocking.length,
-    blockingCount: blocking.length,
+    blockingRecall,
+    blockingSeverity: recall === 1 ? blockingRecall : null,
+    precision: findings.length === 0 ? null : matching.length / findings.length,
+    findingCount: findings.length,
+    blockingCount: findings.filter((f) => f.blocking).length,
     score: recall,
   };
 }

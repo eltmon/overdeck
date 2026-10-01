@@ -186,5 +186,34 @@ export function renderPlacementTable(records: EvalCaseRecord[]): string {
     `- anthropic: ${finds.anthropic.length} (${finds.anthropic.join(', ')})`,
     `- openai: ${finds.openai.length} (${finds.openai.join(', ')})`,
   );
+  lines.push('', '### Review recall: found vs rated blocking', '', ...reviewSeverityLines(records));
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * One line per (model, effort): any-severity recall, blocking recall, and how often a found
+ * blocker was rated blocking. Records written before the split (no blockingRecall) are skipped:
+ * their `recall` meant blocking recall.
+ */
+function reviewSeverityLines(records: EvalCaseRecord[]): string[] {
+  const groups = new Map<string, EvalCaseRecord[]>();
+  for (const r of records) {
+    if (r.suite !== 'review-recall' || !('blockingRecall' in r.metrics)) continue;
+    const key = JSON.stringify([r.model, r.effort ?? 'n/a']);
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  return [...groups.entries()]
+    .map(([key, group]) => {
+      const [model, effort] = JSON.parse(key) as [string, string];
+      const count = (metric: string) => group.filter((r) => r.metrics[metric] === 1).length;
+      const found = count('recall');
+      const blocking = count('blockingRecall');
+      return {
+        model,
+        effort,
+        line: `- ${model} (${effort}): recall ${found}/${group.length}; blocking recall ${blocking}/${group.length}; rated blocking when found ${blocking}/${found}`,
+      };
+    })
+    .sort((a, b) => a.model.localeCompare(b.model) || a.effort.localeCompare(b.effort))
+    .map((g) => g.line);
 }

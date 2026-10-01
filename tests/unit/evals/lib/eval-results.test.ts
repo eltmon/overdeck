@@ -123,4 +123,21 @@ describe('evals/lib/eval-results', () => {
     expect(rows[1]).toContain('| review-recall | claude-opus-5-5 |');
     expect(rows[2]).toContain('| review-recall | gpt-6-luna |');
   });
+
+  it('renderPlacementTable reports recall, blocking recall and blocking severity per model, skipping legacy records', () => {
+    const split = (recall: 0 | 1, blockingRecall: 0 | 1) => ({ recall, blockingRecall, blockingSeverity: recall ? blockingRecall : null });
+    const table = renderPlacementTable([
+      record({ caseId: 'c1', model: 'claude-opus-5-5', metrics: split(1, 1) }),
+      record({ caseId: 'c2', model: 'claude-opus-5-5', metrics: split(1, 0) }),
+      record({ caseId: 'c3', model: 'claude-opus-5-5', metrics: split(0, 0) }),
+      record({ caseId: 'c1', model: 'claude-sonnet-5-5', effort: null, metrics: split(1, 0) }),
+      // Legacy record: written before the split, so its `recall` meant blocking recall.
+      record({ caseId: 'c2', model: 'claude-sonnet-5-5', effort: null, metrics: { recall: 1 } }),
+    ]);
+    const section = table.slice(table.indexOf('### Review recall: found vs rated blocking'));
+    expect(section.split('\n').filter((l) => l.startsWith('- '))).toEqual([
+      '- claude-opus-5-5 (high): recall 2/3; blocking recall 1/3; rated blocking when found 1/2',
+      '- claude-sonnet-5-5 (n/a): recall 1/1; blocking recall 0/1; rated blocking when found 0/1',
+    ]);
+  });
 });
