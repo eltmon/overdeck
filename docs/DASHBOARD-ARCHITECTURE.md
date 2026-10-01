@@ -49,6 +49,16 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
 - Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
   unready clients are closed with `terminal-ready-timeout`
+- App-level heartbeat (PAN-4434): a client that opts in with `?heartbeat=1` on the upgrade URL
+  receives a `\u0000{"type":"ping"}` control frame every 20s from connection onward (across the
+  attach/respawn wait) and must answer `{"type":"pong"}`; any inbound message resets the missed-interval
+  counter, and two consecutive silent intervals end in `ws.terminate()`. Ping/pong client messages are
+  dropped at the single `ws.on('message')` entry point before they can reach the PTY, the Herdr bridge,
+  or any pending-input buffer. A connection without `?heartbeat=1` gets no heartbeat and is never
+  terminated by it; `XTerminal.tsx` always opts in. A data frame is used instead of a protocol-level
+  `ws.ping()` because proxies such as Cloudflare close an idle WebSocket after ~100s and treat a data
+  frame as traffic more reliably than a ping frame. See `ws-terminal-heartbeat.ts` and
+  `components/terminal/terminalControlFrames.ts`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through

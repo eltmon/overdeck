@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "issueId": "PAN-4434",
+  "created": "2026-10-01T21:15:30.449Z",
+  "updated": "2026-10-01T22:40:23.631Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T22:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-01T22:06:55.505Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-01T22:39:10.216Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T22:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-01T22:40:23.631Z"
+    }
+  ],
+  "items": {
+    "heartbeat-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4434",
+      "claimedAt": "2026-10-01T21:15:30.449Z",
+      "doneAt": "2026-10-01T21:19:11.479Z"
+    },
+    "ws-terminal-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4434",
+      "claimedAt": "2026-10-01T21:19:20.550Z",
+      "doneAt": "2026-10-01T21:25:31.777Z"
+    },
+    "xterminal-frame-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4434",
+      "claimedAt": "2026-10-01T21:25:50.176Z",
+      "doneAt": "2026-10-01T21:28:08.490Z"
+    },
+    "xterminal-pong": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4434",
+      "claimedAt": "2026-10-01T21:28:16.479Z",
+      "doneAt": "2026-10-01T21:30:48.055Z"
+    },
+    "docs-heartbeat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4434",
+      "claimedAt": "2026-10-01T21:30:53.899Z",
+      "doneAt": "2026-10-01T21:32:18.216Z"
+    },
+    "heartbeat-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:37:44.468Z"
+    },
+    "heartbeat-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:38:15.776Z"
+    },
+    "heartbeat-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:38:51.649Z"
+    },
+    "heartbeat-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:39:21.821Z"
+    },
+    "heartbeat-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:39:55.642Z"
+    },
+    "ws-terminal-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:40:30.599Z"
+    },
+    "ws-terminal-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:41:03.542Z"
+    },
+    "ws-terminal-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:41:35.455Z"
+    },
+    "xterminal-frame-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:42:27.778Z"
+    },
+    "xterminal-frame-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:11.718Z"
+    },
+    "xterminal-frame-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:56.528Z"
+    },
+    "xterminal-pong.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:44:35.532Z"
+    },
+    "xterminal-pong.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:45:16.743Z"
+    },
+    "xterminal-pong.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:46:00.486Z"
+    },
+    "xterminal-pong.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:46:42.784Z"
+    },
+    "docs-heartbeat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:47:22.091Z"
+    },
+    "docs-heartbeat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:48:02.888Z"
+    },
+    "docs-heartbeat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:48:37.862Z"
+    },
+    "docs-heartbeat.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:49:12.785Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-01T22:40:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4434\n\n# Review — PAN-4434\n## Verdict: CHANGES REQUESTED — the issue's manual idle-proxy AC is still unverified (PR body records it as blocked); needs a completed soak or an operator waiver\n\n## Context\n- Run ID: agent-pan-4434-review-918a790b\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4434/.pan/review/agent-pan-4434-review-918a790b/context.json\n- Branch / workspace: feature/pan-4434 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4434\n- PR: [#4458](https://github.com/eltmon/overdeck/pull/4458) (open, head 918a790b)\n- HEAD reviewed: 918a790b08817cca6b4733aa57ccb346cc7cc480\n- Base: merge-base with origin/main 8a82dad552bc. Prior cycle: 9710e74801ed (run agent-pan-4434-review-9710e748, CHANGES REQUESTED).\n\n## Prior-cycle findings\n| Finding | Status | Evidence |\n| --- | --- | --- |\n| ! Manual idle-proxy AC not recorded in PR | **Still open** | PR body now has a \"Manual idle-proxy check — blocked\" section. It records upgrade/auth/attach/snapshot through an idle-closing TCP proxy, but states \"Zero ping/pong frames were observed through the proxy\" because `pty.spawn()` segfaults on the workspace's `node:22-alpine` image. It says the 10-minute claim is \"unverified\" and asks for a non-Alpine soak or an operator waiver. No waiver appears on the issue or PR. |\n| ~ Pings reset the one-shot 4404 retry latch | Fixed | `XTerminal.tsx` now resets `sessionNotFoundRetried` only when `control?.type !== 'ping'`; new test \"a heartbeat ping does not reset the one-shot 4404 retry latch\" passes. Snapshot, size and live data still reset it as before. |\n| ~ New frontend tests not in `npm test`/CI | Fixed | `package.json` `test:frontend-subset` now lists `src/components/XTerminal.test.tsx` and `src/components/terminal/terminalControlFrames.test.ts`; CI `test` job green on 918a790b. |\n| ? Primitive JSON after NUL dropped | Fixed | `parseTerminalControlFrame` returns null unless the parse result is a non-null object; new test covers `1`, `\"x\"`, `null`. |\n\n## Blocking Findings\n\n### [requirements] Manual idle-proxy acceptance check is unverified — PR #4458 description\n- Severity: ! (MUST)\n- Classification / requirement scope: specification defect (the xBRIEF dropped the issue-body AC) with a validation-gap consequence; in_pr_scope.\n- Trigger and changed-code connection: Issue #4434 **Acceptance**: \"Manual check recorded in the PR: a terminal left idle 10 minutes behind a proxy with a 100 s idle timeout stays connected.\" PRD NFR-5 / AC-manual say the same.\n- Expected / observed / impact: Expected a recorded result that an idle terminal stayed connected. Observed: the PR records that the check could not be completed and that no heartbeat frame crossed the proxy. The behavior the feature exists for is still demonstrated only by the fake-timer unit test and code inspection. The author's diagnosis (node-pty SIGSEGV on Alpine in `startLocalPty`, untouched by this PR) is plausible and is not a defect in this PR's code.\n- Evidence: PR body and issue comments fetched via GitHub REST API (gh CLI is unauthenticated here); issue comment 2026-10-01T22:27:37Z is the author's operator question; no reply or waiver follows.\n- Fix: Either (a) run the soak on a host where node-pty works (the operator's dashboard, a non-Alpine container, or a Herdr-backed terminal that does not use `pty.spawn`) and record \"stayed connected\" in the PR, or (b) the operator waives or rewrites the AC on the issue. A reviewer cannot discharge either: it is the author's recorded evidence or the operator's call.\n\n## Non-blocking Findings\nNone new. The code changes in this cycle are correct and minimal.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| `src/dashboard/server/ws-terminal-heartbeat.ts` | Unchanged since prior cycle; previously reviewed correct. |\n| `src/dashboard/server/ws-terminal.ts` | Unchanged since prior cycle; previously reviewed correct (single-entry ping/pong drop; opt-in start; auth block untouched). |\n| `src/dashboard/frontend/src/components/XTerminal.tsx` | Reviewed. Control frame parsed once up front and reused; latch reset skipped for pings only. Net −8 lines vs merge-base (15/23). |\n| `src/dashboard/frontend/src/components/terminal/terminalControlFrames.ts` | Reviewed. Object guard correct; `\\u0000null` and primitives now fall through to xterm as before the PR. |\n| `src/dashboard/frontend/src/components/XTerminal.test.tsx` | Reviewed. New latch test uses fake timers and asserts no third socket. |\n| `src/dashboard/frontend/src/components/terminal/terminalControlFrames.test.ts` | Reviewed. |\n| `package.json` | Reviewed. Only appends two files to `test:frontend-subset`. |\n| `src/dashboard/server/__tests__/ws-terminal-heartbeat*.test.ts` | Unchanged; previously reviewed. |\n| `docs/DASHBOARD-ARCHITECTURE.md`, `docs/DASHBOARD-AUTH.md`, `configuration/remote-access.mdx` | Unchanged; previously reviewed accurate. |\n| `.pan/continues/PAN-4434.xbrief.json`, `.pan/drafts/PAN-4434.md`, `.pan/specs/…xbrief.json` | Planning artifacts; continue file updated with feedback items. Spec still omits AC-manual. |\n\n### Dimensions\n- Correctness: prior advisories fixed; no new defects.\n- Security: no change in trust boundaries this cycle.\n- Performance: one JSON.parse per NUL-prefixed frame, same count as before (now hoisted).\n- Requirements/UX: all FRs met; AC-manual unverified (blocking).\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-W1 heartbeat unit tests | Met | Prior cycle local run; CI test shards green on 918a790b. |\n| AC-W2 wiring + no import cycle | Met | Unchanged code; CI green. |\n| AC-W3 extraction | Met | 44/44 frontend tests pass locally. |\n| AC-W4 pong + file-size + net ≤0 | Met | `scripts/lint-file-size.sh` exit 0; numstat 15/23. |\n| AC-W5 docs | Met | Unchanged since prior cycle verification. |\n| Issue \"Manual check recorded in the PR\" / NFR-5 / AC-manual | **Unverified** | PR body records the attempt as blocked; no completed soak, no waiver. |\n\n## Verification\n- CI on exact HEAD 918a790b (GitHub REST check-runs): test, test-shard 1–4, lint, lint-group core/effect/skills/state (effect group runs `lint:effect-diagnostics`), build (22), Clean install + server smoke, test-e2e, Prompt change trailer gate, Non-blocking flake lane — all success. `overdeck/verification` status success.\n- Local: frontend `npx vitest run src/components/XTerminal.test.tsx src/components/terminal/terminalControlFrames.test.ts` → 2 files, 44 tests passed. `bash scripts/lint-file-size.sh` → exit 0.\n- Not run: full suite (CI owns it); live proxy soak (it is the blocking AC itself, and the workspace container cannot spawn a PTY).\n\n## Scope Note\nThis is the second cycle blocked on the same AC, and code changes cannot clear it. The author has already asked the operator (issue #4434 comment, 2026-10-01T22:27:37Z). The fastest resolution is an operator decision: waive or rewrite the manual AC, or run the 10-minute soak on a host where node-pty works and add the result to the PR. Separately, the planner dropped an issue-body AC from the xBRIEF; that is a process gap worth a follow-up.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4434/.pan/review/agent-pan-4434-review-918a790b/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4434 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

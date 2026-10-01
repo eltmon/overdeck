@@ -13,6 +13,7 @@ function baseConfig(overrides: Partial<EvalModelConfig> = {}): EvalModelConfig {
     temperature: null,
     maxTokens: 128000,
     openaiVia: 'api',
+    anthropicVia: null,
     ...overrides,
   };
 }

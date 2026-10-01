@@ -1,0 +1,213 @@
+{
+  "version": "1",
+  "issueId": "PAN-4406",
+  "created": "2026-10-01T21:14:51.269Z",
+  "updated": "2026-10-01T22:10:37.503Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "e5-refusal-clause": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:14:51.269Z",
+      "doneAt": "2026-10-01T21:16:09.752Z"
+    },
+    "e4-elided-identifiers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:16:15.262Z",
+      "doneAt": "2026-10-01T21:17:19.028Z"
+    },
+    "e2-parse-bullets-citations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:17:20.342Z",
+      "doneAt": "2026-10-01T21:18:58.195Z"
+    },
+    "e2-split-recall-metrics": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:19:03.504Z",
+      "doneAt": "2026-10-01T21:20:24.639Z"
+    },
+    "e2-requirements-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:20:30.535Z",
+      "doneAt": "2026-10-01T21:21:34.037Z"
+    },
+    "cli-route-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:21:39.180Z",
+      "doneAt": "2026-10-01T21:22:41.125Z"
+    },
+    "cli-route-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:22:46.577Z",
+      "doneAt": "2026-10-01T21:24:53.738Z"
+    },
+    "cli-route-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:24:58.777Z",
+      "doneAt": "2026-10-01T21:26:15.277Z"
+    },
+    "e3-cap-and-live-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:26:23.845Z",
+      "doneAt": "2026-10-01T21:38:49.743Z"
+    },
+    "eval-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:38:51.093Z",
+      "doneAt": "2026-10-01T21:39:31.355Z"
+    },
+    "e5-refusal-clause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:01.258Z"
+    },
+    "e5-refusal-clause.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:46.862Z"
+    },
+    "e5-refusal-clause.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:44:26.171Z"
+    },
+    "e4-elided-identifiers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:45:05.776Z"
+    },
+    "e4-elided-identifiers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:45:47.913Z"
+    },
+    "e4-elided-identifiers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:46:32.833Z"
+    },
+    "e4-elided-identifiers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:47:13.668Z"
+    },
+    "e2-parse-bullets-citations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:47:54.371Z"
+    },
+    "e2-parse-bullets-citations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:48:28.190Z"
+    },
+    "e2-parse-bullets-citations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:49:01.803Z"
+    },
+    "e2-parse-bullets-citations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:49:36.858Z"
+    },
+    "e2-split-recall-metrics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:50:19.232Z"
+    },
+    "e2-split-recall-metrics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:51:11.324Z"
+    },
+    "e2-split-recall-metrics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:51:58.084Z"
+    },
+    "e2-split-recall-metrics.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:52:44.597Z"
+    },
+    "e2-requirements-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:53:33.507Z"
+    },
+    "e2-requirements-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:54:20.545Z"
+    },
+    "e2-requirements-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:55:06.386Z"
+    },
+    "cli-route-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:56:06.349Z"
+    },
+    "cli-route-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:57:01.447Z"
+    },
+    "cli-route-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:57:45.962Z"
+    },
+    "cli-route-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:58:32.413Z"
+    },
+    "cli-route-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:59:19.717Z"
+    },
+    "cli-route-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:00:13.758Z"
+    },
+    "cli-route-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:00:59.784Z"
+    },
+    "cli-route-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:01:47.751Z"
+    },
+    "cli-route-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:02:34.923Z"
+    },
+    "cli-route-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:03:41.282Z"
+    },
+    "cli-route-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:04:30.253Z"
+    },
+    "e3-cap-and-live-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:05:36.641Z"
+    },
+    "e3-cap-and-live-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:06:40.649Z"
+    },
+    "eval-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:07:35.533Z"
+    },
+    "eval-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:08:27.970Z"
+    },
+    "eval-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:09:25.685Z"
+    },
+    "eval-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:10:37.502Z"
+    }
+  }
+}

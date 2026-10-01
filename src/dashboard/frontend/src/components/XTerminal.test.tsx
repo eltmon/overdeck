@@ -359,6 +359,49 @@ describe('XTerminal', () => {
     });
   });
 
+  it('opts in to the terminal heartbeat', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].url).toContain('heartbeat=1');
+    });
+  });
+
+  it('answers a ping frame with a pong', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ write: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({ data: `\u0000${JSON.stringify({ type: 'ping' })}` });
+
+    await waitFor(() => {
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong' }));
+    });
+    expect(ws.send.mock.calls.filter(([msg]) => msg === JSON.stringify({ type: 'pong' }))).toHaveLength(1);
+    expect(term.write.mock.calls.some(([data]) => typeof data === 'string' && data.includes('ping'))).toBe(false);
+  });
+
+  it('drops unknown control frames', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ write: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({ data: `\u0000${JSON.stringify({ type: 'future' })}` });
+
+    expect(term.write.mock.calls.some(([data]) => typeof data === 'string' && data.includes('future'))).toBe(false);
+  });
+
   it('never fits or sends a resize while the host is hidden', async () => {
     render(<XTerminal sessionName="test-session" />);
 
@@ -891,6 +934,31 @@ describe('XTerminal - patient reconnect', () => {
     // The first 4404 may be a respawn gap: one reconnect, no "has ended" yet.
     expect(MockWebSocket.instances).toHaveLength(2);
     expect(onDisconnect).not.toHaveBeenCalled();
+
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
+    expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it('a heartbeat ping does not reset the one-shot 4404 retry latch (PAN-4434)', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.advanceTimersByTimeAsync(3_000));
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    // A ping arrives during the reconnect's respawn wait — it must not look like
+    // real session traffic and reset the retry latch.
+    act(() => MockWebSocket.instances[1].onmessage?.({ data: `\u0000${JSON.stringify({ type: 'ping' })}` }));
 
     act(() => MockWebSocket.instances[1].onclose?.({ code: 4404, reason: 'missing' }));
     await act(async () => vi.runOnlyPendingTimersAsync());
