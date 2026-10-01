@@ -19,6 +19,9 @@ import {
   Gauge,
   Globe,
   Trash2,
+  KeyRound,
+  Smartphone,
+  Archive,
 } from 'lucide-react';
 import { type BackgroundAiFeature } from './types';
 import { type NavItem } from './primitives';
@@ -55,7 +58,10 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'swarming', label: 'Swarming', icon: GitBranch },
   { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'close-out', label: 'Close-out', icon: Trash2 },
+  { id: 'session-vault', label: 'Session Vault', icon: Archive },
+  { id: 'anywhere', label: 'Anywhere', icon: Smartphone },
   { id: 'remote', label: 'Remote', icon: Globe },
+  { id: 'access-tokens', label: 'Access Tokens', icon: KeyRound },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },

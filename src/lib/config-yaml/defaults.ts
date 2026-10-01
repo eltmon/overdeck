@@ -199,12 +199,6 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   rtk: {
     enabled: false,
   },
-  tldr: {
-    // Default ON: TLDR was historically active whenever a workspace `.venv`
-    // existed. The toggle lets operators turn it off (e.g. to reclaim the disk
-    // the per-workspace .venv consumes — PAN-1674).
-    enabled: true,
-  },
   tts: {
     enabled: false,
     lifecycle: true,

@@ -138,7 +138,7 @@ function aggregateSupportFleet(processes: HostProcessRecord[]): Pick<
 }
 
 function isSupportFleetProcess(process: HostProcessRecord): boolean {
-  return /\b(traefik|smee|pty-supervisor|pty-supervisors|tldr)\b/i.test(process.command);
+  return /\b(traefik|smee|pty-supervisor|pty-supervisors)\b/i.test(process.command);
 }
 
 function getLastTickAgeSeconds(

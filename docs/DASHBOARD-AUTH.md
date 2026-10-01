@@ -258,6 +258,46 @@ bar before any request, runs the exchange, then the normal session mint. A
 refused exchange throws `DashboardPairingError`; it never falls back to the
 root bootstrap.
 
+## Anywhere routes (PAN-4445)
+
+`routes/anywhere.ts` serves the dashboard's Settings → Anywhere screens. The
+pair dialog and Devices panel call the same pairing and device routes as
+`pan pair` and `pan devices`.
+
+**`POST /api/anywhere/trusted-origins`** takes `{ origin }` and saves it to
+`~/.overdeck/trusted-origins.json` (`{ version: 1, origins }`, written through
+a temp file and rename by `addSavedTrustedOrigin()` in
+`src/lib/remote-access/trusted-origins.ts`). It answers `200 { origin, added }`,
+where `origin` is normalized to `scheme://host[:port]` and `added` is false when
+the origin was already trusted.
+
+- Only the **root session** may call it. The internal token (the CLI and every
+  pipeline agent), a paired device and a scoped token get **403** (D-5):
+  widening origin trust widens the dashboard's attack surface, so it stays
+  with the operator's browser on this machine.
+- A missing, invalid, non-http(s) or loopback origin is **400**. Loopback
+  origins are already trusted for this port and never help another device.
+- A saved file that is unreadable or invalid is **500** naming the file; it is
+  never overwritten.
+- Nothing is written in any refused case.
+
+Saved origins merge into `getTrustedOrigins()` (`routes/origin-validation.ts`)
+in **every** launch mode, outside the bare-launch `config.yaml` fallback, so a
+Traefik or `OVERDECK_TRUSTED_ORIGINS` launch trusts them too. The route calls
+`invalidateTrustedOriginsCache()` after an add, so the next request and the
+next WebSocket upgrade from that origin pass with no restart. The file is read
+only when the cache fills (`readSavedTrustedOriginsSync()`), never per request.
+
+**`GET /api/anywhere/status`** needs any dashboard credential and returns
+`{ machine, addresses, devices, vault, problems }` with
+`Cache-Control: no-store` (`src/lib/remote-access/anywhere-status.ts`).
+`addresses` are the trusted origins, each flagged `loopback` by
+`isLoopbackOrigin()` (`src/lib/remote-access/loopback.ts`, the one loopback
+check, which `pan pair` re-exports as `isLoopbackBase`). `devices.active`
+counts unrevoked device records. `problems` are computed on the server, each
+with an `action` (`pair-dialog`, `settings-section`, or `none` with an optional
+`docsUrl`) that the UI maps to a button.
+
 ## Remote request gate
 
 The server binds `0.0.0.0`, and many routes check only `Origin`.
@@ -286,10 +326,10 @@ matches `//api/x` to `/api/x`. Routes keep their own checks (Origin, CSRF,
 internal-token-only routes); the gate adds a floor, it does not replace them.
 
 `dashboard.require_token_mint` (boolean, default `false`) is read from raw
-`~/.overdeck/config.yaml` by `src/lib/remote-access/config.ts` and cached for
-the process lifetime, so changing it needs a dashboard restart. Its schema entry
-and Settings toggle are tracked by
-[PAN-4435](https://github.com/eltmon/overdeck/issues/4435).
+`~/.overdeck/config.yaml` by `src/lib/remote-access/config.ts` and cached until
+a Settings save calls `invalidateRemoteAccessConfig()`, so the Settings toggle
+(Access Tokens section) applies at once; a hand edit needs a restart.
+`GET /api/settings` reports the enforced value.
 
 ## Threat model
 
@@ -335,7 +375,8 @@ distinct causes produce different symptoms:
   `OVERDECK_TRUSTED_ORIGINS` not set for this launch) — the *mint itself*
   403s on origin, which the frontend does not distinguish from an unreachable
   server, so it surfaces as `unreachable`/`delayed`, not `unauthorized`. Fix:
-  correct the trusted-origin env for this launch path.
+  correct the trusted-origin env for this launch path, or add the address
+  from Settings → Anywhere (`~/.overdeck/trusted-origins.json`).
 - **Non-loopback peer with no credential** — the mint's origin check passes
   but neither the internal token nor an existing session is present and the
   peer is not loopback/Docker-bridge/in-container, so the mint itself 401s →

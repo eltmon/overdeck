@@ -76,7 +76,7 @@ function rowToLink(row: LinkRow): PullRequestLink {
 /** Every non-archived conversation, operator and agent alike, for the sweep. */
 export function listConversationsForPullRequestSync(): PullRequestSyncConversation[] {
   const rows = getOverdeckDatabase()
-    .prepare(`SELECT id, name, cwd, issue_id FROM conversations WHERE archived_at IS NULL`)
+    .prepare(`SELECT id, name, cwd, issue_id FROM conversations WHERE archived_at IS NULL AND origin <> 'vault'`)
     .all<{ id: string; name: string; cwd: string; issue_id: string | null }>();
   return rows.map((row) => ({ id: row.id, name: row.name, cwd: row.cwd, issueId: row.issue_id }));
 }

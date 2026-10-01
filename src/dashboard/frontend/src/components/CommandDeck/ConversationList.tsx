@@ -120,6 +120,10 @@ export interface Conversation {
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey?: string | null;
+  /** PAN-4436: 'vault' = a read-only Session Vault browse copy owned by another machine. */
+  origin?: 'local' | 'vault';
+  /** PAN-4436: the owning machine's label for a browse copy. */
+  vaultOwnerLabel?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

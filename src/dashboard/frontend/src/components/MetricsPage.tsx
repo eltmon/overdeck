@@ -6,7 +6,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, TrendingUp, AlertTriangle, ArrowRightLeft } from 'lucide-react';
-import { TldrServiceStatus } from './TldrServiceStatus';
 
 interface MetricsSummary {
   today: {
@@ -164,12 +163,6 @@ export function MetricsPage() {
           </div>
         </div>
       )}
-
-      {/* TLDR Code Analysis Status */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-foreground mb-4">Services</h2>
-        <TldrServiceStatus />
-      </div>
 
       {/* Placeholder for charts */}
       <div className="bg-card border border-border rounded-lg p-6">

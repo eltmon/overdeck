@@ -212,9 +212,6 @@ export interface SettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
-    tldr?: {
-      enabled?: boolean;
-    };
   };
   telemetry?: {
     enabled: boolean;
@@ -298,5 +295,6 @@ export interface SettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  dashboard?: { require_token_mint?: boolean };
   tiered_execution?: TieredExecutionConfig;
 }

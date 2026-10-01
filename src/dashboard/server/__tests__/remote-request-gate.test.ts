@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NO_LOSS_MATRIX } from '../../../../tests/unit/lib/overdeck/no-loss-matrix.js';
 import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
-import { _resetRemoteAccessConfigForTests } from '../../../lib/remote-access/config.js';
+import { invalidateRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { _resetDashboardSessionTokenForTests, rejectUnauthorizedDashboardSessionMintRequest } from '../routes/dashboard-auth.js';
 import { REMOTE_GATE_ALLOWLIST, remoteRequestGateLayer } from '../remote-request-gate.js';
 
@@ -54,7 +54,7 @@ async function send(method: string, path: string, opts: { peer?: string; headers
 
 async function setRequireTokenMint(value: boolean): Promise<void> {
   await writeFile(join(home, 'config.yaml'), `dashboard:\n  require_token_mint: ${value}\n`, 'utf8');
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
 }
 
 /** `GET /api/devices/:id` → `/api/devices/x`, so the path is concrete. */
@@ -70,13 +70,13 @@ beforeEach(async () => {
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetAccessTokensForTests();
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
 });
 
 afterEach(async () => {
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
   delete process.env.OVERDECK_INTERNAL_TOKEN;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
@@ -173,6 +173,19 @@ describe('remote request gate (PAN-3762)', () => {
   it('keeps the loopback session mint when require_token_mint is off', async () => {
     await setRequireTokenMint(false);
     expect(rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }))).toBeNull();
+  });
+
+  it('applies require_token_mint after invalidation without a restart', async () => {
+    const loopbackMint = () => rejectUnauthorizedDashboardSessionMintRequest(makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1' }));
+
+    await setRequireTokenMint(false);
+    expect(loopbackMint()).toBeNull();
+
+    await setRequireTokenMint(true);
+    expect(loopbackMint()?.status).toBe(401);
+
+    await setRequireTokenMint(false);
+    expect(loopbackMint()).toBeNull();
   });
 });
 

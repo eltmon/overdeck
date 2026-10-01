@@ -229,7 +229,7 @@ export function CloseOutSection({ markSaveError, markSaved, setSaveStatus }: Clo
         <div className="space-y-1">
           <SettingsRow
             label="Remove the workspace when an issue is closed out"
-            description="Stops the workspace's Docker stack, TLDR daemon and stray processes and removes the worktree. Branches and memory are kept."
+            description="Stops the workspace's Docker stack and stray processes and removes the worktree. Branches and memory are kept."
             status={view && <SettingsRowStatus variant="neutral" label={sourceLabel(view.remove_workspace.source)} />}
           >
             <ToggleSwitch

@@ -10,9 +10,10 @@
  * proxy (Tailscale Serve, cloudflared) makes remote visitors look local.
  *
  * Read from the raw YAML, the same way `readTraefikConfigFromYaml()` does, and
- * cached for the process lifetime: changing it needs a dashboard restart.
- * PAN-2351 later adds the schema entry and the Settings toggle. A missing,
- * unreadable or invalid value means `false`.
+ * cached until a Settings save calls `invalidateRemoteAccessConfig()`; a hand
+ * edit of config.yaml still needs a dashboard restart. The Settings toggle
+ * lives in the Access Tokens section (PAN-4435). A missing, unreadable or
+ * invalid value means `false`.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -42,7 +43,7 @@ export function readRemoteAccessConfig(): RemoteAccessConfig {
   return cached;
 }
 
-/** Test-only: forget the cached value so the next read re-parses config.yaml. */
-export function _resetRemoteAccessConfigForTests(): void {
+/** Forget the cached value so the next read re-parses config.yaml. A Settings save calls this. */
+export function invalidateRemoteAccessConfig(): void {
   cached = undefined;
 }

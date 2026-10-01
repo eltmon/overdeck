@@ -15,7 +15,6 @@ optional:
   - POLYREPO_CONTEXT
   - PENDING_FEEDBACK
   - NEW_TRACKER_CONTEXT
-  - TLDR_AVAILABLE
   - MEMORY_CONTEXT
   - RECORD_CONTEXT
   - TESTS_ON_CI
@@ -136,22 +135,6 @@ Instead, when you detect a stuck subagent that appears to be waiting on a prompt
 4. Halt your own item loop. The user must address the permissions configuration before work can resume.
 
 The only acceptable interaction with a subagent's tmux session from inside the work agent is read-only inspection (`capture-pane`, `list-sessions`). Writing keystrokes is forbidden.
-
-{{#TLDR_AVAILABLE}}
-## TLDR: Token-Efficient Code Analysis
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-{{/TLDR_AVAILABLE}}
 
 {{#STITCH_DESIGNS}}
 ## UI Designs (Stitch)

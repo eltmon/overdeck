@@ -17,7 +17,6 @@ optional:
   - MULTI_SUITE
   - DNS_DOMAIN
   - MEMORY_CONTEXT
-  - TLDR_AVAILABLE
 ---
 # Test Execution — {{ISSUE_ID}}
 
@@ -35,21 +34,6 @@ optional:
 {{MEMORY_CONTEXT}}
 {{/MEMORY_CONTEXT}}
 
-{{#TLDR_AVAILABLE}}
-## TLDR: Efficient Failure Diagnosis
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-{{/TLDR_AVAILABLE}}
 ## Test Suites
 
 {{TEST_CONFIG_SUMMARY}}

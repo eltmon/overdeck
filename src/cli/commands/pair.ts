@@ -15,11 +15,17 @@
  * connections can be open then). See configuration/remote-access.mdx.
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
- * it imports only Commander types and chalk statically. Config and token
- * modules load inside each handler.
+ * it imports only Commander types, chalk and the import-free
+ * `lib/remote-access/loopback.ts` statically. Config and token modules load
+ * inside each handler.
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
+
+import { isLoopbackOrigin as isLoopbackBase } from '../../lib/remote-access/loopback.js';
+
+/** True when the base URL only resolves on this machine (PAN-4445 D-7: one check, shared with the server). */
+export { isLoopbackBase };
 
 export interface PairOptions { label?: string; url?: string; json?: boolean }
 
@@ -31,17 +37,6 @@ const LOOPBACK_WARNING = 'This URL only works on this machine. Pass --url with a
 /** `<base>/#pair=<credential>`: the credential rides in the fragment only. */
 export function pairingUrl(base: string, credential: string): string {
   return `${base.replace(/\/+$/, '')}/#pair=${credential}`;
-}
-
-/** True when the base URL only resolves on this machine. */
-export function isLoopbackBase(base: string): boolean {
-  let host: string;
-  try {
-    host = new URL(base).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  return host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1' || host === '[::1]' || host === '::1';
 }
 
 class DashboardUnreachableError extends Error {}

@@ -1,14 +1,13 @@
 /**
  * Workspace-data route module — extracted from routes/workspaces.ts (B / wave 2, seam 1).
  *
- * Read-only workspace query + plan/UAT + TLDR endpoints:
+ * Read-only workspace query + plan/UAT endpoints:
  *   GET    /api/workspace-stack-health
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
  *   GET    /api/workspaces/:issueId/uat-context
  *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
- *   GET    /api/workspaces/:issueId/tldr
  *
  * Shared singletons (project path, workspace info, container status, pending ops,
  * review reconciliation, readJsonBody, spawnPanCommand, requireTrustedMutationOrigin)
@@ -17,7 +16,7 @@
 
 import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { access, readFile, stat, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -52,7 +51,6 @@ import { XBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../../../lib/xbrief/types.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
-import { getTldrDaemonService } from '../../../../lib/tldr-daemon.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -176,56 +174,6 @@ export async function getPersistedBranchFallbackAsync(issueId: string): Promise<
   const cachedAgents = await getCachedRunningAgents();
   const issueAgents = cachedAgents.filter((a) => a.issueId.toUpperCase() === issueId.toUpperCase());
   return getPersistedBranchFallback(issueAgents);
-}
-async function getIndexStats(workspacePath: string): Promise<{
-  fileCount?: number;
-  indexAge?: string;
-  edgeCount?: number;
-}> {
-  const tldrPath = join(workspacePath, '.tldr');
-  const tldrExists = await access(tldrPath).then(() => true, () => false);
-  if (!tldrExists) return {};
-  try {
-    let indexAge: string | undefined;
-    const langPath = join(tldrPath, 'languages.json');
-    const langContent = await readFile(langPath, 'utf-8').catch(() => null);
-    if (langContent) {
-      const langData = JSON.parse(langContent);
-      if (langData.timestamp) {
-        const ageMs = Date.now() - langData.timestamp * 1000;
-        const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-        indexAge =
-          ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
-      }
-    }
-    if (!indexAge) {
-      const stats = await stat(tldrPath);
-      const ageMs = Date.now() - stats.mtimeMs;
-      const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-      indexAge =
-        ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
-    }
-    let fileCount: number | undefined;
-    let edgeCount: number | undefined;
-    const cgPath = join(tldrPath, 'cache', 'call_graph.json');
-    const cgContent = await readFile(cgPath, 'utf-8').catch(() => null);
-    if (cgContent) {
-      const cg = JSON.parse(cgContent);
-      edgeCount = Array.isArray(cg.edges) ? cg.edges.length : undefined;
-      if (Array.isArray(cg.edges)) {
-        const files = new Set<string>();
-        for (const e of cg.edges) {
-          if (e.from_file) files.add(e.from_file);
-          if (e.to_file) files.add(e.to_file);
-        }
-        fileCount = files.size;
-      }
-    }
-    return { fileCount, indexAge, edgeCount };
-  } catch (err) {
-    console.error(`[getIndexStats] Error for ${workspacePath}:`, err);
-    return {};
-  }
 }
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: XBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
@@ -930,52 +878,6 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
     return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );
-// ─── Route: GET /api/workspaces/:issueId/tldr ─────────────────────────────────
-
-const getWorkspaceTldrRoute = HttpRouter.add(
-  'GET',
-  '/api/workspaces/:issueId/tldr',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueId(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-
-    return yield* Effect.promise(async () => {
-        const projectRoot = process.cwd();
-        const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
-        const venvPath = join(workspacePath, '.venv');
-
-        if (!existsSync(workspacePath)) {
-          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-        }
-
-        if (!existsSync(venvPath)) {
-          return jsonResponse({
-            available: false,
-            reason: 'No .venv found in workspace',
-          });
-        }
-
-        const service = getTldrDaemonService(workspacePath, venvPath);
-        const status = await service.getStatus();
-        const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
-
-        return jsonResponse({
-          available: true,
-          running: status.running,
-          pid: status.pid,
-          healthy: status.healthy,
-          workspacePath,
-          fileCount,
-          indexAge,
-          edgeCount,
-        });
-    })
-  }))
-);
-
 // PAN-3917: `PATCH /api/workspaces/:issueId/tiered-execution` is deleted. The
 // per-issue override was a record field (`writeRecordTieredExecutionOverride`)
 // and the record plane is gone. Tiered execution resolves from the plan's
@@ -989,7 +891,6 @@ export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspacePlanRoute,
   getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
-  getWorkspaceTldrRoute,
 );
 
 export default workspaceDataRouteLayer;

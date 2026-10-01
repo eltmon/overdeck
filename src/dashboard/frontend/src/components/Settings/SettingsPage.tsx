@@ -22,7 +22,10 @@ import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { CloseOutSection } from './sections/CloseOutSection';
+import { SessionVaultSection } from './sections/SessionVaultSection';
+import { AnywhereSection } from './sections/AnywhereSection';
 import { RemoteSection } from './sections/RemoteSection';
+import { AccessTokensSection } from './sections/AccessTokensSection';
 import { MemorySection } from './sections/MemorySection';
 import { BackgroundAiSection } from './sections/BackgroundAiSection';
 import { TerminalSection } from './sections/TerminalSection';
@@ -240,7 +243,6 @@ export function SettingsPage() {
   const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
-  const [reloadingTldr, setReloadingTldr] = useState(false);
   const [claudeAuth, setClaudeAuth] = useState<{
     installed: boolean;
     loggedIn: boolean;
@@ -549,7 +551,16 @@ export function SettingsPage() {
         setSaveStatus={setSaveStatus}
       />
 
+      <SessionVaultSection />
+
+      <AnywhereSection />
+
       <RemoteSection
+        formData={formData}
+        onSettingsChange={applySettings}
+      />
+
+      <AccessTokensSection
         formData={formData}
         onSettingsChange={applySettings}
       />
@@ -653,10 +664,7 @@ export function SettingsPage() {
 
       <ExperimentalSection
         formData={formData}
-        queryClient={queryClient}
-        reloadingTldr={reloadingTldr}
         saveStatus={saveStatus}
-        setReloadingTldr={setReloadingTldr}
         onSettingsChange={applySettings}
       />
 

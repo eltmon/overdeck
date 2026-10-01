@@ -24,7 +24,6 @@ import { spawnPanCli } from '../../../lib/pan-cli-invocation.js';
  *   GET    /api/workspaces/:issueId/stashes
  *   POST   /api/workspaces/:issueId/stashes/:stashRef/recover
  *   DELETE /api/workspaces/:issueId/stashes/:stashRef
- *   GET    /api/workspaces/:issueId/tldr
  *
  * Lifecycle endpoints (/api/issues/):
  *   POST   /api/issues/:issueId/start
@@ -89,7 +88,6 @@ import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
-import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata, listWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { loadConfigSync } from '../../../lib/config.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';

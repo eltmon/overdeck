@@ -39,7 +39,7 @@ per-workspace for comparison across runs.
 **Examples:**
 - `/benchmark Opus 4.6 baseline`
 - `/benchmark All OpenAI models`
-- `/benchmark Sonnet 4.6 with TLDR enabled`
+- `/benchmark Sonnet 4.6 with RTK enabled`
 - `/benchmark Haiku fast mode, no planning`
 
 ## What This Does

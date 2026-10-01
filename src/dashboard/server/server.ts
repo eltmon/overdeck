@@ -56,10 +56,12 @@ import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
+import { anywhereRouteLayer } from './routes/anywhere.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
+import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
 import { metricsRouteLayer } from './routes/metrics.js'
@@ -164,6 +166,13 @@ const staticRouteLayer = HttpRouter.add(
     const url = HttpServerRequest.toURL(request);
     if (Option.isNone(url)) {
       return HttpServerResponse.text('Bad Request', { status: 400 });
+    }
+
+    // An unregistered API path is a 404, never the SPA shell: a client that
+    // calls .json() on index.html gets a parse error instead of a clean
+    // "gone" (PAN-4429 deleted the TLDR routes).
+    if (url.value.pathname === '/api' || url.value.pathname.startsWith('/api/')) {
+      return jsonResponse({ error: 'Not Found' }, { status: 404 });
     }
 
     const config = yield* ServerConfig;
@@ -290,6 +299,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   remoteRouteLayer,
   settingsRouteLayer,
   modelPresetsRouteLayer,
+  vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
   metricsRouteLayer,
@@ -330,6 +340,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   knowledgeViewerRouteLayer,
   environmentRouteLayer,
   pairingRouteLayer,
+  anywhereRouteLayer,
   accessTokensRouteLayer,
   staticRouteLayer,
 );

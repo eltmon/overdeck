@@ -40,7 +40,6 @@ const REQUIRED_SURFACES = [
   'Capacity guardrail',
   'Summary cards',
   'Deacon section',
-  'TLDR section',
   'pan doctor',
 ] as const;
 

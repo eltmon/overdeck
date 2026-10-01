@@ -93,8 +93,8 @@ Commands:
   reload [options]                Build Overdeck, then restart the dashboard
                                   only after the build succeeds
   restart [options]               Restart a platform component (default:
-                                  dashboard only — leaves CLIProxy, Traefik,
-                                  TLDR running)
+                                  dashboard only — leaves CLIProxy and Traefik
+                                  running)
   project                         Project registry for multi-project workspace
                                   support
   projects                        Project registry for multi-project workspace
