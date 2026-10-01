@@ -66,7 +66,7 @@ afterEach(async () => {
 });
 
 describe('device list and revoke routes (PAN-3762)', () => {
-  it('lists every paired device, only devices, and never includes tokenHash', async () => {
+  it('lists every paired device with its scopes, only devices, and never includes tokenHash', async () => {
     const phone = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
     const laptop = await createAccessToken({ name: 'laptop', scopes: ['admin'], kind: 'device' });
     await createAccessToken({ name: 'ci-token', scopes: ['admin'], kind: 'token' });
@@ -75,8 +75,8 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect(res.status).toBe(200);
     expect(res.text).not.toContain('tokenHash');
     expect(res.json.devices).toEqual([
-      { id: phone.record.id, name: 'phone', createdAt: phone.record.createdAt, lastUsedAt: null, revokedAt: null },
-      { id: laptop.record.id, name: 'laptop', createdAt: laptop.record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: phone.record.id, name: 'phone', scopes: ['admin'], createdAt: phone.record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: laptop.record.id, name: 'laptop', scopes: ['admin'], createdAt: laptop.record.createdAt, lastUsedAt: null, revokedAt: null },
     ]);
   });
 
@@ -111,5 +111,16 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect(stillAuthenticates(b.token)).toBe(true);
     expect((await call('GET', '/api/devices', asDevice(a.token))).status).toBe(401);
     expect((await call('GET', '/api/devices', asDevice(b.token))).status).toBe(200);
+  });
+
+  it('refuses to let an admin access token revoke a device (PAN-2351)', async () => {
+    const device = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const { token } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+
+    const res = await call('DELETE', `/api/devices/${device.record.id}`, { authorization: `Bearer ${token}` });
+    expect(res.status).toBe(403);
+    expect(res.json.error).toBe('an access token cannot revoke devices');
+    expect(stillAuthenticates(device.token)).toBe(true);
+    expect((await call('DELETE', '/api/devices/no-such-device', { authorization: `Bearer ${token}` })).status).toBe(403);
   });
 });

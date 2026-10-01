@@ -64,6 +64,19 @@ export function mergeRemoteConfig(result: NormalizedConfig, config: YamlConfig |
 }
 
 /**
+ * Merge `dashboard.*`. Anything but a literal `true` is false, never an
+ * error (PAN-4435 D-2). Global config only: whichever source sets it first
+ * in merge order wins, so a project `.pan.yaml` cannot override the value
+ * a machine's global config.yaml already set (PAN-4435 AC4).
+ */
+export function mergeDashboardConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  if (result.dashboard !== undefined) return;
+  const dashboard = config?.dashboard;
+  if (!dashboard || typeof dashboard !== 'object' || !('require_token_mint' in dashboard)) return;
+  result.dashboard = { requireTokenMint: dashboard.require_token_mint === true };
+}
+
+/**
  * Merge shadow configuration from multiple sources
  */
 export function mergeShadowConfig(

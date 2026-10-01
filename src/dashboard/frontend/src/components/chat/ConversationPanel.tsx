@@ -1055,7 +1055,7 @@ export function ConversationPanel({
           ) : (
             <ConversationView
               conversation={conversation}
-              onResume={onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
+              onResume={conversation.origin === 'vault' ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}

@@ -42,6 +42,7 @@ import { effortConfigErrors } from './agents/effort-support.js';
 import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
+import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from './remote-access/config.js';
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -268,6 +269,8 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  /** Dashboard access (PAN-4435). `require_token_mint` persists under `dashboard` in config.yaml. */
+  dashboard?: { require_token_mint?: boolean };
   tiered_execution?: ApiTieredExecutionConfig;
 }
 
@@ -751,6 +754,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       resiliency_tier: config.remote?.resiliencyTier ?? 'ephemeral',
       max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
     },
+    // D-1: reports the enforced value (raw config.yaml), not the merged
+    // config — a project .pan.yaml never reaches enforcement.
+    dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint },
     tiered_execution: config.tieredExecution,
   };
 }
@@ -846,6 +852,11 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   } else {
     doc.deleteIn(['remote']);
+  }
+
+  // PAN-4435 D-3: never delete the block when a PUT omits it (security flag).
+  if (isRecord(config.dashboard)) {
+    setBlockMergePreserving(doc, ['dashboard'], config.dashboard as Record<string, unknown>);
   }
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
@@ -1029,6 +1040,7 @@ async function saveSettingsApiPromiseUnlocked(
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
+    dashboard: settings.dashboard,
     tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
       providerAuth: currentConfig.providerAuth,
       workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
@@ -1039,6 +1051,7 @@ async function saveSettingsApiPromiseUnlocked(
 
   // Clear the cache because rapid writes or coarse filesystem mtime resolution can miss invalidation.
   clearConfigCache();
+  invalidateRemoteAccessConfig();
   await synchronizeAnalyticsServices();
   // PAN-4264: turning operator grouping on derives the hash (one gh call).
   if (settings.telemetry?.operatorGrouping === true) void ensureOperatorHash();
@@ -1145,6 +1158,7 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       ...current.remote,
       ...updates.remote,
     },
+    dashboard: { ...current.dashboard, ...updates.dashboard },
   };
 
   // Save and return
@@ -1299,6 +1313,17 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       ) {
         errors.push('remote.max_concurrent_agents must be a non-negative integer');
       }
+    }
+  }
+
+  if (settings.dashboard !== undefined) {
+    if (!isRecord(settings.dashboard)) {
+      errors.push('dashboard must be an object');
+    } else if (
+      settings.dashboard.require_token_mint !== undefined &&
+      typeof settings.dashboard.require_token_mint !== 'boolean'
+    ) {
+      errors.push('dashboard.require_token_mint must be a boolean');
     }
   }
 

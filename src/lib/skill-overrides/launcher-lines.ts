@@ -7,12 +7,22 @@
  * Skill packs (PAN-4334): the same step points a per-launch plugin link at the
  * pack mount, and the Claude command passes it as `--plugin-dir` when it is a
  * directory. The link lives at `<OVERDECK_HOME>/launch/<launchKey>/skill-packs`.
+ *
+ * Deft (PAN-3943): the step writes a per-launch env file (Claude: `deft.env`
+ * beside the plugin link; Codex: `$CODEX_HOME/overdeck-deft.env`). The
+ * launcher reads it line by line and exports only two literal assignments;
+ * the file is never sourced.
  */
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { shellQuote } from '../shell-quote.js';
 
 const WARNING = `echo "[launcher] WARNING: skill overrides not applied" >&2`;
+
+/** Bash that exports the allowlisted Deft env lines from `file` (already shell-quoted). */
+export function deftEnvReadLine(file: string): string {
+  return `if [ -f ${file} ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < ${file}; fi`;
+}
 
 /** Bash for the launcher step that resolves overrides before the harness starts. */
 export function launcherSkillOverrideLines(opts: {
@@ -33,10 +43,13 @@ export function launcherSkillOverrideLines(opts: {
       `if ! PAN_SKILL_SETTINGS="$(${command})"; then ${WARNING}; PAN_SKILL_SETTINGS=''; fi`,
       `case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) ${WARNING}; PAN_SKILL_SETTINGS='' ;; esac`,
     ];
-    if (link) lines.push(`if [ -d ${link} ]; then PAN_SKILL_PLUGIN_DIR=${link}; else PAN_SKILL_PLUGIN_DIR=''; fi`);
+    if (link && opts.pluginLink) {
+      lines.push(`if [ -d ${link} ]; then PAN_SKILL_PLUGIN_DIR=${link}; else PAN_SKILL_PLUGIN_DIR=''; fi`);
+      lines.push(deftEnvReadLine(shellQuote(join(dirname(opts.pluginLink), 'deft.env'))));
+    }
     return lines;
   }
-  return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`];
+  return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`, deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"')];
 }
 
 /** The Claude command suffix that passes the resolved settings, when the step was emitted. */

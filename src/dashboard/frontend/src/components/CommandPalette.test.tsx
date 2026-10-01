@@ -158,6 +158,10 @@ describe('CommandPalette conversation results', () => {
             conversationId: 'session-a',
             projectId: '-home-eltmon-Projects-overdeck-workspaces-feature-pan-1896',
             projectKey: 'overdeck',
+            title: null,
+            archived: false,
+            matchTier: 'text',
+            hitCount: 1,
             role: 'assistant',
             ts: '2026-06-02T01:00:00.000Z',
             byteOffset: 42,
@@ -225,6 +229,46 @@ describe('CommandPalette conversation results', () => {
     expect(conversationsHeading.compareDocumentPosition(memoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('renders a title-labelled row using its title text (PAN-4358)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [{
+            sessionId: 'title-only-conv',
+            conversationId: 'title-only-conv',
+            projectId: '',
+            projectKey: null,
+            title: 'Personal portfolio deployment to GitHub',
+            archived: false,
+            matchTier: 'title',
+            hitCount: 0,
+            role: '',
+            ts: '2026-06-02T01:00:00.000Z',
+            byteOffset: null,
+            displayContent: 'Personal portfolio deployment to GitHub',
+            excerpt: '',
+            excerptSegments: [],
+            rank: 1,
+          }],
+          memory: [],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'portfolio' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(getOptionByValue('conv-title-only-conv-title')).toHaveTextContent('Personal portfolio deployment to GitHub');
+  });
+
   it('opens a selected conversation hit with its byte offset', async () => {
     const onOpenConversationHit = vi.fn();
     render(
@@ -272,6 +316,10 @@ describe('CommandPalette conversation results', () => {
             subagentId: 'deadbeef01',
             projectId: '-home-eltmon-Projects-overdeck',
             projectKey: 'overdeck',
+            title: null,
+            archived: false,
+            matchTier: 'text',
+            hitCount: 1,
             role: 'assistant',
             ts: '2026-06-02T01:00:00.000Z',
             byteOffset: 7,
@@ -319,11 +367,15 @@ describe('CommandPalette conversation results', () => {
 });
 
 describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
-  const conversation = (id: string, rank: number, ts: string | null) => ({
+  const conversation = (id: string, rank: number, ts: string | null, matchTier: 'title' | 'text' | 'path' = 'text') => ({
     sessionId: id,
     conversationId: id,
     projectId: 'overdeck',
     projectKey: 'overdeck',
+    title: null,
+    archived: false,
+    matchTier,
+    hitCount: 1,
     role: 'assistant',
     ts,
     byteOffset: rank,
@@ -370,6 +422,16 @@ describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
     renderCommandPalette();
     await search();
     expect(optionLabels()).toEqual(['conv-newest-3', 'conv-middle-2', 'conv-oldest-1']);
+  });
+
+  it('ranks a title match above a newer text match in newest-first order (PAN-4358 D14)', async () => {
+    installConversationResults([
+      conversation('newer-text', 2, '2026-03-01T00:00:00Z', 'text'),
+      conversation('older-title', 1, '2026-01-01T00:00:00Z', 'title'),
+    ]);
+    renderCommandPalette();
+    await search();
+    expect(optionLabels()).toEqual(['conv-older-title-1', 'conv-newer-text-2']);
   });
 
   it('restores rank order and persists false when toggled off', async () => {
@@ -659,6 +721,10 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
     conversationId: id,
     projectId: 'overdeck',
     projectKey: 'overdeck',
+    title: null,
+    archived: false,
+    matchTier: 'text',
+    hitCount: 1,
     role: 'assistant',
     ts: '2026-06-02T01:00:00.000Z',
     byteOffset: rank,

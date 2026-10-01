@@ -249,6 +249,7 @@ __pycache__/
 # files are workspace runtime, never tracked (the dirty-tree gate refuses review otherwise).
 .overdeck/pipeline.jsonl
 .overdeck/verification/
+.overdeck/test-removal-waiver.json*
 .overdeck/feedback/
 .overdeck/feedback/
 .overdeck/review/

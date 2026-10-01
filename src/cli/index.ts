@@ -43,6 +43,7 @@ import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
 import { registerPairCommands } from './commands/pair.js';
+import { registerTokenCommands } from './commands/token.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -223,6 +224,7 @@ backup
 
 registerSkillsCommands(program);
 registerPairCommands(program);
+registerTokenCommands(program);
 
 // pan issues — list and triage work
 program

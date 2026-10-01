@@ -332,6 +332,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/prd',                             kind: 'http', disposition: 'READ',        door: 'getIssuePrd → findDraftPrd + readPrdContent' },
   { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },
   { surface: 'GET /api/issues/:id/verification',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Verification artifact + ReviewStatus verification state' },
+  { surface: 'GET /api/issues/:id/test-removal-waiver',             kind: 'http', disposition: 'READ',        door: 'readTestSkipWaiver + snapshotWorkspaceHeads' },
+  { surface: 'POST /api/issues/:id/test-removal-waiver',            kind: 'http', disposition: 'WRITE',       door: 'grantTestSkipWaiver → <workspace>/.overdeck/test-removal-waiver.json' },
   { surface: 'GET /api/issues/:issueId/staffing',                   kind: 'http', disposition: 'READ',        door: 'Issue record staffing override + resolved configuration' },
   { surface: 'POST /api/issues/:issueId/staffing',                  kind: 'http', disposition: 'WRITE',       door: 'Issue record writer updates the work-model override' },
   { surface: 'GET /api/issues/:id/tasks',                           kind: 'http', disposition: 'READ',        door: 'readWorkspacePlanSync (merged xBRIEF items) + issue record claims' },
@@ -410,6 +412,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/pairing/exchange',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (pairing)' },
   { surface: 'GET /api/devices',                          kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind device)' },
   { surface: 'DELETE /api/devices/:id',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
+  { surface: 'POST /api/anywhere/trusted-origins',        kind: 'http', disposition: 'WRITE',       door: 'remote-access/trusted-origins.addSavedTrustedOrigin (PAN-4445)' },
+  { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
+  { surface: 'GET /api/access-tokens',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind token)' },
+  { surface: 'POST /api/access-tokens',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (kind token)' },
+  { surface: 'DELETE /api/access-tokens/:id',             kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
   { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },
@@ -539,6 +546,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/model-presets/:id/plan',                      kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via model-presets plan (read-only)' },
   { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
   { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
+
+  // ── vault.ts ──────────────────────────────────────────────────────────────
+  { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
+  { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/confirm',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts confirmEviction → transcript-deletion-door (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/decline',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts declineEntry (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/clear',                 kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts clearBatch (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/reoffer',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts reofferEntry (PAN-4307)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },

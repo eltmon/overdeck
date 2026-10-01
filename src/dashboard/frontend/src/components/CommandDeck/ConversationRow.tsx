@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -317,6 +317,18 @@ export function ConversationRow({
     : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
 
   // Fork / spawn status badges — shared by both row variants.
+  const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
+  const ownerBadge = conv.origin === 'vault' ? (
+    <span
+      className={styles.conversationBranchChip}
+      title={`Read-only copy from ${ownerLabel}`}
+      aria-label={`Read-only copy from ${ownerLabel}`}
+      data-testid="vault-owner-badge"
+    >
+      <MonitorSmartphone size={10} />
+      <span className={styles.conversationBranchChipText}>{`from ${ownerLabel}`}</span>
+    </span>
+  ) : null;
   const pullRequestBadge = conv.pullRequest ? (
     <PullRequestBadge
       link={conv.pullRequest}
@@ -523,6 +535,7 @@ export function ConversationRow({
               <span className={styles.conversationBranchChipText}>{conv.branch}</span>
             </span>
           )}
+          {ownerBadge}
           {pullRequestBadge}
           {forkBadges}
         </>
@@ -542,6 +555,7 @@ export function ConversationRow({
                 <span className={styles.conversationBranchChipText}>{conv.branch}</span>
               </span>
             )}
+            {ownerBadge}
             {pullRequestBadge}
             {conv.lastAttachedAt && (
               <>

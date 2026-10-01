@@ -13,7 +13,6 @@ vi.mock('../../overdeck/issue-projects.js', () => ({
   getProjectConfigFromWorkspacePath: mocks.getProjectConfigFromWorkspacePath,
 }));
 
-import { resolveActiveTestSkipWaiver } from '../test-skip-waiver.js';
 import { captureHandoffContext } from '../handoff-context.js';
 import { writeContinueState } from '../../xbrief/continue-state.js';
 import type { AgentState } from '../../agents.js';
@@ -34,29 +33,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks();
   if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true });
-});
-
-describe('resolveActiveTestSkipWaiver reads the workspace continue file (PAN-4225 ac1)', () => {
-  it('finds a D-test-removal-waived decision that exists only in the workspace copy', () => {
-    mkdirSync(workspaceDir(), { recursive: true });
-    const sha = 'abc123';
-    const now = new Date().toISOString();
-    writeContinueState(workspaceDir(), issueId, {
-      version: '1',
-      issueId,
-      created: now,
-      updated: now,
-      gitState: {},
-      decisions: [{ id: `D-test-removal-waived:${sha}`, summary: 'covered elsewhere', recordedAt: now }],
-      hazards: [],
-      resumePoint: null,
-      sessionHistory: [],
-    });
-
-    const waiver = resolveActiveTestSkipWaiver(issueId, sha);
-
-    expect(waiver?.sha).toBe(sha);
-  });
 });
 
 describe('captureHandoffContext reads the workspace continue file (PAN-4225 ac2)', () => {

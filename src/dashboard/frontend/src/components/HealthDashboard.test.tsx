@@ -144,6 +144,15 @@ function stubServiceQueries(projectSpecialists: unknown[] = []) {
     if (url === '/api/specialists/projects') {
       return Promise.resolve(jsonResponse(projectSpecialists));
     }
+    if (url === '/api/anywhere/status') {
+      return Promise.resolve(jsonResponse({
+        machine: { environmentId: '0f0e0d0c-1111-4000-8000-000000000000', label: 'desk' },
+        addresses: [{ origin: 'http://127.0.0.1:3011', loopback: true }],
+        devices: { active: 0 },
+        vault: { state: 'off', backend: null },
+        problems: [],
+      }));
+    }
     return Promise.reject(new Error(`Unexpected request: ${url}`));
   }));
 }
@@ -161,6 +170,18 @@ describe('HealthDashboard', () => {
     expect(screen.getByRole('heading', { name: 'Host health' })).toBeInTheDocument();
     expect(screen.getByLabelText('Deacon status')).toBeInTheDocument();
     expect(await screen.findByText('No agents to monitor')).toBeInTheDocument();
+  });
+
+  it('renders the Anywhere status card after Host health and before Deacon (PAN-4445)', async () => {
+    const { container } = renderDashboard();
+
+    expect(await screen.findByText('Only this machine')).toBeInTheDocument();
+    const card = container.querySelector('[data-component="anywhere-status-card"]');
+    const hostHealth = screen.getByRole('heading', { name: 'Host health' });
+    const deacon = screen.getByLabelText('Deacon status');
+    expect(card).not.toBeNull();
+    expect(hostHealth.compareDocumentPosition(card as Element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((card as Element).compareDocumentPosition(deacon) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders every accepted status and falls unknown future statuses back to unavailable', async () => {

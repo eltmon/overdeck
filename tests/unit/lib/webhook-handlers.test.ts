@@ -59,6 +59,8 @@ vi.mock('../../../src/lib/cloister/pr-facts.js', () => ({
   getPrFacts: (...args: unknown[]) => mockGetPrFacts(...args),
 }));
 
+vi.mock('../../../src/lib/overdeck/pull-requests.js', () => ({ fetchIssuePullRequest: vi.fn() }));
+
 vi.mock('../../../src/lib/cloister/merge-agent.js', () => ({
   postMergeLifecycle: (...args: Parameters<typeof mockPostMergeLifecycle>) => mockPostMergeLifecycle(...args),
 }));
@@ -194,6 +196,31 @@ describe('handleCheckSuite', () => {
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
     expect(mockBumpIssuePrTabCacheGeneration).not.toHaveBeenCalled();
   });
+
+  it('resolves a failing suite with empty pull_requests by head (PAN-4432)', async () => {
+    mockGetPrFacts.mockResolvedValue({
+      open: true,
+      number: 9,
+      headSha: 'abc123',
+      headBranch: 'feature/pan-77',
+    });
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch: 'feature/pan-77',
+        head_sha: 'abc123',
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-77',
+      prNumber: 9,
+      source: 'check_suite',
+    }));
+  });
 });
 
 describe('handleCheckRun', () => {
@@ -270,6 +297,83 @@ describe('handleCheckRun', () => {
     }));
 
     expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
+  });
+
+  it('resolves an empty pull_requests array by head branch and SHA (PAN-4432)', async () => {
+    mockGetPrFacts.mockResolvedValue({
+      open: true,
+      number: 9,
+      headSha: 'abc123',
+      headBranch: 'feature/pan-77',
+    });
+
+    await handleCheckRun(makePayload({
+      check_run: {
+        name: 'test-shard (2/4)',
+        conclusion: 'failure',
+        head_sha: 'abc123',
+        check_suite: { head_branch: 'feature/pan-77' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-77',
+      prNumber: 9,
+      headSha: 'abc123',
+      headRef: 'feature/pan-77',
+    }));
+  });
+
+  it('does not relay when the open PR has moved past the run\'s head (PAN-4432)', async () => {
+    mockGetPrFacts.mockResolvedValue({
+      open: true,
+      number: 9,
+      headSha: 'def456',
+      headBranch: 'feature/pan-77',
+    });
+
+    await handleCheckRun(makePayload({
+      check_run: {
+        name: 'test-shard (2/4)',
+        conclusion: 'failure',
+        head_sha: 'abc123',
+        check_suite: { head_branch: 'feature/pan-77' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
+  });
+
+  it('makes no forge read for an in-progress run with empty pull_requests (PAN-4432)', async () => {
+    await handleCheckRun(makePayload({
+      check_run: {
+        name: 'test-shard (2/4)',
+        status: 'in_progress',
+        conclusion: null,
+        head_sha: 'abc123',
+        check_suite: { head_branch: 'feature/pan-77' },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockGetPrFacts).not.toHaveBeenCalled();
+  });
+
+  it('skips a run whose head_branch names no issue (PAN-4432)', async () => {
+    await handleCheckRun(makePayload({
+      check_run: {
+        name: 'test-shard (2/4)',
+        conclusion: 'failure',
+        head_sha: 'abc123',
+        check_suite: { head_branch: null },
+        pull_requests: [],
+      },
+    }));
+
+    expect(mockGetPrFacts).not.toHaveBeenCalled();
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
 });
 

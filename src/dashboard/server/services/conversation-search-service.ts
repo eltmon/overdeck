@@ -61,6 +61,7 @@ export async function searchConversationChunks(input: {
   rawQuery: string;
   matchQuery: string;
   limit: number;
+  candidateLimit?: number;
   config?: NormalizedConversationSearchConfig;
 }): Promise<ConversationSearchHit[]> {
   const config = input.config ?? getConversationSearchConfig();
@@ -72,6 +73,7 @@ export async function searchConversationChunks(input: {
       rankConversationSearch({
         query: input.rawQuery,
         limit: input.limit,
+        candidateLimit: input.candidateLimit,
         store: {
           searchBm25: (_query, candidateLimit) => handle.db.searchBm25(input.matchQuery, candidateLimit),
           searchVector: (embedding, candidateLimit) => handle.db.searchVector(embedding, candidateLimit),
@@ -109,11 +111,17 @@ async function filterLiveHits(db: EmbeddingsDbHandle, hits: ConversationSearchHi
   for (const filePath of db.listFileCursors()) {
     pathBySessionId.set(sessionIdFromPath(filePath), filePath);
   }
+  const liveByPath = new Map<string, Promise<boolean>>();
   const live = await Promise.all(
-    hits.map(async (hit) => {
+    hits.map((hit) => {
       const filePath = pathBySessionId.get(hit.sessionId);
       if (!filePath) return false;
-      return stat(filePath).then(() => true, () => false);
+      let pending = liveByPath.get(filePath);
+      if (!pending) {
+        pending = stat(filePath).then(() => true, () => false);
+        liveByPath.set(filePath, pending);
+      }
+      return pending;
     }),
   );
   return hits.filter((_, index) => live[index]);

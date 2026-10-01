@@ -38,6 +38,7 @@ import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
+import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
@@ -55,9 +56,12 @@ import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
+import { anywhereRouteLayer } from './routes/anywhere.js'
+import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
+import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
 import { metricsRouteLayer } from './routes/metrics.js'
@@ -277,6 +281,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
+  testRemovalWaiverRouteLayer,
   pipelineMembershipRouteLayer,
   parkedRouteLayer,
   velocityRouteLayer,
@@ -294,6 +299,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   remoteRouteLayer,
   settingsRouteLayer,
   modelPresetsRouteLayer,
+  vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
   metricsRouteLayer,
@@ -334,6 +340,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   knowledgeViewerRouteLayer,
   environmentRouteLayer,
   pairingRouteLayer,
+  anywhereRouteLayer,
+  accessTokensRouteLayer,
   staticRouteLayer,
 );
 

@@ -1,0 +1,198 @@
+{
+  "version": "1",
+  "issueId": "PAN-4435",
+  "created": "2026-09-30T19:25:19.083Z",
+  "updated": "2026-09-30T21:55:30.416Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dashboard-schema": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T19:25:19.083Z",
+      "doneAt": "2026-09-30T19:36:46.823Z"
+    },
+    "settings-api-mapping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T19:36:57.971Z",
+      "doneAt": "2026-09-30T19:49:25.353Z"
+    },
+    "live-toggle-invalidation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T19:50:02.124Z",
+      "doneAt": "2026-09-30T20:01:53.049Z"
+    },
+    "access-tokens-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:02:12.269Z",
+      "doneAt": "2026-09-30T20:14:25.385Z"
+    },
+    "create-token-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:14:33.871Z",
+      "doneAt": "2026-09-30T20:32:40.197Z"
+    },
+    "require-token-mint-toggle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:32:48.006Z",
+      "doneAt": "2026-09-30T20:41:53.765Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:42:02.817Z",
+      "doneAt": "2026-09-30T20:49:06.960Z"
+    },
+    "settings-uat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4435",
+      "claimedAt": "2026-09-30T20:49:25.186Z",
+      "doneAt": "2026-09-30T20:57:30.920Z"
+    },
+    "dashboard-schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:09:36.420Z"
+    },
+    "dashboard-schema.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:11:52.530Z"
+    },
+    "dashboard-schema.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:04.910Z"
+    },
+    "dashboard-schema.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:17.002Z"
+    },
+    "dashboard-schema.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:29.362Z"
+    },
+    "settings-api-mapping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:43.276Z"
+    },
+    "settings-api-mapping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:12:55.764Z"
+    },
+    "settings-api-mapping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:08.505Z"
+    },
+    "settings-api-mapping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:21.583Z"
+    },
+    "live-toggle-invalidation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:34.249Z"
+    },
+    "live-toggle-invalidation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:46.975Z"
+    },
+    "live-toggle-invalidation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:13:59.514Z"
+    },
+    "live-toggle-invalidation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:14:11.777Z"
+    },
+    "access-tokens-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:14:24.926Z"
+    },
+    "access-tokens-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:14:37.412Z"
+    },
+    "access-tokens-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:14:50.338Z"
+    },
+    "access-tokens-section.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:15:02.749Z"
+    },
+    "access-tokens-section.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:15:16.205Z"
+    },
+    "create-token-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:15:28.795Z"
+    },
+    "create-token-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:15:41.618Z"
+    },
+    "create-token-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:15:54.893Z"
+    },
+    "create-token-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:07.744Z"
+    },
+    "create-token-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:21.709Z"
+    },
+    "require-token-mint-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:33.770Z"
+    },
+    "require-token-mint-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:45.999Z"
+    },
+    "require-token-mint-toggle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:16:57.853Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:17:11.580Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:17:24.695Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:17:36.543Z"
+    },
+    "settings-uat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:17:49.689Z"
+    },
+    "settings-uat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:18:01.697Z"
+    },
+    "settings-uat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:18:14.515Z"
+    },
+    "settings-uat.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:18:27.641Z"
+    },
+    "settings-uat.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T21:18:40.699Z"
+    }
+  },
+  "feedback": []
+}

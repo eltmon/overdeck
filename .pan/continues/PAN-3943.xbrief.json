@@ -1,0 +1,252 @@
+{
+  "version": "1",
+  "issueId": "PAN-3943",
+  "created": "2026-09-29T22:32:07.575Z",
+  "updated": "2026-09-30T00:06:24.918Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "deft-skill-map": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:32:07.575Z",
+      "doneAt": "2026-09-29T22:37:21.806Z"
+    },
+    "deft-adapter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:37:30.544Z",
+      "doneAt": "2026-09-29T22:42:24.067Z"
+    },
+    "deft-mount-transform": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:42:30.658Z",
+      "doneAt": "2026-09-29T22:45:28.486Z"
+    },
+    "directive-detect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:45:34.554Z",
+      "doneAt": "2026-09-29T22:48:26.685Z"
+    },
+    "deft-collision-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:48:41.935Z",
+      "doneAt": "2026-09-29T22:51:54.520Z"
+    },
+    "deft-project-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:52:01.187Z",
+      "doneAt": "2026-09-29T22:55:08.267Z"
+    },
+    "deft-launch-env": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:55:15.427Z",
+      "doneAt": "2026-09-29T23:02:09.091Z"
+    },
+    "launcher-deft-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T23:02:14.386Z",
+      "doneAt": "2026-09-29T23:17:42.696Z"
+    },
+    "cli-deft-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T23:17:48.525Z",
+      "doneAt": "2026-09-29T23:23:01.004Z"
+    },
+    "docs-deft": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T23:23:05.888Z",
+      "doneAt": "2026-09-29T23:24:20.961Z"
+    },
+    "live-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T23:24:42.288Z",
+      "doneAt": "2026-09-29T23:27:26.473Z"
+    },
+    "deft-skill-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:38:38.175Z"
+    },
+    "deft-skill-map.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:38:50.088Z"
+    },
+    "deft-skill-map.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:03.221Z"
+    },
+    "deft-skill-map.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:15.678Z"
+    },
+    "deft-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:29.698Z"
+    },
+    "deft-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:43.361Z"
+    },
+    "deft-adapter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:39:55.229Z"
+    },
+    "deft-adapter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:40:07.961Z"
+    },
+    "deft-mount-transform.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:40:22.121Z"
+    },
+    "deft-mount-transform.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:40:35.335Z"
+    },
+    "deft-mount-transform.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:40:47.388Z"
+    },
+    "deft-mount-transform.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:01.102Z"
+    },
+    "directive-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:14.111Z"
+    },
+    "directive-detect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:29.519Z"
+    },
+    "directive-detect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:42.824Z"
+    },
+    "directive-detect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:41:55.944Z"
+    },
+    "deft-collision-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:42:09.667Z"
+    },
+    "deft-collision-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:42:22.795Z"
+    },
+    "deft-collision-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:42:36.173Z"
+    },
+    "deft-collision-report.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:42:48.847Z"
+    },
+    "deft-project-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:43:01.667Z"
+    },
+    "deft-project-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:43:13.381Z"
+    },
+    "deft-project-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:43:25.585Z"
+    },
+    "deft-launch-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:43:37.984Z"
+    },
+    "deft-launch-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:43:50.241Z"
+    },
+    "deft-launch-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:44:02.556Z"
+    },
+    "deft-launch-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:44:16.201Z"
+    },
+    "deft-launch-env.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:44:29.876Z"
+    },
+    "launcher-deft-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:44:42.748Z"
+    },
+    "launcher-deft-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:44:55.062Z"
+    },
+    "launcher-deft-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:45:07.861Z"
+    },
+    "launcher-deft-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:45:20.847Z"
+    },
+    "cli-deft-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:45:33.842Z"
+    },
+    "cli-deft-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:45:46.118Z"
+    },
+    "cli-deft-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:45:58.457Z"
+    },
+    "cli-deft-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:46:11.176Z"
+    },
+    "docs-deft.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:46:23.549Z"
+    },
+    "docs-deft.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:46:36.118Z"
+    },
+    "docs-deft.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:46:48.338Z"
+    },
+    "live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:47:00.052Z"
+    },
+    "live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:47:12.103Z"
+    },
+    "live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:47:24.664Z"
+    },
+    "live-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:47:36.929Z"
+    }
+  },
+  "feedback": []
+}
