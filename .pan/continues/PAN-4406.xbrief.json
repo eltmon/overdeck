@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:54:20.545Z",
+  "updated": "2026-10-01T21:55:06.387Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "e2-requirements-evidence.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T21:54:20.545Z"
+    },
+    "e2-requirements-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:55:06.386Z"
     }
   }
 }
