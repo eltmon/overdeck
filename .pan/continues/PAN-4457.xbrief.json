@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4457",
   "created": "2026-10-01T21:43:35.334Z",
-  "updated": "2026-10-01T23:35:47.740Z",
+  "updated": "2026-10-01T23:35:58.718Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "primary-checkout-matching.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T23:35:47.740Z"
+    },
+    "created-link-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:58.718Z"
     }
   }
 }
