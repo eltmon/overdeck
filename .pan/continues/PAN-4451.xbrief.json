@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:35:30.475Z",
+  "updated": "2026-10-01T13:35:31.577Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4451",
       "claimedAt": "2026-10-01T13:34:41.332Z",
       "doneAt": "2026-10-01T13:35:30.475Z"
+    },
+    "blocked-journal-types": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:35:31.577Z"
     }
   }
 }
