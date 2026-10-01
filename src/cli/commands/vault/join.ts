@@ -17,26 +17,20 @@
  * rotation, so the next save continues each owned record under its new name.
  * A `key.next` left by a rotation this machine started and never committed is
  * removed: it belongs to the key that was just replaced.
+ *
+ * The state changes live in `joinVault()` (`src/lib/vault/join-core.ts`,
+ * PAN-4446); this wrapper owns the flags, the prompts and every output line.
  */
-import { rm } from 'node:fs/promises';
-import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
-import { readVaultConfig, writeVaultConfig } from '../../../lib/vault/config.js';
-import { HEADER_REF_NAME, readVaultHeader, VaultAuthenticationError } from '../../../lib/vault/format.js';
-import { deriveSubkeys, phraseToKey, saveVaultKey } from '../../../lib/vault/identity.js';
+import { readVaultConfig } from '../../../lib/vault/config.js';
 import {
-  KEYWRAP_UNREADABLE_MESSAGE,
-  KeywrapFormatError,
-  PASSPHRASE_MISMATCH_MESSAGE,
-  parseKeywrap,
-  unwrapVaultKey,
-} from '../../../lib/vault/keywrap.js';
-import { PASSPHRASE_KEY_RETIRED_MESSAGE, PHRASE_MISMATCH_MESSAGE } from '../../../lib/vault/join-core.js';
-import { clearNextKey } from '../../../lib/vault/rotate.js';
-import { DirVaultStore } from '../../../lib/vault/store/dir.js';
-import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
-import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../../lib/vault/store/types.js';
-import { syncOnce } from '../../../lib/vault/sync.js';
-import { DIR_BACKEND_PREFIX, defaultIo, readPassphrase, readPhrase, type CliIo } from './shared.js';
+  PASSPHRASE_KEY_RETIRED_MESSAGE,
+  PHRASE_MISMATCH_MESSAGE,
+  joinVault,
+  type JoinSecret,
+  type KeywrapState,
+} from '../../../lib/vault/join-core.js';
+import { KEYWRAP_UNREADABLE_MESSAGE } from '../../../lib/vault/keywrap.js';
+import { defaultIo, readPassphrase, readPhrase, type CliIo } from './shared.js';
 
 export { PASSPHRASE_KEY_RETIRED_MESSAGE, PHRASE_MISMATCH_MESSAGE };
 
@@ -45,30 +39,34 @@ export interface JoinOptions {
   passphraseFile?: string;
 }
 
-type KeyOutcome = { key: Buffer | null } | { error: string };
+type PromptedSecret = JoinSecret | { kind: 'fail'; message: string };
+
+/** Prompt for the 24-word recovery phrase; a read error stops the join. */
+async function promptPhrase(io: CliIo): Promise<PromptedSecret> {
+  try {
+    return { kind: 'phrase', value: await readPhrase(io) };
+  } catch (error) {
+    return { kind: 'fail', message: (error as Error).message };
+  }
+}
 
 /**
- * Try the passphrase keywrap. `key: null` means fall back to the recovery
- * phrase (no keywrap, an unreadable one, or an empty answer).
+ * Ask for the passphrase when the backend holds a readable keywrap; otherwise,
+ * or on an empty answer, fall back to the recovery phrase.
  */
-async function unlockWithPassphrase(url: string, store: VaultStore, io: CliIo, passphraseFile?: string): Promise<KeyOutcome> {
-  const wrapped = await store.getObject(KEYWRAP_OBJECT_NAME);
-  if (!wrapped) {
+async function promptSecret(url: string, io: CliIo, keywrap: KeywrapState, passphraseFile?: string): Promise<PromptedSecret> {
+  if (keywrap === 'absent') {
     return passphraseFile
-      ? { error: `This vault has no passphrase set. Use the recovery phrase: pan vault join ${url} --phrase-file <path>` }
-      : { key: null };
+      ? { kind: 'fail', message: `This vault has no passphrase set. Use the recovery phrase: pan vault join ${url} --phrase-file <path>` }
+      : promptPhrase(io);
   }
-  try {
-    parseKeywrap(wrapped);
-  } catch (error) {
-    if (!(error instanceof KeywrapFormatError)) throw error;
+  if (keywrap === 'unreadable') {
     io.err(KEYWRAP_UNREADABLE_MESSAGE);
-    return { key: null };
+    return promptPhrase(io);
   }
   const passphrase = await readPassphrase(io, 'Vault passphrase (press Enter to use the recovery phrase instead): ', passphraseFile);
-  if (passphrase.trim() === '') return { key: null };
-  const key = await unwrapVaultKey(wrapped, passphrase);
-  return key ? { key } : { error: PASSPHRASE_MISMATCH_MESSAGE };
+  if (passphrase.trim() === '') return promptPhrase(io);
+  return { kind: 'passphrase', value: passphrase };
 }
 
 export async function joinCommand(url: string, options: JoinOptions = {}, io: CliIo = defaultIo): Promise<void> {
@@ -81,84 +79,24 @@ export async function joinCommand(url: string, options: JoinOptions = {}, io: Cl
     io.err('Use either --phrase-file or --passphrase-file, not both.');
     return io.exit(1);
   }
-  // A phrase file is parsed before any backend access, as before PAN-4328.
-  let key: Buffer | null = null;
+  // A phrase file is read here and parsed by the core before any backend access, as before PAN-4328.
+  let secret: JoinSecret | ((keywrap: KeywrapState) => Promise<PromptedSecret>);
   if (options.phraseFile) {
     try {
-      key = phraseToKey(await readPhrase(io, options.phraseFile));
+      secret = { kind: 'phrase', value: await readPhrase(io, options.phraseFile) };
     } catch (error) {
       io.err((error as Error).message);
       return io.exit(1);
     }
+  } else {
+    secret = (keywrap) => promptSecret(url, io, keywrap, options.passphraseFile);
   }
 
-  let store: VaultStore;
-  let createdClone = false;
-  try {
-    if (url.startsWith(DIR_BACKEND_PREFIX)) {
-      store = await DirVaultStore.open(url.slice(DIR_BACKEND_PREFIX.length));
-    } else {
-      try {
-        store = await GitVaultStore.open(gitVaultCloneDir());
-      } catch {
-        store = await initGitVault(url, gitVaultCloneDir());
-        createdClone = true;
-      }
-    }
-  } catch (error) {
-    io.err(error instanceof VaultOfflineError ? `Could not reach ${url}: ${error.message}` : (error as Error).message);
+  const result = await joinVault({ url, secret });
+  if (result.status === 'error') {
+    io.err(result.message);
     return io.exit(1);
   }
-  const fail = async (message: string): Promise<never> => {
-    io.err(message);
-    if (createdClone) await rm(gitVaultCloneDir(), { recursive: true, force: true });
-    return io.exit(1);
-  };
-
-  if (!createdClone && !url.startsWith(DIR_BACKEND_PREFIX)) {
-    // An existing clone may predate the keywrap or a key rotation; offline, use the local view.
-    await store.refresh().catch((error: unknown) => {
-      if (!(error instanceof VaultOfflineError)) throw error;
-    });
-  }
-  let fromPassphrase = false;
-  if (!key) {
-    const outcome = await unlockWithPassphrase(url, store, io, options.passphraseFile);
-    if ('error' in outcome) return fail(outcome.error);
-    key = outcome.key;
-    fromPassphrase = key !== null;
-  }
-  if (!key) {
-    try {
-      key = phraseToKey(await readPhrase(io));
-    } catch (error) {
-      return fail((error as Error).message);
-    }
-  }
-  const keys = deriveSubkeys(key);
-
-  const header = await store.readRef(HEADER_REF_NAME);
-  let matches = false;
-  if (header) {
-    try {
-      matches = (await readVaultHeader(header.value, keys)) !== null;
-    } catch (error) {
-      if (!(error instanceof VaultAuthenticationError)) throw error;
-    }
-  }
-  if (!matches) {
-    if (!header) return fail(`${url} is not a Session Vault yet. Run: pan vault setup ${url}`);
-    return fail(fromPassphrase ? PASSPHRASE_KEY_RETIRED_MESSAGE : PHRASE_MISMATCH_MESSAGE);
-  }
-
-  // Objects this machine wrote under a retired key and never published must not reach the backend.
-  await store.discardUnpublished();
-  await saveVaultKey(key);
-  // A pending rotation here started from the key this join replaces; it must not resume.
-  await clearNextKey();
-  await writeVaultConfig({ backend: url });
-  const me = await ensureEnvironmentIdentity();
-  const report = await syncOnce({ store, keys });
-  io.out(`Joined the Session Vault at ${url} as ${me.label} (${me.environmentId}).`);
-  io.out(report.offline ? 'The backend was unreachable during the first sync; run pan vault sync later.' : `${report.records} saved conversation(s) listed.`);
+  io.out(`Joined the Session Vault at ${url} as ${result.machine.label} (${result.machine.environmentId}).`);
+  io.out(result.offline ? 'The backend was unreachable during the first sync; run pan vault sync later.' : `${result.records} saved conversation(s) listed.`);
 }
