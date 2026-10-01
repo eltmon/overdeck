@@ -19,7 +19,7 @@ vi.mock('../../../dashboard/server/event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: emitOnlyMock })),
 }));
 
-const { createConversation } = await import('../conversations.js');
+const { archiveConversation, createConversation } = await import('../conversations.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../infra.js');
 const {
   linkCreatedPullRequestToIssueConversations,
@@ -221,6 +221,64 @@ describe('linkCreatedPullRequestToIssueConversations (pipeline-opened PRs)', () 
     conversation('agent-pan-3', REPO_PATH, 'PAN-3');
     expect(linkCreatedPullRequestToIssueConversations('PAN-3', undefined)).toEqual([]);
     expect(linkCreatedPullRequestToIssueConversations('PAN-3', 'not a url')).toEqual([]);
+  });
+
+  // PAN-4457: operator conversations working inside the issue's workspace get
+  // a created link too, without waiting for the sweep.
+  describe('workspace-prefix operator conversations (PAN-4457)', () => {
+    it('links an operator conversation at the workspace root and one nested under it', () => {
+      const ws = join(REPO_PATH, 'workspaces', 'feature-pan-4000');
+      const atRoot = conversation('op-at-root', ws, 'PAN-4000');
+      const nested = conversation('op-nested', join(ws, 'packages', 'x'), 'PAN-4000');
+
+      const linked = linkCreatedPullRequestToIssueConversations('PAN-4000', PR_URL, ws);
+
+      expect(linked.sort()).toEqual([atRoot, nested].sort());
+      expect(listConversationPullRequests(atRoot)).toHaveLength(1);
+      expect(listConversationPullRequests(nested)).toHaveLength(1);
+    });
+
+    it('never links an operator conversation whose cwd merely shares the workspace path as a prefix', () => {
+      const ws = join(REPO_PATH, 'workspaces', 'feature-pan-4001');
+      const sibling = conversation('op-sibling', `${ws}-other`, 'PAN-4001');
+
+      const linked = linkCreatedPullRequestToIssueConversations('PAN-4001', PR_URL, ws);
+
+      expect(linked).toEqual([]);
+      expect(listConversationPullRequests(sibling)).toEqual([]);
+    });
+
+    it('never links an archived operator conversation inside the workspace', () => {
+      const ws = join(REPO_PATH, 'workspaces', 'feature-pan-4002');
+      const archived = conversation('op-archived', ws, 'PAN-4002');
+      archiveConversation(archived);
+
+      const linked = linkCreatedPullRequestToIssueConversations('PAN-4002', PR_URL, ws);
+
+      expect(linked).toEqual([]);
+      expect(listConversationPullRequests(archived)).toEqual([]);
+    });
+
+    it('treats the workspace path as a literal, never a LIKE wildcard', () => {
+      const ws = join(REPO_PATH, 'workspaces', 'feature_x');
+      const lookalike = conversation('op-lookalike', join(REPO_PATH, 'workspaces', 'featureAx'), 'PAN-4003');
+
+      const linked = linkCreatedPullRequestToIssueConversations('PAN-4003', PR_URL, ws);
+
+      expect(linked).toEqual([]);
+      expect(listConversationPullRequests(lookalike)).toEqual([]);
+    });
+
+    it('matches today\'s agent-only behavior when no workspacePath is given', () => {
+      const ws = join(REPO_PATH, 'workspaces', 'feature-pan-4004');
+      const work = conversation('agent-pan-4004', ws, 'PAN-4004');
+      const operator = conversation('op-no-workspace-path', ws, 'PAN-4004');
+
+      const linked = linkCreatedPullRequestToIssueConversations('PAN-4004', PR_URL);
+
+      expect(linked).toEqual([work]);
+      expect(listConversationPullRequests(operator)).toEqual([]);
+    });
   });
 });
 

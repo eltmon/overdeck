@@ -189,21 +189,38 @@ export function unlinkConversationPullRequest(
 
 /**
  * The pipeline opened (or found) the PR for an issue: link it with source
- * `created` to every non-archived agent conversation for that issue, so they
- * show it without waiting for a sweep. A link that is already `created`, or
- * that the operator dismissed, is left alone. Emits one event per conversation
- * that changed and returns their names. Never throws: a failed link must not
- * fail the PR creation.
+ * `created` to every non-archived agent conversation for that issue, and to
+ * every operator conversation working inside the issue's workspace (PAN-4457),
+ * so they show it without waiting for a sweep. A link that is already
+ * `created`, or that the operator dismissed, is left alone. Emits one event
+ * per conversation that changed and returns their names. Never throws: a
+ * failed link must not fail the PR creation.
  */
-export function linkCreatedPullRequestToIssueConversations(issueId: string, url: string | undefined): string[] {
+export function linkCreatedPullRequestToIssueConversations(
+  issueId: string,
+  url: string | undefined,
+  workspacePath?: string,
+): string[] {
   try {
     const ref = url ? parsePullRequestRef(url) : null;
     if (!ref) return [];
-    const names = getOverdeckDatabase()
+    const agentNames = getOverdeckDatabase()
       .prepare(`SELECT name FROM conversations WHERE lower(issue_id) = lower(?) AND archived_at IS NULL`)
       .all<{ name: string }>(issueId)
       .map((row) => row.name)
       .filter(isAgentConversationName);
+    const operatorNames = workspacePath
+      ? (() => {
+        const root = workspacePath.replace(/\/+$/, '');
+        return getOverdeckDatabase()
+          .prepare(`SELECT name FROM conversations
+                    WHERE archived_at IS NULL AND origin <> 'vault' AND (cwd = ? OR instr(cwd, ?) = 1)`)
+          .all<{ name: string }>(root, `${root}/`)
+          .map((row) => row.name)
+          .filter((name) => !isAgentConversationName(name));
+      })()
+      : [];
+    const names = [...new Set([...agentNames, ...operatorNames])];
     const linked: string[] = [];
     for (const name of names) {
       const before = findLink(name, ref);
