@@ -35,6 +35,23 @@ Add `--hooks` to register a Claude Code `Stop` hook that saves after every turn:
 pan vault setup git@github.com:you/session-vault.git --hooks
 ```
 
+### From the dashboard
+
+Open Settings → Session Vault. While the vault is off, the section shows
+**Set up a new vault**:
+
+1. Enter the Git URL of the empty repository (a `dir:<path>` backend works too).
+2. Choose the passphrase for joining new machines: **Suggested (generated for you)**, **My
+   own** (16 or more characters), or **None**.
+3. Click **Set up vault**.
+
+A dialog then shows the 24-word recovery phrase and, with a suggested passphrase, the
+generated passphrase. They are shown only once and never stored by the dashboard. The dialog
+closes only after you check **I wrote it down** and click **Done**.
+
+The dashboard cannot install the Claude Code `Stop` hook; use `pan vault setup … --hooks` for
+that.
+
 ## Join from a second machine
 
 ```bash
@@ -45,6 +62,10 @@ Enter the 24 words when prompted (or pass `--phrase-file <path>`). If the vault 
 passphrase, you are asked for that first; see below. A wrong phrase prints
 `The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.`
 and writes nothing.
+
+From the dashboard: open Settings → Session Vault on the new machine and use **Join an
+existing vault**. Enter the Git URL and the passphrase, or click **Use the recovery phrase
+instead** and enter the 24 words, then click **Join**.
 
 ## Passphrase unlock
 
@@ -68,6 +89,11 @@ pan vault passphrase remove
 When a passphrase is set, `pan vault join` asks for it first. Press Enter to use the
 recovery phrase instead, or pass `--passphrase-file <path>`. A wrong passphrase prints
 `The passphrase did not unlock this vault.` and writes nothing.
+
+If a machine is set up for the vault but its key file is missing, or its key was retired by
+a rotation on another machine, Settings → Session Vault shows **Unlock this machine** with the
+configured Git URL filled in. Enter the passphrase or the recovery phrase and click
+**Unlock**. It is the same as running `pan vault join` with that URL.
 
 <Warning>
 The backend stores your vault key wrapped under the passphrase, so anyone who can read the backend can try to guess the passphrase offline. Each guess is deliberately slow and memory-hungry, which puts a generated passphrase out of reach but not a weak one. The recovery phrase stays the root of recovery: setting or removing a passphrase never changes the vault key, and removing the passphrase never locks you out.
@@ -139,6 +165,11 @@ then run `pan vault allow-secret <id> <line>` or `pan vault exclude --session <i
 
 With the dashboard running, conversations started from it are saved automatically 30 seconds
 after they go quiet, and synced every 5 minutes; no hook is needed.
+
+To sync right away, click **Sync now** in Settings → Session Vault. The button appears only
+in the primary dashboard, which runs the sync loop; the section then shows the new last-sync
+time. Change the interval with `syncIntervalSec` in `~/.overdeck/vault/config.json` (see
+[Where things live](#where-things-live)).
 
 ## Continue on another machine
 
@@ -251,7 +282,7 @@ dual-booting the same machine were not verified.
 | --- | --- |
 | `~/.overdeck/vault/key` | Your vault key (mode 0600). Back it up as the recovery phrase. |
 | `~/.overdeck/vault/key.next` | Present only while a key rotation is in progress. Finish it with `pan vault rotate-key`. |
-| `~/.overdeck/vault/config.json` | Backend URL, exclusions, `evict`, `liveQuietMinutes`. |
+| `~/.overdeck/vault/config.json` | Backend URL, exclusions, `evict`, `liveQuietMinutes`, `syncIntervalSec` (seconds between dashboard syncs). |
 | `~/.overdeck/vault/git/` | Local clone of your vault remote. |
 | `~/.overdeck/vault/index.json` | This machine's saved-transcript index and list cache. Never uploaded. |
 
