@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { SettingsSection } from '../primitives';
+import { SessionVaultJoinForm } from './SessionVaultJoinForm';
 import { SessionVaultSetupForm } from './SessionVaultSetupForm';
 import { postVault } from './sessionVaultShared';
 
@@ -85,21 +87,23 @@ async function fetchVaultEvictionBatch(): Promise<EvictionBatchResponse> {
   return res.json();
 }
 
-function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; onChanged: () => void }) {
+function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; onChanged: (message?: string) => void }) {
   if (status.state === 'off') {
-    return <SessionVaultSetupForm onDone={onChanged} />;
+    return (
+      <div className="space-y-6">
+        <SessionVaultSetupForm onDone={onChanged} />
+        <SessionVaultJoinForm mode="join" backend={null} onDone={onChanged} />
+      </div>
+    );
+  }
+  if (status.state === 'key-missing' || status.state === 'key-mismatch') {
+    return <SessionVaultJoinForm mode="unlock" backend={status.backend} onDone={onChanged} />;
   }
 
   return (
     <div className="space-y-1 text-xs">
       {status.state === 'rotation-pending' && (
         <p className="text-muted-foreground">A key rotation is unfinished on this machine. Run: pan vault rotate-key</p>
-      )}
-      {status.state === 'key-missing' && (
-        <p className="text-muted-foreground">The vault key is missing for backend {status.backend}. Run: pan vault join {status.backend}</p>
-      )}
-      {status.state === 'key-mismatch' && (
-        <p className="text-muted-foreground">This machine&apos;s vault key does not open {status.backend}. Run: pan vault join {status.backend}</p>
       )}
       {status.state === 'ready' && (
         <>
@@ -165,7 +169,12 @@ export function SessionVaultSection() {
   });
 
   const refetchBatch = () => void queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEY });
-  const refetchStatus = () => void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY });
+  const [vaultNotice, setVaultNotice] = useState<string | null>(null);
+  /** A setup or join changed the vault: show its line (if any) and re-read the status. */
+  const handleVaultChanged = (message?: string) => {
+    setVaultNotice(message ?? null);
+    void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY });
+  };
 
   /** Runs a batch-mutating POST, reporting a toast on rejection instead of an unhandled promise. */
   async function postVaultBatch(path: string, body: Record<string, unknown> | undefined, failureMessage: string): Promise<{ status: number; body: unknown } | null> {
@@ -241,8 +250,9 @@ export function SessionVaultSection() {
           Failed to load vault status: {statusError instanceof Error ? statusError.message : String(statusError)}
         </div>
       ) : (
-        status && <VaultStatusBlock status={status} onChanged={refetchStatus} />
+        status && <VaultStatusBlock status={status} onChanged={handleVaultChanged} />
       )}
+      {vaultNotice && <p data-testid="vault-notice" className="mt-2 text-xs text-muted-foreground">{vaultNotice}</p>}
 
       {status && status.state !== 'off' && (
         <div className="mt-6 space-y-6">

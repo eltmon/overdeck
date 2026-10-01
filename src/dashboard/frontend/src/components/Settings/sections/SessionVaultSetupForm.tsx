@@ -104,13 +104,13 @@ function RecoveryDialog({ secrets, onDone }: { secrets: ShownOnce; onDone: () =>
   );
 }
 
-export function SessionVaultSetupForm({ onDone }: { onDone: () => void }) {
+/** `onDone` receives a line for the section to show when there is one; a setup changes the state and unmounts this form. */
+export function SessionVaultSetupForm({ onDone }: { onDone: (message?: string) => void }) {
   const [url, setUrl] = useState('');
   const [choice, setChoice] = useState<PassphraseChoice>('generate');
   const [custom, setCustom] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [shownOnce, setShownOnce] = useState<ShownOnce | null>(null);
 
   const customTooShort = choice === 'custom' && custom.length < PASSPHRASE_MIN_LENGTH;
@@ -119,14 +119,12 @@ export function SessionVaultSetupForm({ onDone }: { onDone: () => void }) {
   const handleSubmit = async () => {
     setRunning(true);
     setError(null);
-    setNotice(null);
     const passphrase = choice === 'custom' ? { mode: 'custom', value: custom } : { mode: choice };
     try {
       const { status, body } = await postVault('setup', { url: url.trim(), passphrase });
       const result = body as SetupResponse | null;
       if (status === 200 && result?.status === 'already-set-up') {
-        setNotice('This machine is already set up with this vault.');
-        onDone();
+        onDone('This machine is already set up with this vault.');
       } else if (status === 200 && result?.status === 'created') {
         setCustom('');
         if (result.recoveryPhrase) {
@@ -136,8 +134,7 @@ export function SessionVaultSetupForm({ onDone }: { onDone: () => void }) {
             passphraseError: result.passphrase && !result.passphrase.stored ? result.passphrase.error ?? null : null,
           });
         } else {
-          setNotice("Set up with this machine's existing vault key. Its recovery phrase was shown when the key was created.");
-          onDone();
+          onDone("Set up with this machine's existing vault key. Its recovery phrase was shown when the key was created.");
         }
       } else if (status === 422 && result?.code && JOIN_INSTEAD_CODES.has(result.code)) {
         setError(JOIN_INSTEAD_MESSAGE);
@@ -201,7 +198,6 @@ export function SessionVaultSetupForm({ onDone }: { onDone: () => void }) {
         {running ? 'Setting up…' : 'Set up vault'}
       </button>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       {shownOnce && <RecoveryDialog secrets={shownOnce} onDone={handleDone} />}
     </div>
   );

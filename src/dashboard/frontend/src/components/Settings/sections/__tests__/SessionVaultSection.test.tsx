@@ -116,9 +116,19 @@ describe('SessionVaultSection', () => {
     renderSection();
 
     await waitFor(() => expect(screen.getByText('Set up a new vault')).toBeTruthy());
+    expect(screen.getByText('Join an existing vault')).toBeTruthy();
     expect(screen.queryByText(/Run: pan vault setup/)).toBeNull();
     expect(screen.queryByText('Machines')).toBeNull();
     expect(screen.queryByText('Pending deletion')).toBeNull();
+  });
+
+  it('state key-missing shows "Unlock this machine" and no "Run: pan vault join" text', async () => {
+    mockFetch({ status: { ...READY_STATUS, state: 'key-missing' } as unknown as typeof READY_STATUS });
+    renderSection();
+
+    await waitFor(() => expect(screen.getByText('Unlock this machine')).toBeTruthy());
+    expect((screen.getByLabelText('Git URL') as HTMLInputElement).value).toBe('dir:/tmp/vault');
+    expect(screen.queryByText(/Run: pan vault join/)).toBeNull();
   });
 
   it('renders a verified and a failed entry with their status', async () => {

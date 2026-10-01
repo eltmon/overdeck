@@ -38,8 +38,7 @@ describe('SessionVaultSetupForm (PAN-4446 WI-7)', () => {
     expect(path).toBe('/api/vault/setup');
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ url: REMOTE, passphrase: { mode: 'generate' } });
-    await waitFor(() => expect(screen.getByText('This machine is already set up with this vault.')).toBeTruthy());
-    expect(onDone).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith('This machine is already set up with this vault.'));
   });
 
   it('ac2: a created response shows the phrase once and Done stays disabled until "I wrote it down" is checked', async () => {
