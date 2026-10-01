@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:58:31.142Z",
+  "updated": "2026-10-01T22:59:06.497Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "docs-continued-on-states.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T22:58:31.142Z"
+    },
+    "docs-continued-on-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:59:06.497Z"
     }
   }
 }
