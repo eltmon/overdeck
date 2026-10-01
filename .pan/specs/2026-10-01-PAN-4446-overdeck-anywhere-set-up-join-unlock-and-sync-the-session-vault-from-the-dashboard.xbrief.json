@@ -1,0 +1,914 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-01T21:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4446: Overdeck Anywhere: set up, join, unlock and sync the Session Vault from the dashboard",
+    "updated": "2026-10-01T21:17:30.859Z"
+  },
+  "plan": {
+    "id": "pan-4446",
+    "title": "Overdeck Anywhere: set up, join, unlock and sync the Session Vault from the dashboard",
+    "status": "proposed",
+    "uid": "c403ba6a-5de4-4b34-b056-5e2473825241",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-01T21:30:00Z",
+    "updated": "2026-10-01T21:17:30.859Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4446",
+        "label": "PAN-4446",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4446.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "dashboard",
+      "anywhere",
+      "cli-refactor",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "Setting up, joining or unlocking the Session Vault and forcing a sync all need a terminal (pan vault setup/join/sync). An operator using Overdeck Anywhere from the dashboard alone cannot start the vault, add a second machine, or recover a machine whose key is missing or was retired by a rotation.",
+      "Proposal": "Extract the state-changing bodies of pan vault setup and pan vault join into print-free cores (src/lib/vault/setup-core.ts, join-core.ts) that take a value or a prompt callback, so the CLI keeps its exact output and the dashboard calls the same code. Add queued setupVaultFromDashboard / joinVaultFromDashboard / syncVaultNow to the vault service, three operator-only routes (POST /api/vault/setup, /join, /sync), and setup/join/unlock forms plus Sync now in Settings → Session Vault, proven by a Playwright journey on a bare git remote and documented in configuration/session-vault.mdx and docs/SESSION-VAULT.md.",
+      "NonGoals": "- A lock action, a pan vault unlock verb, or dashboard-driven key rotation\n- Dashboard controls for syncIntervalSec, evict or other vault/config.json keys (link to docs only)\n- Setting, changing or removing the passphrase after setup from the dashboard\n- Installing the Claude Code Stop hook from the dashboard (--hooks stays CLI-only)\n- Changing any pan vault setup/join output line, stream or exit code, or editing their existing tests\n- Letting the internal token (pipeline agents, CLI) or a scoped access token call setup, join or sync\n- A GET /api/vault/passphrase-suggestion route\n- Background sync in a peer dashboard without OVERDECK_VAULT_IN_PEER=1\n- Persisting or logging the recovery phrase or a generated passphrase anywhere outside the one HTTP response"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Cores take either a resolved value or a prompt callback invoked where the CLI prompts today",
+        "rationale": "setup prompts after printing the phrase and join prompts only after reading the keywrap; plain input->result cores would reorder CLI output and break the exact-stderr CLI tests"
+      },
+      {
+        "summary": "Suggested passphrase is generated server-side ({mode:'generate'}) and returned once with the recovery phrase; no passphrase-suggestion route",
+        "rationale": "the issue says setup returns 'any generated passphrase exactly once'; generating server-side means the secret crosses the wire once instead of twice"
+      },
+      {
+        "summary": "Sync now returns 409 sync-not-running on a dashboard whose vault service is not started; the UI shows the button only when status.running is true; Playwright uses OVERDECK_VAULT_IN_PEER=1",
+        "rationale": "keeps PAN-4307 NFR-4 (a peer never advances the vault) and follows the PAN-4436/PAN-4437 Playwright precedent"
+      },
+      {
+        "summary": "Auto-sync settings link to the docs page (save-and-sync section) instead of a dashboard control",
+        "rationale": "the issue says link to PAN-4436/PAN-4437's auto-sync controls, but neither shipped one; syncIntervalSec lives only in vault/config.json"
+      },
+      {
+        "summary": "Routes accept root-session and device credentials; internal-token and token get 403 after the CSRF/origin check",
+        "rationale": "issue scope says operator-only including paired devices; mirrors PAN-4445 D-5 and pairing D-11 placement; route-scopes.ts already defaults devices to admin"
+      },
+      {
+        "summary": "dir: backends are accepted from the dashboard with URL validation (<=2048 chars, no control characters, no leading '-')",
+        "rationale": "dir: is a documented backend and callers already hold admin; git clone already uses '--' so option injection is blocked twice"
+      },
+      {
+        "summary": "Join keeps 'other backend' before the flag-conflict check by having the CLI wrapper check config itself",
+        "rationale": "preserves the exact current error precedence of joinCommand; the core repeats the cheap check for the dashboard"
+      }
+    ],
+    "items": [
+      {
+        "id": "setup-core",
+        "title": "Extract the setup state changes into setupVault() in src/lib/vault/setup-core.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/setup-core.ts",
+            "tests/unit/lib/vault/setup-core.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/setup-core.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "setup-core.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "cli-setup-wrapper",
+            "vault-service-ops",
+            "vault-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4446.md WI-1. Create setupVault(input) with the exact SetupPassphrase / SetupVaultInput / SetupVaultResult / SetupErrorCode types and the 8 ordered steps in WI-1 (direct custom passphrase strength check first; other-backend; already-set-up (returns {status, backend} only and never calls ensureEnvironmentIdentity); openOrInitStore moved from src/cli/commands/vault/setup.ts lines 41-56; save key before header; header check/CAS with forgetNewKey and clone cleanup; identity+config+syncOnce; existing key reused -> recoveryPhrase null and no callback; new key -> resolve passphrase (callback gets {recoveryPhrase, machine, backend}) and putSlot keywrap, VaultOfflineError -> {stored:false,error}). Move KEY_LOSS_WARNING here. Error messages are the CLI's exact strings (D-3). Import DIR_BACKEND_PREFIX from src/lib/vault/open.ts. Prints nothing, never exits. Write the five WI-1 tests using tests/unit/cli/vault/helpers.ts and a git init --bare remote."
+        },
+        "items": [
+          {
+            "id": "setup-core.ac1",
+            "title": "Given an empty bare git remote, when setupVault runs with {mode:'generate'}, then it returns status 'created' with a 24-word recoveryPhrase and a 6-word passphrase.generated, and the remote holds objects/keywrap/v1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-core.ac2",
+            "title": "Given a direct 12-character custom passphrase, when setupVault runs, then it returns code 'weak-passphrase' and creates no vault/key file and no commit on the remote",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-core.ac3",
+            "title": "Given a remote that is already a vault for another key, when setupVault runs, then it returns code 'foreign-vault' with message '<url> is already a vault protected by another key. Run: pan vault join <url>' and leaves no vault/key file and no clone directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-core.ac4",
+            "title": "Given an existing vault/key with no configured backend, when setupVault runs with a callback, then it returns recoveryPhrase null and never calls the callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-core.ac5",
+            "title": "Given setup-core.ts imports, when tests/unit/lib/vault/import-graph.test.ts runs, then it reports zero violations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-core",
+        "title": "Extract the join state changes into joinVault() in src/lib/vault/join-core.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/vault/join-core.ts",
+            "tests/unit/lib/vault/join-core.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/join-core.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "join-core.test.ts and import-graph.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "cli-join-wrapper",
+            "vault-service-ops",
+            "vault-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create joinVault(input) with JoinSecret / KeywrapState / JoinVaultInput / JoinVaultResult / JoinErrorCode exactly as written, following the 7 ordered steps mirroring src/cli/commands/vault/join.ts lines 77-165. Move PHRASE_MISMATCH_MESSAGE and PASSPHRASE_KEY_RETIRED_MESSAGE here (join.ts re-exports them in cli-join-wrapper). A direct phrase is parsed before any backend access; every error after the store opens removes a clone this call created; a wrong passphrase returns before readRef(HEADER_REF_NAME). Direct passphrase + absent keywrap -> 'no-passphrase' ('This vault has no passphrase set. Use the recovery phrase.'); unreadable -> 'keywrap-unreadable'. Prints nothing, never exits. Write the five WI-2 tests (remote created via setupVault)."
+        },
+        "items": [
+          {
+            "id": "join-core.ac1",
+            "title": "Given a vault with a passphrase keywrap, when joinVault runs with the correct direct passphrase, then it returns status 'joined' with via 'passphrase' and writes vault/key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-core.ac2",
+            "title": "Given a wrong direct passphrase on a fresh home, when joinVault runs, then it returns code 'wrong-passphrase', writes no vault/key file and leaves no clone directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-core.ac3",
+            "title": "Given a vault with no keywrap, when joinVault runs with a direct passphrase, then it returns code 'no-passphrase'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-core.ac4",
+            "title": "Given a malformed direct recovery phrase, when joinVault runs, then it returns code 'bad-phrase' and creates no clone directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-core.ac5",
+            "title": "Given a callback that returns {kind:'fail', message:'x'}, when joinVault runs, then it returns code 'aborted' with message 'x' and removes the clone it created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-setup-wrapper",
+        "title": "Make pan vault setup a wrapper over setupVault() with unchanged output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/setup.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/setup.test.ts tests/unit/cli/vault/setup-passphrase.test.ts tests/unit/cli/vault/setup-hooks.test.ts tests/unit/cli/vault/cli-wiring.test.ts tests/unit/lib/vault/two-machine.e2e.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "git diff origin/main --stat -- tests/unit/cli/vault tests/unit/lib/vault/two-machine.e2e.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all six test files pass",
+            "the git diff prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Keep the flag-conflict check and --passphrase-file read/strength check first. Call setupVault with a callback that prints exactly setup.ts lines 134-141 (enabled line, phrase block, KEY_LOSS_WARNING) and returns the mapping of choosePassphraseAtSetup (null->none, generated->generate, else custom). After the call map error -> io.err(message)+exit 1; already-set-up -> the existing 'already set up' line + hooks; recoveryPhrase null -> print the enabled line; otherwise print the generated-passphrase line, 'Passphrase unlock is on…', or 'Could not store the passphrase: <error>. Run: pan vault passphrase set' on stderr; hooks last. Re-export KEY_LOSS_WARNING. Remove unused imports. Do not edit any existing test file."
+        },
+        "items": [
+          {
+            "id": "cli-setup-wrapper.ac1",
+            "title": "Given the existing CLI setup tests, when they run against the wrapped setupCommand, then setup.test.ts, setup-passphrase.test.ts, setup-hooks.test.ts and two-machine.e2e.test.ts pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-setup-wrapper.ac2",
+            "title": "Given the branch diff, when git diff origin/main runs over tests/unit/cli/vault and two-machine.e2e.test.ts, then it produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-setup-wrapper.ac3",
+            "title": "Given a TTY setup, when the operator presses Enter at the passphrase prompt, then the recovery phrase lines print before the prompt, as on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-join-wrapper",
+        "title": "Make pan vault join a wrapper over joinVault() with unchanged output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/vault/join.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/vault/join-passphrase.test.ts tests/unit/cli/vault/setup.test.ts tests/unit/lib/vault/two-machine.e2e.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "git diff origin/main --stat -- tests/unit/cli/vault tests/unit/lib/vault/two-machine.e2e.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "the git diff prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Order: readVaultConfig + other-backend message (D-4) -> flag conflict -> --phrase-file read in try/catch passed as {kind:'phrase'} -> otherwise the keywrap callback exactly as written in WI-4 (absent+passphraseFile -> fail with the '--phrase-file <path>' hint; unreadable -> io.err(KEYWRAP_UNREADABLE_MESSAGE) then phrase prompt; present -> passphrase prompt, blank -> phrase prompt). Map error -> io.err(message)+exit 1; joined -> the two lines of join.ts 164-165. Delete unlockWithPassphrase, re-export the two message constants from join-core, remove unused imports. Do not edit any existing test file."
+        },
+        "items": [
+          {
+            "id": "cli-join-wrapper.ac1",
+            "title": "Given the existing join tests, when join-passphrase.test.ts runs against the wrapped joinCommand, then every case passes including 'a wrong passphrase writes nothing and reads nothing but the keywrap'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-join-wrapper.ac2",
+            "title": "Given --phrase-file and --passphrase-file together with no backend configured, when pan vault join runs, then stderr is exactly ['Use either --phrase-file or --passphrase-file, not both.'] and it exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-join-wrapper.ac3",
+            "title": "Given the branch diff, when git diff origin/main runs over tests/unit/cli/vault and two-machine.e2e.test.ts, then it produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-service-ops",
+        "title": "Add queued setup, join and Sync-now operations to the vault service",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-service.ts",
+            "tests/unit/dashboard/server/services/vault-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-service.test.ts passes including the three new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add setupVault/joinVault to VaultServiceDeps and resolveDeps. Add setupVaultFromDashboard, joinVaultFromDashboard (both via enqueueVaultOperation, run whether or not the service started) and syncVaultNow (returns {status:'not-running'} when !started, else enqueues runSync(config) and returns {status:'synced', snapshot}). First split cycle(): move everything after maybeRecreateLoop (lines 195-229) into runSync(config); cycle() keeps its guard + maybeRecreateLoop and calls runSync. syncVaultNow must never call cycle() or maybeRecreateLoop, otherwise a call inside the 5 s boot window creates a second sync loop. Never log results (they carry secrets). Tests use the file's existing startVaultService({...}) injection and fake timers."
+        },
+        "items": [
+          {
+            "id": "vault-service-ops.ac1",
+            "title": "Given the vault service was never started, when syncVaultNow() runs, then it returns {status:'not-running'} and syncOnce is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service-ops.ac2",
+            "title": "Given a started service with an open vault, when syncVaultNow() runs, then syncOnce is called once and the returned snapshot has a non-null lastSync.at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service-ops.ac3",
+            "title": "Given a deferred operation already in the queue, when setupVaultFromDashboard() is called, then setupVault runs only after that operation settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-service-ops.ac4",
+            "title": "Given fake timers and a started service, when syncVaultNow() runs at t=0 and timers advance 5 s, then createSyncLoop has been called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-routes",
+        "title": "Add POST /api/vault/setup, /join and /sync routes for operator credentials",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/vault.ts",
+            "src/dashboard/server/__tests__/vault-setup-routes.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/vault.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/vault-setup-routes.test.ts tests/unit/dashboard/server/routes/vault.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add noStore() and rejectNonOperatorCredential() (root-session or device only, after rejectUnsafeDashboardMutationRequest). Implement the HTTP contract table: setup/join bodies validated per D-12 and WI-6 (400), core error -> 422 {status:'error',code,message}, sync not-running -> 409 {error:'Background sync runs only in the primary dashboard.', code:'sync-not-running'}, throw -> 500 {error}. Every response through noStore(). Add the routes to vaultRouteLayer and the header comment. Add three WRITE rows to no-loss-matrix.ts after the PAN-4437 rows (file must stay <= 1000 lines). Tests copy the credential setup of src/dashboard/server/__tests__/anywhere-trusted-origins.test.ts and mock ../services/vault-service.js. Also add setupVaultFromDashboard, joinVaultFromDashboard and syncVaultNow as vi.fn() entries to the hoisted mocks object in tests/unit/dashboard/server/routes/vault.test.ts (its vi.mock factory returns that fixed object, so the file fails to load without them); change nothing else there."
+        },
+        "items": [
+          {
+            "id": "vault-routes.ac1",
+            "title": "Given a root session, when POST /api/vault/setup returns the mocked created result, then the response is 200 and carries Cache-Control: no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac2",
+            "title": "Given the internal token or a Bearer scoped token, when any of the three routes is called, then it returns 403 and the vault-service mocks are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac3",
+            "title": "Given a paired-device cookie with a valid CSRF header, when POST /api/vault/join is called, then the request reaches joinVaultFromDashboard and returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac4",
+            "title": "Given a body {url:'-x'}, when POST /api/vault/setup is called, then it returns 400; given a not-running service, POST /api/vault/sync returns 409 with code 'sync-not-running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-routes.ac5",
+            "title": "Given the no-loss matrix test, when it runs, then it accepts the three new route rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-form",
+        "title": "Add the Set-up-a-new-vault form and shown-once recovery dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSetupForm.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSetupForm.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/SessionVaultSetupForm.test.tsx src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Build SessionVaultSetupForm({onDone}) exactly as WI-7 specifies (Git URL input, Suggested/My own/None radio, always-visible no-recovery warning, POST /api/vault/setup via ensureDashboardSession + dashboardMutationJsonHeaders, D-9 copy for foreign-vault/race-lost, already-set-up message, recoveryPhrase-null message). On created-with-phrase open a CreateAccessTokenDialog-style modal: role=dialog, data-testid vault-recovery-phrase and vault-generated-passphrase, 'I wrote it down' checkbox gating 'Done', overlay/Escape inert until checked; Done clears secret state. Secrets only in useState (no react-query, no toast). In SessionVaultSection state off, replace the 'Run: pan vault setup' text with the form; update the off-state test."
+        },
+        "items": [
+          {
+            "id": "setup-form.ac1",
+            "title": "Given the default form, when 'Set up vault' is clicked, then it POSTs {url, passphrase:{mode:'generate'}} to /api/vault/setup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-form.ac2",
+            "title": "Given a created response with a phrase, when the dialog renders, then vault-recovery-phrase shows the phrase and 'Done' stays disabled until 'I wrote it down' is checked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-form.ac3",
+            "title": "Given a 422 foreign-vault response, when it renders, then the form shows the 'Use “Join an existing vault” below' hint instead of the server message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-form.ac4",
+            "title": "Given vault state off, when SessionVaultSection renders, then it shows the 'Set up a new vault' heading and no 'Run: pan vault setup' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-form",
+        "title": "Add the Join-an-existing-vault and Unlock-this-machine form",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultJoinForm.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultJoinForm.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/SessionVaultJoinForm.test.tsx src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Build SessionVaultJoinForm({mode, backend, onDone}) as WI-8 specifies: headings 'Join an existing vault' / 'Unlock this machine', unlock mode prefills the URL read-only with backend plus the explanation line, passphrase input with 'Use the recovery phrase instead' toggle to a 24-word textarea, POST /api/vault/join with {url, secret:{kind,value}}, joined message with records/offline, D-9 copy for not-a-vault. Mount: off -> join form below the setup form; key-missing/key-mismatch -> unlock form replacing the 'Run: pan vault join' lines."
+        },
+        "items": [
+          {
+            "id": "join-form.ac1",
+            "title": "Given passphrase mode, when 'Join' is clicked, then it POSTs secret.kind 'passphrase' to /api/vault/join",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-form.ac2",
+            "title": "Given the operator clicked 'Use the recovery phrase instead', when 'Join' is clicked, then it POSTs secret.kind 'phrase'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-form.ac3",
+            "title": "Given unlock mode with backend 'dir:/v', when the form renders, then the Git URL input holds 'dir:/v' and is read-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-form.ac4",
+            "title": "Given vault state key-missing, when SessionVaultSection renders, then it shows 'Unlock this machine' and no 'Run: pan vault join' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-now",
+        "title": "Add Sync now, the last-sync test id and the auto-sync docs link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/SessionVaultSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionVaultSection.test.tsx passes with the two new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In state ready with status.running true, render a 'Sync now' button posting /api/vault/sync ('Syncing…' and disabled while running); write a 200 body into STATUS_QUERY_KEY with setQueryData; 409/500 -> toast.error(body.error). Add data-testid vault-last-sync to the last-sync span. Add the D-10 line linking https://overdeck.ai/configuration/session-vault#save-and-sync. No button when running is false; rotation-pending text unchanged."
+        },
+        "items": [
+          {
+            "id": "sync-now.ac1",
+            "title": "Given state ready and running true, when 'Sync now' is clicked, then it POSTs /api/vault/sync and renders the returned lastSync.at in vault-last-sync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-now.ac2",
+            "title": "Given state ready and running false, when the section renders, then no 'Sync now' button exists and 'Background sync runs only in the primary dashboard.' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-now.ac3",
+            "title": "Given state ready, when the section renders, then a link to https://overdeck.ai/configuration/session-vault#save-and-sync renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-vault-setup",
+        "title": "Playwright: dashboard-only setup, Sync now and passphrase join on a bare git remote",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4446-vault-setup.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4446-vault-setup.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the spec passes and writes test-results/pan-4446/a-synced.png and b-joined.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-11",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. No CLI calls. git init --bare a temp remote; dashboard A = startIsolatedDashboard({home: homeA, env:{OVERDECK_VAULT_IN_PEER:'1'}}) in a fresh browser context: set up with Suggested, read the 6-word passphrase, assert 24 words, check 'I wrote it down', Done, assert the phrase is gone; Sync now -> vault-last-sync visible within 20s; screenshot; stop A. Dashboard B on homeB with the same env in a new context: Join with the remote path + passphrase, assert 'Joined as', Sync now, assert two machines with one '(this machine)'; screenshot. afterEach stops dashboards and removes temp dirs. Never touch the operator's live dashboard."
+        },
+        "items": [
+          {
+            "id": "playwright-vault-setup.ac1",
+            "title": "Given an isolated dashboard on an empty home, when the operator sets up a vault on a bare git remote with Suggested, then a 24-word recovery phrase and a 6-word passphrase render once and disappear after Done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-vault-setup.ac2",
+            "title": "Given the set-up vault, when 'Sync now' is clicked, then vault-last-sync renders within 20 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-vault-setup.ac3",
+            "title": "Given a second isolated home, when the operator joins with the passphrase and clicks Sync now, then the Machines table lists two machines with one marked '(this machine)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-vault-dashboard",
+        "title": "Document dashboard setup, join, unlock and Sync now",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4446",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/session-vault.mdx",
+            "docs/SESSION-VAULT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Set up a new vault\\|Unlock this machine\\|Sync now' configuration/session-vault.mdx",
+            "grep -c 'POST /api/vault/setup\\|POST /api/vault/join\\|POST /api/vault/sync\\|setup-core.ts\\|join-core.ts' docs/SESSION-VAULT.md"
+          ],
+          "expected_outputs": [
+            "the first grep counts at least 3 lines",
+            "the second grep counts at least 3 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. configuration/session-vault.mdx: add 'From the dashboard' subsections under 'Set up the first machine' (line 16: Set up a new vault, three passphrase choices, shown-once dialog with 'I wrote it down'), 'Join from a second machine' (line 38: join form, 'Use the recovery phrase instead'), 'Passphrase unlock' (line 49: 'Unlock this machine' for a missing or rotated-away key) and 'Save and sync' (line 127: 'Sync now' in the primary dashboard, syncIntervalSec in vault/config.json). docs/SESSION-VAULT.md: add the three routes with the credential rule (root session or paired device; internal token and scoped tokens get 403), the 409 on a peer and the secrets rule to 'Dashboard (Overdeck mode)' (line 345); add setup-core.ts and join-core.ts to 'Module map' (line 472); state in 'Commands' that pan vault setup/join wrap the cores."
+        },
+        "items": [
+          {
+            "id": "docs-vault-dashboard.ac1",
+            "title": "Given configuration/session-vault.mdx, when read, then it describes 'Set up a new vault', 'Unlock this machine' and 'Sync now' under the setup, passphrase-unlock and save-and-sync sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-vault-dashboard.ac2",
+            "title": "Given docs/SESSION-VAULT.md, when read, then the Dashboard section lists POST /api/vault/setup, POST /api/vault/join and POST /api/vault/sync and states that the internal token and scoped tokens get 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-vault-dashboard.ac3",
+            "title": "Given docs/SESSION-VAULT.md Module map, when read, then it names src/lib/vault/setup-core.ts and src/lib/vault/join-core.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "setup-core",
+        "to": "cli-setup-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-core",
+        "to": "vault-service-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "join-core",
+        "to": "cli-join-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "join-core",
+        "to": "vault-service-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-service-ops",
+        "to": "vault-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-form",
+        "to": "join-form",
+        "type": "blocks"
+      },
+      {
+        "from": "join-form",
+        "to": "sync-now",
+        "type": "blocks"
+      },
+      {
+        "from": "vault-routes",
+        "to": "playwright-vault-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-form",
+        "to": "playwright-vault-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "join-form",
+        "to": "playwright-vault-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-now",
+        "to": "playwright-vault-setup",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-01-PAN-4446-overdeck-anywhere-set-up-join-unlock-and-sync-the-session-vault-from-the-dashboard.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
