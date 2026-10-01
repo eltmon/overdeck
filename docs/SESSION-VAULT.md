@@ -391,6 +391,16 @@ works the same way against the same on-disk vault.
 - `OVERDECK_VAULT_IN_PEER=1` starts the vault service and the browse copies in a peer
   dashboard. It exists for isolated UAT fixtures that own a throwaway `OVERDECK_HOME`; never
   set it on a peer that shares the primary's home.
+- **Continued-on states** ([PAN-4447](https://github.com/eltmon/overdeck/issues/4447)). A local
+  conversation whose native file round-tripped through another machine gets a row chip and a
+  composer notice reading "Continued on <machine>." with a "View its copy" link to
+  `vault-<vaultId>` (the parent's vault id for a fork). A P-6 settlement fork also gets a second
+  composer line, "Local turns since then were saved as a fork (<id8>)." The composer stays
+  enabled throughout — this machine still owns the native file (or its fork); only the
+  read-only browse-copy panel above is ever disabled. The state comes from `round-trip.ts`, a
+  pure projection over the local index that reads each list-cache row's `parentVaultId` and
+  `forkKind`; a version fork (`forkKind: 'version'`, from `forkRecordAtVersion`) shows no
+  continued-on state.
 
 ## Configuration
 
@@ -498,6 +508,7 @@ src/lib/vault/wip-apply.ts        apply a snapshot: verify, unbundle, checkout b
 src/lib/vault/open.ts             openVaultContext: resolve backend + open, shared by CLI and dashboard
 src/lib/vault/browse.ts           browse cache: decrypted LOG copies of records other machines own
 src/lib/vault/continue-inspect.ts write-free Continue-here preview facts, driftNote
+src/lib/vault/round-trip.ts       roundTripStates: continued-elsewhere / forked-locally per owned path
 src/cli/commands/vault/*.ts       the pan vault verbs
 
 src/dashboard/server/services/vault-service.ts          boot delay, sync loop, eviction-batch API, snapshot

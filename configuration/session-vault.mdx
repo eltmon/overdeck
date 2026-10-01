@@ -165,6 +165,11 @@ project, the dialog offers to clone and register it first. If another machine co
 conversation in the meantime, the dialog says `Already continued on <machine>.` and changes
 nothing.
 
+Back on the first machine, the dashboard then marks that conversation "continued on
+`<machine>`" and links straight to the other machine's copy. If you keep typing there anyway,
+those turns are not lost: they are saved as a separate fork, and the panel names the fork's id
+so you can find it again later.
+
 ### Your uncommitted code comes along
 
 Each save also takes an encrypted snapshot of the code the conversation was working on:
