@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { SettingsSection } from '../primitives';
+import { SessionVaultSetupForm } from './SessionVaultSetupForm';
+import { postVault } from './sessionVaultShared';
 
 type VaultState = 'off' | 'rotation-pending' | 'key-missing' | 'key-mismatch' | 'ready';
 
@@ -84,21 +85,9 @@ async function fetchVaultEvictionBatch(): Promise<EvictionBatchResponse> {
   return res.json();
 }
 
-async function postVault(path: string, body?: Record<string, unknown>): Promise<{ status: number; body: unknown }> {
-  await ensureDashboardSession();
-  const res = await fetch(`/api/vault/${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: await dashboardMutationJsonHeaders(),
-    body: JSON.stringify(body ?? {}),
-  });
-  const parsed = await res.json().catch(() => null);
-  return { status: res.status, body: parsed };
-}
-
-function VaultStatusBlock({ status }: { status: VaultStatusResponse }) {
+function VaultStatusBlock({ status, onChanged }: { status: VaultStatusResponse; onChanged: () => void }) {
   if (status.state === 'off') {
-    return <p className="text-xs text-muted-foreground">Session Vault is off. Run: pan vault setup &lt;git-url&gt;</p>;
+    return <SessionVaultSetupForm onDone={onChanged} />;
   }
 
   return (
@@ -176,6 +165,7 @@ export function SessionVaultSection() {
   });
 
   const refetchBatch = () => void queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEY });
+  const refetchStatus = () => void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY });
 
   /** Runs a batch-mutating POST, reporting a toast on rejection instead of an unhandled promise. */
   async function postVaultBatch(path: string, body: Record<string, unknown> | undefined, failureMessage: string): Promise<{ status: number; body: unknown } | null> {
@@ -251,7 +241,7 @@ export function SessionVaultSection() {
           Failed to load vault status: {statusError instanceof Error ? statusError.message : String(statusError)}
         </div>
       ) : (
-        status && <VaultStatusBlock status={status} />
+        status && <VaultStatusBlock status={status} onChanged={refetchStatus} />
       )}
 
       {status && status.state !== 'off' && (

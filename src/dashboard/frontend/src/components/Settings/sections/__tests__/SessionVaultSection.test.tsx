@@ -111,11 +111,12 @@ describe('SessionVaultSection', () => {
     toastMocks.error.mockClear();
   });
 
-  it('shows the off-state text and nothing else when the vault is off', async () => {
+  it('shows the setup form and nothing else when the vault is off', async () => {
     mockFetch({ status: OFF_STATUS });
     renderSection();
 
-    await waitFor(() => expect(screen.getByText('Session Vault is off. Run: pan vault setup <git-url>')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Set up a new vault')).toBeTruthy());
+    expect(screen.queryByText(/Run: pan vault setup/)).toBeNull();
     expect(screen.queryByText('Machines')).toBeNull();
     expect(screen.queryByText('Pending deletion')).toBeNull();
   });
