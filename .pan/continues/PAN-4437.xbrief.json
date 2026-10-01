@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4437",
   "created": "2026-09-30T19:30:30.547Z",
-  "updated": "2026-10-01T14:19:57.439Z",
+  "updated": "2026-10-01T14:20:11.160Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "add-project-prefill.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T14:19:57.439Z"
+    },
+    "vault-continue-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:20:11.160Z"
     }
   }
 }
