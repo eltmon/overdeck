@@ -1,6 +1,6 @@
 /** PAN-4437 WI-7: the Continue here dialog's states and the POSTs it sends. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -125,6 +125,21 @@ describe('VaultContinueDialog (PAN-4437)', () => {
     const state = useAddProjectDialog.getState();
     expect(state).toMatchObject({ open: true, mode: 'clone', initialUrl: 'https://github.com/acme/widget.git' });
     expect(state.onCreatedExtra).toBeTypeOf('function');
+    // The Add-project modal sits below this one, so this dialog steps aside until it closes.
+    await waitFor(() => expect(screen.queryByTestId('vault-continue-dialog')).not.toBeInTheDocument());
+    act(() => useAddProjectDialog.getState().hide());
+    expect(await screen.findByTestId('vault-continue-dialog')).toBeInTheDocument();
+  });
+
+  it('shows a skipped snapshot reason, but not a clean or no-git skip (like the CLI)', async () => {
+    routes({ ...clean, wip: { kind: 'skipped', reason: 'too-large' }, codePlacement: 'none' });
+    renderDialog();
+    expect(await screen.findByText('No code snapshot: skipped (too-large).')).toBeInTheDocument();
+    cleanup();
+    routes({ ...clean, wip: { kind: 'skipped', reason: 'clean' }, codePlacement: 'none' });
+    renderDialog();
+    expect(await screen.findByText('/src/widget')).toBeInTheDocument();
+    expect(screen.queryByText(/No code snapshot/)).not.toBeInTheDocument();
   });
 
   it('a non-resumable harness explains the CLI path', async () => {

@@ -10,7 +10,9 @@ import { useAddProjectDialog } from '../project/new/addProjectDialogStore';
  * code snapshot, any drift), then POSTs the continue with the owner token the
  * preview showed, so a conversation another machine took over in the
  * meantime is reported instead of taken. A machine with no checkout is
- * offered the Add-project dialog in clone mode with the URL filled in.
+ * offered the Add-project dialog in clone mode with the URL filled in; this
+ * dialog steps aside while that one is open and re-reads the preview after a
+ * create.
  */
 
 export interface ContinuePreview {
@@ -69,12 +71,14 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [driftOverride, setDriftOverride] = useState<string[] | null>(null);
+  const addProjectOpen = useAddProjectDialog((state) => state.open);
 
   useEffect(() => {
+    if (addProjectOpen) return undefined;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
+  }, [addProjectOpen, busy, onClose]);
 
   const submit = async (onDrift?: 'continue' | 'note') => {
     if (!preview) return;
@@ -139,7 +143,8 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
       codeLine = `Apply the code snapshot from ${wip.at} (${formatSize(wip.bytes)}) here. Branch: ${wip.branch ?? `detached at ${wip.base.slice(0, 12)}`}.`;
     } else if (wip.kind === 'captured' && preview.codePlacement === 'new-workspace') {
       codeLine = `${target.cwd} has uncommitted changes, so the code snapshot from ${wip.at} goes into a new workspace.`;
-    } else if (wip.kind === 'skipped') {
+    } else if (wip.kind === 'skipped' && !/^(clean|no-git)\b/.test(wip.reason)) {
+      // Like `pan vault resume`: a clean checkout or a non-git cwd is not worth a line.
       codeLine = `No code snapshot: skipped (${wip.reason}).`;
     }
     body = (
@@ -162,6 +167,8 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
       </>
     );
   }
+
+  if (addProjectOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={() => { if (!busy) onClose(); }}>
