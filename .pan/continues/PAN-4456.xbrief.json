@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:49:21.998Z",
+  "updated": "2026-10-01T21:50:03.459Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "changelog-mdx-anywhere.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T21:49:21.997Z"
+    },
+    "changelog-mdx-anywhere.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:50:03.458Z"
     }
   }
 }
