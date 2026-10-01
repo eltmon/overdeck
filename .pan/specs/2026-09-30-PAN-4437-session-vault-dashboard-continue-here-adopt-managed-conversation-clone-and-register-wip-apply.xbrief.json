@@ -4,17 +4,17 @@
     "created": "2026-09-30T19:27:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4437: Session Vault: dashboard \"Continue here\" (adopt, managed conversation, clone-and-register, WIP apply)",
-    "updated": "2026-09-30T19:29:05.064Z"
+    "updated": "2026-09-30T19:29:47.339Z"
   },
   "plan": {
     "id": "pan-4437",
     "title": "Session Vault: dashboard \"Continue here\" (adopt, managed conversation, clone-and-register, WIP apply)",
-    "status": "proposed",
+    "status": "running",
     "uid": "607205a5-3441-4f04-8712-d1f9a9186b47",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-30T19:27:15Z",
-    "updated": "2026-09-30T19:29:05.064Z",
+    "updated": "2026-09-30T19:29:47.339Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4437",
@@ -763,5 +763,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
