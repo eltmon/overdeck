@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:58:12.811Z",
+  "updated": "2026-10-01T13:58:24.915Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "task-block-on.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T13:58:12.810Z"
+    },
+    "blocker-wake-tick.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:24.915Z"
     }
   }
 }
