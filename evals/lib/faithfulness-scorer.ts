@@ -54,7 +54,10 @@ export function parseSummaryCase(data: unknown): SummaryCase {
   return c as SummaryCase;
 }
 
-const PATH_RE = /(?:~\/|\b)(?:[\w.@-]+\/)+[\w.@-]+\.(?:tsx?|js|md|json|sh|ya?ml)\b|\b[\w-]+\.(?:tsx?|md|json|sh|ya?ml)\b/g;
+// A leading dot-directory (.pan/, .overdeck/) is part of the path; without the middle branch
+// `\b` starts the match after the dot and `.pan/specs/x.json` is extracted as `pan/specs/x.json`.
+const PATH_RE =
+  /(?:~\/|(?<![\w.])\.(?=[\w@-]+\/)|\b)(?:[\w.@-]+\/)+[\w.@-]+\.(?:tsx?|js|md|json|sh|ya?ml)\b|\b[\w-]+\.(?:tsx?|md|json|sh|ya?ml)\b/g;
 const ISSUE_ID_RE = /\b[A-Z]{2,}-\d+\b/g;
 // Standards identifiers shaped like issue ids; never Overdeck-invented facts.
 const NON_ISSUE_PREFIXES = new Set(['UTF', 'SHA', 'ISO', 'HTTP', 'TLS', 'SSL', 'RFC', 'ES']);
@@ -76,15 +79,33 @@ export function extractIdentifiers(text: string): string[] {
   return [...found].filter((id) => id.length > 0);
 }
 
+// How summaries shorten an identifier: ..., …, *, or a <placeholder>.
+const ELISION_RE = /\.{3,}|…|\*|<[^<>\s]*>/g;
+
+/** True when every literal fragment of an elided identifier occurs in the source, in order. */
+function elidedIdentifierSupported(id: string, source: string): boolean {
+  let from = 0;
+  for (const fragment of id.split(ELISION_RE).filter((f) => f !== '')) {
+    const at = source.indexOf(fragment, from);
+    if (at === -1) return false;
+    from = at + fragment.length;
+  }
+  return true;
+}
+
 /**
  * Extracted identifiers that do not occur anywhere in the source: a case-sensitive substring
- * match, except issue ids, which match case-insensitively (branches and paths spell PAN-12 as pan-12).
+ * match, except issue ids, which match case-insensitively (branches and paths spell PAN-12 as pan-12),
+ * and elided identifiers, whose literal fragments must occur in the source in order.
  */
 export function unsupportedIdentifiers(summary: string, source: string): string[] {
   const lowerSource = source.toLowerCase();
-  return extractIdentifiers(summary).filter((id) =>
-    /^[A-Z]{2,}-\d+$/.test(id) ? !lowerSource.includes(id.toLowerCase()) : !source.includes(id),
-  );
+  return extractIdentifiers(summary).filter((id) => {
+    if (/^[A-Z]{2,}-\d+$/.test(id)) return !lowerSource.includes(id.toLowerCase());
+    // A fresh non-global copy: .test on the /g ELISION_RE is stateful (lastIndex).
+    if (new RegExp(ELISION_RE.source).test(id)) return !elidedIdentifierSupported(id, source);
+    return !source.includes(id);
+  });
 }
 
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+|\n+/;

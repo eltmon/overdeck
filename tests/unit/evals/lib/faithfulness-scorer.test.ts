@@ -63,6 +63,45 @@ describe('evals/lib/faithfulness-scorer', () => {
     ]);
   });
 
+  // The cases below are the PAN-4406 run's captured false positives (Opus/Sonnet 5.5 compaction and handoff summaries).
+  describe('elided identifiers and dot-directories (PAN-4406)', () => {
+    it('extracts a dot-directory path once, with its dot', () => {
+      for (const summary of [
+        'Wrote `.pan/specs/2026-09-27-PAN-4263-...xbrief.json` for the plan.',
+        'Wrote .pan/specs/2026-09-27-PAN-4263-...xbrief.json for the plan.',
+      ]) {
+        const ids = extractIdentifiers(summary);
+        expect(ids).toContain('.pan/specs/2026-09-27-PAN-4263-...xbrief.json');
+        expect(ids.filter((id) => id.startsWith('pan/'))).toEqual([]);
+      }
+      expect(extractIdentifiers('see .pan/specs/a.xbrief.json')).toEqual(['.pan/specs/a.xbrief.json']);
+    });
+
+    it('supports an elided identifier whose fragments occur in the source in order', () => {
+      const cases: Array<[string, string]> = [
+        ['Output in `.../tasks/brdyp4ckx.output`.', 'Wrote /tmp/claude-1000/-home-x/abc/tasks/brdyp4ckx.output'],
+        ['Read `/tmp/claude-1000/.../tasks/<id>.output` next.', 'Wrote /tmp/claude-1000/-home-x/abc/tasks/b19msud0w.output'],
+        ['Spec at .pan/specs/2026-09-27-PAN-4263-...xbrief.json', 'git add .pan/specs/2026-09-27-PAN-4263-open-pr-selector.xbrief.json'],
+        ['Spec at `.pan/specs/…PAN-4268…` is final.', 'git add .pan/specs/2026-09-28-PAN-4268-ensure-main.xbrief.json'],
+      ];
+      for (const [summary, source] of cases) expect(unsupportedIdentifiers(summary, source)).toEqual([]);
+    });
+
+    it('keeps invented paths unsupported', () => {
+      expect(unsupportedIdentifiers('Added src/lib/github-pr-select.ts.', 'Edited src/lib/github.ts')).toEqual([
+        'src/lib/github-pr-select.ts',
+      ]);
+    });
+
+    it('rejects an elided identifier whose fragments occur out of order', () => {
+      expect(unsupportedIdentifiers('See `/tasks/.../tmp/x.output`.', 'Wrote /tmp/a/tasks/b.output')).toEqual([
+        '/tasks/.../tmp/x.output',
+      ]);
+      // Both fragments occur in the source, but /tmp/a only before /tasks/.
+      expect(unsupportedIdentifiers('See `/tasks/.../tmp/a`.', 'Wrote /tmp/a/tasks/b.output')).toEqual(['/tasks/.../tmp/a']);
+    });
+  });
+
   describe('decoyViolations', () => {
     it('flags an anchor stated as current', () => {
       expect(decoyViolations('The dashboard now runs on port 4000.', summaryCase().decoys)).toEqual(['old-port']);

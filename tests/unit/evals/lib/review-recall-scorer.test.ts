@@ -108,28 +108,146 @@ describe('evals/lib/review-recall-scorer', () => {
     });
   });
 
+  // Glyph bullets and every-citation matching (PAN-4406): the run's Opus 5.5 rep-1 report for
+  // case 4284 found the blocker as a `~` bullet citing only the basename, and scored 0.
+  describe('glyph bullets and citations (PAN-4406)', () => {
+    const OPUS_4284_REPORT = `## Non-blocking Notes
+
+- **~ A stale registry entry can keep messages held after the pane clears (in_pr_scope, AC3).**
+  - The test "feed row carries a non-answerable pendingPermission for a registry-only entry" uses \`permission-answered.txt\`. There, the pane shows the prompt answered, yet the feed still reports \`pendingPermission\` (\`answerable: false\`).
+  - The hook treats any truthy \`pendingPermission\` as blocking (\`useHeldMessageRelease.ts:28-29\`). Held messages therefore stay held until the registry entry is cleared, not when "the prompt clears."
+
+- **~ Hook mount point not visible (in_pr_scope, AC3 wiring).**
+  - \`useHeldMessageRelease\` is not mounted in the excerpt.
+`;
+    const blocker4284: ReviewRecallCase['blocker'] = {
+      title: 'A stale registry entry keeps messages held',
+      file: 'src/dashboard/frontend/src/App/hooks/useHeldMessageRelease.ts',
+      lines: [31, 38],
+      keywords: ['registry', 'held', 'pendingpermission'],
+    };
+
+    it('parses glyph bullets as non-blocking findings and matches the blocker through any body citation', () => {
+      const findings = parseFindings(OPUS_4284_REPORT);
+      expect(findings.map((f) => [f.glyph, f.blocking])).toEqual([
+        ['~', false],
+        ['~', false],
+      ]);
+      expect(findings[0]!.citations).toContainEqual({ file: 'useHeldMessageRelease.ts', line: 28 });
+      // The first body citation is permission-answered.txt; matching still checks every citation.
+      expect(findings[0]!.citations[0]).toEqual({ file: 'permission-answered.txt', line: null });
+      expect(findingMatchesBlocker(findings[0]!, blocker4284, { minKeywordHits: 99 })).toBe(true);
+      expect(findings[1]!.body).toContain('is not mounted in the excerpt');
+      expect(findings[0]!.body).not.toContain('is not mounted in the excerpt');
+    });
+
+    it('parses a Sonnet-style backticked-glyph bullet as non-blocking with its inline citation', () => {
+      const report =
+        '- `≉` **Path setup moved earlier** — `getProjectPath` now runs for every request (`src/dashboard/server/routes/workspaces.ts:3668`).\n';
+      const [finding] = parseFindings(report);
+      expect(finding).toMatchObject({
+        glyph: '≉',
+        blocking: false,
+        file: 'src/dashboard/server/routes/workspaces.ts',
+        line: 3668,
+      });
+      expect(finding!.title.startsWith('Path setup moved earlier')).toBe(true);
+    });
+
+    it('does not count a list item inside a heading finding as a second finding', () => {
+      const report = '### ! Race — `src/lib/vault/store/git.ts:262`\n- ~ a nested note\n\n## Non-blocking Notes\n\n- ~ Separate note\n';
+      expect(parseFindings(report).map((f) => [f.glyph, f.blocking, f.title])).toEqual([
+        ['!', true, 'Race'],
+        ['~', false, 'Separate note'],
+      ]);
+    });
+
+    it('matches a shortened path only on a segment boundary that keeps the basename', () => {
+      const blocker = { ...reviewCase().blocker, file: 'src/a/useX.ts', lines: [10] };
+      const matches = (cited: string) =>
+        findingMatchesBlocker(parseFindings(`- ~ Note — \`${cited}:10\`\n`)[0]!, blocker, { minKeywordHits: 99 });
+      expect(matches('useX.ts')).toBe(true);
+      expect(matches('a/useX.ts')).toBe(true);
+      expect(matches('X.ts')).toBe(false);
+      const dirBlocker = { ...blocker, file: 'src/hooks' };
+      expect(findingMatchesBlocker(parseFindings('- ~ Note — `hooks:10`\n')[0]!, dirBlocker)).toBe(false);
+    });
+  });
+
   describe('scoreReviewRecall', () => {
-    it('returns recall 1 when a blocking finding cites the blocker file 10 lines away', () => {
+    it('returns recall, blocking recall and severity 1 when a blocking finding cites the blocker file 10 lines away', () => {
       const report = '## Findings\n\n### ! Ledger race — `src/lib/vault/store/git.ts:242`\nDetails.\n';
-      expect(scoreReviewRecall(report, reviewCase())).toEqual({ recall: 1, precision: 1, blockingCount: 1, score: 1 });
+      expect(scoreReviewRecall(report, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 1,
+        blockingSeverity: 1,
+        precision: 1,
+        findingCount: 1,
+        blockingCount: 1,
+        score: 1,
+      });
     });
 
-    it('returns recall 0 when the same finding is non-blocking', () => {
+    it('returns recall 1 but blocking recall 0 when the same finding is non-blocking', () => {
       const report = '## Non-blocking Notes\n\n### ~ Ledger race — `src/lib/vault/store/git.ts:242`\nDetails.\n';
-      expect(scoreReviewRecall(report, reviewCase())).toEqual({ recall: 0, precision: null, blockingCount: 0, score: 0 });
+      expect(scoreReviewRecall(report, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 0,
+        blockingSeverity: 0,
+        precision: 1,
+        findingCount: 1,
+        blockingCount: 0,
+        score: 1,
+      });
     });
 
-    it('returns precision 0.5 when one of two blocking findings matches', () => {
-      expect(scoreReviewRecall(MIXED_REPORT, reviewCase())).toEqual({ recall: 1, precision: 0.5, blockingCount: 2, score: 1 });
+    it('scores the MIXED_REPORT blocking match, with precision over findings of any severity', () => {
+      expect(scoreReviewRecall(MIXED_REPORT, reviewCase())).toEqual({
+        recall: 1,
+        blockingRecall: 1,
+        blockingSeverity: 1,
+        precision: 0.2,
+        findingCount: 5,
+        blockingCount: 2,
+        score: 1,
+      });
     });
 
-    it('returns precision null, recall 0 and no blocking findings for a None report', () => {
+    // The run's Opus 5.5 rep-2 report for case 1428: found, but rated advisory — the floor the run hit.
+    it('scores a found-but-advisory blocker as recall 1, blocking recall 0, blocking severity 0 (PAN-4406)', () => {
+      const report = `## Non-blocking Notes
+
+### ~ Blocking tmux check runs before cheap in-memory filters — \`src/lib/cloister/stuck-remediation.ts:79\`
+**Problem:** \`sessionExistsSync\` is almost certainly a synchronous \`tmux has-session\` subprocess. It runs for every running work agent on every patrol tick.
+`;
+      const c = reviewCase({
+        id: '1428-per-agent-bd-ready-subprocess',
+        lane: 'performance',
+        blocker: {
+          title: 'Per-agent bd ready subprocess on every patrol',
+          file: 'src/lib/cloister/stuck-remediation.ts',
+          lines: [90],
+          keywords: ['bd ready', 'subprocess', 'patrol'],
+        },
+      });
+      expect(scoreReviewRecall(report, c)).toMatchObject({ recall: 1, blockingRecall: 0, blockingSeverity: 0, score: 1 });
+    });
+
+    it('returns recall 0, blocking severity null and precision null for a None report', () => {
       expect(scoreReviewRecall('## Findings\n\nNone', reviewCase())).toEqual({
         recall: 0,
+        blockingRecall: 0,
+        blockingSeverity: null,
         precision: null,
+        findingCount: 0,
         blockingCount: 0,
         score: 0,
       });
+    });
+
+    it('returns blocking severity null when findings exist but none matches', () => {
+      const report = '### ! Race — `src/lib/vault/store/sqlite.ts:252`\nUnrelated.\n';
+      expect(scoreReviewRecall(report, reviewCase())).toMatchObject({ recall: 0, blockingRecall: 0, blockingSeverity: null, precision: 0 });
     });
   });
 
@@ -145,6 +263,13 @@ describe('evals/lib/review-recall-scorer', () => {
     it('rejects a diff over 60,000 chars and a security lane', () => {
       expect(() => parseReviewRecallCase(reviewCase({ diff: 'x'.repeat(60_001) }))).toThrow(/over 60000/);
       expect(() => parseReviewRecallCase({ ...reviewCase(), lane: 'security' })).toThrow(/lane must be one of/);
+    });
+
+    it('accepts blocker.evidence outside-excerpt or absent and rejects any other value', () => {
+      const withEvidence = (evidence: unknown) => ({ ...reviewCase(), blocker: { ...reviewCase().blocker, evidence } });
+      expect(parseReviewRecallCase(withEvidence('outside-excerpt')).blocker.evidence).toBe('outside-excerpt');
+      expect(parseReviewRecallCase(reviewCase()).blocker.evidence).toBeUndefined();
+      expect(() => parseReviewRecallCase(withEvidence('maybe'))).toThrow(/blocker\.evidence must be excerpt or outside-excerpt/);
     });
   });
 
@@ -169,6 +294,16 @@ describe('evals/lib/review-recall-scorer', () => {
         // Committed diffs stay small so the branch diff fits the verification gate's git buffer.
         expect(c.diff.length, c.id).toBeLessThanOrEqual(15_000);
       }
+    });
+
+    // The requirements-lane diagnosis (evals/README.md): these real blockers need files or PRD text the excerpt lacks.
+    it('marks exactly the four diagnosed requirements-lane cases as outside-excerpt', () => {
+      expect(cases.filter((c) => c.blocker.evidence === 'outside-excerpt').map((c) => c.id).sort()).toEqual([
+        '3979-the-new-docs-sentence-names',
+        '4230-prd-readers-still-look-only',
+        '4252-model-calls-md-line-references',
+        '4321-resume-switch-model-and-fork',
+      ]);
     });
 
     it('scores recall 1 for each case when its own blocker is reported as a canonical heading', () => {

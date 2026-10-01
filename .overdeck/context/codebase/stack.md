@@ -26,7 +26,7 @@
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
-- **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI.
+- **Evals:** Evalite (`npm run eval` = `cd evals && evalite .`), not in CI. Anthropic models can run through the `claude` CLI on a subscription with `OVERDECK_EVAL_ANTHROPIC_VIA=claude-cli` (`evals/lib/claude-cli.ts`).
   Live-model evals call `runPromptScenario` in `evals/lib/prompt-harness.ts` and
   need `OVERDECK_EVAL_MODEL` (no fallback); `typecheck:evals` covers `evals/**`.
   Unit tests for eval helpers live in `tests/unit/evals/`. The model-placement
@@ -55,4 +55,4 @@
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-09-29 -->
+<!-- last-verified: 2026-10-01 -->
