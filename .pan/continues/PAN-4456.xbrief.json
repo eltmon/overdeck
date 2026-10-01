@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:23:00.540Z",
+  "updated": "2026-10-01T21:23:04.511Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4456",
       "claimedAt": "2026-10-01T21:21:51.153Z",
       "doneAt": "2026-10-01T21:23:00.540Z"
+    },
+    "cli-pair-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:23:04.511Z"
     }
   }
 }
