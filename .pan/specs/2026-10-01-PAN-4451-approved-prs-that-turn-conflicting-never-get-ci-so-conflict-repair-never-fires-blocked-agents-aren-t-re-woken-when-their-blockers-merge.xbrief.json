@@ -1,0 +1,745 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-01T14:10:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4451: Approved PRs that turn conflicting never get CI, so conflict repair never fires; blocked agents aren't re-woken when their blockers merge",
+    "updated": "2026-10-01T13:31:39.408Z"
+  },
+  "plan": {
+    "id": "pan-4451",
+    "title": "Approved PRs that turn conflicting never get CI, so conflict repair never fires; blocked agents aren't re-woken when their blockers merge",
+    "status": "proposed",
+    "uid": "87a9349b-5728-4a7f-bc58-c24582bbc05e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-01T14:10:00.000Z",
+    "updated": "2026-10-01T13:31:39.408Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4451",
+        "label": "PAN-4451",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4451.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "conflict-repair",
+      "blocker-wake",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "PAN-4384's conflict-repair gate requires green CI and a passed CI test job at the head, but GitHub runs no pull_request CI on a CONFLICTING PR, so an approved PR that turns conflicting is never repaired (PR #4440 idled ~19 h with no test check). Separately, an agent that parks waiting on sibling issues has no structured way to say so, and nothing wakes it when they merge (PAN-4437).",
+      "Proposal": "Waive CI evidence in evaluateConflictRepairGate when the forge says mergeable:false (red checks still disqualify; the merge gate is unchanged). Add pan task block <issue> <item> --on <ref>..., which journals blocked.declared, and a 120 s dashboard blocker-wake patrol that sends the work agent one wake message (journaled as blocked.woken) when every blocker of a still-blocked item has merged. Document both in PIPELINE-GATES.md and MERGE-WORKFLOW.md and tell work agents to declare blockers.",
+      "NonGoals": "- A blocker closed without a merge never wakes the agent\n- No escalation timer for a declaration that never resolves\n- No GitLab MR refs (#N on GitLab projects, MR URLs); GitLab issue IDs work through getPrFacts\n- Conflicting PRs with red checks at the head stay on the CI-failure feedback path\n- Conflicting PRs whose approval does not stand at the head are not repaired\n- No change to evaluateIssueMergeGate, evaluateMergeReadiness, pr-facts.ts, the auto-merge scheduler or the review pipeline\n- No dashboard UI for blocker declarations\n- No 'cleared' journal type; pan task unblock writes no journal entry\n- No new top-level pan verb"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Waive all CI evidence (pending/none checks, missing or skipped test job) at a conflicting head; keep red checks disqualifying.",
+        "rationale": "The issue accepts 'no result at all when the PR is conflicting'; GitHub cannot run pull_request CI without a merge ref; the unchanged merge gate re-checks CI on the repaired head, so nothing merges untested."
+      },
+      {
+        "summary": "Do not read 'last green test result on an earlier head' from the forge.",
+        "rationale": "The no-result case already covers it, and an extra read costs GitHub quota with no safety gain."
+      },
+      {
+        "summary": "Declare blockers with pan task block <issue> <item> --on <ref>... instead of a new verb.",
+        "rationale": "Item-level blocking already exists; no new skill, slash-command manifest or src/cli/index.ts growth."
+      },
+      {
+        "summary": "A declaration is live while the item is still 'blocked' in the continue file and no blocked.woken names it.",
+        "rationale": "unblock/done/cancel end a declaration with no extra journal type, and a moved-on agent never gets a stale wake."
+      },
+      {
+        "summary": "Blocker-wake patrol runs every 120 s in the dashboard with the conflict-repair host skips and kill switch OVERDECK_DISABLE_BLOCKER_WAKE.",
+        "rationale": "Waking a minute late is harmless and halves forge reads; the dashboard process owns prompt delivery and the feedback-target ladder."
+      },
+      {
+        "summary": "Delivery reuses resolveIssueFeedbackTarget + messageAgent with a dedup key; unreachable raises Needs-you once.",
+        "rationale": "Same ladder conflict repair uses, so a parked or exited agent is resumed."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "20 files, but the projected-surface lint counts each top-level doc file as its own subsystem (docs/PIPELINE-GATES.md, docs/MERGE-WORKFLOW.md, roles/work.md, sync-sources/skills), giving 7; code changes stay in src/lib/cloister, src/cli/commands and src/dashboard/server. The docs and role-prompt edits describe the code change and must ship with it.",
+      "canonicalFilename": "2026-10-01-PAN-4451-approved-prs-that-turn-conflicting-never-get-ci-so-conflict-repair-never-fires-blocked-agents-aren-t-re-woken-when-their-blockers-merge.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "conflict-gate-waive-ci",
+        "title": "Waive CI evidence at a conflicting head in evaluateConflictRepairGate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-gate-conflict-repair.test.ts reports every test green including the pending/none, red, waived test job and PR #4440 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts/PAN-4451.md. In src/lib/cloister/merge-gate.ts evaluateConflictRepairGate: drop the checks !== 'green' condition, return conflicting:false with reason 'CI checks failing on PR HEAD <sha>' only when checks === 'red', build asMergeable with checks:'green', and call evaluateMergeReadiness with ciTestsRequired:false. Remove the now-unused local ciTestsRequired in that function only and update its JSDoc. Do not edit pr-facts.ts. Update merge-gate-conflict-repair.test.ts exactly as WI-1 lists."
+        },
+        "items": [
+          {
+            "id": "conflict-gate-waive-ci.ac1",
+            "title": "Given an approved-at-head PR with mergeable:false and checks 'pending' or 'none', evaluateConflictRepairGate returns conflicting:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-waive-ci.ac2",
+            "title": "Given mergeable:false, checks 'green', testJobSucceeded:false and ciTestsRequired true (the PR #4440 shape), evaluateConflictRepairGate returns conflicting:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-waive-ci.ac3",
+            "title": "Given mergeable:false and checks 'red', evaluateConflictRepairGate returns conflicting:false with a reason that contains 'CI checks failing on PR HEAD'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-waive-ci.ac4",
+            "title": "Draft, changes-requested, approval-not-at-head and failed-required-UAT cases still return conflicting:false, and git diff origin/main -- src/lib/cloister/pr-facts.ts shows no change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-prompt-wording",
+        "title": "Stop the conflict-repair prompt claiming the PR is green",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/conflict-repair.ts",
+            "src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "expected_outputs": [
+            "conflict-repair.test.ts reports every test green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/lib/cloister/conflict-repair.ts buildConflictRepairPrompt replace 'is approved and green but now conflicts' with 'is approved but now conflicts' and add the line 'GitHub runs no CI on a conflicting PR; CI runs again on the head you push.' right after it. Change the module header's 'An approved, green PR' to 'An approved PR'. Update the prompt assertions in conflict-repair.test.ts."
+        },
+        "items": [
+          {
+            "id": "conflict-prompt-wording.ac1",
+            "title": "buildConflictRepairPrompt returns text that contains 'is approved but now conflicts with origin/main' and 'GitHub runs no CI on a conflicting PR'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-prompt-wording.ac2",
+            "title": "buildConflictRepairPrompt returns text that no longer contains 'approved and green', asserted with not.toContain in conflict-repair.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocked-journal-types",
+        "title": "Add blocked.* journal types and the blocker-ref leaf parser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/cloister/blocker-refs.ts",
+            "src/lib/cloister/__tests__/blocker-refs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/blocker-refs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "blocker-refs.test.ts reports every test green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "task-block-on",
+            "blocker-wake-tick",
+            "show-blocked-entries"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add 'blocked.declared' | 'blocked.woken' to PipelineJournalEntryType in src/lib/cloister/pipeline-journal.ts. Create src/lib/cloister/blocker-refs.ts exporting BlockerRef, BlockerRefError, BlockerRefContext, formatBlockerRef, parseStoredBlockerRef and parseBlockerRefs with exactly the accepted forms and error messages WI-3 lists. The module imports only ../forge.js parseArtifactRef; never messaging, agents or dashboard code. Add blocker-refs.test.ts covering every form, error and the round-trip."
+        },
+        "items": [
+          {
+            "id": "blocked-journal-types.ac1",
+            "title": "parseBlockerRefs returns canonical refs for 'PAN-4307', '#4444', 'eltmon/overdeck#4444' and 'https://github.com/eltmon/overdeck/pull/4444', splits comma-separated values and de-duplicates them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-journal-types.ac2",
+            "title": "parseBlockerRefs throws BlockerRefError naming the ref for an unknown prefix, the blocked issue itself, '#N' when the blocked issue is not on GitHub, a GitLab MR URL, and an unparsable value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-journal-types.ac3",
+            "title": "parseStoredBlockerRef(formatBlockerRef(ref)) returns an equal ref for issue and PR refs, and returns null for an unparsable string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-journal-types.ac4",
+            "title": "PipelineJournalEntryType contains 'blocked.declared' and 'blocked.woken', and blocker-refs.ts contains no import from agents/, dashboard/ or messaging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-block-on",
+        "title": "Add --on <refs...> to pan task block and journal blocked.declared",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/task.ts",
+            "src/cli/commands/__tests__/task.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/task.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "task.test.ts reports every test green including the three --on cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/cli/commands/task.ts register --on <refs...> on the block command and add runTaskBlock: parse refs with parseBlockerRefs before any write (isKnownIssue via resolveProjectFromIssueSync, blockedIssueRepo via resolveGitHubIssue from tracker-utils), then run the existing blocked-status write and commit, then append one blocked.declared entry (source pan-task-block, data item and canonical blockers) to the workspace journal. Without --on keep today's output and write no journal entry. Add the three task.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "task-block-on.ac1",
+            "title": "When pan task block PAN-1 PAN-1-a --on PAN-2 '#7' runs, it marks the item blocked, commits the continue file and appends one blocked.declared entry with blockers ['PAN-2', 'eltmon/overdeck#7']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-block-on.ac2",
+            "title": "When pan task block runs without --on, it appends no journal entry and prints the same line as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-block-on.ac3",
+            "title": "When --on names the blocked issue itself, the command exits 1 and neither setItemStatus nor appendPipelineEntry is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-block-on.ac4",
+            "title": "pan task block --help prints the --on <refs...> option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocker-wake-tick",
+        "title": "Build the blocker-wake tick that wakes the work agent once all blockers merged",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/blocker-wake.ts",
+            "src/lib/cloister/__tests__/blocker-wake.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/blocker-wake.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "blocker-wake.test.ts reports every WI-5 case green",
+            "typecheck completes without errors",
+            "lint completes without errors, including lint:circular"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Two new files only; no existing module is edited, so it cannot collide with sibling items."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Create src/lib/cloister/blocker-wake.ts mirroring conflict-repair.ts: BLOCKER_WAKE_INTERVAL_MS = 120000, injectable BlockerWakeDeps, pendingDeclarations, buildBlockerWakePrompt with the exact WI-5 text, tickBlockerWake. Apply the live-declaration rule (newest declared per item, item still 'blocked' in the continue file, no blocked.woken naming its at), memoize merged refs, batch resolved declarations into one delivery, journal one blocked.woken per declaration with outcome delivered or unreachable, raise Needs-you once when unreachable, never throw. Add blocker-wake.test.ts with every WI-5 case."
+        },
+        "items": [
+          {
+            "id": "blocker-wake-tick.ac1",
+            "title": "Given a live declaration whose blockers all report merged, tickBlockerWake sends one message and appends blocked.woken with outcome 'delivered' and declaredAt equal to the declaration's at; a second tick sends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-tick.ac2",
+            "title": "Given one unmerged blocker, or an item whose continue-file status is no longer 'blocked', tickBlockerWake sends nothing and appends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-tick.ac3",
+            "title": "Given two items resolved in the same tick, tickBlockerWake sends one message that contains both item ids and appends two blocked.woken entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-tick.ac4",
+            "title": "When the target is needs-you or delivery throws, tickBlockerWake raises Needs-you once, records blocked.woken with outcome 'unreachable', and the next tick sends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-tick.ac5",
+            "title": "When isMerged throws for one ref, tickBlockerWake logs it and returns without throwing, and a ref seen merged is not read again on the next tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocker-wake-patrol",
+        "title": "Host the blocker-wake patrol in the dashboard process",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/blocker-wake-patrol.ts",
+            "src/dashboard/server/services/__tests__/blocker-wake-patrol.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/blocker-wake-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "blocker-wake-patrol.test.ts reports every test green under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Create src/dashboard/server/services/blocker-wake-patrol.ts as a copy of conflict-repair-patrol.ts using BLOCKER_WAKE_INTERVAL_MS, tickBlockerWake and OVERDECK_DISABLE_BLOCKER_WAKE, exporting startBlockerWakePatrol and stopBlockerWakePatrol. Wire start and stop into src/dashboard/server/main.ts next to the conflict-repair patrol with the exact log lines from WI-6. Add blocker-wake-patrol.test.ts using vi.useFakeTimers and advanceTimersByTimeAsync. Also change the main.ts comment above the conflict-repair start block from 'an approved, green PR' to 'an approved PR'."
+        },
+        "items": [
+          {
+            "id": "blocker-wake-patrol.ac1",
+            "title": "When the fake clock advances BLOCKER_WAKE_INTERVAL_MS, the patrol runs the injected tick exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-patrol.ac2",
+            "title": "startBlockerWakePatrol returns false when OVERDECK_DISABLE_BLOCKER_WAKE=1 or on a peer dashboard, and a frozen Deacon or an overlapping tick skips the tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-wake-patrol.ac3",
+            "title": "When the dashboard boots, main.ts starts the blocker-wake patrol right after the conflict-repair patrol and logs '[overdeck] Blocker-wake patrol started'; shutdown calls stopBlockerWakePatrol beside stopConflictRepairPatrol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "show-blocked-entries",
+        "title": "Print blocked.declared and blocked.woken in pan show",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/show.ts",
+            "src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "expected_outputs": [
+            "show-pipeline-journal.test.ts reports every test green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Add the two cases to summarizePipelineEntry in src/cli/commands/show.ts after the conflict.repair-escalated case, returning exactly the strings WI-7 gives, and add matching assertions to show-pipeline-journal.test.ts."
+        },
+        "items": [
+          {
+            "id": "show-blocked-entries.ac1",
+            "title": "summarizePipelineEntry returns 'PAN-1-a waits on PAN-2, eltmon/overdeck#7' for a blocked.declared entry with that item and those blockers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-blocked-entries.ac2",
+            "title": "summarizePipelineEntry returns 'PAN-1-a woke agent-pan-1' for a delivered blocked.woken entry and 'PAN-1-a needs you — agent unreachable' for an unreachable one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-conflict-repair",
+        "title": "Document the conflict-repair CI waiver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'approved, green PR' docs/PIPELINE-GATES.md docs/MERGE-WORKFLOW.md || true",
+            "grep -n 'PAN-4451' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "the first grep prints no lines",
+            "the second grep prints the predicate paragraph line naming PAN-4451"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. In docs/PIPELINE-GATES.md section 'Conflict repair (PAN-4384)' rewrite the predicate paragraph to state the PAN-4451 CI waiver (no merge ref so no pull_request CI; pending/none checks and a missing or skipped test job accepted; red rejected; the merge gate still needs green CI on the repaired head) and change 'An approved, green PR' to 'An approved PR'. In docs/MERGE-WORKFLOW.md 'After another feature merges' change 'an approved, green PR conflict' to 'an approved PR conflict' and add the one sentence WI-8 gives."
+        },
+        "items": [
+          {
+            "id": "docs-conflict-repair.ac1",
+            "title": "grep for 'approved, green PR' in docs/PIPELINE-GATES.md and docs/MERGE-WORKFLOW.md returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conflict-repair.ac2",
+            "title": "The PIPELINE-GATES.md predicate paragraph contains the statement that a conflicting PR gets no pull_request CI and that only red checks disqualify it (PAN-4451)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-blocker-wake",
+        "title": "Document blocker wake in PIPELINE-GATES and MERGE-WORKFLOW",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Blocker wake (PAN-4451)' docs/PIPELINE-GATES.md",
+            "grep -n 'blocked.declared\\|blocked.woken' docs/PIPELINE-GATES.md",
+            "grep -n 'blocker-wake-pan-4451' docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "the heading line prints",
+            "both journal-table rows print",
+            "the MERGE-WORKFLOW link line prints"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. Add a '## Blocker wake (PAN-4451)' section to docs/PIPELINE-GATES.md directly after the Conflict repair section covering the declaration command and ref forms, the live-declaration rule, the merged check, the 120 s patrol and its skips, batching, the unreachable path and the closed-without-merge non-goal. Add the two journal-table rows after the conflict.repair-escalated row. Add the WI-9 paragraph with the anchor link to docs/MERGE-WORKFLOW.md 'After another feature merges'."
+        },
+        "items": [
+          {
+            "id": "docs-blocker-wake.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a '## Blocker wake (PAN-4451)' section that names pan task block --on, the 120-second patrol and OVERDECK_DISABLE_BLOCKER_WAKE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-blocker-wake.ac2",
+            "title": "The PIPELINE-GATES.md journal table contains rows for blocked.declared and blocked.woken naming their writers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-blocker-wake.ac3",
+            "title": "docs/MERGE-WORKFLOW.md 'After another feature merges' contains a link to PIPELINE-GATES.md#blocker-wake-pan-4451",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-blocker-instructions",
+        "title": "Tell work agents and the pan-task skill to declare blockers with --on",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T14:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-task/SKILL.md",
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n 'pan task block <issue> <item> --on' roles/work.md"
+          ],
+          "expected_outputs": [
+            "lint completes without errors, including lint:prompt-trailer and lint-skills",
+            "the grep prints the new roles/work.md paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10. In sync-sources/skills/pan-task/SKILL.md add the --on example and replace the no-reason-flag sentence with the WI-10 wording. In roles/work.md add the WI-10 paragraph after the paragraph ending 'checks on its next tick.' in 'Signal the flywheel before you stall'. Commit the roles/work.md edit with the trailer 'Prompt-Change: tell work agents to declare blockers with pan task block --on (PAN-4451)' so lint:prompt-trailer accepts it."
+        },
+        "items": [
+          {
+            "id": "agent-blocker-instructions.ac1",
+            "title": "roles/work.md contains a paragraph telling agents to run pan task block <issue> <item> --on <ref>... when parked on other issues or PRs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-blocker-instructions.ac2",
+            "title": "sync-sources/skills/pan-task/SKILL.md contains a pan task block example with --on and no longer contains 'there is no `--reason` flag or free-text note field.' as the whole explanation of block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-blocker-instructions.ac3",
+            "title": "npm run lint passes, and the commit touching roles/work.md contains a 'Prompt-Change:' trailer line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "blocked-journal-types",
+        "to": "task-block-on",
+        "type": "blocks"
+      },
+      {
+        "from": "blocked-journal-types",
+        "to": "blocker-wake-tick",
+        "type": "blocks"
+      },
+      {
+        "from": "blocked-journal-types",
+        "to": "show-blocked-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-wake-tick",
+        "to": "blocker-wake-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-conflict-repair",
+        "to": "docs-blocker-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "task-block-on",
+        "to": "agent-blocker-instructions",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
