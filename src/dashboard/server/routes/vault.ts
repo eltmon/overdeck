@@ -10,6 +10,8 @@
  *   POST /api/vault/eviction-batch/decline        — body { vaultId }
  *   POST /api/vault/eviction-batch/clear
  *   POST /api/vault/eviction-batch/reoffer        — body { vaultId }
+ *   GET  /api/vault/sessions/:vaultId/continue-preview  — PAN-4437 FR-1, writes nothing
+ *   POST /api/vault/sessions/:vaultId/continue          — body { expectedOwnerToken, onDrift? }
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -22,6 +24,7 @@ import {
   reofferEvictionEntry,
   reviewEvictionBatch,
 } from '../services/vault-service.js';
+import { continueHere, previewContinue } from '../services/vault-continue.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -134,6 +137,56 @@ const reofferVaultEvictionEntryRoute = HttpRouter.add(
   })),
 );
 
+const VAULT_ID_PATTERN = /^[0-9a-f-]+$/;
+const OWNER_TOKEN_PATTERN = /^[0-9a-f]{16}$/;
+
+const vaultIdParam = Effect.gen(function* () {
+  const vaultId = (yield* HttpRouter.params)['vaultId'] ?? '';
+  return VAULT_ID_PATTERN.test(vaultId) ? vaultId : null;
+});
+
+const getVaultContinuePreviewRoute = HttpRouter.add(
+  'GET',
+  '/api/vault/sessions/:vaultId/continue-preview',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+    const vaultId = yield* vaultIdParam;
+    if (vaultId === null) return jsonResponse({ error: 'vaultId must be a vault record id' }, { status: 400 });
+    return yield* Effect.promise(async () => {
+      const outcome = await previewContinue(vaultId);
+      return jsonResponse(outcome.body, { status: outcome.status });
+    });
+  })),
+);
+
+const postVaultContinueRoute = HttpRouter.add(
+  'POST',
+  '/api/vault/sessions/:vaultId/continue',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const vaultId = yield* vaultIdParam;
+    if (vaultId === null) return jsonResponse({ error: 'vaultId must be a vault record id' }, { status: 400 });
+    const body = yield* readJsonBody;
+    if (body === MALFORMED_JSON) return jsonResponse({ error: 'request body is not valid JSON' }, { status: 400 });
+    const expectedOwnerToken = stringField(body, 'expectedOwnerToken');
+    if (expectedOwnerToken === null || !OWNER_TOKEN_PATTERN.test(expectedOwnerToken)) {
+      return jsonResponse({ error: 'expectedOwnerToken is required (16 hex characters)' }, { status: 400 });
+    }
+    const onDrift = (body as Record<string, unknown> | null)?.['onDrift'];
+    if (onDrift !== undefined && onDrift !== 'continue' && onDrift !== 'note') {
+      return jsonResponse({ error: "onDrift must be 'continue' or 'note'" }, { status: 400 });
+    }
+    return yield* Effect.promise(async () => {
+      const outcome = await continueHere(vaultId, { expectedOwnerToken, ...(onDrift ? { onDrift } : {}) });
+      return jsonResponse(outcome.body, { status: outcome.status });
+    });
+  })),
+);
+
 export const vaultRouteLayer = Layer.mergeAll(
   getVaultStatusRoute,
   getVaultEvictionBatchRoute,
@@ -141,4 +194,6 @@ export const vaultRouteLayer = Layer.mergeAll(
   declineVaultEvictionEntryRoute,
   clearVaultEvictionBatchRoute,
   reofferVaultEvictionEntryRoute,
+  getVaultContinuePreviewRoute,
+  postVaultContinueRoute,
 );

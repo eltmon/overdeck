@@ -19,6 +19,7 @@ import { stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { adoptRecord, forkRecordAtVersion, materializeOwned, type AdoptResult } from '../../../lib/vault/adopt.js';
+import { driftNote } from '../../../lib/vault/continue-inspect.js';
 import { compareCwdState, readCwdState, type CwdStateField } from '../../../lib/vault/cwd-state.js';
 import type { SessionRecord } from '../../../lib/vault/format.js';
 import { readViewLines } from '../../../lib/vault/materialize.js';
@@ -61,9 +62,7 @@ export function parseResumeTarget(arg: string): { id: string; version: number | 
   return { id: arg.slice(0, at), version };
 }
 
-export function driftNote(fields: readonly CwdStateField[]): string {
-  return `[Session Vault] This conversation was resumed in a working directory whose ${fields.join(', ')} differ${fields.length === 1 ? 's' : ''} from where it was saved. Check the current state before relying on earlier assumptions.`;
-}
+export { driftNote } from '../../../lib/vault/continue-inspect.js';
 
 function shellQuote(value: string): string {
   return /^[A-Za-z0-9_./:@%+=-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;

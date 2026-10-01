@@ -53,6 +53,8 @@ export const POLL_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const
 export interface UseProjectCreateIntentOptions {
   onCreated?: (project: CreatedProject) => void;
   initialMode?: ProjectCreateMode;
+  /** Initial Repository URL; the first resolve runs with it. */
+  initialUrl?: string;
 }
 
 function newOperationId(): string {
@@ -94,9 +96,10 @@ function failureFrom(body: unknown, fallback: string): ProjectCreateFailure {
 export function useProjectCreateIntent({
   onCreated,
   initialMode = 'clone',
+  initialUrl,
 }: UseProjectCreateIntentOptions = {}) {
   const [mode, setModeState] = useState<ProjectCreateMode>(initialMode);
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(initialUrl ?? '');
   const [path, setPath] = useState('');
 
   // Overrides are `undefined` until edited, which is what keeps a server

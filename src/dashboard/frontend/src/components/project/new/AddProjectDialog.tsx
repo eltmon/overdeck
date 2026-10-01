@@ -24,11 +24,13 @@ const MODE_FOR_STEP = { clone: 'clone', create: 'new' } as const;
 interface AddProjectDialogProps {
   variant: 'modal' | 'page';
   initialMode?: AddProjectMode;
+  /** Prefills the clone step's Repository URL. */
+  initialUrl?: string;
   onCreated: (project: CreatedProject) => void;
   onCancel: () => void;
 }
 
-export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: AddProjectDialogProps) {
+export function AddProjectDialog({ variant, initialMode, initialUrl, onCreated, onCancel }: AddProjectDialogProps) {
   const [step, setStep] = useState<Step>(initialMode ? STEP_FOR_MODE[initialMode] : 'start');
   // A running clone or batch keeps the modal open: closing it would stop
   // watching an operation the server is still carrying out.
@@ -58,6 +60,7 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
       <AddProjectFormStep
         key={step}
         mode={MODE_FOR_STEP[step]}
+        initialUrl={step === 'clone' ? initialUrl : undefined}
         titleId={titleId}
         onCreated={onCreated}
         onChange={backToStart}
@@ -95,16 +98,21 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
 export function AddProjectDialogHost({ onCreated }: { onCreated: (project: CreatedProject) => void }) {
   const open = useAddProjectDialog((state) => state.open);
   const mode = useAddProjectDialog((state) => state.mode);
+  const initialUrl = useAddProjectDialog((state) => state.initialUrl);
+  const onCreatedExtra = useAddProjectDialog((state) => state.onCreatedExtra);
   const hide = useAddProjectDialog((state) => state.hide);
   if (!open) return null;
   return (
     <AddProjectDialog
       variant="modal"
       initialMode={mode}
+      initialUrl={initialUrl}
       onCancel={hide}
       onCreated={(project) => {
-        // Before hide(): the created handler reads the pending returnTo.
+        // Before hide(): the created handler reads the pending returnTo, and
+        // hide() clears the caller's extra handler.
         onCreated(project);
+        onCreatedExtra?.(project);
         hide();
       }}
     />

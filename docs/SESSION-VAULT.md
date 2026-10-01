@@ -237,6 +237,27 @@ command). Codex indexes the rollout from its sessions directory itself; the vaul
 writes a Codex SQLite file (checkpoint outcome 2026-09-28: `opened`). Other harnesses get a
 markdown seed digest at `<cwd>/.overdeck-vault-seed-<vaultId>.md`.
 
+**Dashboard: Continue here.** A browse copy of a conversation another machine owns has a
+**Continue here** button ([PAN-4437](https://github.com/eltmon/overdeck/issues/4437)). Its
+dialog reads `GET /api/vault/sessions/:vaultId/continue-preview`, which writes nothing, and
+continues with `POST /api/vault/sessions/:vaultId/continue`. The target checkout is chosen in
+this order: the saved `cwd` when it exists here; else the registered project whose
+`github_repo` or `gitlab_repo` matches the record's git origin (case-insensitive, first
+match wins); else, when the origin parses, the dialog offers **Clone and register <slug>**,
+which opens the Add-project dialog in clone mode with the URL filled in; else it names
+`pan vault resume <id8> --cwd <dir>`. The browser never chooses a directory. A captured code
+snapshot is applied in place on a clean checkout. On a dirty checkout it goes into a new
+`scratch/vault-<id8>` workspace, unless the checkout already holds that exact snapshot; a
+dirty checkout that is not a registered project is refused, because no workspace can be
+created for it. A placed snapshot means no drift check; otherwise the drift choices are
+Continue, Continue with a note (the same first message as `--on-drift note`) and Cancel. The
+continue step re-reads the record: if another machine took it over after the dialog opened,
+or lost a concurrent adoption race, the dialog shows `Already continued on <label>.` and no
+native file or conversation row is written. The continued conversation is a managed
+conversation; Codex records adopt into that conversation's private Codex home
+(`${OVERDECK_HOME}/agents/<tmuxSession>/`), not `~/.codex`. `@<version>` forks and harnesses
+other than Claude Code and Codex stay CLI-only.
+
 ### Carrying your code
 
 Resume moves the conversation, and since
@@ -348,7 +369,9 @@ works the same way against the same on-disk vault.
   eviction still requires the explicit confirm, from the CLI or the panel.
 - **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`,
   `POST /api/vault/eviction-batch/confirm`, `POST /api/vault/eviction-batch/decline`,
-  `POST /api/vault/eviction-batch/clear`, and `POST /api/vault/eviction-batch/reoffer`.
+  `POST /api/vault/eviction-batch/clear`, `POST /api/vault/eviction-batch/reoffer`,
+  `GET /api/vault/sessions/:vaultId/continue-preview` and
+  `POST /api/vault/sessions/:vaultId/continue` (Continue here, see "Resume, versions and drift").
   `confirm` re-runs the same eligibility checks as `pan vault evict --confirm` but skips
   re-checking entries already marked `failed` (`skipFailed`), so one failing entry never
   blocks confirming the rest.
@@ -362,8 +385,9 @@ works the same way against the same on-disk vault.
   the pull-request sweep. A record that is tombstoned, now owned by this machine, or gone from
   the vault loses its row and its file at the next sync. The browse cache is a derived copy,
   not a transcript, so it is removed directly and never goes through the deletion door. While
-  the vault is off, browse rows stay as the last successful sync left them. "Continue here"
-  from the panel is [PAN-4437](https://github.com/eltmon/overdeck/issues/4437).
+  the vault is off, browse rows stay as the last successful sync left them. The panel's
+  **Continue here** button continues the conversation on this machine (see "Resume, versions
+  and drift").
 - `OVERDECK_VAULT_IN_PEER=1` starts the vault service and the browse copies in a peer
   dashboard. It exists for isolated UAT fixtures that own a throwaway `OVERDECK_HOME`; never
   set it on a peer that shares the primary's home.
@@ -473,6 +497,7 @@ src/lib/vault/wip-capture.ts      WIP code snapshot: temp-index commit, bundle, 
 src/lib/vault/wip-apply.ts        apply a snapshot: verify, unbundle, checkout base, apply
 src/lib/vault/open.ts             openVaultContext: resolve backend + open, shared by CLI and dashboard
 src/lib/vault/browse.ts           browse cache: decrypted LOG copies of records other machines own
+src/lib/vault/continue-inspect.ts write-free Continue-here preview facts, driftNote
 src/cli/commands/vault/*.ts       the pan vault verbs
 
 src/dashboard/server/services/vault-service.ts          boot delay, sync loop, eviction-batch API, snapshot
@@ -480,7 +505,10 @@ src/dashboard/server/services/vault-settle-poller.ts    15s liveness poll, debou
 src/dashboard/server/services/vault-liveness.ts         Overdeck-mode isLive: conversation/agent liveness doors
 src/dashboard/server/services/vault-browse-service.ts   after each sync: refresh browse cache, reconcile vault-<id> rows
 src/lib/overdeck/conversation-vault-rows.ts             browse-row door: upsert/remove vault-<id> conversation rows
-src/dashboard/server/routes/vault.ts                    the six /api/vault/* routes
+src/dashboard/server/services/vault-continue.ts         Continue here: previewContinue, continueHere
+src/lib/overdeck/conversation-vault-continue.ts         Continue here: managed conversation row and resume launch
+src/lib/projects/origin-match.ts                        git origin -> registered project (Continue here target)
+src/dashboard/server/routes/vault.ts                    the eight /api/vault/* routes
 src/dashboard/frontend/.../sections/SessionVaultSection.tsx   Settings -> Session Vault panel
 ```
 

@@ -98,6 +98,34 @@ describe('vault adopt', () => {
     expect((await getOwned(winner.path))!.vaultId).toBe(vaultId);
   });
 
+  it('refuses without writing when the owner changed since the caller checked it (PAN-4437 D-6)', async () => {
+    const vaultId = await settleOnA();
+    const { record: seen } = await readRecord(vaultId);
+    const machineB: EnvironmentIdentity = { v: 1, environmentId: 'env-b', label: 'laptop-b', createdAt: 'x' };
+    const machineC: EnvironmentIdentity = { v: 1, environmentId: 'env-c', label: 'desktop-c', createdAt: 'x' };
+    useHome(homeB);
+    // C adopts after B checked the owner but before B adopts.
+    const taken = await adoptRecord({ vaultId, store, keys, targetCwd: cwd, identity: machineC, projectsRoot: join(root, 'projects-c') });
+    expect(taken.adopted).toBe(true);
+    const { version: before } = await readRecord(vaultId);
+
+    const rootB = join(root, 'projects-b');
+    const result = await adoptRecord({
+      vaultId, store, keys, targetCwd: cwd, identity: machineB, projectsRoot: rootB, expectedOwnerEnvironmentId: seen.owner.environmentId,
+    });
+    expect(result).toEqual({ adopted: false, alreadyContinuedOn: 'desktop-c' });
+    expect(existsSync(rootB)).toBe(false);
+    const after = await readRecord(vaultId);
+    expect(after.version).toBe(before);
+    expect(after.record.owner).toEqual({ environmentId: 'env-c', label: 'desktop-c' });
+
+    // The matching expected owner still adopts.
+    const ok = await adoptRecord({
+      vaultId, store, keys, targetCwd: cwd, identity: machineB, projectsRoot: rootB, expectedOwnerEnvironmentId: 'env-c',
+    });
+    expect(ok.adopted).toBe(true);
+  });
+
   it('refuses to adopt a record this machine already owns', async () => {
     const vaultId = await settleOnA();
     await expect(adoptRecord({ vaultId, store, keys, targetCwd: cwd, projectsRoot: join(root, 'p') })).rejects.toThrow(/already owned by this machine/);
