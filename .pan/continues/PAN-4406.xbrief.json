@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:24:53.739Z",
+  "updated": "2026-10-01T21:24:58.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4406",
       "claimedAt": "2026-10-01T21:22:46.577Z",
       "doneAt": "2026-10-01T21:24:53.738Z"
+    },
+    "cli-route-harness": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:24:58.777Z"
     }
   }
 }
