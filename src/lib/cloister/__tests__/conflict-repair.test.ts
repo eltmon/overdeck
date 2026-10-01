@@ -118,7 +118,9 @@ describe('isConflictRepairCandidate', () => {
 describe('buildConflictRepairPrompt', () => {
   it('names the sync-main, push, and review-request steps and the conflicting paths', () => {
     const prompt = buildConflictRepairPrompt({ issueId: ISSUE, head: 'aaaa1111', conflictPaths: ['a.txt', 'b.md'] });
-    expect(prompt).toContain('CONFLICT REPAIR: the PR for PAN-1166 (head aaaa1111) is approved and green');
+    expect(prompt).toContain('CONFLICT REPAIR: the PR for PAN-1166 (head aaaa1111) is approved but now conflicts');
+    expect(prompt).toContain('GitHub runs no CI on a conflicting PR');
+    expect(prompt).not.toContain('approved and green');
     expect(prompt).toContain('Conflicting paths: a.txt, b.md');
     expect(prompt).toContain('1. Run `pan sync-main PAN-1166` to merge origin/main into this branch (it does not push).');
     expect(prompt).toContain('5. Commit, push the branch, then run `pan review request PAN-1166`.');

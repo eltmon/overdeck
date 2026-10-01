@@ -39,6 +39,7 @@ export type PipelineJournalEntryType =
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
   | 'conflict.repair-requested' | 'conflict.repair-escalated'
+  | 'blocked.declared' | 'blocked.woken'
   | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned';
 
 export interface PipelineJournalEntry {

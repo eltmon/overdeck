@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   repos: vi.fn(),
   repoRoots: vi.fn(),
   withTaskStateLock: vi.fn((_lockPath: string, fn: () => Promise<unknown>) => fn()),
+  appendPipelineEntry: vi.fn(),
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -35,6 +36,10 @@ vi.mock('../../../lib/xbrief/continue-state.js', () => ({
 vi.mock('../../../lib/overdeck/plan-artifact-commit.js', () => ({
   commitPlanArtifacts: mocks.commit,
   planArtifactCommitMessage: (id: string) => `chore(workspace): plan artifacts for ${id}`,
+}));
+vi.mock('../../../lib/cloister/pipeline-journal.js', () => ({ appendPipelineEntry: mocks.appendPipelineEntry }));
+vi.mock('../../../lib/tracker-utils.js', () => ({
+  resolveGitHubIssue: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', prefix: 'PAN', number: 1 }),
 }));
 vi.mock('../../../lib/xbrief/task-state-lock.js', () => ({
   taskStateLockPath: async () => '/tmp/test/lock',
@@ -155,6 +160,40 @@ describe('pan task CLI', () => {
     await program().parseAsync(['node', 'pan', 'task', verb, 'PAN-1', 'PAN-1-a']);
     expect(mocks.setItemStatus).toHaveBeenCalledWith(expect.any(String), 'PAN-1', 'PAN-1-a', status);
     expect(mocks.withTaskStateLock).toHaveBeenCalledTimes(1);
+  });
+
+  it('block --on sets the item blocked, commits, and journals one blocked.declared (PAN-4451)', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'block', 'PAN-1', 'PAN-1-a', '--on', 'PAN-2', '#7']);
+    expect(mocks.setItemStatus).toHaveBeenCalledWith(expect.any(String), 'PAN-1', 'PAN-1-a', 'blocked');
+    expect(mocks.commit).toHaveBeenCalledTimes(1);
+    expect(mocks.appendPipelineEntry).toHaveBeenCalledTimes(1);
+    expect(mocks.appendPipelineEntry).toHaveBeenCalledWith('/tmp/test/workspaces/feature-pan-1', {
+      type: 'blocked.declared',
+      issueId: 'PAN-1',
+      source: 'pan-task-block',
+      data: { item: 'PAN-1-a', blockers: ['PAN-2', 'eltmon/overdeck#7'] },
+    });
+    expect(console.log).toHaveBeenCalledWith('PAN-1-a\tblocked\twaits on PAN-2, eltmon/overdeck#7');
+  });
+
+  it('block without --on journals nothing and prints the plain status line', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'block', 'PAN-1', 'PAN-1-a']);
+    expect(mocks.setItemStatus).toHaveBeenCalledWith(expect.any(String), 'PAN-1', 'PAN-1-a', 'blocked');
+    expect(mocks.appendPipelineEntry).not.toHaveBeenCalled();
+    expect(console.log).toHaveBeenCalledWith('PAN-1-a\tblocked');
+  });
+
+  it('block --on the blocked issue itself exits 1 and writes nothing', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'block', 'PAN-1', 'PAN-1-a', '--on', 'PAN-1']);
+    expect(process.exitCode).toBe(1);
+    expect(console.error).toHaveBeenCalledWith('PAN-1 cannot be blocked on itself');
+    expect(mocks.setItemStatus).not.toHaveBeenCalled();
+    expect(mocks.appendPipelineEntry).not.toHaveBeenCalled();
+  });
+
+  it('block --help lists the --on option', () => {
+    const block = program().commands[0].commands.find((command) => command.name() === 'block');
+    expect(block?.helpInformation()).toContain('--on <refs...>');
   });
 
   it('reads next and show without writing or taking the task-state lock', async () => {

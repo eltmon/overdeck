@@ -132,6 +132,11 @@ export interface ConflictRepairGateResult {
  * same policy as evaluateIssueMergeGate, judged as if the forge said
  * `mergeable`. Approval must stand at the head: a marker, else a GitHub review
  * of the head read directly (withForgeApprovalAtHead skips unmergeable PRs).
+ *
+ * PAN-4451: CI evidence is waived. GitHub builds no merge ref for a conflicting
+ * PR, so pull_request CI never runs on it; pending, absent or test-job-less
+ * checks pass. Red checks still disqualify. The merge gate re-judges CI on the
+ * repaired head.
  */
 export async function evaluateConflictRepairGate(
   issueId: string,
@@ -141,15 +146,25 @@ export async function evaluateConflictRepairGate(
   if (facts.error || !facts.open || facts.mergeable !== false) {
     return { conflicting: false, reason: facts.error ?? 'PR is not conflicting', facts };
   }
-  if (facts.draft || facts.changesRequested || facts.checks !== 'green') {
+  if (facts.draft || facts.changesRequested) {
     return { conflicting: false, reason: 'PR is not otherwise merge-ready', facts };
+  }
+  // PAN-4451: GitHub builds no merge ref for a conflicting PR, so pull_request CI
+  // never runs on it and its head cannot get a test result. Only a red head
+  // disqualifies; the merge gate re-judges CI on the repaired head.
+  if (facts.checks === 'red') {
+    return { conflicting: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}`, facts };
   }
   let approvedAtHead = facts.approvedAtHead === true;
   if (!approvedAtHead && facts.forge === 'github') {
     approvedAtHead = (await forgeApprovalAtHead(facts, deps.readReviews, deps.overdeckLogins)) === true;
   }
-  const asMergeable: PrFacts = { ...facts, mergeable: true, ...(approvedAtHead ? { approvedAtHead: true } : {}) };
-  const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
+  const asMergeable: PrFacts = {
+    ...facts,
+    mergeable: true,
+    checks: 'green',
+    ...(approvedAtHead ? { approvedAtHead: true } : {}),
+  };
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {
     try {
@@ -158,7 +173,7 @@ export async function evaluateConflictRepairGate(
       uatRequired = true;
     }
   }
-  const readiness = evaluateMergeReadiness(asMergeable, { ciTestsRequired, uatRequired, requireApprovalAtHead: true });
+  const readiness = evaluateMergeReadiness(asMergeable, { ciTestsRequired: false, uatRequired, requireApprovalAtHead: true });
   return readiness.ready ? { conflicting: true, facts } : { conflicting: false, reason: readiness.reason, facts };
 }
 
