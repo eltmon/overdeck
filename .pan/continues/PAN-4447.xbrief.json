@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:47:49.586Z",
+  "updated": "2026-10-01T22:48:30.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "round-trip-two-machine.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T22:47:49.586Z"
+    },
+    "conversation-continuity-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:48:30.799Z"
     }
   }
 }
