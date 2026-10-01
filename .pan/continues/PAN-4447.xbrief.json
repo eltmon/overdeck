@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:54:42.360Z",
+  "updated": "2026-10-01T22:55:22.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "conversation-row-chip.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T22:54:42.360Z"
+    },
+    "composer-continuity-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:55:22.078Z"
     }
   }
 }
