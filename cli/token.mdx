@@ -1,0 +1,68 @@
+---
+title: pan token
+description: Create, list or revoke scoped API tokens
+---
+
+# `pan token`
+
+<Note>
+Available from the next release (v0.65.0).
+</Note>
+
+Create, list or revoke scoped API tokens: bearer tokens limited to named scopes, for a
+program such as an event sidecar or a notifier instead of a full device session. See the
+scope table at [Remote access](/configuration/remote-access#scoped-api-tokens).
+
+## create
+
+```bash
+pan token create <name> --scopes <list> [--json]
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--scopes <list>` | Required. Comma-separated, from `read:events, read:state, read:conversations, tell, operate, admin`. |
+| `--json` | Print `{ id, name, scopes, token }` as JSON. |
+
+Prints the id, name, scopes, and the token (`odk_…`) once, followed by:
+
+```
+This token is shown once. A running dashboard accepts it within 5 seconds.
+```
+
+Works without a running dashboard; it writes the registry directly.
+
+## list
+
+```bash
+pan token list [--json]
+```
+
+Lists access tokens with columns `ID NAME SCOPES CREATED LAST USED REVOKED`. Works without a
+running dashboard.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print the tokens as JSON. |
+
+With no access tokens: `No access tokens. Create one with \`pan token create\`.`
+
+## revoke
+
+```bash
+pan token revoke <id>
+```
+
+Through the dashboard it prints:
+
+```
+Revoked access token "<name>" (<id>); closed <n> live connection(s).
+```
+
+With no dashboard running it writes the registry and prints:
+
+```
+Dashboard not running; revoked in the registry. No live connections were open.
+```
+
+An unknown id prints `No access token with id <id>.` and exits 1.
