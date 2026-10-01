@@ -198,6 +198,11 @@ CI on a conflicting PR, so the patrol does not wait for CI before the repair
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
 
+An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
+gets one `BLOCKERS MERGED` message within about two minutes of the last of
+those issues or PRs merging. See
+[Blocker wake](PIPELINE-GATES.md#blocker-wake-pan-4451).
+
 ## Stash Discipline
 
 The merge workflow does not create stashes. Agents never run `git stash`.

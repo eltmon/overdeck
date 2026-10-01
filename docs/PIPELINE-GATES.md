@@ -606,6 +606,66 @@ when the door refuses for a reason the operator must fix (`circuit-breaker`,
 so no cached pre-push head answers for the new one. When the new head is approved, the existing auto-merge scheduler
 re-arms the issue under the same policy as before the conflict.
 
+## Blocker wake (PAN-4451)
+
+An agent that parks because other issues or PRs must merge first used to say
+so only in a comment, so nothing woke it when they merged. PAN-4437's agent
+idled for hours after both of its blockers landed.
+
+**The declaration.** `pan task block <issue> <item> --on <ref>...` sets the
+item to `blocked` in the continue file and journals `blocked.declared` with
+`data.item` and the canonical `data.blockers`. `--on` takes one or more refs,
+and each value may hold comma-separated refs:
+
+- an issue ID of a registered project (`PAN-4307`), stored as is;
+- `#N`, a PR in the blocked issue's GitHub repo, stored as `owner/repo#N`;
+- `owner/repo#N`;
+- a GitHub PR URL, stored as `owner/repo#N`.
+
+The refs are validated before anything is written. An issue of an unknown
+project, the blocked issue itself, `#N` for an issue that is not on GitHub, a
+GitLab merge request URL, or anything else makes the command exit 1 and write
+nothing. Without `--on`, `pan task block` behaves as before and journals
+nothing.
+
+**A live declaration.** Per item, only the newest `blocked.declared` counts.
+It is live while the continue file still says the item is `blocked` and no
+`blocked.woken` entry names its `at` in `data.declaredAt`. So
+`pan task unblock`, `reopen`, `cancel` and `done` end a declaration with no
+extra write.
+
+**Merged.** An issue ref has merged when `getPrFacts` read by its feature
+branch (`feature/<id>`, which bypasses the PR-tab cache) says `merged`. A PR
+ref has merged when `gh pr view <n> --repo <repo> --json state` answers
+`MERGED`. A read error counts as not merged yet and is logged. A ref seen
+merged is remembered in the process and never read again. A blocker that
+closes without a merge never wakes the agent.
+
+**The patrol.** `startBlockerWakePatrol`
+(`dashboard/server/services/blocker-wake-patrol.ts`) runs `tickBlockerWake`
+(`cloister/blocker-wake.ts`) every 120 seconds in the dashboard process. A
+tick reads the forge only for an issue whose journal has a live declaration
+whose item is still `blocked`, and it reads one ref at a time, stopping at the
+first unmerged ref. It does nothing while the Deacon is frozen, on a peer
+dashboard, or with `OVERDECK_DISABLE_BLOCKER_WAKE=1`, and it skips a paused
+issue and a workspace directory that no longer exists. An overlapping tick is
+skipped, and one issue's failure never stops the rest.
+
+**One wake per declaration.** When every blocker of one or more live
+declarations of an issue has merged, the patrol sends the issue's work agent
+one `BLOCKERS MERGED` message that lists every resolved item, through
+`resolveIssueFeedbackTarget` (wake the live agent, else resume or start one),
+keyed by the declarations' `at` values. The message tells the agent to run
+`pan sync-main <id>`, confirm the code it waited for is present, then
+`pan task unblock` each item. Each declaration gets its own `blocked.woken`
+entry with `outcome: 'delivered'` and the agent ID.
+
+**Unreachable.** When the agent cannot be reached (`resolveIssueFeedbackTarget`
+returns needs-you, or delivery throws or is not accepted), the patrol raises
+Needs-you once through `surfaceIssueFeedbackNeedsYou` and journals
+`blocked.woken` with `outcome: 'unreachable'`, so the next tick never retries
+that declaration. There is no escalation for blockers that never merge.
+
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
@@ -1038,6 +1098,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
+| `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
+| `blocked.woken` | `cloister/blocker-wake.ts` `tickBlockerWake`, once per declaration when all its blockers merged (`data.item`, `data.declaredAt`, `data.outcome`: `delivered` \| `unreachable`) |
 | `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
 | `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
 | `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |
