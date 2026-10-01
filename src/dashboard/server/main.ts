@@ -62,6 +62,7 @@ import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
+import { startBlockerWakePatrol, stopBlockerWakePatrol } from './services/blocker-wake-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
@@ -725,6 +726,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopConflictRepairPatrol();
+  stopBlockerWakePatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -864,7 +866,7 @@ if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 }
 
-// PAN-4384: routes an approved, green PR that turned CONFLICTING back to its
+// PAN-4384: routes an approved PR that turned CONFLICTING back to its
 // work agent for a sync-main repair.
 if (startConflictRepairPatrol()) {
   console.log('[overdeck] Conflict-repair patrol started');
@@ -872,6 +874,15 @@ if (startConflictRepairPatrol()) {
   console.log('[overdeck] Conflict-repair patrol SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Conflict-repair patrol SKIPPED (OVERDECK_DISABLE_CONFLICT_REPAIR=1)');
+}
+
+// PAN-4451: wakes a work agent whose declared blockers (`pan task block --on`) all merged.
+if (startBlockerWakePatrol()) {
+  console.log('[overdeck] Blocker-wake patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Blocker-wake patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Blocker-wake patrol SKIPPED (OVERDECK_DISABLE_BLOCKER_WAKE=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker
