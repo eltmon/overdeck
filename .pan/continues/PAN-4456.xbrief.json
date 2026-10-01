@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:45:36.323Z",
+  "updated": "2026-10-01T21:46:22.012Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "remote-access-vault-unlock.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T21:45:36.322Z"
+    },
+    "remote-access-vault-unlock.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:46:22.012Z"
     }
   }
 }
