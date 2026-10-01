@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:26:15.278Z",
+  "updated": "2026-10-01T21:26:23.845Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4406",
       "claimedAt": "2026-10-01T21:24:58.777Z",
       "doneAt": "2026-10-01T21:26:15.277Z"
+    },
+    "e3-cap-and-live-check": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4406",
+      "claimedAt": "2026-10-01T21:26:23.845Z"
     }
   }
 }
