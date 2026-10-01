@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:39:31.356Z",
+  "updated": "2026-10-01T21:43:01.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4406",
       "claimedAt": "2026-10-01T21:38:51.093Z",
       "doneAt": "2026-10-01T21:39:31.355Z"
+    },
+    "e5-refusal-clause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:01.258Z"
     }
   }
 }
