@@ -3,7 +3,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import type { EffortLevel } from '@overdeck/contracts';
-import { resolveEvalModelConfig, type EvalModelConfig, type EvalProvider, type OpenAIVia } from './eval-model.js';
+import { callClaudeCli } from './claude-cli.js';
+import {
+  resolveEvalModelConfig,
+  type AnthropicVia,
+  type EvalModelConfig,
+  type EvalProvider,
+  type OpenAIVia,
+} from './eval-model.js';
 import { evalCostUsd, usageFromAnthropic, type EvalUsage } from './eval-usage.js';
 import { callOpenAIResponses } from './openai-responses.js';
 
@@ -42,6 +49,7 @@ export interface PromptScenarioRun {
   temperature: 0 | null;
   maxTokens: number;
   openaiVia: OpenAIVia | null;
+  anthropicVia: AnthropicVia | null;
   usage: EvalUsage;
   costUsd: number | null;
   costBasis: 'api' | 'api-equivalent';
@@ -102,7 +110,11 @@ export async function runPromptScenario(opts: RunPromptScenarioOptions): Promise
   const config = resolveEvalModelConfig(process.env, { maxTokens: opts.maxTokens });
   const startedAt = Date.now();
   const result =
-    config.provider === 'openai' ? await callOpenAIResponses(config, prompt, process.env) : await callAnthropic(config, prompt);
+    config.provider === 'openai'
+      ? await callOpenAIResponses(config, prompt, process.env)
+      : config.anthropicVia === 'claude-cli'
+        ? await callClaudeCli(config, prompt)
+        : await callAnthropic(config, prompt);
   return {
     text: result.text,
     run: {
@@ -113,9 +125,10 @@ export async function runPromptScenario(opts: RunPromptScenarioOptions): Promise
       temperature: config.temperature,
       maxTokens: config.maxTokens,
       openaiVia: config.openaiVia,
+      anthropicVia: config.anthropicVia,
       usage: result.usage,
       costUsd: evalCostUsd(config.provider, config.model, result.usage),
-      costBasis: config.openaiVia === 'cliproxy' ? 'api-equivalent' : 'api',
+      costBasis: config.openaiVia === 'cliproxy' || config.anthropicVia === 'claude-cli' ? 'api-equivalent' : 'api',
       stopReason: result.stopReason,
       durationMs: Date.now() - startedAt,
     },

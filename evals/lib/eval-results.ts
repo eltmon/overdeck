@@ -20,6 +20,8 @@ export interface EvalCaseRecord {
   provider: 'anthropic' | 'openai';
   effort: EffortLevel | null;
   openaiVia: 'api' | 'cliproxy' | null;
+  /** Anthropic route; null for OpenAI and for records written before PAN-4406. */
+  anthropicVia: 'api' | 'claude-cli' | null;
   /** 0..1 */
   score: number;
   /** Suite-specific sub-scores. */
@@ -47,6 +49,7 @@ export function recordFromRun(
     provider: run.provider,
     effort: run.effort,
     openaiVia: run.openaiVia,
+    anthropicVia: run.anthropicVia,
     score,
     metrics,
     usage: run.usage,

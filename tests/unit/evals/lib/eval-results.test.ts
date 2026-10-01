@@ -22,6 +22,7 @@ function run(overrides: Partial<PromptScenarioRun> = {}): PromptScenarioRun {
     temperature: null,
     maxTokens: 32000,
     openaiVia: null,
+    anthropicVia: 'api',
     usage: { inputTokens: 100, outputTokens: 50, cacheReadTokens: 10, cacheWriteTokens: 5, reasoningTokens: null },
     costUsd: 0.01,
     costBasis: 'api',
@@ -54,12 +55,18 @@ describe('evals/lib/eval-results', () => {
       model: 'claude-sonnet-5-5',
       provider: 'anthropic',
       effort: 'high',
+      anthropicVia: 'api',
       score: 0.5,
       metrics: { lintPass: 1 },
       costUsd: 0.01,
       costBasis: 'api',
       recordedAt: '2026-09-29T10:00:00.000Z',
     });
+  });
+
+  it('recordFromRun copies a claude-cli route and its api-equivalent cost basis', () => {
+    const r = recordFromRun('feedback-acceptance', 'c1', run({ anthropicVia: 'claude-cli', costBasis: 'api-equivalent' }), 1, {});
+    expect(r).toMatchObject({ anthropicVia: 'claude-cli', costBasis: 'api-equivalent' });
   });
 
   it('parseEvalRecords returns the records written by appendEvalRecord', () => {
