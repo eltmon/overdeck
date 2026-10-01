@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:46:16.258Z",
+  "updated": "2026-10-01T22:47:04.389Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "round-trip-states.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T22:46:16.258Z"
+    },
+    "round-trip-two-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:47:04.389Z"
     }
   }
 }
