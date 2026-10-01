@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:49:01.804Z",
+  "updated": "2026-10-01T21:49:36.858Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "e2-parse-bullets-citations.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T21:49:01.803Z"
+    },
+    "e2-parse-bullets-citations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:49:36.858Z"
     }
   }
 }
