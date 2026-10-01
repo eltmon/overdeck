@@ -519,7 +519,7 @@ other branch.
 
 ## Conflict repair (PAN-4384)
 
-An approved, green PR that turns CONFLICTING with main fails the merge gate on
+An approved PR that turns CONFLICTING with main fails the merge gate on
 its last condition (`PR is not mergeable (state=conflicting)`), so no merge
 door ever reaches the merge executor's conflict step. The pre-review conflict
 gate runs only before review dispatch, and the merge-train reconciler never
@@ -529,9 +529,16 @@ PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
 **The predicate.** `evaluateConflictRepairGate` in `cloister/merge-gate.ts`
 calls a PR *merge-ready but conflicting* when the forge reports
 `mergeable: false` and every other merge-gate condition holds under the same
-policy as `evaluateIssueMergeGate`: open, not a draft, no change request,
-checks green, the CI test job passed in `verification.tests: ci` projects, no
-failed required UAT at the head, and approval proven at the head. A verdict
+policy as `evaluateIssueMergeGate`, except CI: open, not a draft, no change
+request, no failed required UAT at the head, and approval proven at the head.
+A conflicting PR gets no `pull_request` CI, because GitHub builds no merge ref
+for it, so its head can never get a test result (PAN-4451). The predicate
+therefore accepts `pending` or `none` checks and a missing or skipped CI test
+job, and only red checks disqualify it; a red head stays on the CI-failure
+feedback path. The merge gate is unchanged, so the repaired head still needs
+green CI and, in `verification.tests: ci` projects, a passed CI test job
+before anything merges. Before PAN-4451 the predicate demanded that CI too,
+and PR #4440 sat approved and CONFLICTING for about 19 hours. A verdict
 marker naming the head proves the approval; otherwise the GitHub reviews are
 read directly, because `withForgeApprovalAtHead` skips unmergeable PRs.
 Nothing is stored: the answer comes from `getPrFacts` at the moment it is

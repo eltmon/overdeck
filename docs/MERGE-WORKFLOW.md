@@ -186,13 +186,15 @@ repository read-only to bypass a real stranded branch.
 ## After another feature merges
 
 A merge does not rebase sibling branches. When another merge (or a direct
-push to `main`) makes an approved, green PR conflict, the forge reports it
+push to `main`) makes an approved PR conflict, the forge reports it
 non-mergeable and the merge gate refuses it. The conflict-repair patrol
 (PAN-4384) finds it within one 60-second tick and sends the issue's work agent
 one repair per PR head: run `pan sync-main <id>`, resolve the conflict, push,
 and run `pan review request <id>`. If the same head still conflicts 45 minutes
 later, or the agent cannot be reached, the patrol raises Needs-you once. See
-[Conflict repair](PIPELINE-GATES.md#conflict-repair-pan-4384). If CI fails
+[Conflict repair](PIPELINE-GATES.md#conflict-repair-pan-4384). GitHub runs no
+CI on a conflicting PR, so the patrol does not wait for CI before the repair
+(PAN-4451); CI runs again on the pushed head. If CI fails
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
 
