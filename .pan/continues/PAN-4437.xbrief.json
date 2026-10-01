@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4437",
   "created": "2026-09-30T19:30:30.547Z",
-  "updated": "2026-10-01T14:19:29.861Z",
+  "updated": "2026-10-01T14:19:43.113Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "add-project-prefill.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T14:19:29.861Z"
+    },
+    "add-project-prefill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:43.112Z"
     }
   }
 }
