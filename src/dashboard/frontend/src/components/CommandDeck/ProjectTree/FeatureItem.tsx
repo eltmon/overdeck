@@ -26,6 +26,8 @@ import { resolveFeatureStateBadge } from './featureStateBadge';
 import { StatusDot } from '../StatusDot';
 import { PIPE_ORDER, PIPE_CLASS, PIPE_STEP_LABELS, derivePipeline, describePipeline, describePipeSegment } from './pipelineStrip';
 import { ResourceCluster } from './ResourceCluster';
+import { PullRequestBadge } from '../../primitives/PullRequestBadge';
+import { issuePullRequestBadgeLink } from '../../primitives/issuePullRequest';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -615,6 +617,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   // PAN-3917: "ready to merge" is derived from the forge (approved, green,
   // mergeable), never a stored isReadyToMerge flag.
   const storeDerived = useDerivedIssueState(feature.issueId);
+  const prBadgeLink = issuePullRequestBadgeLink(storeDerived?.pr, feature.resourceDetails?.prs);
   const resolvedState = storeDerived?.state ?? feature.state ?? null;
   const isReady = resolvedState === 'ready';
 
@@ -813,7 +816,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
-          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} omit={showContainersGroup ? ['docker'] : undefined} /></span>
+          {prBadgeLink && <span data-section="PullRequestBadge" data-testid="feature-pr"><PullRequestBadge link={prBadgeLink} /></span>}
+          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} omit={[...(showContainersGroup ? ['docker' as const] : []), ...(prBadgeLink ? ['pr' as const] : [])]} /></span>
           <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe"
             role="img" title={pipelineLabel} aria-label={pipelineLabel}>
             {pipeline.map((seg, i) => (
