@@ -161,6 +161,10 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `head=${shortSha(data.head)} sync-main repair to ${data.agentId ?? 'the work agent'}`;
     case 'conflict.repair-escalated':
       return `head=${shortSha(data.head)} needs you — ${data.reason ?? 'unknown'}`;
+    case 'blocked.declared':
+      return `${data.item ?? 'item'} waits on ${Array.isArray(data.blockers) ? data.blockers.join(', ') : '?'}`;
+    case 'blocked.woken':
+      return `${data.item ?? 'item'} ${data.outcome === 'unreachable' ? 'needs you — agent unreachable' : `woke ${data.agentId ?? 'the work agent'}`}`;
     case 'strike.landed':
       return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
     case 'handoff.deferred':
