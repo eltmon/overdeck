@@ -4,17 +4,17 @@
     "created": "2026-10-01T21:13:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4456: Overdeck Anywhere docs are stale: pricing page says nothing has shipped, CLI references and changelog entries missing",
-    "updated": "2026-10-01T21:15:07.958Z"
+    "updated": "2026-10-01T21:15:52.507Z"
   },
   "plan": {
     "id": "pan-4456",
     "title": "Overdeck Anywhere docs are stale: pricing page says nothing has shipped, CLI references and changelog entries missing",
-    "status": "proposed",
+    "status": "running",
     "uid": "6b97c879-fee1-44b6-92e2-ee0929486151",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T21:13:36Z",
-    "updated": "2026-10-01T21:15:07.958Z",
+    "updated": "2026-10-01T21:15:52.507Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4456",
@@ -986,5 +986,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
