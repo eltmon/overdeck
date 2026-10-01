@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:57:53.810Z",
+  "updated": "2026-10-01T22:58:31.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "composer-continuity-notice.ac5": {
       "status": "completed",
       "doneAt": "2026-10-01T22:57:53.810Z"
+    },
+    "docs-continued-on-states.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:58:31.142Z"
     }
   }
 }
