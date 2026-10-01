@@ -46,7 +46,7 @@ function formatSize(bytes: number): string {
 }
 
 function previewUrl(vaultId: string): string {
-  return `/api/vault/records/${encodeURIComponent(vaultId)}/continue-preview`;
+  return `/api/vault/sessions/${encodeURIComponent(vaultId)}/continue-preview`;
 }
 
 async function fetchPreview(vaultId: string): Promise<ContinuePreview> {
@@ -86,7 +86,7 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
     setError(null);
     try {
       await ensureDashboardSession();
-      const res = await fetch(`/api/vault/records/${encodeURIComponent(vaultId)}/continue`, {
+      const res = await fetch(`/api/vault/sessions/${encodeURIComponent(vaultId)}/continue`, {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),

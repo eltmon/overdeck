@@ -239,8 +239,8 @@ markdown seed digest at `<cwd>/.overdeck-vault-seed-<vaultId>.md`.
 
 **Dashboard: Continue here.** A browse copy of a conversation another machine owns has a
 **Continue here** button ([PAN-4437](https://github.com/eltmon/overdeck/issues/4437)). Its
-dialog reads `GET /api/vault/records/:vaultId/continue-preview`, which writes nothing, and
-continues with `POST /api/vault/records/:vaultId/continue`. The target checkout is chosen in
+dialog reads `GET /api/vault/sessions/:vaultId/continue-preview`, which writes nothing, and
+continues with `POST /api/vault/sessions/:vaultId/continue`. The target checkout is chosen in
 this order: the saved `cwd` when it exists here; else the registered project whose
 `github_repo` or `gitlab_repo` matches the record's git origin (case-insensitive, first
 match wins); else, when the origin parses, the dialog offers **Clone and register <slug>**,
@@ -370,8 +370,8 @@ works the same way against the same on-disk vault.
 - **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`,
   `POST /api/vault/eviction-batch/confirm`, `POST /api/vault/eviction-batch/decline`,
   `POST /api/vault/eviction-batch/clear`, `POST /api/vault/eviction-batch/reoffer`,
-  `GET /api/vault/records/:vaultId/continue-preview` and
-  `POST /api/vault/records/:vaultId/continue` (Continue here, see "Resume, versions and drift").
+  `GET /api/vault/sessions/:vaultId/continue-preview` and
+  `POST /api/vault/sessions/:vaultId/continue` (Continue here, see "Resume, versions and drift").
   `confirm` re-runs the same eligibility checks as `pan vault evict --confirm` but skips
   re-checking entries already marked `failed` (`skipFailed`), so one failing entry never
   blocks confirming the rest.

@@ -10,8 +10,8 @@
  *   POST /api/vault/eviction-batch/decline        — body { vaultId }
  *   POST /api/vault/eviction-batch/clear
  *   POST /api/vault/eviction-batch/reoffer        — body { vaultId }
- *   GET  /api/vault/records/:vaultId/continue-preview  — PAN-4437 FR-1, writes nothing
- *   POST /api/vault/records/:vaultId/continue          — body { expectedOwnerToken, onDrift? }
+ *   GET  /api/vault/sessions/:vaultId/continue-preview  — PAN-4437 FR-1, writes nothing
+ *   POST /api/vault/sessions/:vaultId/continue          — body { expectedOwnerToken, onDrift? }
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -147,7 +147,7 @@ const vaultIdParam = Effect.gen(function* () {
 
 const getVaultContinuePreviewRoute = HttpRouter.add(
   'GET',
-  '/api/vault/records/:vaultId/continue-preview',
+  '/api/vault/sessions/:vaultId/continue-preview',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(request);
@@ -163,7 +163,7 @@ const getVaultContinuePreviewRoute = HttpRouter.add(
 
 const postVaultContinueRoute = HttpRouter.add(
   'POST',
-  '/api/vault/records/:vaultId/continue',
+  '/api/vault/sessions/:vaultId/continue',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);

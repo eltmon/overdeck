@@ -183,11 +183,11 @@ describe('vault routes', () => {
 
   it('GET continue-preview passes the service status and body through (PAN-4437)', async () => {
     continueMocks.previewContinue.mockResolvedValue({ status: 200, body: { vaultId: VAULT_ID, ownerToken: TOKEN } });
-    const result = await call('GET', `/api/vault/records/${VAULT_ID}/continue-preview`);
+    const result = await call('GET', `/api/vault/sessions/${VAULT_ID}/continue-preview`);
     expect(result).toEqual({ status: 200, body: { vaultId: VAULT_ID, ownerToken: TOKEN } });
     expect(continueMocks.previewContinue).toHaveBeenCalledWith(VAULT_ID);
 
-    const bad = await call('GET', '/api/vault/records/NOT_AN_ID/continue-preview');
+    const bad = await call('GET', '/api/vault/sessions/NOT_AN_ID/continue-preview');
     expect(bad.status).toBe(400);
     expect(continueMocks.previewContinue).toHaveBeenCalledTimes(1);
   });
@@ -195,13 +195,13 @@ describe('vault routes', () => {
   it('POST continue passes a 409 already-continued body through (PAN-4437)', async () => {
     const body = { code: 'already-continued', label: 'laptop-b', error: 'Already continued on laptop-b.', codeAppliedAt: null };
     continueMocks.continueHere.mockResolvedValue({ status: 409, body });
-    const result = await call('POST', `/api/vault/records/${VAULT_ID}/continue`, { body: { expectedOwnerToken: TOKEN, onDrift: 'note' } });
+    const result = await call('POST', `/api/vault/sessions/${VAULT_ID}/continue`, { body: { expectedOwnerToken: TOKEN, onDrift: 'note' } });
     expect(result).toEqual({ status: 409, body });
     expect(continueMocks.continueHere).toHaveBeenCalledWith(VAULT_ID, { expectedOwnerToken: TOKEN, onDrift: 'note' });
   });
 
   it('POST continue refuses a bad onDrift, a missing token and a missing CSRF header (PAN-4437)', async () => {
-    const path = `/api/vault/records/${VAULT_ID}/continue`;
+    const path = `/api/vault/sessions/${VAULT_ID}/continue`;
     expect((await call('POST', path, { body: { expectedOwnerToken: TOKEN, onDrift: 'cancel' } })).status).toBe(400);
     expect((await call('POST', path, { body: {} })).status).toBe(400);
     expect((await call('POST', path, { body: { expectedOwnerToken: 'short' } })).status).toBe(400);

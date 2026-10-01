@@ -27,6 +27,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { test, expect, type Page } from '@playwright/test';
+import { claudeProjectDir, claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
 import { startIsolatedDashboard, type IsolatedDashboard } from './fixtures/isolated-dashboard.js';
 
 const execFileAsync = promisify(execFile);
@@ -213,7 +214,7 @@ test('a machine that continued first wins the race', async ({ browser }) => {
     await expect(dialog.getByRole('alert')).toHaveText('Already continued on machine-c.');
     await page.screenshot({ path: `${SHOT_DIR}/already-continued.png`, fullPage: true });
 
-    expect(jsonlFiles(join(fakeHome, '.claude', 'projects'))).toEqual([]);
+    expect(jsonlFiles(claudeProjectsRoot(fakeHome))).toEqual([]);
     expect((await conversations()).some((row) => row.name === `vault-${ids.t2}`)).toBe(true);
   } finally {
     await context.close();
@@ -260,8 +261,7 @@ test('Continue here adopts, applies the code snapshot and resumes the conversati
     expect(continued!.cwd).toBe(checkout);
     expect(continued!.claudeSessionId).toBeTruthy();
     const sessionId = continued!.claudeSessionId!;
-    const encoded = checkout.replace(/[^a-zA-Z0-9-]/g, '-');
-    expect(existsSync(join(fakeHome, '.claude', 'projects', encoded, `${sessionId}.jsonl`))).toBe(true);
+    expect(existsSync(join(claudeProjectDir(checkout, claudeProjectsRoot(fakeHome)), `${sessionId}.jsonl`))).toBe(true);
     expect(readFileSync(join(checkout, 'app.txt'), 'utf8')).toBe('changed on machine-a\n');
     expect(readFileSync(join(checkout, 'new.txt'), 'utf8')).toBe('added on machine-a\n');
 
