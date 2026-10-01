@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4457",
   "created": "2026-10-01T21:43:35.334Z",
-  "updated": "2026-10-01T23:31:55.303Z",
+  "updated": "2026-10-01T23:32:08.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "badge-adapter.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T23:31:55.303Z"
+    },
+    "badge-adapter.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:32:08.881Z"
     }
   }
 }
