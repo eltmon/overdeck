@@ -168,6 +168,13 @@ const staticRouteLayer = HttpRouter.add(
       return HttpServerResponse.text('Bad Request', { status: 400 });
     }
 
+    // An unregistered API path is a 404, never the SPA shell: a client that
+    // calls .json() on index.html gets a parse error instead of a clean
+    // "gone" (PAN-4429 deleted the TLDR routes).
+    if (url.value.pathname === '/api' || url.value.pathname.startsWith('/api/')) {
+      return jsonResponse({ error: 'Not Found' }, { status: 404 });
+    }
+
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
     const pathService = yield* Path.Path;

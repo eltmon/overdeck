@@ -6,7 +6,7 @@ import { join } from 'node:path';
  * Tests for src/lib/platform-lifecycle.ts.
  *
  * The scope invariants below are the whole point of this module — `pan restart`
- * exists so a dashboard restart cannot tear down CLIProxy, Traefik, or TLDR.
+ * exists so a dashboard restart cannot tear down CLIProxy or Traefik.
  * If these tests start failing it means scope leakage has been introduced and
  * the restart/recovery design is broken.
  */
@@ -198,7 +198,7 @@ describe('restartDashboard — scope contract', () => {
     expect(warning).toHaveBeenCalledWith(expect.stringContaining('ports are free, continuing restart'));
   });
 
-  it('does NOT import or call CLIProxy / Traefik / TLDR modules', async () => {
+  it('does NOT import or call CLIProxy / Traefik modules', async () => {
     // If restartDashboard ever stops CLIProxy, this import graph check will
     // catch it at runtime: we fail the test if any of those symbols get
     // touched. This is the primary scope guard.

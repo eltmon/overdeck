@@ -13,10 +13,6 @@ vi.mock('../prompts.js', () => ({
   renderPrompt: renderPromptMock,
 }));
 
-vi.mock('../config-yaml.js', () => ({
-  isTldrEnabled: vi.fn(() => false),
-}));
-
 import { buildWorkAgentPrompt, type WorkAgentPromptContext } from '../work-agent-prompt.js';
 
 describe('buildWorkAgentPrompt PAN-1872 guards', () => {

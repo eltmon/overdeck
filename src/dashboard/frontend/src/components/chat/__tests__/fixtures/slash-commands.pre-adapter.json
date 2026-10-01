@@ -580,10 +580,6 @@
     "insert": "pan admin hooks status"
   },
   {
-    "label": "pan admin tldr",
-    "insert": "pan admin tldr "
-  },
-  {
     "label": "pan admin fpp",
     "insert": "pan admin fpp "
   },

@@ -87,13 +87,10 @@ interface RestartMarker {
  * loads new content-hashed chunk filenames (no ERR_MODULE_NOT_FOUND after rebuild).
  */
 async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<void> {
-  const { postMergeLifecycle, notifyTldrDaemon } = await import('../../lib/cloister/merge-agent.js');
+  const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
   // PAN-3917 (D1): the post-merge deploy step is gone, so there is no rebuild
   // loop left for this fresh process to opt out of.
   await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch);
-  if (pending.sourceBranch) {
-    await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
-  }
 }
 
 async function runClaimedPendingLifecycle(

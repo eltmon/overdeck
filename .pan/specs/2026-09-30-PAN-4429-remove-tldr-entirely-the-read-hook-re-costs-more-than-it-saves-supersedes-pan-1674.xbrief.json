@@ -1,0 +1,1396 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-30T00:31:25Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4429: Remove TLDR entirely: the read hook re-costs more than it saves (supersedes PAN-1674)",
+    "updated": "2026-09-30T00:39:53.704Z"
+  },
+  "plan": {
+    "id": "pan-4429",
+    "title": "Remove TLDR entirely: the read hook re-costs more than it saves (supersedes PAN-1674)",
+    "status": "running",
+    "uid": "9e118638-d9e2-4122-92f1-ae0f5606c28f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-09-30T00:31:25Z",
+    "updated": "2026-09-30T00:39:53.704Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4429",
+        "label": "PAN-4429",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tldr",
+      "removal",
+      "hooks",
+      "migration",
+      "cleanup"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator scoped one atomic removal of the TLDR feature. Removing the agents.tldr config type and src/lib/tldr-daemon.ts is compile-coupled to every consumer across CLI, server, frontend, prompts and hooks, and the settings.json unregister migration must ship with the hook-script deletion. The 20 items are small vertical slices with explicit edges; the wide file surface comes from deletion, not new design.",
+      "canonicalFilename": "2026-09-30-PAN-4429-remove-tldr-entirely-the-read-hook-re-costs-more-than-it-saves-supersedes-pan-1674.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "TLDR's Read hook denies Reads of code files over 3 KB and injects an outline, but a 14-day audit of 2,071 transcripts found agents re-read the file after 92% of 282 denials, adding a model turn each time. Every new workspace also pip-installs ~1.5 GB of CPU torch + llm-tldr and starts a daemon, even with agents.tldr.enabled false; 18 copies filled the disk on 2026-09-29.",
+      "Proposal": "Delete every TLDR code path (hooks, venv install, daemon lifecycle, CLI verbs, HTTP routes, Health/Metrics panel, Settings toggle, prompt variable, role guidance, cost fields, skills, docs). Migrate existing installs: pan sync/pan install unregister the tldr hooks from ~/.claude/settings.json before deleting ~/.overdeck/bin/tldr-*, remove the mcp.json tldr server, dashboard boot stops leftover daemons via pidfiles, pan sync prints a one-line hint about leftover .venv/.tldr/ dirs, and agents.tldr in config.yaml loads silently and is dropped on the next Settings save. Keep the disk-space floor commit 70fe945e5d6 from feature/pan-1674.",
+      "NonGoals": "- Deleting any .venv or .tldr/ directory in a user checkout\n- Taking anything from feature/pan-1674 other than commit 70fe945e5d6\n- Editing historical docs (docs/prds/**, docs/history/**, .release/**, CHANGELOG.md history, .pan/**, vbrief/**, design and mockup files)\n- Removing .venv/ or .tldr/ from .gitignore or .mintignore\n- Renaming the tldr sibling server in tests/lib/claude-mcp.test.ts\n- Adding a replacement code-summary feature or keeping TLDR behind a flag\n- Adding a committed test that greps repository source for 'tldr'"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep one issue with plan.metadata.sizeJustification instead of splitting into sibling issues",
+        "rationale": "The operator filed a single atomic removal; config-type and tldr-daemon.ts deletion is compile-coupled to every consumer, and the hook unregister must ship with the script deletion."
+      },
+      {
+        "summary": "Unparseable settings.json during retire: do not rewrite it, still delete the bin files",
+        "rationale": "Claude Code loads no hooks from an invalid settings file, and syncHooks' manifest prune deletes the bins anyway; refusing to overwrite follows PAN-1137."
+      },
+      {
+        "summary": "Retire agents.tldr silently on load (no warning) and drop it on the next Settings save",
+        "rationale": "The models.overrides warning exists because operators must move values; a TLDR key needs no action. Matches THE-CUT precedent for owns_inspection."
+      },
+      {
+        "summary": "Stop legacy daemons at dashboard boot, unmarked and idempotent, with a /proc or ps cmdline check",
+        "rationale": "Dashboard boot runs on both pan up and pan reload; the cmdline check prevents killing a reused pid."
+      },
+      {
+        "summary": "Print the leftover .venv/.tldr/ hint from pan sync only when a .tldr/ directory exists",
+        "rationale": "pan sync output is what the operator reads; .tldr/ is a reliable signal the dirs were TLDR's, while .venv alone may be the user's."
+      },
+      {
+        "summary": "Remove the 'TLDR section' surface from the health no-loss matrix instead of marking it SUPERSEDED",
+        "rationale": "system-health-no-loss.test.ts requires exactly one SUPERSEDED row; THE-CUT.md records the deletion."
+      },
+      {
+        "summary": "Add pan-tldr and pan-admin-tldr to LEGACY_SKILL_NAMES in addition to manifest pruning",
+        "rationale": "Installs from before the skills manifest have no manifest entries, so manifest pruning alone would leave the skills behind."
+      },
+      {
+        "summary": "retireTldrHooks also prunes each registered checkout's .claude/settings.json, settings.local.json and mcp.json",
+        "rationale": "copyOverdeckSettingsToWorkspace merged the global tldr hooks into at least ten existing workspaces' untracked .claude/settings.json; without the sweep, Reads in those workspaces would call deleted scripts."
+      }
+    ],
+    "items": [
+      {
+        "id": "workspace-disk-floor",
+        "title": "Cherry-pick the disk safety floor into createWorkspace",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/disk-floor.ts",
+            "src/lib/__tests__/disk-floor.test.ts",
+            "src/lib/workspace-manager/create.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/disk-floor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disk-floor.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Run `git cherry-pick 70fe945e5d6`. It conflicts only in create.ts because PAN-1674 imported `./tldr-venv.js`, which does not exist on main: keep main's imports, add `import { checkDiskFloor } from '../disk-floor.js';`, and insert the `checkDiskFloor(projectConfig.path)` refusal between the dry-run `return result;` and the `// PAN-1990 FR-6/AC-4` workspace-row creation. Keep the original commit message and its `Item: workspace-disk-floor` trailer. Take nothing else from feature/pan-1674."
+        },
+        "items": [
+          {
+            "id": "workspace-disk-floor.ac1",
+            "title": "Given a filesystem with under 10 GiB free, when createWorkspace runs, then it returns success=false with the 'workspace creation needs at least 10.0 GiB' error and creates no workspace row (disk-floor.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-disk-floor.ac2",
+            "title": "Given create.ts, `git grep -n checkDiskFloor src/lib/workspace-manager/create.ts` shows the call placed before the `PAN-1990 FR-6/AC-4` row creation and after the dryRun return",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retire-tldr-hooks",
+        "title": "Unregister TLDR hooks from settings.json before deleting their scripts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/retired-hooks.ts",
+            "src/lib/__tests__/retired-hooks.test.ts",
+            "src/lib/claude-hooks-registration.ts",
+            "src/lib/claude-hooks-provision.ts",
+            "src/cli/commands/sync.ts",
+            "src/cli/commands/setup/hooks.ts",
+            "roles/work.md",
+            "src/cli/commands/__tests__/setup-hooks.test.ts",
+            "src/lib/__tests__/claude-hooks-provision.test.ts",
+            "src/lib/workspace-manager/migration.ts",
+            "sync-sources/hooks/tldr-*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/retired-hooks.test.ts src/cli/commands/__tests__/setup-hooks.test.ts src/lib/__tests__/claude-hooks-provision.test.ts packages/contracts/src/__tests__/hook-inventory.test.ts src/lib/__tests__/role-definitions.test.ts",
+            "npm run typecheck",
+            "bash scripts/check-prompt-change-trailer.sh"
+          ],
+          "expected_outputs": [
+            "all five test files pass",
+            "typecheck completes without errors",
+            "prompt-change trailer check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "legacy-tldr-cleanup",
+            "delete-tldr-core"
+          ],
+          "acJustification": "Six criteria: the global unregister, idempotency, the unparseable branch, mcp.json, the per-workspace sweep and the call ordering are each separately observable parts of one inseparable migration.",
+          "parallelSafeReason": "Its only file shared with another item is src/cli/commands/sync.ts, and legacy-tldr-cleanup is ordered after it by a blocks edge; every other file in its scope is owned by this item alone."
+        },
+        "narrative": {
+          "Action": "PRD W2. Create src/lib/retired-hooks.ts with RETIRED_HOOK_SCRIPT_NAMES, pure pruneRetiredOverdeckHooks(settings, binDir) (matches `<binDir>/<name>` and literal `overdeck/bin/<name>`, every hook type, drops a matcher group only when all its hooks were retired), and async retireTldrHooks({settingsPath, binDir, mcpPath}) that prunes+backs up+atomically writes settings.json, THEN deletes the bin files, then removes mcp.json mcpServers.tldr when its command ends with tldr-mcp. Unparseable settings.json: no write, return warning, still delete the bins. VITEST guard like provisionClaudeHooks. No jq/python3 dependency. Wire: call retireTldrHooks() in src/cli/commands/sync.ts BEFORE `syncHooks()`; call pruneRetiredOverdeckHooks at the start of applyOverdeckHookRegistrations (labels into `removed`); call retireTldrHooks() in setupHooksCommand after its settings write (pan install path). In the same commit delete the two sync-sources/hooks/tldr-* scripts, their HOOK_SCRIPT_NAMES entries and registration rows, the requiresPython3 field, the python3Available option and its probes, the setup/hooks.ts python3 check + mcp.json tldr writer + TLDR success lines, and the two tldr hook groups in roles/work.md frontmatter. Commit body carries `Prompt-Change: remove TLDR hooks from the work role (PAN-4429)`. Also export listCandidateCheckouts() (registered project roots from listProjectsSync plus each dir in <root>/workspaces/) and, before deleting the bins, apply the same prune to each checkout's .claude/settings.json and .claude/settings.local.json and the tldr-server removal to its .claude/mcp.json (these are copies made by copyOverdeckSettingsToWorkspace in src/lib/workspace-manager/migration.ts); write only changed files, skip missing or unparseable ones. migration.ts itself needs no change: once the global settings are clean, new workspaces copy no tldr hooks."
+        },
+        "items": [
+          {
+            "id": "retire-tldr-hooks.ac1",
+            "title": "Given a settings.json with tldr-read-enforcer and tldr-post-edit entries in both `<binDir>/<name>` and `overdeck/bin/<name>` forms plus unrelated hooks, when retireTldrHooks runs, then it writes settings.json with no tldr- entries, preserves every unrelated hook, and deletes both bin files (retired-hooks.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-tldr-hooks.ac2",
+            "title": "Given retireTldrHooks already ran, when it runs again, then it returns no unregistered entries and leaves settings.json byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-tldr-hooks.ac3",
+            "title": "Given an unparseable settings.json, when retireTldrHooks runs, then it does not rewrite the file, returns a warning, and still deletes the bin files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-tldr-hooks.ac4",
+            "title": "Given mcp.json with a `tldr` server whose command ends with tldr-mcp and another server, when retireTldrHooks runs, then the tldr server is removed and the other server is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-tldr-hooks.ac6",
+            "title": "Given a registered workspace whose .claude/settings.json has tldr-read-enforcer entries and whose .claude/mcp.json has a tldr-mcp server, when retireTldrHooks runs, then both files are rewritten without those entries and their other hooks and servers are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-tldr-hooks.ac5",
+            "title": "Given src/cli/commands/sync.ts, the retireTldrHooks() call appears before the syncHooks() call, and applyOverdeckHookRegistrations no longer accepts a python3Available option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-create-no-venv",
+        "title": "Remove the TLDR venv install from workspace creation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts",
+            "src/lib/workspace-manager/worktree-ops.ts",
+            "src/lib/workspace-manager.ts",
+            "src/lib/__tests__/relocate-venv-scripts.test.ts",
+            "scripts/patches/llm-tldr-tsx-support.py",
+            ".tldrignore",
+            ".gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n -i -E 'python3|pip install|tldr|relocateVenvScripts' -- src/lib/workspace-manager/ src/lib/workspace-manager.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. Delete the create.ts block from `// Setup TLDR code analysis for workspace` through its `TLDR setup failed:` catch, the relocateVenvScripts import, relocateVenvScripts + docstring in worktree-ops.ts, its re-export in src/lib/workspace-manager.ts, relocate-venv-scripts.test.ts, scripts/patches/llm-tldr-tsx-support.py and .tldrignore. Keep `.venv/` and `.tldr/` in .gitignore; reword the comment to `# Legacy TLDR/Python venv dirs (PAN-4429 removed TLDR; keep them untracked)`."
+        },
+        "items": [
+          {
+            "id": "workspace-create-no-venv.ac1",
+            "title": "Given workspace creation code, `git grep -n -i -E 'python3|pip install|tldr|relocateVenvScripts' -- src/lib/workspace-manager/ src/lib/workspace-manager.ts` returns no lines, so createWorkspace runs no python or pip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-create-no-venv.ac2",
+            "title": "Given the repo, .tldrignore and scripts/patches/llm-tldr-tsx-support.py no longer exist and .gitignore still ignores `.venv/` and `.tldr/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-lifecycle-no-daemon",
+        "title": "Stop starting or stopping TLDR daemons in spawn, remove, teardown and merge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/remove.ts",
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/supervisor-channels.ts",
+            "src/lib/cloister/merge-agent.ts",
+            "src/dashboard/server/pending-lifecycle.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n -i tldr -- src/lib/workspace-manager/remove.ts src/lib/lifecycle/ src/lib/agents/spawn.ts src/lib/agents/supervisor-channels.ts src/lib/cloister/merge-agent.ts src/dashboard/server/pending-lifecycle.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Delete the TLDR stop block in remove.ts, stopTldrDaemon/stopTldrDaemonImpl and the `// 4. Stop TLDR daemon` step in teardown-workspace.ts (renumber later step comments), the TLDR mention in workflows.ts:152 and supervisor-channels.ts:376 comments, the `// Ensure TLDR daemon is running` block in spawn.ts (import becomes loadConfigSync only), notifyTldrDaemon and its call in merge-agent.ts, and the notifyTldrDaemon import/call in pending-lifecycle.ts. Remove imports this orphans."
+        },
+        "items": [
+          {
+            "id": "workspace-lifecycle-no-daemon.ac1",
+            "title": "Given the seven files, `git grep -n -i tldr` over them returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-lifecycle-no-daemon.ac2",
+            "title": "Given teardownWorkspace runs with deleteWorkspace, then it produces no `teardown:tldr-daemon` step result and postMergeLifecycle calls no TLDR notifier (typecheck passes with notifyTldrDaemon deleted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-admin-tldr-verb",
+        "title": "Delete the pan admin tldr verb",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/tldr-handler.ts",
+            "src/cli/commands/admin/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/fixtures/slash-commands.pre-adapter.json",
+            "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli && npm run generate:slash-commands",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
+            "bash scripts/lint-slash-commands.sh"
+          ],
+          "expected_outputs": [
+            "generator rewrites the manifest without pan-admin-tldr",
+            "both no-loss tests pass",
+            "slash-command drift lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. Delete tldr-handler.ts and the `.command('tldr [action] [workspace]')` registration in admin/index.ts. Rebuild the CLI and regenerate the composer manifest. Remove the `pan admin tldr` entry from slash-commands.pre-adapter.json and change `toHaveLength(227)` to 226 in both no-loss tests."
+        },
+        "items": [
+          {
+            "id": "cli-admin-tldr-verb.ac1",
+            "title": "Given the built CLI, `node dist/cli/index.js admin tldr` exits non-zero as an unknown command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-admin-tldr-verb.ac2",
+            "title": "Given the regenerated manifest, composer-commands.generated.ts contains no `pan-admin-tldr` entry and both no-loss tests pass with 226 pre-adapter commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-status-tldr",
+        "title": "Delete pan status --tldr and the per-agent TLDR metrics line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/status.ts",
+            "src/cli/index.ts",
+            "tests/lib/tldr-status.test.ts",
+            "src/cli/commands/__tests__/status-harness.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli && npm run generate:slash-commands",
+            "npx vitest run src/cli/commands/__tests__/status-harness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "manifest regenerated without --tldr",
+            "status-harness.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In status.ts delete the tldr-daemon import, `tldr?: boolean`, the `if (options.tldr)` branch, the per-agent `TLDR:` metrics block and TldrIndexEntry…tldrIndexStatusCommand. Delete `.option('--tldr', …)` from src/cli/index.ts. Delete tests/lib/tldr-status.test.ts and the tldr-daemon vi.mock in status-harness.test.ts. Regenerate the composer manifest (runs after cli-admin-tldr-verb, which also regenerates it)."
+        },
+        "items": [
+          {
+            "id": "cli-status-tldr.ac1",
+            "title": "Given the built CLI, `node dist/cli/index.js status --tldr` exits non-zero with an unknown-option error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-status-tldr.ac2",
+            "title": "Given status.ts and the regenerated manifest, `git grep -n -i tldr -- src/cli/commands/status.ts packages/contracts/src/composer-commands.generated.ts` returns only the restart description line that cli-sidecar-daemon removes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-sidecar-daemon",
+        "title": "Stop starting and stopping TLDR in pan up, dev, down and restart",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/up-sidecars.ts",
+            "src/cli/commands/dev.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/restart.ts",
+            "src/cli/commands/dashboard-lifecycle-commands.ts",
+            "tests/fixtures/pan-help.txt",
+            "src/lib/platform-lifecycle.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build:cli && npm run generate:slash-commands",
+            "npx vitest run tests/unit/lib/platform-lifecycle.test.ts",
+            "git grep -n -i tldr -- src/cli/ src/lib/platform-lifecycle.ts packages/contracts/src/composer-commands.generated.ts tests/fixtures/pan-help.txt"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "manifest regenerated",
+            "platform-lifecycle.test.ts passes",
+            "grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Delete the TLDR start blocks in up-sidecars.ts and dev.ts, the `pan down` TLDR stop block and comment in src/cli/index.ts, the tldrAvailable/stop/start blocks and TLDR comments/message in restart.ts (message becomes '  CLIProxy and Traefik were left running.'), the TLDR words in dashboard-lifecycle-commands.ts, and `'tldr'` from the StageFailure stage union plus comments in platform-lifecycle.ts and its test. Hand-edit tests/fixtures/pan-help.txt to the new wrapped description. Regenerate the manifest."
+        },
+        "items": [
+          {
+            "id": "cli-sidecar-daemon.ac1",
+            "title": "Given the CLI source, `git grep -n -i tldr -- src/cli/ src/lib/platform-lifecycle.ts` returns no lines, so pan up, pan dev, pan down and pan restart --full never start or stop a TLDR daemon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-sidecar-daemon.ac2",
+            "title": "Given the built CLI, `node dist/cli/index.js restart --help` prints 'leaves CLIProxy and Traefik running' and tests/fixtures/pan-help.txt matches that text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-services-routes",
+        "title": "Delete the /api/services/tldr routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/tldr.ts",
+            "src/dashboard/server/routes/misc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no-loss-matrix.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. Delete routes/misc/tldr.ts (GET status, POST start/stop/reload) and remove tldrRouteLayer's import, layer entry and doc lines from routes/misc.ts."
+        },
+        "items": [
+          {
+            "id": "server-services-routes.ac1",
+            "title": "Given the running dashboard, GET /api/services/tldr/status returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-services-routes.ac2",
+            "title": "Given src/dashboard/server/routes/misc.ts, it no longer imports or mounts tldrRouteLayer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-admin-workspace-routes",
+        "title": "Delete the admin and workspace TLDR routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/admin.ts",
+            "tests/unit/dashboard/server/routes/admin.test.ts",
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/routes/workspaces/workspace-data.ts",
+            "src/dashboard/server/routes/resources/core-services.ts",
+            "tests/unit/dashboard/routes/resources-core-services.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-core-services.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resources-core-services.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. Delete getAdminTldrRoute (+ import, doc line, layer entry) in admin.ts and delete admin.test.ts (whole file tests that route). Remove the unused tldr import and doc line in workspaces.ts. Delete getIndexStats, getWorkspaceTldrRoute, its layer entry, import and doc lines in workspace-data.ts. Drop `|tldr` from the isSupportFleetProcess regex in core-services.ts and update its test (remove the tldr process, memberCount 3, cpuPercent 7.5, memoryBytes 90_000_000, retitle)."
+        },
+        "items": [
+          {
+            "id": "server-admin-workspace-routes.ac1",
+            "title": "Given the running dashboard, GET /api/admin/tldr/PAN-1 and GET /api/workspaces/PAN-1/tldr return 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-admin-workspace-routes.ac2",
+            "title": "Given a process named 'tldr daemon', isSupportFleetProcess no longer counts it as a support-fleet member (resources-core-services.test.ts passes with 3 members)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-health-metrics",
+        "title": "Delete the TLDR service panel from Health and Metrics",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TldrServiceStatus.tsx",
+            "src/dashboard/frontend/src/components/HealthDashboard.tsx",
+            "src/dashboard/frontend/src/components/MetricsPage.tsx",
+            "src/dashboard/frontend/src/components/HealthDashboard.test.tsx",
+            "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+            "src/dashboard/frontend/tests/health-page.spec.ts",
+            "src/dashboard/frontend/tests/system-health-pill.spec.ts",
+            "src/dashboard/frontend/tests/ephemeral-specialist-ui.spec.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/HealthDashboard.test.tsx src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both component tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. Delete TldrServiceStatus.tsx; remove its import and render from HealthDashboard.tsx and the whole Services div from MetricsPage.tsx; strip the TLDR stubs and 'TLDR · Not configured (optional)' assertions (retitle the tests) in HealthDashboard.test.tsx and system-health-ui-no-loss.test.tsx; remove the TLDR page.route stubs and assertion from the three Playwright specs; drop 'TLDR' from the tool_read tools list in GodView/confluence/model.ts. Browser checks, if run, use an isolated Playwright browser profile."
+        },
+        "items": [
+          {
+            "id": "frontend-health-metrics.ac1",
+            "title": "Given the Health page with no agents, it renders host and Deacon status and renders no 'TLDR' text (HealthDashboard.test.tsx passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-health-metrics.ac2",
+            "title": "Given the Metrics page, it renders no 'Services' section and makes no request to /api/services/tldr/status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-health-metrics.ac3",
+            "title": "Given the frontend sources, `git grep -n -i tldr -- src/dashboard/frontend/` returns no lines outside the no-loss fixtures handled by other items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-settings-toggle",
+        "title": "Delete the TLDR toggle and reload button from Settings",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ExperimentalSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/CloseOutSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint reports no unused imports or props"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. Delete the reloadingTldr props, handleTldrToggle and the 'TLDR code-aware reads' row (toggle experimental-tldr-toggle and button tldr-reload-daemons) from ExperimentalSection.tsx, plus the orphaned queryClient prop and Loader2/RefreshCw imports; delete the reloadingTldr state and props (and queryClient prop if unused) in SettingsPage.tsx; change the CloseOutSection description to 'Stops the workspace's Docker stack and stray processes…'; delete `tldr?:` from Settings/types.ts agents."
+        },
+        "items": [
+          {
+            "id": "frontend-settings-toggle.ac1",
+            "title": "Given Settings → Experimental, it renders no element with data-testid experimental-tldr-toggle or tldr-reload-daemons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-settings-toggle.ac2",
+            "title": "Given the Settings sources, `git grep -n -i tldr -- src/dashboard/frontend/src/components/Settings/` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompts-tldr-available",
+        "title": "Delete the TLDR_AVAILABLE prompt variable and its prompt blocks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/work-agent-prompt.ts",
+            "src/lib/cloister/prompts/work.md",
+            "src/lib/cloister/prompts/resume-work.md",
+            "src/lib/cloister/prompts/review.md",
+            "src/lib/cloister/prompts/test.md",
+            "src/lib/cloister/__tests__/prompts.test.ts",
+            "src/lib/cloister/__tests__/work-agent-prompt-pan-1872.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/prompts.test.ts src/lib/cloister/__tests__/work-agent-prompt-pan-1872.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both prompt test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12. renderPrompt throws on undeclared variables, so land together: delete isTldrEnabled import and TLDR_AVAILABLE from work-agent-prompt.ts; delete `  - TLDR_AVAILABLE` and the {{#TLDR_AVAILABLE}} block from work.md, resume-work.md, review.md, test.md; delete the three TLDR guidance tests and the `TLDR_AVAILABLE: false` lines in prompts.test.ts; delete the isTldrEnabled vi.mock in work-agent-prompt-pan-1872.test.ts."
+        },
+        "items": [
+          {
+            "id": "prompts-tldr-available.ac1",
+            "title": "Given a work, resume-work, review or test prompt render, the output contains no 'TLDR' text and rendering does not throw an unknown-variable error (prompts.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-tldr-available.ac2",
+            "title": "Given src/lib/cloister/, `git grep -n -i tldr -- src/lib/cloister/` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "roles-tldr-guidance",
+        "title": "Strip TLDR guidance from the role prompts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/plan.md",
+            "roles/test.md",
+            "roles/review-correctness.md",
+            "roles/review-performance.md",
+            "roles/review-requirements.md",
+            "roles/review-security.md",
+            "src/lib/planning/__tests__/planner-context-no-duplicates.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/planner-context-no-duplicates.test.ts",
+            "bash scripts/check-prompt-change-trailer.sh"
+          ],
+          "expected_outputs": [
+            "planner-context test passes",
+            "prompt-change trailer check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W13. Delete the '## TLDR: prefer code summaries over full reads' section from the six role files, rewrite roles/plan.md:49 to 'Use Read only for the issue-specific delta.' and drop the TLDR sentence at roles/plan.md:109. Delete the 'documents the TLDR PreToolUse hook in exactly one of the two files' test. Commit body: `Prompt-Change: remove TLDR guidance from role prompts (PAN-4429)`."
+        },
+        "items": [
+          {
+            "id": "roles-tldr-guidance.ac1",
+            "title": "Given roles/, `git grep -n -i tldr -- roles/` returns no lines after this item and retire-tldr-hooks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-tldr-guidance.ac2",
+            "title": "Given the branch history, scripts/check-prompt-change-trailer.sh exits 0 because the role-editing commit carries a Prompt-Change trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-agents-tldr",
+        "title": "Retire the agents.tldr config key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/domain-mergers.ts",
+            "src/lib/config-yaml.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts",
+            "src/lib/config-yaml/__tests__/merge.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/config-yaml/ src/lib/__tests__/settings-api.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml and settings-api tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W14. Delete TldrConfig, NormalizedTldrConfig, the agents.tldr and normalized tldr fields, the tldr default, isTldrEnabled (and its barrel export), mergeTldrConfig and its call, and every agents.tldr branch in settings-api.ts (type, read, write, conversion, merge, validation, comment). Add `doc.deleteIn(['agents', 'tldr']);` beside the existing models.overrides deleteIn with comment `// agents.tldr is retired (PAN-4429); an explicit Settings save drops it.` Silent on load, no warning. Add tests to the existing config-yaml and settings-api test files (confirm exact file names with `git ls-files src/lib | grep -E 'settings-api.*test|config-yaml.*test'` and adjust files_scope)."
+        },
+        "items": [
+          {
+            "id": "config-agents-tldr.ac1",
+            "title": "Given a config.yaml containing `agents:\\n  tldr:\\n    enabled: true`, when the config loads, then it does not throw and the normalized config has no tldr property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-agents-tldr.ac2",
+            "title": "Given a YAML doc containing agents.tldr, when a Settings save writes it, then the written YAML contains no agents.tldr key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-agents-tldr.ac3",
+            "title": "Given the config sources, `git grep -n -i tldr -- src/lib/config-yaml/ src/lib/config-yaml.ts src/lib/settings-api.ts` returns only the retirement comment and deleteIn line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-metrics-bundle",
+        "title": "Delete TLDR cost-event fields and rebuild the cost hook bundle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/events.ts",
+            "sync-sources/hooks/record-cost-event.ts",
+            "sync-sources/hooks/record-cost-event.js",
+            "src/lib/__tests__/tldr-metrics.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:scripts",
+            "npm run typecheck",
+            "grep -c -i tldr sync-sources/hooks/record-cost-event.js"
+          ],
+          "expected_outputs": [
+            "bundle rebuilt",
+            "typecheck completes without errors",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W15. Delete the four tldr* fields and comment in costs/events.ts, the tldr-daemon import, metrics capture block, tldrAttachedToFirstEvent, tldrFields and its spread in record-cost-event.ts. Run `npm run build:scripts` AFTER config-agents-tldr (the bundle inlines config-yaml defaults) and commit the regenerated .js. Delete tldr-metrics.test.ts."
+        },
+        "items": [
+          {
+            "id": "cost-metrics-bundle.ac1",
+            "title": "Given the rebuilt bundle, `grep -c -i tldr sync-sources/hooks/record-cost-event.js` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-metrics-bundle.ac2",
+            "title": "Given a cost event written by record-cost-event, it carries no tldrInterceptions, tldrBypasses, tldrTokensSaved or tldrBypassReasons field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-tldr-cleanup",
+        "title": "Stop leftover TLDR daemons at dashboard boot and print the leftover-dir hint in pan sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/legacy-tldr-cleanup.ts",
+            "src/lib/__tests__/legacy-tldr-cleanup.test.ts",
+            "src/dashboard/server/main.ts",
+            "src/cli/commands/sync.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/legacy-tldr-cleanup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "legacy-tldr-cleanup.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W17. Create src/lib/legacy-tldr-cleanup.ts importing listCandidateCheckouts() from ./retired-hooks.js, with async stopLegacyTldrDaemons(checkouts?, deps?) that reads <checkout>/.tldr/daemon.pid, skips dead pids (process.kill(pid,0)), reads the command line from /proc/<pid>/cmdline or `execFile('ps', ['-o','command=','-p',pid])`, and sends SIGTERM only when it contains 'tldr'; and findLegacyTldrCheckouts(). No execSync (dashboard-reachable). Fire-and-forget stopLegacyTldrDaemons() after the HTTP bind in src/dashboard/server/main.ts with a log line when pids were signalled. In src/cli/commands/sync.ts, after the retire step, print one dim line when findLegacyTldrCheckouts() is non-empty. Never delete .venv or .tldr/."
+        },
+        "items": [
+          {
+            "id": "legacy-tldr-cleanup.ac1",
+            "title": "Given a checkout whose .tldr/daemon.pid names a live process whose command line contains 'tldr', when stopLegacyTldrDaemons runs, then it sends SIGTERM to that pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-tldr-cleanup.ac2",
+            "title": "Given a pidfile naming a live process whose command line lacks 'tldr', or a dead pid, or a garbage pidfile, when stopLegacyTldrDaemons runs, then it sends no signal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-tldr-cleanup.ac3",
+            "title": "Given two checkouts where only one has a .tldr/ directory, findLegacyTldrCheckouts returns only that checkout and no directory is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-tldr-cleanup.ac4",
+            "title": "Given src/lib/legacy-tldr-cleanup.ts, `git grep -n execSync src/lib/legacy-tldr-cleanup.ts` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-removal",
+        "title": "Delete the pan-tldr and pan-admin-tldr skills and TLDR text in other skills",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-tldr/SKILL.md",
+            "sync-sources/skills/pan-admin-tldr/SKILL.md",
+            "src/lib/sync.ts",
+            "tests/unit/lib/sync-remove-legacy-skills.test.ts",
+            "tests/fixtures/synced-skills.txt",
+            "sync-sources/skills/pan/SKILL.md",
+            "sync-sources/skills/pan-dev/SKILL.md",
+            "sync-sources/skills/pan-restart/SKILL.md",
+            "sync-sources/skills/pan-stop-all-agents/SKILL.md",
+            "sync-sources/skills/benchmark/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-remove-legacy-skills.test.ts tests/fixtures/synced-skills.test.ts",
+            "git grep -n -i tldr -- sync-sources/skills/"
+          ],
+          "expected_outputs": [
+            "both tests pass",
+            "grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W18. Delete both skill directories. Add 'pan-tldr' and 'pan-admin-tldr' to LEGACY_SKILL_NAMES in removeLegacySkills070 (src/lib/sync.ts) and replace the PAN-1132 comment with `// pan-tldr and pan-admin-tldr: TLDR was removed (PAN-4429).` Update sync-remove-legacy-skills.test.ts (add both names to the hard-coded list; use pan-help as the non-legacy example). Regenerate synced-skills.txt with UPDATE_FIXTURES=1. Strip TLDR text from pan, pan-dev (delete Step 10, renumber), pan-restart, pan-stop-all-agents and benchmark SKILL.md files as the PRD specifies."
+        },
+        "items": [
+          {
+            "id": "skills-removal.ac1",
+            "title": "Given a ~/.claude/skills containing pan-tldr and pan-admin-tldr, when removeLegacySkills070 runs, then both directories are removed and pan-help is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-removal.ac2",
+            "title": "Given sync-sources/skills/, `git grep -n -i tldr -- sync-sources/skills/` returns no lines and synced-skills.txt lists neither skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-rows",
+        "title": "Record every deleted TLDR surface in the no-loss map",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/system-health-no-loss.test.ts",
+            "docs/THE-CUT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts tests/unit/dashboard/system-health-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "both no-loss tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W19. Flip the six TLDR HTTP rows (admin tldr, four services/tldr, workspaces tldr) to disposition DELETE with door 'TLDR removed (PAN-4429)'; add kind 'cli' DELETE rows for `pan admin tldr` and `pan status --tldr`; fix the comment naming TldrServiceStatus. Remove 'TLDR section' from HEALTH_NO_LOSS_MATRIX and REQUIRED_SURFACES (do not mark SUPERSEDED). Add THE-CUT.md rows for the CLI verb, the status flag, the routes, the Health/Metrics panel, the agents.tldr Settings toggle and reload button, features/tldr.mdx and the two skills, each ending 'dropped (PAN-4429) — the read hook cost more turns than it saved; see the changelog'."
+        },
+        "items": [
+          {
+            "id": "no-loss-rows.ac1",
+            "title": "Given no-loss-matrix.ts, every surface containing 'tldr' has disposition DELETE with a PAN-4429 reason, and rows exist for `pan admin tldr` and `pan status --tldr`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-rows.ac2",
+            "title": "Given docs/THE-CUT.md, it lists the TLDR CLI verb, status flag, routes, Health panel, Settings toggle, doc page and skills as dropped (PAN-4429)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-rows.ac3",
+            "title": "Given the health no-loss test, it passes with no 'TLDR section' surface and exactly one SUPERSEDED row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-docs-changelog",
+        "title": "Remove TLDR from user and developer docs and add the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/tldr.mdx",
+            "docs.json",
+            "CLAUDE.md",
+            "README.md",
+            "features/skills.mdx",
+            "reference/token-spend-report.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "docs/SKILL-DISTRIBUTION-ANALYSIS.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"JSON.parse(require('fs').readFileSync('docs.json','utf8'))\"",
+            "git grep -n -i tldr -- CLAUDE.md README.md features/ reference/ docs.json docs/CONTEXT-LAYERS.md docs/SKILL-DISTRIBUTION-ANALYSIS.md"
+          ],
+          "expected_outputs": [
+            "docs.json parses",
+            "grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W20. Delete features/tldr.mdx and its docs.json nav entry (fix the preceding trailing comma). Delete the TLDR line in CLAUDE.md Small-But-Sharp, the README row, the features/skills.mdx pan-tldr row, the CONTEXT-LAYERS.md tldr-read-enforcer row and the SKILL-DISTRIBUTION-ANALYSIS.md pan-tldr row; change token-spend-report.mdx to 'RTK, Caveman'. Add a v0.65.0 Unreleased <Update> block in changelog.mdx (or extend an existing Unreleased block) with a '#### Changed' entry 'TLDR removed' stating the audit numbers, the dropped ~1.5 GB venv, that pan sync unregisters hooks and dashboard boot stops old daemons, that .venv/.tldr/ dirs are kept, that agents.tldr is ignored, and that agents started before the upgrade should be restarted; link #4429. Leave historical docs untouched."
+        },
+        "items": [
+          {
+            "id": "tldr-docs-changelog.ac1",
+            "title": "Given the docs site config, docs.json parses as JSON and contains no 'features/tldr' entry, and features/tldr.mdx does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-docs-changelog.ac2",
+            "title": "Given CLAUDE.md, README.md, features/, reference/, docs/CONTEXT-LAYERS.md and docs/SKILL-DISTRIBUTION-ANALYSIS.md, a case-insensitive grep for tldr returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-docs-changelog.ac3",
+            "title": "Given changelog.mdx, its newest Unreleased block contains a 'TLDR removed' entry that states 282 denials across 2,071 transcripts, that .venv/.tldr/ directories are not deleted, and that agents started before the upgrade should be restarted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-tldr-core",
+        "title": "Delete tldr-daemon.ts and verify no TLDR code remains",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-30T00:31:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4429",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tldr-daemon.ts",
+            "scripts/codemods/rename-sync-suffix-sync-candidates.json",
+            "scripts/codemods/rename-sync-suffix-targets.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -il tldr -- src sync-sources scripts packages roles",
+            "npm run typecheck",
+            "npm run build:cli && npm run lint"
+          ],
+          "expected_outputs": [
+            "grep lists only src/lib/retired-hooks.ts, src/lib/legacy-tldr-cleanup.ts, their tests, and their call sites in src/cli/commands/sync.ts, src/cli/commands/setup/hooks.ts, src/lib/claude-hooks-registration.ts, src/lib/sync.ts and src/dashboard/server/main.ts",
+            "typecheck completes without errors",
+            "lint exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-2",
+            "NFR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W16. After every other code item lands, delete src/lib/tldr-daemon.ts and remove the TLDR objects (isTldrEnabledSync and the four tldr-daemon.ts entries) from both codemod JSON files, keeping them valid JSON. Run the NFR-2 grep and fix any stray reference in the owning item's spirit. Do not add a committed test that greps source."
+        },
+        "items": [
+          {
+            "id": "delete-tldr-core.ac1",
+            "title": "Given the finished branch, `git grep -il tldr -- src sync-sources scripts packages roles` returns only the migration modules, their tests and their call sites listed in expected_outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-tldr-core.ac2",
+            "title": "Given the finished branch, `npm run typecheck` and `npm run build:cli && npm run lint` exit 0 with src/lib/tldr-daemon.ts deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "workspace-disk-floor",
+        "to": "workspace-create-no-venv",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-tldr-hooks",
+        "to": "legacy-tldr-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-admin-tldr-verb",
+        "to": "cli-status-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-status-tldr",
+        "to": "cli-sidecar-daemon",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-lifecycle-no-daemon",
+        "to": "config-agents-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "server-services-routes",
+        "to": "config-agents-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "prompts-tldr-available",
+        "to": "config-agents-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "config-agents-tldr",
+        "to": "cost-metrics-bundle",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-create-no-venv",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-sidecar-daemon",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "server-admin-workspace-routes",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-health-metrics",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "roles-tldr-guidance",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-metrics-bundle",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-tldr-cleanup",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-removal",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-settings-toggle",
+        "to": "delete-tldr-core",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

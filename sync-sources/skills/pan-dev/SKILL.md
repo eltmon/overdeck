@@ -13,7 +13,7 @@ allowed-tools:
 
 # Start Overdeck in Development Mode
 
-Start the dashboard server (Node 22, bundled) and the Vite frontend dev server (HMR on port 3010) for active dashboard development. Traefik, skills sync, and TLDR are started the same as `pan up`.
+Start the dashboard server (Node 22, bundled) and the Vite frontend dev server (HMR on port 3010) for active dashboard development. Traefik and skills sync are started the same as `pan up`.
 
 ## When to Use
 
@@ -167,16 +167,7 @@ for i in $(seq 1 10); do
 done
 ```
 
-### Step 10: Start TLDR daemon (if .venv exists)
-
-```bash
-cd ~/Projects/overdeck
-if [ -d .venv ]; then
-  pan admin tldr start 2>/dev/null || echo "TLDR unavailable (non-fatal)"
-fi
-```
-
-### Step 11: Report status
+### Step 10: Report status
 
 Print:
 - Server: `http://localhost:3011` (API)

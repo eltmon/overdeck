@@ -609,8 +609,6 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
     /** RTK Bash output compression configuration */
     rtk?: RtkConfig;
-    /** TLDR token-efficient code-analysis configuration */
-    tldr?: TldrConfig;
   };
 
   /** TTS configuration */
@@ -769,21 +767,6 @@ export interface CavemanConfig {
 }
 
 export interface RtkConfig {
-  enabled?: boolean;
-}
-
-/**
- * TLDR (token-efficient code analysis) configuration.
- *
- * When enabled, work/planning agents whose workspace has a TLDR `.venv` get the
- * TLDR MCP tools wired in and their prompt advertises TLDR as available; the
- * per-workspace TLDR daemon is started at spawn. When disabled, agents fall back
- * to direct file reads regardless of whether a `.venv` is present. Default ON to
- * preserve historical behaviour (TLDR was implicitly on whenever a `.venv`
- * existed). Changing this only affects sessions launched/resumed AFTER the
- * change — running agents must be resumed to pick it up.
- */
-export interface TldrConfig {
   enabled?: boolean;
 }
 
@@ -964,9 +947,6 @@ export interface NormalizedConfig {
   /** RTK Bash output compression configuration (normalised, never undefined) */
   rtk: NormalizedRtkConfig;
 
-  /** TLDR token-efficient code-analysis configuration (normalised, never undefined) */
-  tldr: NormalizedTldrConfig;
-
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
 
@@ -1083,11 +1063,6 @@ export interface NormalizedCavemanConfig {
 }
 
 export interface NormalizedRtkConfig {
-  enabled: boolean;
-}
-
-/** Normalized TLDR configuration (never undefined). */
-export interface NormalizedTldrConfig {
   enabled: boolean;
 }
 

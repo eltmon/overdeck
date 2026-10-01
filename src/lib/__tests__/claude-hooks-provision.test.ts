@@ -17,9 +17,9 @@ import { provisionClaudeHooks } from '../claude-hooks-provision.js';
 describe('applyOverdeckHookRegistrations', () => {
   const binDir = '/home/user/.overdeck/bin';
 
-  it('registers every table entry into empty settings (python3 available)', () => {
+  it('registers every table entry into empty settings', () => {
     const settings: ClaudeSettings = {};
-    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir, { python3Available: true });
+    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir);
 
     expect(removed).toEqual([]);
     expect(added).toHaveLength(OVERDECK_HOOK_REGISTRATIONS.length);
@@ -29,12 +29,11 @@ describe('applyOverdeckHookRegistrations', () => {
       entry.hooks.some((hook) => hook.command === join(binDir, 'permission-event-hook')))).toBe(true);
   });
 
-  it('skips TLDR hooks without python3 and is idempotent', () => {
+  it('is idempotent', () => {
     const settings: ClaudeSettings = {};
-    const first = applyOverdeckHookRegistrations(settings, binDir, { python3Available: false });
-    expect(first.added.some((entry) => entry.includes('tldr'))).toBe(false);
+    applyOverdeckHookRegistrations(settings, binDir);
 
-    const second = applyOverdeckHookRegistrations(settings, binDir, { python3Available: false });
+    const second = applyOverdeckHookRegistrations(settings, binDir);
     expect(second.added).toEqual([]);
     expect(second.removed).toEqual([]);
   });
@@ -48,7 +47,7 @@ describe('applyOverdeckHookRegistrations', () => {
         ],
       },
     };
-    applyOverdeckHookRegistrations(settings, binDir, { python3Available: true });
+    applyOverdeckHookRegistrations(settings, binDir);
 
     expect(settings.statusLine).toEqual({ type: 'command', command: 'my-statusline' });
     expect(settings.hooks?.PreToolUse?.[0]).toEqual(
@@ -64,7 +63,7 @@ describe('applyOverdeckHookRegistrations', () => {
         ],
       },
     };
-    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir, { python3Available: false });
+    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir);
 
     expect(removed).toContain('Stop:stop-hook');
     expect(added).toContain('Stop:stop-hook');
@@ -87,14 +86,14 @@ describe('applyOverdeckHookRegistrations', () => {
       };
       const before = JSON.stringify(herdrEntry);
 
-      const first = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin', { python3Available: true });
+      const first = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin');
       expect(first.added).toContain('SessionStart:session-start-hook');
       expect(first.removed).toEqual([]);
       expect(JSON.stringify(settings.hooks?.SessionStart?.[0])).toBe(before);
       expect(settings.hooks?.SessionStart?.some((entry) =>
         entry.hooks.some((hook) => hook.command === '/home/op/.overdeck/bin/session-start-hook'))).toBe(true);
 
-      const second = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin', { python3Available: true });
+      const second = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin');
       expect(second).toEqual({ added: [], removed: [] });
       expect(JSON.stringify(settings.hooks?.SessionStart?.[0])).toBe(before);
       expect(settings.hooks?.SessionStart).toHaveLength(2);

@@ -414,20 +414,6 @@ export function isClaudeCodeChannelsMcpEnabled(): boolean {
 }
 
 /**
- * Whether TLDR (token-efficient code analysis) is enabled. Gates whether agents
- * advertise/use the TLDR MCP tools and whether the per-workspace TLDR daemon is
- * started at spawn. Read at session launch — a change only affects sessions
- * launched/resumed after it. Defaults to true when unset.
- */
-export function isTldrEnabled(): boolean {
-  try {
-    return loadConfigSync().config.tldr.enabled;
-  } catch {
-    return DEFAULT_CONFIG.tldr.enabled;
-  }
-}
-
-/**
  * The `ui.open_in_editor_command` template (e.g. `cursor {path}`), or null when
  * unset. Null is the gate: the workspace band hides "Open in editor" entirely
  * rather than guessing an editor (PAN-3331).

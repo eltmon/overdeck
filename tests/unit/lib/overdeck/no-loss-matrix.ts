@@ -48,7 +48,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────
-  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
 
   // ── artifacts.ts (actual paths from codebase) ─────────────────────────────
@@ -434,10 +434,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/planning/:issueId/status',         kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (planning status)' },
   { surface: 'POST /api/planning/:issueId/message',       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver (planning session)' },
   { surface: 'DELETE /api/planning/:issueId',             kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
-  { surface: 'GET /api/services/tldr/status',             kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/start',             kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/stop',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/reload',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
+  { surface: 'GET /api/services/tldr/status',             kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/start',             kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/stop',              kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/reload',            kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'GET /api/cache-status',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Cache diagnostics; outside 8 remodel domains' },
   { surface: 'POST /api/cache/clear',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Cache diagnostics; outside 8 remodel domains' },
   { surface: 'GET /api/metrics/runtimes',                 kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents (runtime metrics)' },
@@ -683,7 +683,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/issues/:issueId/forge-merge',                kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.merge (per-repo path)' },
   { surface: 'POST /api/issues/:issueId/approve',                    kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("merging")' },
   { surface: 'DELETE /api/review/:issueId/pending',                  kind: 'http', disposition: 'DELETE',      door: 'ready_for_merge is now derived; explicit clear verb unnecessary' },
-  { surface: 'GET /api/workspaces/:issueId/tldr',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR workspace context; outside 8 remodel domains' },
+  { surface: 'GET /api/workspaces/:issueId/tldr',                    kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'POST /api/workspaces/:issueId/refresh-token',          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Auth token refresh; outside 8 remodel domains' },
   { surface: 'GET /api/merge-queue',                                 kind: 'http', disposition: 'READ',        door: 'MergeResolver.listQueues' },
   { surface: 'POST /api/internal/pipeline/notify',                   kind: 'http', disposition: 'DELETE',      door: 'replaced by writer\'s own bus.emit; side-channel eliminated' },
@@ -814,6 +814,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'schema: api_cache (panopticon.db)',        kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real api_cache lives in cache.db with different schema (cache-service.ts)' },
   { surface: 'schema: rate_limits (panopticon.db)',      kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real rate_limits lives in cache.db with different schema (cache-service.ts)' },
 
+  // PAN-4429: TLDR removed — its read hook cost more model turns than it saved.
+  { surface: 'pan admin tldr',                           kind: 'cli', disposition: 'DELETE',       door: 'TLDR removed (PAN-4429); the daemon it managed no longer exists' },
+  { surface: 'pan status --tldr',                        kind: 'cli', disposition: 'DELETE',       door: 'TLDR removed (PAN-4429); there is no TLDR index to report on' },
+
   // scripts/create-overdeck-db.ts and scripts/drizzle-node-sqlite-smoke.ts exempted
   // from the overdeck boundary lint. These are intentional dev/setup tools that
   // legitimately import the DB driver directly — they create and smoke-test
@@ -931,6 +935,5 @@ export const HEALTH_NO_LOSS_MATRIX: HealthNoLossMatrixEntry[] = [
   { surface: 'Capacity guardrail', disposition: 'V2_HOME', target: 'mapSpawnGateDecision preserves blocking enforcement decisions while attaching accepted health evidence' },
   { surface: 'Summary cards', disposition: 'V2_HOME', target: 'HealthDashboard renders all accepted AgentHealthStatus counts with accessible names' },
   { surface: 'Deacon section', disposition: 'V2_HOME', target: 'HealthDashboard DeaconStatus remains visible while loading, unavailable, or agent-empty' },
-  { surface: 'TLDR section', disposition: 'V2_HOME', target: 'HealthDashboard TldrServiceStatus distinguishes optional unconfigured from request unavailable' },
   { surface: 'pan doctor', disposition: 'V2_HOME', target: 'Independent dependency, installation, state-worktree, and system diagnostic command; it is not a live V2 snapshot view' },
 ];

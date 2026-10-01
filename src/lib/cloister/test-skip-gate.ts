@@ -170,7 +170,9 @@ export async function runTestSkipGate(
     const { stdout } = await execFileAsync(
       'git',
       ['diff', '-U0', `${changedBase}...HEAD`],
-      { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 },
+      // execFile's 1 MiB default buffer failed the gate closed on a 2.8 MB
+      // diff (a rebuilt hook bundle, PAN-4429).
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000, maxBuffer: 64 * 1024 * 1024 },
     );
     diff = stdout;
   } catch (err) {

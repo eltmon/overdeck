@@ -534,7 +534,6 @@ program
   .command('status')
   .description('Show running agents')
   .option('--json', 'Output as JSON')
-  .option('--tldr', 'Show TLDR index health across all workspaces')
   .option('--context', 'Show context window usage % for each agent')
   .action(lazyAction(() => import('./commands/status.js'), 'statusCommand'));
 
@@ -942,7 +941,7 @@ defineUpCommand(program)
 
       // Health-gate: poll /api/health before reporting success so a half-started
       // dashboard can't masquerade as healthy. On timeout we log a warning but
-      // do NOT tear down CLIProxy/TLDR below — keeping the system in the best
+      // do NOT tear down CLIProxy below — keeping the system in the best
       // recoverable state (dashboard-side failure, sidecars still usable).
       let readyUrl: string;
       let apiUrl: string;
@@ -1155,27 +1154,6 @@ program
       }
     } catch {
       // Non-fatal — cliproxy may not be installed/running
-    }
-
-    // Stop TLDR daemon on project root
-    try {
-      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execAsync = promisify(exec);
-
-      const projectRoot = process.cwd();
-      const venvPath = join(projectRoot, '.venv');
-
-      if (existsSync(venvPath)) {
-        console.log(chalk.dim('\nStopping TLDR daemon...'));
-        const tldrService = getTldrDaemonService(projectRoot, venvPath);
-        await tldrService.stop();
-        console.log(chalk.green('✓ TLDR daemon stopped'));
-      }
-    } catch (error: any) {
-      // Non-fatal - TLDR daemon may not be running
-      console.log(chalk.dim('  (TLDR daemon not running)'));
     }
 
     console.log('');

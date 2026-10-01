@@ -30,9 +30,6 @@
  *   GET  /api/planning/:issueId/status
  *   POST /api/planning/:issueId/message
  *   DELETE /api/planning/:issueId
- *   GET  /api/services/tldr/status
- *   POST /api/services/tldr/start
- *   POST /api/services/tldr/stop
  *   GET  /api/cache-status
  *   GET  /api/metrics/runtimes
  *   GET  /api/metrics/tasks
@@ -49,7 +46,6 @@ import { trackersRouteLayer } from './misc/trackers.js';
 import { healthRouteLayer } from './misc/health.js';
 import { deaconRouteLayer } from './misc/deacon.js';
 import { planningRouteLayer } from './misc/planning.js';
-import { tldrRouteLayer } from './misc/tldr.js';
 import { metaRouteLayer } from './misc/meta.js';
 import { updatesRouteLayer } from './misc/updates.js';
 import { skillOverridesRouteLayer } from './misc/skill-overrides.js';
@@ -62,7 +58,6 @@ export const miscRouteLayer = Layer.mergeAll(
   healthRouteLayer,
   deaconRouteLayer,
   planningRouteLayer,
-  tldrRouteLayer,
   metaRouteLayer,
   updatesRouteLayer,
   skillOverridesRouteLayer,

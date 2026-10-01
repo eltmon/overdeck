@@ -8,7 +8,6 @@ import {
   type NormalizedFeatureRegistryConfig,
   type NormalizedRtkConfig,
   type NormalizedShadowConfig,
-  type NormalizedTldrConfig,
   type NormalizedTtsDaemonConfig,
   type ResiliencyTier,
   type YamlConfig,
@@ -144,15 +143,6 @@ export function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig |
 
   if (rtk.enabled !== undefined) {
     result.enabled = rtk.enabled;
-  }
-}
-
-export function mergeTldrConfig(result: NormalizedTldrConfig, config: YamlConfig | null): void {
-  const tldr = config?.agents?.tldr;
-  if (!tldr) return;
-
-  if (tldr.enabled !== undefined) {
-    result.enabled = tldr.enabled;
   }
 }
 

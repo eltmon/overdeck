@@ -74,7 +74,6 @@ ADMIN (PLUMBING)
   pan admin db <cmd>          Database seeding
   pan admin config <cmd>      Configuration management
   pan admin hooks install     Install Claude Code heartbeat hooks
-  pan admin tldr <cmd>        TLDR daemon management
   pan admin fpp <cmd>         FPP hooks
   pan admin tracker <cmd>     Tracker-specific operations
   pan admin migrate-config    Migrate settings.json → config.yaml

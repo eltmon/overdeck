@@ -117,8 +117,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   Any change touching record merges must stay verdict-aware (terminal verdicts
   survive same-cycle verdict-free writes; only a newer `reviewSpawnedAt` or a
   newer terminal verdict supersedes).
-- **Per-workspace `.venv`** (TLDR) can be ~7.5GB each — don't copy/back up
-  workspaces blindly.
+- **Leftover per-workspace `.venv` / `.tldr/`** from the removed TLDR feature
+  (PAN-4429) can be 1.5–7.5GB each. Overdeck no longer creates or deletes them
+  (they may be the user's own); `.gitignore` keeps them untracked. Don't copy or
+  back up old workspaces blindly.
 - **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
   image on stop/start and on `restart.on-failure`. The ephemeral tier mitigates this
   with a VM-side continuous commit+push heartbeat daemon plus per-bead push

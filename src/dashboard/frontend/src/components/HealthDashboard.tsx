@@ -25,7 +25,6 @@ import { useSystemHealth } from '../hooks/useSystemHealth';
 import { requestSettingsSection } from '../lib/settingsSection';
 import { DeaconStatus } from './CommandDeck/DeaconStatus';
 import { AnywhereStatusCard } from './Settings/anywhere/AnywhereStatusCard';
-import { TldrServiceStatus } from './TldrServiceStatus';
 
 async function fetchHealth(): Promise<readonly AgentHealthSnapshot[]> {
   const res = await fetch('/api/health/agents');
@@ -305,7 +304,6 @@ export function HealthDashboard({ onOpenSettings }: HealthDashboardProps = {}) {
       />
 
       <DeaconStatus />
-      <TldrServiceStatus />
 
       <section aria-labelledby="agent-health-title" className="space-y-4">
         <h2 id="agent-health-title" className="text-sm font-semibold text-muted-foreground uppercase">

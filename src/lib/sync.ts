@@ -132,10 +132,7 @@ export function removeLegacySkills070(): string[] {
   // pan-config → pan-admin-config
   // pan-tracker → pan-admin-tracker
   //
-  // pan-tldr was previously listed here when admin moved to pan-admin-tldr,
-  // but pan-tldr is now a separate work-agent-facing skill (different scope
-  // from the admin skill — it teaches agents to USE the TLDR MCP tools).
-  // PAN-1132.
+  // pan-tldr and pan-admin-tldr: TLDR was removed (PAN-4429).
   const LEGACY_SKILL_NAMES = [
     'pan-issue',
     'pan-plan-finalize',
@@ -143,6 +140,8 @@ export function removeLegacySkills070(): string[] {
     'pan-rescue',
     'pan-config',
     'pan-tracker',
+    'pan-tldr',
+    'pan-admin-tldr',
   ];
 
   const removed: string[] = [];

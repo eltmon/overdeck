@@ -194,9 +194,6 @@ export interface ApiSettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
-    tldr?: {
-      enabled?: boolean;
-    };
   };
   telemetry?: ApiTelemetryConfig;
   tts?: ApiTtsConfig;
@@ -371,7 +368,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * unknown keys (and their comments) survive untouched. Shallow on purpose —
  * nested entries (e.g. a single provider's object) are replaced wholesale so
  * a cleared override actually clears. Matches the existing per-key precedent
- * for `tts` and `agents.rtk`/`agents.tldr` below.
+ * for `tts` and `agents.rtk` below.
  */
 function setBlockMergePreserving(doc: ReturnType<typeof parseDocument>, path: string[], value: Record<string, unknown>): void {
   const existing = doc.getIn(path);
@@ -700,9 +697,6 @@ export function loadSettingsApi(): ApiSettingsConfig {
       rtk: {
         enabled: config.rtk?.enabled ?? false,
       },
-      tldr: {
-        enabled: config.tldr?.enabled ?? true,
-      },
     },
     telemetry: telemetrySettingsFromConfig(config.telemetry),
     tts: toApiTtsConfig(config.tts),
@@ -798,6 +792,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
   // models.overrides is retired (#4131); an explicit Settings save drops it.
   doc.deleteIn(['models', 'overrides']);
+  // agents.tldr is retired (PAN-4429); an explicit Settings save drops it.
+  if (doc.hasIn(['agents', 'tldr'])) doc.deleteIn(['agents', 'tldr']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
     doc.setIn(['models', 'gemini_thinking_level'], config.models.gemini_thinking_level);
@@ -840,10 +836,6 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
 
   if (config.agents?.rtk !== undefined) {
     doc.setIn(['agents', 'rtk'], config.agents.rtk);
-  }
-
-  if (config.agents?.tldr !== undefined) {
-    doc.setIn(['agents', 'tldr'], config.agents.tldr);
   }
 
   if (config.tts !== undefined) {
@@ -968,11 +960,8 @@ async function saveSettingsApiPromiseUnlocked(
       dashscope: settings.api_keys.dashscope,
       typesafe: settings.api_keys.typesafe,
     },
-    agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
-      ? {
-          ...(settings.agents?.rtk !== undefined ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } } : {}),
-          ...(settings.agents?.tldr !== undefined ? { tldr: { enabled: settings.agents.tldr.enabled ?? true } } : {}),
-        }
+    agents: settings.agents?.rtk !== undefined
+      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
       : undefined,
     tts: settings.tts_summarizer
       ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
@@ -1101,10 +1090,6 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       rtk: {
         ...current.agents?.rtk,
         ...updates.agents?.rtk,
-      },
-      tldr: {
-        ...current.agents?.tldr,
-        ...updates.agents?.tldr,
       },
     },
     tts: {
@@ -1257,13 +1242,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push('agents.rtk must be an object');
         } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
           errors.push('agents.rtk.enabled must be a boolean');
-        }
-      }
-      if (settings.agents.tldr !== undefined) {
-        if (!isRecord(settings.agents.tldr)) {
-          errors.push('agents.tldr must be an object');
-        } else if (settings.agents.tldr.enabled !== undefined && typeof settings.agents.tldr.enabled !== 'boolean') {
-          errors.push('agents.tldr.enabled must be a boolean');
         }
       }
     }

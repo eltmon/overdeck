@@ -585,6 +585,16 @@ void ensureOperatorHash();
 
 let stopResourceRefreshServices = () => undefined;
 
+// PAN-4429: TLDR is removed; stop the index daemons older installs left
+// running. Idempotent and cheap, so it runs on every boot with no marker.
+void whenDashboardListening()
+  .then(async () => {
+    const { stopLegacyTldrDaemons } = await import('../../lib/legacy-tldr-cleanup.js');
+    const pids = await stopLegacyTldrDaemons();
+    if (pids.length) console.log(`[overdeck] Stopped ${pids.length} legacy TLDR daemon(s) (PAN-4429)`);
+  })
+  .catch((err) => console.warn('[overdeck] Legacy TLDR daemon stop failed (non-fatal):', err));
+
 void (async () => {
   const store = await initEventStore();
   // Request serving comes first. Resource convergence starts only after the

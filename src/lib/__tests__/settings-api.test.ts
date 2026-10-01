@@ -488,6 +488,17 @@ describe('saveSettingsApi', () => {
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
   });
 
+  it('drops the retired agents.tldr key on save (PAN-4429)', async () => {
+    mockReadFile.mockResolvedValue('agents:\n  tldr:\n    enabled: true\n  rtk:\n    enabled: true\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+
+    await saveSettingsApi(loadSettingsApi());
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).not.toContain('tldr');
+    expect(written).toContain('rtk:');
+  });
+
   it('persists explicit provider harness overrides', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();

@@ -23,7 +23,6 @@ import {
   mergeRemoteConfig,
   mergeRtkConfig,
   mergeShadowConfig,
-  mergeTldrConfig,
   mergeTtsConfig,
 } from './domain-mergers.js';
 import {
@@ -732,9 +731,6 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge RTK configuration
     mergeRtkConfig(result.rtk, config);
-
-    // Merge TLDR configuration
-    mergeTldrConfig(result.tldr, config);
 
     // Merge docs RAG configuration
     mergeDocsConfig(result.docs, config);

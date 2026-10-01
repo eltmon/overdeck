@@ -212,9 +212,6 @@ export interface SettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
-    tldr?: {
-      enabled?: boolean;
-    };
   };
   telemetry?: {
     enabled: boolean;

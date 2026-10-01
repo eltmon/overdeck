@@ -1,12 +1,12 @@
 /**
- * Overdeck platform stack lifecycle — dashboard + CLIProxy + Traefik + TLDR.
+ * Overdeck platform stack lifecycle — dashboard + CLIProxy + Traefik.
  *
  * Used by `pan up`, `pan down`, and `pan restart`. Provides scoped primitives so
  * a dashboard restart does not strand the system or tear down unrelated shared
  * sidecars.
  *
  * Scope rules (must be preserved — see tests):
- *   - `restartDashboard()`      MUST NOT stop CLIProxy, Traefik, or TLDR.
+ *   - `restartDashboard()`      MUST NOT stop CLIProxy or Traefik.
  *   - `restartCliproxy()`       MUST NOT stop the dashboard or Traefik.
  *   - `restartTraefik()`        MUST NOT stop the dashboard or CLIProxy.
  *   - `stopFullStack()`         Stops everything (the nuclear option, used by `pan down`).
@@ -106,7 +106,7 @@ export interface PlatformConfig {
 }
 
 export interface StageFailure {
-  stage: 'traefik' | 'cliproxy' | 'dashboard' | 'tldr';
+  stage: 'traefik' | 'cliproxy' | 'dashboard';
   reason: string;
   recovery?: 'dashboard-left-running';
 }

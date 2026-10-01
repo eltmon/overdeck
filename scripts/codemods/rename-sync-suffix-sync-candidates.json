@@ -306,11 +306,6 @@
   },
   {
     "module": "config-yaml/load.ts",
-    "name": "isTldrEnabledSync",
-    "count": 7
-  },
-  {
-    "module": "config-yaml/load.ts",
     "name": "loadConfigSync",
     "count": 218
   },
@@ -1588,26 +1583,6 @@
     "module": "sync.ts",
     "name": "syncStatuslineSync",
     "count": 5
-  },
-  {
-    "module": "tldr-daemon.ts",
-    "name": "captureTldrMetricsSync",
-    "count": 1
-  },
-  {
-    "module": "tldr-daemon.ts",
-    "name": "getTldrDaemonServiceSync",
-    "count": 47
-  },
-  {
-    "module": "tldr-daemon.ts",
-    "name": "getTldrMetricsSync",
-    "count": 4
-  },
-  {
-    "module": "tldr-daemon.ts",
-    "name": "listTldrDaemonServicesSync",
-    "count": 2
   },
   {
     "module": "tmux.ts",

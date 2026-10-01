@@ -149,7 +149,7 @@ export function close(
  * 1. Verify branch merged (hard fail if not — must pass before any cleanup)
  * 2. Move PRD + archive workspace artifacts (hard fail if archiving fails)
  * 3. Mark xBRIEF completed
- * 4. Clean up workspace (tmux, TLDR, Docker, worktree)
+ * 4. Clean up workspace (tmux, Docker, worktree)
  * 5. Clean up agent state
  * 6. Close issue on tracker
  * 7. Apply closed-out label

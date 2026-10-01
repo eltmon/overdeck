@@ -618,7 +618,7 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText(/container-1/)).toBeInTheDocument();
   });
 
-  it('keeps agent summary cards, Deacon, and optional TLDR visible on the Health page', async () => {
+  it('keeps agent summary cards and Deacon visible on the Health page', async () => {
     const agents: AgentHealthSnapshot[] = [{
       id: 'agent-wedged',
       status: 'wedged',
@@ -633,7 +633,6 @@ describe('system health UI no-loss audit', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/health/agents') return Promise.resolve(jsonResponse(agents));
-      if (url === '/api/services/tldr/status') return Promise.resolve(jsonResponse({ daemons: [] }));
       if (url === '/api/specialists/projects') return Promise.resolve(jsonResponse([]));
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     }));
@@ -657,6 +656,5 @@ describe('system health UI no-loss audit', () => {
       expect(await screen.findByLabelText(label)).toBeInTheDocument();
     }
     expect(screen.getByLabelText('Deacon status')).toBeInTheDocument();
-    expect(await screen.findByText('TLDR · Not configured (optional)')).toBeInTheDocument();
   });
 });
