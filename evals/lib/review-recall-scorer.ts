@@ -28,9 +28,17 @@ export interface ParsedFinding {
   glyph: FindingGlyph;
   blocking: boolean;
   title: string;
+  /** The primary location: the heading location, else the first citation. */
   file: string | null;
   line: number | null;
+  /** Every location the finding cites: the heading location first, then body citations in order. */
+  citations: FindingCitation[];
   body: string;
+}
+
+export interface FindingCitation {
+  file: string;
+  line: number | null;
 }
 
 export const MAX_DIFF_CHARS = 60_000;
@@ -88,17 +96,39 @@ export function parseReviewRecallCase(data: unknown): ReviewRecallCase {
 // optional because roles/review-requirements.md headings name a requirement source, not a
 // file; such findings take their location from the first file citation in the body.
 const HEADING_RE = /^###\s+(!|⊗|~|≉|\?)\s+(.+?)\s*$/gm;
+// `- **~ title**`, `- \`≉\` **title**`, `* ? title`: a finding written as a top-level list item.
+const BULLET_RE = /^[-*]\s+(?:\*\*|`)?\s*(!|⊗|~|≉|\?)(?:\*\*|`)?\s+(.+?)\s*$/gm;
 const LOCATION_RE = /\s+[—–-]\s+`([^`]+)`/;
 const BODY_CITATION_RE = /`([^`\s]+)`/g;
 const PATH_LIKE_RE = /^(?:\.\/)?[\w@~.-]+(?:\/[\w@~.-]+)*\.[A-Za-z0-9]+$/;
 
-function parseLocation(raw: string): { file: string; line: number | null } | null {
+function parseLocation(raw: string): FindingCitation | null {
   const m = raw.trim().match(/^([^:\s]+)(?::(\d+))?/);
   if (!m || !PATH_LIKE_RE.test(m[1]!)) return null;
   return { file: m[1]!, line: m[2] !== undefined ? Number(m[2]) : null };
 }
 
-export function parseFindings(report: string): ParsedFinding[] {
+/** `first` (when present), then every path-like backticked citation in `text`, de-duplicated. */
+function collectCitations(first: FindingCitation | null, text: string): FindingCitation[] {
+  const citations: FindingCitation[] = [];
+  const seen = new Set<string>();
+  const add = (c: FindingCitation | null): void => {
+    if (!c || seen.has(`${c.file}:${c.line}`)) return;
+    seen.add(`${c.file}:${c.line}`);
+    citations.push(c);
+  };
+  add(first);
+  for (const cite of text.matchAll(BODY_CITATION_RE)) add(parseLocation(cite[1]!));
+  return citations;
+}
+
+interface PositionedFinding {
+  start: number;
+  end: number;
+  finding: ParsedFinding;
+}
+
+function parseHeadingFindings(report: string): PositionedFinding[] {
   return [...report.matchAll(HEADING_RE)].map((m) => {
     const glyph = m[1] as FindingGlyph;
     const headingText = m[2]!;
@@ -108,28 +138,67 @@ export function parseFindings(report: string): ParsedFinding[] {
     const body = (nextHeading === -1 ? rest : rest.slice(0, nextHeading)).trim();
 
     let title = headingText;
-    let location: { file: string; line: number | null } | null = null;
+    let location: FindingCitation | null = null;
     const loc = headingText.match(LOCATION_RE);
     if (loc) {
       location = parseLocation(loc[1]!);
       if (location) title = headingText.slice(0, loc.index).trim();
     }
-    if (!location) {
-      for (const cite of body.matchAll(BODY_CITATION_RE)) {
-        location = parseLocation(cite[1]!);
-        if (location) break;
-      }
-    }
+    const citations = collectCitations(location, body);
+    const primary = location ?? citations[0] ?? null;
 
     return {
-      glyph,
-      blocking: glyph === '!' || glyph === '⊗',
-      title,
-      file: location?.file ?? null,
-      line: location?.line ?? null,
-      body,
+      start: m.index!,
+      end: nextHeading === -1 ? report.length : bodyStart + nextHeading,
+      finding: {
+        glyph,
+        blocking: glyph === '!' || glyph === '⊗',
+        title,
+        file: primary?.file ?? null,
+        line: primary?.line ?? null,
+        citations,
+        body,
+      },
     };
   });
+}
+
+/** Glyph-bullet findings; a bullet's body is its following indented (or blank) lines. Never blocking. */
+function parseBulletFindings(report: string, headingRanges: Array<{ start: number; end: number }>): PositionedFinding[] {
+  const found: PositionedFinding[] = [];
+  for (const m of report.matchAll(BULLET_RE)) {
+    const start = m.index!;
+    // A list item inside a heading finding's body belongs to that finding.
+    if (headingRanges.some((r) => start > r.start && start < r.end)) continue;
+    const bodyLines: string[] = [];
+    for (const line of report.slice(start + m[0].length).split('\n').slice(1)) {
+      if (line.trim() !== '' && !/^\s/.test(line)) break;
+      bodyLines.push(line);
+    }
+    const body = bodyLines.join('\n').trim();
+    const title = m[2]!.replace(/\*\*/g, '').trim();
+    const citations = collectCitations(null, `${m[2]!}\n${body}`);
+    found.push({
+      start,
+      end: start + m[0].length,
+      finding: {
+        glyph: m[1] as FindingGlyph,
+        blocking: false,
+        title,
+        file: citations[0]?.file ?? null,
+        line: citations[0]?.line ?? null,
+        citations,
+        body,
+      },
+    });
+  }
+  return found;
+}
+
+/** Heading findings and glyph-bullet findings, in report order. */
+export function parseFindings(report: string): ParsedFinding[] {
+  const headings = parseHeadingFindings(report);
+  return [...headings, ...parseBulletFindings(report, headings)].sort((a, b) => a.start - b.start).map((p) => p.finding);
 }
 
 function normalizePath(p: string): string {
@@ -139,8 +208,9 @@ function normalizePath(p: string): string {
 function sameFile(cited: string, blockerFile: string): boolean {
   const a = normalizePath(cited);
   const b = normalizePath(blockerFile);
-  // A model may cite the path with a checkout prefix (workspaces/feature-x/src/...).
-  return a === b || a.endsWith(`/${b}`);
+  // A model may cite the path with a checkout prefix (workspaces/feature-x/src/...)
+  // or shorten it to a trailing part that keeps the basename (hooks/useX.ts, useX.ts).
+  return a === b || a.endsWith(`/${b}`) || (/\.[A-Za-z0-9]+$/.test(a) && b.endsWith(`/${a}`));
 }
 
 export function findingMatchesBlocker(
@@ -150,11 +220,14 @@ export function findingMatchesBlocker(
 ): boolean {
   const lineWindow = opts.lineWindow ?? 15;
   const minKeywordHits = opts.minKeywordHits ?? 2;
-  if (!f.blocking || f.file === null || !sameFile(f.file, blocker.file)) return false;
-  if (f.line !== null && blocker.lines.some((l) => Math.abs(l - f.line!) <= lineWindow)) return true;
   const text = `${f.title}\n${f.body}`.toLowerCase();
-  const hits = blocker.keywords.filter((k) => text.includes(k.toLowerCase())).length;
-  return hits >= minKeywordHits;
+  const keywordMatch = blocker.keywords.filter((k) => text.includes(k.toLowerCase())).length >= minKeywordHits;
+  // Severity is the caller's concern; any cited location of the blocker file can match.
+  return f.citations.some(
+    (c) =>
+      sameFile(c.file, blocker.file) &&
+      (keywordMatch || (c.line !== null && blocker.lines.some((l) => Math.abs(l - c.line!) <= lineWindow))),
+  );
 }
 
 export function scoreReviewRecall(
