@@ -52,6 +52,7 @@ import {
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
@@ -263,6 +264,9 @@ export async function startRequestReviewPipeline(
     source: options.source ?? 'api',
     ...(options.note ? { data: { note: options.note } } : {}),
   });
+
+  // PAN-4457: the PR exists by now (`pan done` opens it first); show it on the issue row at once.
+  refreshIssuePullRequestStateNow(canonicalIssueId);
 
   const started = requestReviewPipeline.start(canonicalIssueId, {
     verify: () => Effect.runPromise(runVerificationForIssue(
