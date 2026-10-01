@@ -250,7 +250,10 @@ working. A `read:events` scoped token works there too, set or not. The dashboard
 
 A local reverse proxy (Tailscale Serve, cloudflared, a Traefik route) connects
 to the dashboard from `127.0.0.1`, so every visitor looks like a local caller.
-Turn on `require_token_mint` whenever such a proxy forwards outside traffic:
+Turn on `require_token_mint` whenever such a proxy forwards outside traffic.
+Idle dashboard terminals stay connected behind proxies with idle timeouts of 30s
+or more because the terminal WebSocket exchanges a ping/pong control frame every
+20s; programmatic clients opt in with `?heartbeat=1` ([PAN-4434](https://github.com/eltmon/overdeck/issues/4434)).
 
 ```yaml
 # ~/.overdeck/config.yaml
@@ -291,5 +294,3 @@ is read only from the global `~/.overdeck/config.yaml`, never from a project
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
-- A heartbeat on terminal WebSockets, so idle terminals survive proxies with
-  short idle timeouts: [PAN-4434](https://github.com/eltmon/overdeck/issues/4434).

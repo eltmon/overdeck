@@ -174,8 +174,10 @@ access logs. Programmatic WebSocket clients (Node `ws`, Python `websockets`) set
 
 **Heartbeats.** `/ws/rpc` emits a `system.heartbeat` every 15 s and
 `/events/stream` sends a `: keepalive` comment every 15 s, so both stay under a
-proxy's idle timeout. `/ws/terminal` has none yet; that is tracked by
-[PAN-4434](https://github.com/eltmon/overdeck/issues/4434).
+proxy's idle timeout. `/ws/terminal` sends a `\u0000{"type":"ping"}` control frame
+every 20 s to clients that connect with `?heartbeat=1`; programmatic Bearer clients
+must add that query parameter themselves and answer `{"type":"pong"}`. See the
+terminal heartbeat section in [DASHBOARD-ARCHITECTURE.md](DASHBOARD-ARCHITECTURE.md).
 
 Rejected raw upgrades (`/ws/terminal`, `/ws/voice`, `/ws/autopreso`) write a
 plain `HTTP/1.1 <status> <message>` response and destroy the socket
