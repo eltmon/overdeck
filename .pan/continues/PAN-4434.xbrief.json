@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4434",
   "created": "2026-10-01T21:15:30.449Z",
-  "updated": "2026-10-01T21:19:20.551Z",
+  "updated": "2026-10-01T21:25:31.778Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-01T21:19:11.479Z"
     },
     "ws-terminal-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4434",
-      "claimedAt": "2026-10-01T21:19:20.550Z"
+      "claimedAt": "2026-10-01T21:19:20.550Z",
+      "doneAt": "2026-10-01T21:25:31.777Z"
     }
   }
 }
