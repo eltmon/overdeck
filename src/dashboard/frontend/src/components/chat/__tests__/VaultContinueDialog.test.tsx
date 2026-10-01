@@ -142,6 +142,18 @@ describe('VaultContinueDialog (PAN-4437)', () => {
     expect(screen.queryByText(/No code snapshot/)).not.toBeInTheDocument();
   });
 
+  it('a dirty checkout explains the new workspace, or why there can be none when it is unregistered', async () => {
+    const dirty = { ...clean, target: { ...clean.target!, dirty: true }, codePlacement: 'new-workspace' as const };
+    routes(dirty);
+    renderDialog();
+    expect(await screen.findByText(/goes into a new workspace\./)).toBeInTheDocument();
+    cleanup();
+    routes({ ...dirty, target: { ...dirty.target, projectKey: null } });
+    renderDialog();
+    expect(await screen.findByText(/is not a registered project, so no workspace can be created/)).toBeInTheDocument();
+    expect(screen.getByText(/pan vault resume abcdef12 --worktree <dir>/)).toBeInTheDocument();
+  });
+
   it('a non-resumable harness explains the CLI path', async () => {
     routes({ ...clean, harness: 'opencode', resumable: false });
     renderDialog();

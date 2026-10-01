@@ -141,6 +141,9 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
     let codeLine: string | null = null;
     if (wip.kind === 'captured' && preview.codePlacement === 'in-place') {
       codeLine = `Apply the code snapshot from ${wip.at} (${formatSize(wip.bytes)}) here. Branch: ${wip.branch ?? `detached at ${wip.base.slice(0, 12)}`}.`;
+    } else if (wip.kind === 'captured' && preview.codePlacement === 'new-workspace' && target.projectKey === null) {
+      // The server refuses this unless the checkout already holds the snapshot (dirty-unregistered).
+      codeLine = `${target.cwd} has uncommitted changes and is not a registered project, so no workspace can be created for the code snapshot. Commit or move the changes, or run: pan vault resume ${id8} --worktree <dir>`;
     } else if (wip.kind === 'captured' && preview.codePlacement === 'new-workspace') {
       codeLine = `${target.cwd} has uncommitted changes, so the code snapshot from ${wip.at} goes into a new workspace.`;
     } else if (wip.kind === 'skipped' && !/^(clean|no-git)\b/.test(wip.reason)) {
