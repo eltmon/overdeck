@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:56:45.601Z",
+  "updated": "2026-10-01T13:56:58.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "blocked-journal-types.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T13:56:45.600Z"
+    },
+    "blocked-journal-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:58.593Z"
     }
   }
 }
