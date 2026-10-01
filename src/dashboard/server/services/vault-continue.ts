@@ -312,6 +312,9 @@ async function runContinue(vaultId: string, body: ContinueBody, deps: VaultConti
     keys: vault.keys,
     targetCwd,
     identity: me,
+    // D-6: tie the CAS to the owner checked above; an adoption by another
+    // machine during the code step is refused, never taken over.
+    expectedOwnerEnvironmentId: record.owner.environmentId,
     ...(harness === 'codex'
       ? { codexHome: codexAgentHome(join(getOverdeckHome(), 'agents', names.tmuxSession)) }
       : { projectsRoot: deps.claudeProjectsRoot() }),

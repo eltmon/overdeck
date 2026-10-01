@@ -158,6 +158,8 @@ describe('continueHere (PAN-4437 WI-4)', () => {
     expect(h.log).toEqual(['queue:continue', `apply:${CWD}`, 'adopt', 'row', 'remove-browse-row']);
     expect(h.mocks.enqueueVaultOperation).toHaveBeenCalledTimes(1);
     expect(h.mocks.adoptRecord).toHaveBeenCalledWith(expect.objectContaining({ projectsRoot: '/home/u/.claude/projects', targetCwd: CWD }));
+    // D-6: the CAS is tied to the owner the token check verified.
+    expect(h.mocks.adoptRecord).toHaveBeenCalledWith(expect.objectContaining({ expectedOwnerEnvironmentId: 'env-a' }));
     expect(h.mocks.launchVaultContinuedConversation).toHaveBeenCalledWith(expect.objectContaining({ name: '20260930-abcd' }), null);
   });
 
