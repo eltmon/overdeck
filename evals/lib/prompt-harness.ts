@@ -65,7 +65,7 @@ export function scenarioMessages(opts: Pick<RunPromptScenarioOptions, 'user' | '
   return messages;
 }
 
-interface ProviderCallResult {
+export interface ProviderCallResult {
   text: string;
   usage: EvalUsage;
   stopReason: string | null;
