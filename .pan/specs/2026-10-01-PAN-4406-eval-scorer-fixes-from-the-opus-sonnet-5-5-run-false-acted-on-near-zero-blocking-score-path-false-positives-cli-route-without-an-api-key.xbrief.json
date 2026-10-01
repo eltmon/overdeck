@@ -4,17 +4,17 @@
     "created": "2026-10-01T21:13:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4406: Eval scorer fixes from the Opus/Sonnet 5.5 run",
-    "updated": "2026-10-01T21:14:05.628Z"
+    "updated": "2026-10-01T21:14:44.732Z"
   },
   "plan": {
     "id": "pan-4406",
     "title": "Eval scorer fixes from the Opus/Sonnet 5.5 run: false 'acted on', near-zero blocking score, path false positives, CLI route without an API key",
-    "status": "proposed",
+    "status": "running",
     "uid": "4327d3cf-aaab-4abc-b5c7-3ca225079830",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T21:13:36Z",
-    "updated": "2026-10-01T21:14:05.628Z",
+    "updated": "2026-10-01T21:14:44.732Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4406",
@@ -814,5 +814,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
