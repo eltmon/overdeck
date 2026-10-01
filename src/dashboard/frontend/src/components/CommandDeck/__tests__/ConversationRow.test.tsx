@@ -326,3 +326,27 @@ describe('ConversationRow verdict badges (PAN-4223 WI-22)', () => {
     expect(screen.getByText('critic of #9 · hotel')).toBeInTheDocument();
   });
 });
+
+describe('ConversationRow vault continuity badge (PAN-4447)', () => {
+  it('conversation-row-chip.ac1: a continued-elsewhere row renders "continued on laptop"', () => {
+    renderRow({ vaultContinuity: { kind: 'continued-elsewhere', vaultId: 'v-1', ownerLabel: 'laptop' } });
+    expect(screen.getByTestId('vault-continuity-badge')).toHaveTextContent('continued on laptop');
+  });
+
+  it('conversation-row-chip.ac2: a forked-locally row renders "continued on laptop" with the fork id8 in its title', () => {
+    renderRow({
+      vaultContinuity: { kind: 'forked-locally', forkVaultId: 'fork12345678', parentVaultId: 'v-1', parentOwnerLabel: 'laptop' },
+    });
+    const badge = screen.getByTestId('vault-continuity-badge');
+    expect(badge).toHaveTextContent('continued on laptop');
+    expect(badge.getAttribute('title')).toContain('saved as a fork (fork1234)');
+  });
+
+  it('conversation-row-chip.ac3: vaultContinuity null renders no badge; a browse row still renders its owner badge', () => {
+    renderRow({ vaultContinuity: null });
+    expect(screen.queryByTestId('vault-continuity-badge')).not.toBeInTheDocument();
+
+    renderRow({ origin: 'vault', vaultOwnerLabel: 'laptop', vaultContinuity: null });
+    expect(screen.getAllByTestId('vault-owner-badge')[0]).toHaveTextContent('from laptop');
+  });
+});

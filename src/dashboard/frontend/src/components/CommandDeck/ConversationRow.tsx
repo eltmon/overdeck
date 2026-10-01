@@ -318,6 +318,24 @@ export function ConversationRow({
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
+  const continuity = conv.vaultContinuity;
+  const continuityLabel = continuity
+    ? (continuity.kind === 'forked-locally' ? continuity.parentOwnerLabel : continuity.ownerLabel)
+    : null;
+  const continuityTitle = continuity?.kind === 'forked-locally'
+    ? `Continued on ${continuityLabel}. Local turns since then were saved as a fork (${continuity.forkVaultId.slice(0, 8)}).`
+    : `Continued on ${continuityLabel}.`;
+  const continuityBadge = continuity ? (
+    <span
+      className={styles.conversationBranchChip}
+      title={continuityTitle}
+      aria-label={continuityTitle}
+      data-testid="vault-continuity-badge"
+    >
+      <MonitorSmartphone size={10} />
+      <span className={styles.conversationBranchChipText}>{`continued on ${continuityLabel}`}</span>
+    </span>
+  ) : null;
   const ownerBadge = conv.origin === 'vault' ? (
     <span
       className={styles.conversationBranchChip}
@@ -328,7 +346,7 @@ export function ConversationRow({
       <MonitorSmartphone size={10} />
       <span className={styles.conversationBranchChipText}>{`from ${ownerLabel}`}</span>
     </span>
-  ) : null;
+  ) : continuityBadge;
   const pullRequestBadge = conv.pullRequest ? (
     <PullRequestBadge
       link={conv.pullRequest}

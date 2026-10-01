@@ -124,7 +124,14 @@ export interface Conversation {
   origin?: 'local' | 'vault';
   /** PAN-4436: the owning machine's label for a browse copy. */
   vaultOwnerLabel?: string | null;
+  /** PAN-4447: this row's native file moved to another machine, or saved a local P-6 fork of a record another machine now owns. Null for a vault browse row or when neither applies. */
+  vaultContinuity?:
+    | { kind: 'continued-elsewhere'; vaultId: string; ownerLabel: string }
+    | { kind: 'forked-locally'; forkVaultId: string; parentVaultId: string; parentOwnerLabel: string }
+    | null;
 }
+
+export type VaultContinuity = NonNullable<Conversation['vaultContinuity']>;
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
 
