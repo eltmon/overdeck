@@ -33,6 +33,7 @@
       "re-read",
       "resume",
       "cached"
-    ]
+    ],
+    "evidence": "outside-excerpt"
   }
 }

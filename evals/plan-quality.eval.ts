@@ -47,7 +47,8 @@ evalite<PlanQualityCase, PlanQualityOutput>('plan quality (E3)', {
     const { text, run } = await runPromptScenario({
       system: loadPromptFile('roles/plan.md'),
       user: await buildPlanQualityUserPrompt(c, prdText),
-      maxTokens: 48_000,
+      // PAN-3917 measured 58,662 output tokens at effort high (2026-09-29 run); 48K truncated it.
+      maxTokens: 64_000,
     });
     const scores = scorePlanQuality(text, reference, prdText);
     appendEvalRecord(

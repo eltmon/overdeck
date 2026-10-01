@@ -11,7 +11,8 @@ contents: everything is encrypted on your machine with a key only you hold, and
 `pan vault` commands send no telemetry.
 
 It also works without the dashboard: `npm install -g @overdeck/core`, then `pan vault` on any
-machine.
+machine. Setting up, joining and unlocking the vault happen in a terminal. Doing them from
+the dashboard is planned: [PAN-4446](https://github.com/eltmon/overdeck/issues/4446).
 
 ## Set up the first machine
 
@@ -24,6 +25,9 @@ machine.
    ```
 
 3. Write down the 24-word recovery phrase it prints. It is shown only once.
+
+A local directory or a NAS mount also works as a backend:
+`pan vault setup dir:/mnt/nas/session-vault`.
 
 <Warning>
 The recovery phrase is the vault key. Anyone with these words can read your vault. Losing every device and these words loses the vault: there is no recovery on any server.
@@ -164,7 +168,8 @@ output names the line number and pattern, never the value. Rotate the secret if 
 then run `pan vault allow-secret <id> <line>` or `pan vault exclude --session <id>`.
 
 With the dashboard running, conversations started from it are saved automatically 30 seconds
-after they go quiet, and synced every 5 minutes; no hook is needed.
+after they go quiet, and synced every 5 minutes; no hook is needed. This arrives in the next
+release (v0.65.0).
 
 To sync right away, click **Sync now** in Settings → Session Vault. The button appears only
 in the primary dashboard, which runs the sync loop; the section then shows the new last-sync
@@ -194,7 +199,8 @@ are read-only copies: to continue one on this machine, click **Continue here** i
 (or run the `pan vault resume <id>` command it shows). If this machine has no checkout of the
 project, the dialog offers to clone and register it first. If another machine continued the
 conversation in the meantime, the dialog says `Already continued on <machine>.` and changes
-nothing.
+nothing. Browse rows and **Continue here** arrive in the next release (v0.65.0). See
+[Conversations](/features/conversations#conversations-from-your-other-machines).
 
 ### Your uncommitted code comes along
 
@@ -247,7 +253,8 @@ anything on its own. To use it:
 list without deleting anything.
 
 With the dashboard running, open Settings → Session Vault, review the list, and click "Yes,
-delete these". Entries marked failed are never deleted.
+delete these". Entries marked failed are never deleted. This panel arrives in the next
+release (v0.65.0).
 
 ## Windows
 
