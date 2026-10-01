@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:20:15.449Z",
+  "updated": "2026-10-01T21:21:04.597Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-10-01T21:20:10.937Z"
     },
     "changelog-mdx-anywhere": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4456",
-      "claimedAt": "2026-10-01T21:20:15.449Z"
+      "claimedAt": "2026-10-01T21:20:15.449Z",
+      "doneAt": "2026-10-01T21:21:04.597Z"
     }
   }
 }
