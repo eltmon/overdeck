@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:52:44.597Z",
+  "updated": "2026-10-01T21:53:33.508Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "e2-split-recall-metrics.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T21:52:44.597Z"
+    },
+    "e2-requirements-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:53:33.507Z"
     }
   }
 }
