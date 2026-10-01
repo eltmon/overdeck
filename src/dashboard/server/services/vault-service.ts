@@ -28,9 +28,11 @@ import {
   type ConfirmResult,
   type EvictionBatch,
 } from '../../../lib/vault/evict.js';
+import { joinVault as joinVaultDefault, type JoinSecret, type JoinVaultResult } from '../../../lib/vault/join-core.js';
 import { VaultKeyRetiredError } from '../../../lib/vault/keyring.js';
 import { openVaultContext as openVaultContextDefault, type OpenVault, type VaultOpenResult } from '../../../lib/vault/open.js';
 import { settle as settleDefault } from '../../../lib/vault/settle.js';
+import { setupVault as setupVaultDefault, type SetupPassphrase, type SetupVaultResult } from '../../../lib/vault/setup-core.js';
 import { createSyncLoop as createSyncLoopDefault, syncOnce as syncOnceDefault, type SyncLoop, type SyncReport } from '../../../lib/vault/sync.js';
 import type { WipMode } from '../../../lib/vault/wip-capture.js';
 import { createVaultIsLive } from './vault-liveness.js';
@@ -50,6 +52,8 @@ export interface VaultServiceDeps {
   now?: () => Date;
   settle?: typeof settleDefault;
   createVaultSettlePoller?: typeof createVaultSettlePollerDefault;
+  setupVault?: typeof setupVaultDefault;
+  joinVault?: typeof joinVaultDefault;
 }
 
 type ResolvedDeps = Required<VaultServiceDeps>;
@@ -66,6 +70,8 @@ function resolveDeps(deps: VaultServiceDeps): ResolvedDeps {
     now: deps.now ?? (() => new Date()),
     settle: deps.settle ?? settleDefault,
     createVaultSettlePoller: deps.createVaultSettlePoller ?? createVaultSettlePollerDefault,
+    setupVault: deps.setupVault ?? setupVaultDefault,
+    joinVault: deps.joinVault ?? joinVaultDefault,
   };
 }
 
@@ -118,6 +124,8 @@ function initialSnapshot(): VaultSnapshotState {
 }
 
 let started = false;
+/** Bumped on every start and stop; a boot read that outlives its run must not create a loop. */
+let runGeneration = 0;
 let deps: ResolvedDeps = resolveDeps({});
 let bootTimer: ReturnType<typeof setTimeout> | null = null;
 let loop: SyncLoop | null = null;
@@ -192,6 +200,16 @@ async function cycle(): Promise<{ offline: boolean }> {
   if (!started) return { offline: false };
   const config = await deps.readVaultConfig();
   maybeRecreateLoop(config.syncIntervalSec);
+  return runSync(config);
+}
+
+/**
+ * One sync against the vault as it is on disk now. Split from `cycle()` so
+ * "Sync now" never touches loop management: inside the boot window
+ * `currentIntervalSec` is still null, and recreating the loop there would
+ * leave the boot handler starting a second one.
+ */
+async function runSync(config: VaultConfig): Promise<{ offline: boolean }> {
   const opened = await deps.openVaultContext();
   applyOpenStatus(opened, config);
   if (opened.status !== 'open') return { offline: false };
@@ -247,6 +265,7 @@ async function queuedSettle(path: string, harness: string, wip: WipMode): Promis
 export function startVaultService(overrides: VaultServiceDeps = {}): void {
   if (started) return;
   started = true;
+  const generation = ++runGeneration;
   deps = resolveDeps(overrides);
   snapshot = initialSnapshot();
   currentIntervalSec = null;
@@ -256,6 +275,7 @@ export function startVaultService(overrides: VaultServiceDeps = {}): void {
     void (async () => {
       if (!started) return;
       const config = await deps.readVaultConfig();
+      if (generation !== runGeneration) return;
       currentIntervalSec = config.syncIntervalSec;
       loop = deps.createSyncLoop({ intervalSec: config.syncIntervalSec, run: () => enqueueVaultOperation('sync', cycle), onError: (error) => console.warn('[vault] sync failed:', error) });
       loop.start();
@@ -273,6 +293,7 @@ const VAULT_SHUTDOWN_BUDGET_MS = 10_000;
 export async function stopVaultService(): Promise<void> {
   if (!started) return;
   started = false;
+  runGeneration++;
   const deadline = Date.now() + VAULT_SHUTDOWN_BUDGET_MS;
   if (bootTimer) {
     clearTimeout(bootTimer);
@@ -331,6 +352,23 @@ export async function getVaultServiceSnapshot(): Promise<VaultStatusResponse> {
       lastSyncedAt: machine.updatedAt,
     })),
   };
+}
+
+/** D-7: setup runs on the vault queue, started or not. Never logs the result (it carries secrets). */
+export function setupVaultFromDashboard(input: { url: string; passphrase: SetupPassphrase }): Promise<SetupVaultResult> {
+  return enqueueVaultOperation('setup', () => deps.setupVault(input));
+}
+
+/** D-7: join (and unlock) runs on the vault queue, started or not. Never logs the input (it carries secrets). */
+export function joinVaultFromDashboard(input: { url: string; secret: JoinSecret }): Promise<JoinVaultResult> {
+  return enqueueVaultOperation('join', () => deps.joinVault(input));
+}
+
+/** D-6: one queued sync; refuses on a dashboard whose vault service never started. Never touches loop management. */
+export async function syncVaultNow(): Promise<{ status: 'not-running' } | { status: 'synced'; snapshot: VaultStatusResponse }> {
+  if (!started) return { status: 'not-running' };
+  await enqueueVaultOperation('sync-now', async () => runSync(await deps.readVaultConfig()));
+  return { status: 'synced', snapshot: await getVaultServiceSnapshot() };
 }
 
 export function onVaultSyncReport(listener: (report: SyncReport, vault: OpenVault) => void | Promise<void>): () => void {
