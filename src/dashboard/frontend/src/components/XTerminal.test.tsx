@@ -945,6 +945,31 @@ describe('XTerminal - patient reconnect', () => {
     expect(onDisconnect).toHaveBeenCalledOnce();
     expect(MockWebSocket.instances).toHaveLength(2);
   });
+
+  it('a heartbeat ping does not reset the one-shot 4404 retry latch (PAN-4434)', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.advanceTimersByTimeAsync(3_000));
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    // A ping arrives during the reconnect's respawn wait — it must not look like
+    // real session traffic and reset the retry latch.
+    act(() => MockWebSocket.instances[1].onmessage?.({ data: `\u0000${JSON.stringify({ type: 'ping' })}` }));
+
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
+    expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
 });
 
 describe('XTerminal - Clipboard Functionality', () => {

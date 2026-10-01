@@ -665,7 +665,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     let firstMessageLogged = false;
     let firstLiveByteLogged = false;
     ws.onmessage = (event) => {
-      sessionNotFoundRetried.current = false;
       if (!firstMessageLogged) {
         firstMessageLogged = true;
         profMark(sessionName, tProf, 'first ws message received');
@@ -679,6 +678,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         dataStr = event.data;
       }
 
+      const control = dataStr.startsWith(TERMINAL_CONTROL_PREFIX) ? parseTerminalControlFrame(dataStr) : null;
+      // A heartbeat ping is not real traffic from the session; resetting the
+      // one-shot 4404 retry latch on it would let a connection that pings
+      // during the respawn wait retry 4404 more than once (PAN-4434).
+      if (control?.type !== 'ping') sessionNotFoundRetried.current = false;
+
       // DEBUG: Log incoming data
       if (DEBUG_TERMINAL) {
         debugMsgCount++;
@@ -690,8 +695,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       }
 
       if (dataStr.startsWith(TERMINAL_CONTROL_PREFIX)) {
-        const control = parseTerminalControlFrame(dataStr);
-
         if (control?.type === 'snapshot') {
           profMark(sessionName, tProf, 'snapshot decoded', `cols=${control.cols} rows=${control.rows} bytes=${control.data.length}`);
           remoteSize.current = { cols: control.cols, rows: control.rows };
