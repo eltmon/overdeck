@@ -265,7 +265,10 @@ export async function startRequestReviewPipeline(
     ...(options.note ? { data: { note: options.note } } : {}),
   });
 
-  // PAN-4457: the PR exists by now (`pan done` opens it first); show it on the issue row at once.
+  // PAN-4457: the review door — every accepted request passes through here —
+  // is where the PR's existence is first certain (`pan done` opens it right
+  // before calling this), so this is where the issue row's PR badge refresh
+  // is triggered rather than waiting for the next tracker poll.
   refreshIssuePullRequestStateNow(canonicalIssueId);
 
   const started = requestReviewPipeline.start(canonicalIssueId, {
