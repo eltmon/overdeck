@@ -430,13 +430,6 @@
   {
     "kind": "sync",
     "file": "src/lib/config-yaml/load.ts",
-    "oldName": "isTldrEnabledSync",
-    "newName": "isTldrEnabled",
-    "skip": false
-  },
-  {
-    "kind": "sync",
-    "file": "src/lib/config-yaml/load.ts",
     "oldName": "loadConfigSync",
     "newName": "loadConfig",
     "skip": true,
@@ -2232,34 +2225,6 @@
     "file": "src/lib/sync.ts",
     "oldName": "syncStatuslineSync",
     "newName": "syncStatusline",
-    "skip": false
-  },
-  {
-    "kind": "sync",
-    "file": "src/lib/tldr-daemon.ts",
-    "oldName": "captureTldrMetricsSync",
-    "newName": "captureTldrMetrics",
-    "skip": false
-  },
-  {
-    "kind": "sync",
-    "file": "src/lib/tldr-daemon.ts",
-    "oldName": "getTldrDaemonServiceSync",
-    "newName": "getTldrDaemonService",
-    "skip": false
-  },
-  {
-    "kind": "sync",
-    "file": "src/lib/tldr-daemon.ts",
-    "oldName": "getTldrMetricsSync",
-    "newName": "getTldrMetrics",
-    "skip": false
-  },
-  {
-    "kind": "sync",
-    "file": "src/lib/tldr-daemon.ts",
-    "oldName": "listTldrDaemonServicesSync",
-    "newName": "listTldrDaemonServices",
     "skip": false
   },
   {

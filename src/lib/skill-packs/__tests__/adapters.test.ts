@@ -15,6 +15,7 @@ import {
   type PackCapabilities,
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
+import { DEFT_SKILL_MAP } from '../deft.js';
 
 const roots: string[] = [];
 
@@ -172,7 +173,54 @@ describe('plain adapter', () => {
   });
 });
 
+describe('deft-readonly adapter', () => {
+  const deftFiles = (omit: readonly string[] = []): Record<string, string> => {
+    const files: Record<string, string> = { LICENSE: 'MIT License\n\nCopyright (c) Deft\n' };
+    for (const name of Object.keys(DEFT_SKILL_MAP)) {
+      if (omit.includes(name)) continue;
+      files[`content/skills/deft-directive-${name}/SKILL.md`] = skillMd(`deft-directive-${name}`, `Deft ${name}.`);
+    }
+    return files;
+  };
+
+  it('returns only the read-only allowlist, named by the stripped dir name', async () => {
+    const manifest = await readPackManifest(fixture(deftFiles()), 'deft-readonly');
+    expect(manifest.skills.map((skill) => skill.name)).toEqual([
+      'cost',
+      'debug',
+      'design-critique',
+      'gh-arch',
+      'glossary',
+      'probe',
+      'write-skill',
+    ]);
+    for (const skill of manifest.skills) expect(skill.dir).toBe(`content/skills/deft-directive-${skill.name}`);
+    expect(manifest.license).toBe('MIT');
+  });
+
+  it('reports the Deft capabilities a mount leaves out', async () => {
+    const manifest = await readPackManifest(fixture(deftFiles()), 'deft-readonly');
+    expect(notAppliedLabels(manifest.capabilities)).toEqual(
+      expect.arrayContaining(['hooks', 'context injection', 'git hooks', 'requires CLI (directive)']),
+    );
+  });
+
+  it('skips an allowlisted skill that is missing at the commit', async () => {
+    const manifest = await readPackManifest(fixture(deftFiles(['probe'])), 'deft-readonly');
+    expect(manifest.skills.map((skill) => skill.name)).toHaveLength(6);
+    expect(manifest.skills.map((skill) => skill.name)).not.toContain('probe');
+  });
+});
+
 describe('KNOWN_PACKS', () => {
+  it('points deft at the eltmon/directive fork with the deft-readonly adapter', () => {
+    expect(KNOWN_PACKS['deft']).toEqual({
+      id: 'deft',
+      url: 'https://github.com/eltmon/directive',
+      adapter: 'deft-readonly',
+    });
+  });
+
   it('marks mattpocock as a claude-plugin pack with its opt-in skill', () => {
     expect(KNOWN_PACKS['mattpocock']).toMatchObject({
       url: 'https://github.com/eltmon/skills',

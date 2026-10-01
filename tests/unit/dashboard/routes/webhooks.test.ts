@@ -180,4 +180,42 @@ describe('runWebhookHandler', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it('dispatches the parsed payload to the matching handler after the response resolves', async () => {
+    const body = JSON.stringify({ repository: { full_name: 'test-owner/test-repo' }, action: 'created' });
+    const { createHmac } = await import('node:crypto');
+    const signature = `sha256=${createHmac('sha256', 'test-webhook-secret').update(body, 'utf-8').digest('hex')}`;
+
+    await Effect.runPromise(runWebhookHandler(body, {
+      'x-github-event': 'check_run',
+      'x-hub-signature-256': signature,
+    }));
+
+    await new Promise((r) => setImmediate(r));
+
+    expect(handleCheckRun).toHaveBeenCalledTimes(1);
+    expect(handleCheckRun).toHaveBeenCalledWith(JSON.parse(body));
+  });
+
+  it('logs a dispatch failure and still returns 200 when the handler rejects', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error('boom');
+    (handleCheckRun as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(error);
+
+    const body = JSON.stringify({ repository: { full_name: 'test-owner/test-repo' }, action: 'created' });
+    const { createHmac } = await import('node:crypto');
+    const signature = `sha256=${createHmac('sha256', 'test-webhook-secret').update(body, 'utf-8').digest('hex')}`;
+
+    const response = await Effect.runPromise(runWebhookHandler(body, {
+      'x-github-event': 'check_run',
+      'x-hub-signature-256': signature,
+    }));
+
+    await new Promise((r) => setImmediate(r));
+
+    expect(response.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[webhook] Dispatch failed for check_run:', error);
+
+    consoleErrorSpy.mockRestore();
+  });
 });

@@ -229,7 +229,7 @@ export function AppRoutes({
       )}
       {activeTab === 'health' && (
         <div className="p-6 w-full overflow-auto">
-          <HealthDashboard />
+          <HealthDashboard onOpenSettings={onOpenSettings} />
         </div>
       )}
       {activeTab === 'activity' && (

@@ -82,21 +82,6 @@ Use fake timers for synthetic delays and retries.
 
 Do not run broad `git diff`, rediscover all changed files, or perform a whole-repository audit.
 
-## TLDR: prefer code summaries over full reads
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-
-
 ## Severity and evidence
 
 Use RFC 2119 severity glyphs:

@@ -7,7 +7,7 @@ description: "pan restart — scoped restart (dashboard by default; --cliproxy, 
 
 Use this whenever a Overdeck component needs to be restarted. The `pan restart`
 command is scope-aware: by default it restarts **only the dashboard** and leaves
-CLIProxy, Traefik, and TLDR running — so a dashboard restart cannot strand the
+CLIProxy and Traefik running — so a dashboard restart cannot strand the
 system or kill unrelated dependencies.
 
 ## Canonical paths
@@ -25,7 +25,7 @@ system or kill unrelated dependencies.
 # Build first if dashboard server or CLI code changed
 cd ~/Projects/overdeck && npm run build
 
-# Dashboard-only restart (safe — leaves CLIProxy, Traefik, TLDR running)
+# Dashboard-only restart (safe — leaves CLIProxy and Traefik running)
 pan restart
 
 # Scoped alternatives
@@ -81,7 +81,7 @@ left running.
 
 - `pan restart` is idempotent: it stops the old listener(s), starts a new one,
   then polls until the health check passes.
-- `pan restart --dashboard` NEVER touches CLIProxy, Traefik, or TLDR — that
+- `pan restart --dashboard` NEVER touches CLIProxy or Traefik — that
   scope contract is enforced by tests.
 - Agent-issued dashboard and full restarts consult the deploy-window gate before
   acquiring the restart lock. A refusal queues the deploy, reports its age and

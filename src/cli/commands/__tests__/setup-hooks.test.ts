@@ -75,8 +75,6 @@ describe('setup hooks', () => {
     ['Stop', 'permission-event-hook', '.*'],
     ['PreToolUse', 'gh-issue-trailer-hook', 'Bash'],
     ['PreToolUse', 'ask-user-question-hook', 'AskUserQuestion'],
-    ['PreToolUse', 'tldr-read-enforcer', 'Read'],
-    ['PostToolUse', 'tldr-post-edit', 'Edit|Write'],
   ] as const)('adds restored tool-event hook %s:%s once', (hookType, scriptName, matcher) => {
     const settings: ClaudeSettings = {};
 
@@ -147,20 +145,6 @@ describe('setup hooks', () => {
           hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'permission-event-hook') }],
         },
       ]));
-      if (settings.hooks?.PreToolUse?.some((entry) => entry.hooks.some((hook) => hook.command.endsWith('/tldr-read-enforcer')))) {
-        expect(settings.hooks.PreToolUse).toEqual(expect.arrayContaining([
-          {
-            matcher: 'Read',
-            hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'tldr-read-enforcer') }],
-          },
-        ]));
-        expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([
-          {
-            matcher: 'Edit|Write',
-            hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'tldr-post-edit') }],
-          },
-        ]));
-      }
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

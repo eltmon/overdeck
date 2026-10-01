@@ -67,6 +67,8 @@ import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
+import { startVaultService, stopVaultService } from './services/vault-service.js';
+import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
 import { startGitHubQuotaPublisher } from './services/github-quota.js';
 import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
@@ -564,6 +566,12 @@ if (!isPeerDashboard) {
   startPullRequestSyncService();
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
 }
+// PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
+if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
+  startVaultBrowseService();
+  startVaultService();
+  console.log('[vault] started (boot +5s, then vault syncIntervalSec; browse copies on each sync)');
+}
 
 // PAN-4264: sample GitHub /rate_limit into the quota ledger (boot +2 min, then every 5 min)
 // and publish the quota snapshot to the read model every 30 s when it changes.
@@ -576,6 +584,16 @@ const stopGitHubRateLimitedTelemetry = registerGitHubRateLimitedTelemetry();
 void ensureOperatorHash();
 
 let stopResourceRefreshServices = () => undefined;
+
+// PAN-4429: TLDR is removed; stop the index daemons older installs left
+// running. Idempotent and cheap, so it runs on every boot with no marker.
+void whenDashboardListening()
+  .then(async () => {
+    const { stopLegacyTldrDaemons } = await import('../../lib/legacy-tldr-cleanup.js');
+    const pids = await stopLegacyTldrDaemons();
+    if (pids.length) console.log(`[overdeck] Stopped ${pids.length} legacy TLDR daemon(s) (PAN-4429)`);
+  })
+  .catch((err) => console.warn('[overdeck] Legacy TLDR daemon stop failed (non-fatal):', err));
 
 void (async () => {
   const store = await initEventStore();
@@ -726,6 +744,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   }
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
+  await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
   stopPullRequestSyncService();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();

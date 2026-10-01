@@ -118,15 +118,6 @@ export async function registerAdminCommands(
     .description('Show installed hook harness support')
     .action(async () => (await import('../setup/hooks.js')).hooksStatusCommand());
 
-  // pan admin tldr — TLDR daemon management
-  admin
-    .command('tldr [action] [workspace]')
-    .description('TLDR daemon: status, start, stop, warm')
-    .option('--json', 'Output as JSON')
-    .action(async (action, workspace, options) => {
-      (await import('./tldr-handler.js')).tldrCommand(action || 'status', workspace, options);
-    });
-
   // pan admin fpp — first-person-plural hooks
   admin
     .command('fpp [action] [idOrMessage...]')

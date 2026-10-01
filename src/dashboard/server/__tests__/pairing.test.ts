@@ -1,7 +1,7 @@
 /**
  * PAN-3762 W2.3: pairing credentials are single use, expire after 10 minutes,
  * are rate limited on failure, never leak the internal token, and cannot be
- * issued by a paired device.
+ * issued by a paired device or (PAN-2351 D-11) an access token.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -136,7 +136,15 @@ describe('pairing credentials and exchange (PAN-3762)', () => {
       'x-overdeck-csrf-token': dashboardCsrfToken(),
     });
     expect(res.status).toBe(403);
-    expect(res.json.error).toContain('paired device');
+    expect(res.json.error).toBe('only the internal token or the root session can issue pairing credentials');
+  });
+
+  it('refuses to let an admin access token issue credentials (PAN-2351)', async () => {
+    const { token } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+    const res = await post('/api/pairing/credentials', {}, { authorization: `Bearer ${token}` });
+    expect(res.status).toBe(403);
+    expect(res.json.error).toBe('only the internal token or the root session can issue pairing credentials');
+    expect(res.cacheControl).toBe('no-store');
   });
 
   it('rejects an exchange from an untrusted Origin', async () => {

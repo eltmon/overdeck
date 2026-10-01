@@ -58,7 +58,7 @@ import {
   resolveSessionFile,
 } from '../../../lib/overdeck/conversation-reads.js';
 import {
-  getEnrichedConversationList,
+  getConversationListWithVaultCopies,
   invalidateConversationFavoritesCache,
   invalidateConversationListEnrichmentCache,
 } from '../../../lib/overdeck/conversation-list.js';
@@ -219,7 +219,7 @@ const getConversationsRoute = HttpRouter.add(
         const offsetParam = url.searchParams.get('offset');
         const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
         const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
-        const enriched = await getEnrichedConversationList(limit, offset);
+        const enriched = await getConversationListWithVaultCopies(limit, offset);
         return jsonResponse(enriched);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

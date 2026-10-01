@@ -3,7 +3,8 @@
  *
  * - `POST /api/pairing/credentials` issues a one-time `odp_` credential. Only
  *   the internal token or the root session may call it (plus CSRF for the
- *   cookie); a paired device gets 403, so a device cannot mint more devices.
+ *   cookie); a paired device or an access token gets 403, so neither can mint
+ *   more devices (PAN-2351 D-11).
  * - `POST /api/pairing/exchange` trades the credential for the caller's own
  *   revocable `odk_` device token, delivered as the `overdeck_device` cookie
  *   (browsers) or in the body (`delivery: 'bearer'`, desktop clients). It is
@@ -11,8 +12,9 @@
  *
  * - `GET /api/devices` lists paired devices (never their token hashes).
  * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket and
- *   SSE connections. A device may revoke itself but not another device; the
- *   internal token and root session may revoke any.
+ *   SSE connections. A device may revoke itself but not another device, an
+ *   access token may revoke none, and the internal token and root session may
+ *   revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
  */
@@ -68,8 +70,10 @@ const issuePairingCredentialRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
-    if (resolveDashboardCredential(request.headers as HeaderMap)?.kind === 'device') {
-      return noStore(jsonResponse({ error: 'a paired device cannot issue pairing credentials' }, { status: 403 }));
+    // PAN-2351 D-11: only root credentials mint new devices.
+    const issuer = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+    if (issuer !== 'internal-token' && issuer !== 'root-session') {
+      return noStore(jsonResponse({ error: 'only the internal token or the root session can issue pairing credentials' }, { status: 403 }));
     }
 
     const body = parseJsonObject(yield* request.text);
@@ -139,6 +143,7 @@ function deviceView(record: PublicAccessTokenRecord) {
   return {
     id: record.id,
     name: record.name,
+    scopes: [...record.scopes],
     createdAt: record.createdAt,
     lastUsedAt: record.lastUsedAt,
     revokedAt: record.revokedAt ?? null,
@@ -165,12 +170,16 @@ const revokeDeviceRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     const id = (yield* HttpRouter.params)['id'] ?? '';
+    const credential = resolveDashboardCredential(request.headers as HeaderMap);
+    // PAN-2351 D-11: checked before the lookup, so a token cannot probe device ids.
+    if (credential?.kind === 'token') {
+      return noStore(jsonResponse({ error: 'an access token cannot revoke devices' }, { status: 403 }));
+    }
 
     const records = yield* Effect.promise(() => listAccessTokens());
     const target = records.find((record) => record.id === id && record.kind === 'device');
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
-    const credential = resolveDashboardCredential(request.headers as HeaderMap);
     if (credential?.kind === 'device' && credential.deviceId !== id) {
       return noStore(jsonResponse({ error: 'a paired device may revoke only itself' }, { status: 403 }));
     }

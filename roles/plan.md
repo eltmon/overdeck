@@ -46,7 +46,7 @@ If a Linear MCP tool call fails with an authentication error: call `mcp__linear_
 2. **xBRIEF plan** in `.overdeck/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy). The PRD's documentation work item must survive the lowering: at least one item carries `metadata.kind: "docs"` or names a doc file (`.md`/`.mdx`, or a `docs/` path) in `metadata.files_scope`, or `pan plan finalize` fails the `docs-item-missing` quality gate. If the change genuinely alters no documented surface, say so in `plan.metadata.docsJustification` rather than dropping the item. Phrase that item's acceptance criteria as concrete observable behavior — "docs updated" and its variants are banned AC phrases.
 3. **Continue context** in `.overdeck/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Codebase Map — read first, keep fresh.** Four files under `<projectRoot>/.overdeck/context/codebase/` (architecture.md, conventions.md, concerns.md, stack.md):
-   - **If present:** read all four files FIRST — they are your primary orientation. Use TLDR/Read only for the issue-specific delta. If you discover any statement is stale or wrong, correct the file and update its `<!-- last-verified: -->` date as part of this session.
+   - **If present:** read all four files FIRST — they are your primary orientation. Use Read only for the issue-specific delta. If you discover any statement is stale or wrong, correct the file and update its `<!-- last-verified: -->` date as part of this session.
    - **If absent or empty:** bootstrap it during discovery. Write all four files from what you learn (≤150 lines each, ends with `<!-- last-verified: YYYY-MM-DD -->`). This is part of planning output, not implementation code.
    These files are committed on main by `pan plan finalize` along with the spec.
 
@@ -106,7 +106,7 @@ After `pan plan finalize`, the pipeline runs without you once the handoff gate o
 ## Process
 
 1. Read the issue and the PRD draft at `.pan/drafts/<ISSUE-ID>.md` if it exists. For cross-issue context, look up existing specs by issue ID under `.pan/specs/` (`*-<ISSUE-ID>-*.xbrief.json`), read-only — never write or move files in `.pan/specs/` directly.
-2. Explore the codebase. Large-file `Read`s return TLDR summaries automatically — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
+2. Explore the codebase with Read/Grep/Glob, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach; write each question self-contained (situation, decision, option consequences) — the operator answers from a dialog without the transcript
 5. **Write the PRD draft** to `.pan/drafts/<ISSUE-ID>.md` in your workspace if no canonical PRD exists (see Outputs #1 for the standard). Do not proceed to the xBRIEF until the PRD is on disk — `pan plan finalize` refuses to run without it and promotes it to `.pan/drafts/` on the feature branch.
@@ -116,21 +116,6 @@ After `pan plan finalize`, the pipeline runs without you once the handoff gate o
    If finalize exits 5 with a plan critique refusal, read `.pan/drafts/<stem>-critique*.md`, answer each `blocks-the-design` finding with a `### <title>` heading under `## Critique response` in the PRD (change the draft only when the finding requires it), then re-run `pan plan finalize`. Never edit the critique file to make it pass. When the issue is flagged, run `pan plan finalize` with a 600 s Bash timeout or `run_in_background: true`; a finalize killed mid-wait leaves the critic running, and the next run waits on it.
 
 8. Stop after `pan plan finalize` returns; do not start implementation work. Stop after planning is complete. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
-
-## TLDR: prefer code summaries over full reads
-
-TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
-large code file automatically returns a structured summary (~1k tokens instead
-of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
-need to invoke anything. To see full contents anyway, Read with offset/limit;
-recently-edited files always return full content so you can verify your changes.
-
-For deliberate exploration, use the CLI via Bash from the checkout root:
-`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
-`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
-tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
-sessions and will not exist in your toolset (PAN-3534).
-
 
 ## State model
 

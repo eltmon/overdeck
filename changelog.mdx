@@ -10,6 +10,18 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.65.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.64.0. The date is set when the release is tagged.
+
+  #### Changed
+
+  - **TLDR removed:** the TLDR Read hook, its index daemon, the `pan admin tldr` and `pan status --tldr` commands, the Health and Metrics TLDR panel, the Settings toggle and the `pan-tldr`/`pan-admin-tldr` skills are gone. A 14-day audit of 2,071 agent transcripts found 282 reads the hook replaced with an outline. Within the next 8 tool calls, 74.5% re-read the file with offset/limit, 13.8% read it through Bash, 3.9% re-read it in full, and only 7.8% worked from the outline, so each denial cost an extra model turn instead of saving tokens. New workspaces no longer install a ~1.5 GB Python venv or start a daemon, and creating a workspace now refuses to run with under 10 GiB free. `pan sync` and `pan install` unregister the two hooks from `~/.claude/settings.json` (and from workspace-local `.claude/settings.json` copies) before deleting their scripts, and the dashboard stops leftover daemons when it starts. Leftover `.venv` and `.tldr/` directories are not deleted; `pan sync` tells you when some exist. An `agents.tldr` key in `config.yaml` is ignored and dropped on the next Settings save. Restart agents started before the upgrade so their sessions stop loading the old hooks. ([#4429](https://github.com/eltmon/overdeck/issues/4429))
+
+  [Compare v0.64.0...main](https://github.com/eltmon/overdeck/compare/v0.64.0...main)
+</Update>
+
 <Update label="v0.64.0" description="2026-09-29">
   #### New
 

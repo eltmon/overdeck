@@ -9,24 +9,24 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { _resetRemoteAccessConfigForTests, readRemoteAccessConfig } from '../../../../src/lib/remote-access/config.js';
+import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from '../../../../src/lib/remote-access/config.js';
 
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
 
 async function writeConfig(body: string): Promise<void> {
   await writeFile(join(home, 'config.yaml'), body, 'utf8');
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
 }
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-3762-remote-config-'));
   process.env.OVERDECK_HOME = home;
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
 });
 
 afterEach(async () => {
-  _resetRemoteAccessConfigForTests();
+  invalidateRemoteAccessConfig();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   await rm(home, { recursive: true, force: true });

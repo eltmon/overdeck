@@ -32,7 +32,7 @@ export const PROJECT_RING = {
 } as const;
 
 export const HOOKS = {
-  tool_read: { color: '#00d4ff', label: 'Read/Grep', tools: ['Read', 'Grep', 'Glob', 'TLDR'] },
+  tool_read: { color: '#00d4ff', label: 'Read/Grep', tools: ['Read', 'Grep', 'Glob'] },
   tool_write: { color: '#ffb800', label: 'Edit/Write', tools: ['Edit', 'Write', 'NotebookEdit'] },
   tool_exec: { color: '#39ff14', label: 'Bash', tools: ['Bash', 'Task Create'] },
   tool_web: { color: '#4aa8ff', label: 'Web', tools: ['WebFetch', 'WebSearch'] },

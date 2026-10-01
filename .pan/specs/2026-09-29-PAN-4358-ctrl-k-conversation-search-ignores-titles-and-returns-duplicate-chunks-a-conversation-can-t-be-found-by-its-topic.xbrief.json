@@ -1,0 +1,632 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T03:38:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4358: Ctrl+K conversation search ignores titles and returns duplicate chunks: a conversation can't be found by its topic",
+    "updated": "2026-09-29T03:40:40.299Z"
+  },
+  "plan": {
+    "id": "pan-4358",
+    "title": "Ctrl+K conversation search ignores titles and returns duplicate chunks: a conversation can't be found by its topic",
+    "status": "running",
+    "uid": "d0a780ac-d1f8-4f23-b9e0-6a4ea061ef8f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T03:38:22Z",
+    "updated": "2026-09-29T03:40:40.299Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4358",
+        "label": "PAN-4358",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4358.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "command-palette",
+      "conversation-search",
+      "ranking"
+    ],
+    "narratives": {
+      "Problem": "Ctrl+K conversation search returns raw transcript chunks: it never matches conversation titles (conversation 2832 'Personal portfolio deployment to GitHub' has zero transcript chunks containing 'portfolio'), it lists the same conversation several times, and common tokens such as the username inside /home/eltmon/... paths, ls -l output and <output-file> tags dominate ranking. Archived conversations appear unmarked.",
+      "Proposal": "Query-time only. A pure classifier marks a chunk 'path' when every literal query-term occurrence sits in a fenced block, inline code or slash-containing token. A pure grouper folds a 300-chunk fused candidate pool plus overdeck.db title matches into one row per conversation with tiers title > text > path, best excerpt and hit count; the limit counts conversations. The palette route returns the grouped rows with title, archived, matchTier, hitCount and nullable byteOffset; title search runs even when the embedding sidecar is off. The palette labels rows by title, shows hit-count and archived chips, keeps tiers first in newest-first order, and opens title-only rows without a message target. Docs describe the ranking.",
+      "NonGoals": "- No BM25-only fallback when the embedding call fails (titles still work)\n- No change to the chunker, indexer, embeddings schema or reindexing\n- No title search over conversation name, issue ids, project names or title_seed\n- No new index or FTS table on conversations.title\n- No unarchive action in the palette\n- No change to memory/observation/summary palette results\n- No change to excerpt construction (buildMarkedExcerpt still marks the first occurrence)\n- No growth of conversations.ts or CommandPalette.tsx past their file-size allowlist caps"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Group chunk hits on the resolved conversation name (conversation row name, else root session id); subagent chunks fold into the parent conversation",
+        "rationale": "The palette already opens subagent hits through the parent, so one row per openable conversation matches the issue's 'one row per conversation'."
+      },
+      {
+        "summary": "Rank in strict tiers title > text > path, then best RRF score, hit count, recency",
+        "rationale": "Issue AC1 and AC3 are ordering guarantees; strict bands make them deterministic and testable."
+      },
+      {
+        "summary": "Path/tool-output detection is lexical at query time: fenced code, inline code and slash-containing tokens; zero literal occurrences count as prose",
+        "rationale": "Chunks only carry user/assistant roles (verified on the live DB), so tool output can only be recognized from text; the live 'eltmon' noise was exactly these three shapes."
+      },
+      {
+        "summary": "Down-weight path-only matches by tier instead of dropping them",
+        "rationale": "The issue allows down-weight or skip; down-weighting keeps path-only conversations reachable when they are the only matches."
+      },
+      {
+        "summary": "Chunk candidate pool of 300 for BM25 and vector lists; the request limit counts conversations",
+        "rationale": "Measured 336 ms warm for the worst common term on the 3.0 GB live DB; a larger pool surfaces more distinct conversations. AC3 is guaranteed within the pool."
+      },
+      {
+        "summary": "Title matching: every query term must prefix a word of the title; archived rows included; agent-/planning-/specialist- conversations excluded",
+        "rationale": "Prefix matching finds 'portfolio' and 'deploy'; the exclusion mirrors listConversations(); the issue asks for archived inclusion."
+      },
+      {
+        "summary": "Title search runs even when conversation-search indexing is disabled or the embed call fails",
+        "rationale": "It only reads overdeck.db, costs nothing, and the embed path has failed before (exhausted credits); DESKTOP-APP.md is updated to match."
+      },
+      {
+        "summary": "Default newest-first palette order sorts by tier before timestamp",
+        "rationale": "DESKTOP-APP.md documents newest-first as the default; without tier-first sorting a title match would not be the first row the operator sees."
+      },
+      {
+        "summary": "Title-only rows carry byteOffset null and open without a message target",
+        "rationale": "The message-locator route 404s for offsets that do not map to a message, and a title-only row has no chunk offset."
+      },
+      {
+        "summary": "Put new code in new modules (conversation-title-search.ts, palette-conversation-hits.ts) instead of adding file-size allowlist rows",
+        "rationale": "conversations.ts and CommandPalette.tsx sit exactly at their allowlist caps; extraction shrinks CommandPalette.tsx."
+      },
+      {
+        "summary": "Document in docs/USAGE.md (new subsection), docs/DESKTOP-APP.md (the real palette section) and docs/CONVERSATION-SUBAGENTS.md",
+        "rationale": "The issue names USAGE.md, which only has a one-line table row; the detailed palette section lives in DESKTOP-APP.md and CONVERSATION-SUBAGENTS.md describes the hit shape being changed."
+      }
+    ],
+    "items": [
+      {
+        "id": "match-classifier",
+        "title": "Add the chunk match classifier (prose vs path/tool-output)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversation-search/match-context.ts",
+            "src/lib/conversation-search/__tests__/match-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/match-context.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "match-context.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4358.md). Create src/lib/conversation-search/match-context.ts exporting `ChunkMatchKind = 'text' | 'path'`, `queryTerms(query)` (lowercased, deduplicated matches of /[\\p{L}\\p{N}_-]+/gu) and `classifyChunkMatch(text, query)`. Non-prose ranges: fenced blocks /```[\\s\\S]*?(?:```|$)/g, inline code /`[^`\\n]+`/g, and path-like tokens /[^\\s<>\"'`()[\\]{},;]*\\/[^\\s<>\"'`()[\\]{},;]*/g. Return 'path' only when there is at least one literal case-insensitive term occurrence and every occurrence lies fully inside a non-prose range; zero occurrences (vector-only or stemmed matches) return 'text'. Add the unit tests listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "match-classifier.ac1",
+            "title": "Given chunk text 'I deployed eltmon.com today' and query 'eltmon', classifyChunkMatch returns 'text'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "match-classifier.ac2",
+            "title": "Given query 'eltmon' occurring only in '/home/eltmon/Projects/x', only inside a ``` fence (terminated or unterminated), only inside inline code, or only in '<output-file>/tmp/claude-1000/-home-eltmon-Projects-lexerra/x</output-file>', classifyChunkMatch returns 'path'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "match-classifier.ac3",
+            "title": "Given one prose occurrence and one path occurrence of the term, classifyChunkMatch returns 'text'; given zero literal occurrences it returns 'text'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "match-classifier.ac4",
+            "title": "queryTerms('Personal  portfolio portfolio') returns ['personal', 'portfolio']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-grouper",
+        "title": "Group fused chunk hits and title matches into one tiered row per conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversation-search/group-hits.ts",
+            "src/lib/conversation-search/__tests__/group-hits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/group-hits.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "group-hits.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ],
+          "foundationFor": [
+            "palette-server-grouping",
+            "title-search"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and decisions D1-D3. Create src/lib/conversation-search/group-hits.ts exporting ConversationMatchTier, ConversationIdentity, TitleMatchedConversation, GroupedConversationHit and groupConversationHits({ hits, titleMatches, query, resolve, limit }) exactly as typed in the PRD. Group key = resolve(hit.parentSessionId ?? hit.sessionId).conversationId. Classify each chunk with classifyChunkMatch from ./match-context.js. bestHit = first 'text' chunk in RRF order, else first chunk. tier = title match ? 'title' : any text chunk ? 'text' : 'path'. Sort by tier (title<text<path), then score (bestHit.rrfScore, 0 for title-only) desc, hitCount desc, lastActivityAt desc, conversationId asc; slice to limit (counts conversations). The module stays DB-free; resolve is injected."
+        },
+        "items": [
+          {
+            "id": "conversation-grouper.ac1",
+            "title": "Given three chunk hits from one session, groupConversationHits returns one row with hitCount 3 and bestHit equal to the highest-RRF chunk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-grouper.ac2",
+            "title": "Given a subagent chunk (parentSessionId 'parent') and a parent chunk, groupConversationHits returns one row keyed by the parent's conversationId, and bestHit.sessionId is the subagent's when that chunk has the higher score",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-grouper.ac3",
+            "title": "Given a title-only match and a higher-scored text-tier conversation, the title match is returned first with tier 'title', hitCount 0 and bestHit null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-grouper.ac4",
+            "title": "Given a path-only conversation with a higher RRF score than a text-tier conversation, the text-tier conversation ranks first and the other has tier 'path'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-grouper.ac5",
+            "title": "Given limit 2 over four conversations, groupConversationHits returns exactly two rows, and archived: true from resolve or from a title match is preserved on the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "title-search",
+        "title": "Search conversation titles in overdeck.db, archived included",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-title-search.ts",
+            "src/lib/overdeck/__tests__/conversation-title-search.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-title-search.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-title-search.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and decisions D8-D10, D12. Create src/lib/overdeck/conversation-title-search.ts (do NOT add to conversations.ts, which is at its file-size cap). Export titleMatchesQuery(title, query) (every queryTerms() term is a prefix of a word of the lowercased title, words split by /[\\p{L}\\p{N}_-]+/gu) and searchConversationTitles(query, limit = 50) returning TitleMatchedConversation[] (type-only import from ../conversation-search/group-hits.js). Use getOverdeckDatabase() from ./infra.js with the PRD's SQL: non-empty titles, archived included, names starting agent-/planning-/specialist- excluded, one escaped `lower(c.title) LIKE ? ESCAPE '\\'` per term (max 8), ORDER BY COALESCE(last_attached_at, created_at) DESC LIMIT 200, then the JS filter and slice. Tests copy the OVERDECK_HOME temp-dir setup of src/lib/overdeck/__tests__/conversation-project-key.test.ts."
+        },
+        "items": [
+          {
+            "id": "title-search.ac1",
+            "title": "titleMatchesQuery('Personal portfolio deployment to GitHub', q) returns true for q = 'portfolio', 'Personal portfolio' and 'deploy', and returns false for 'personal site' and for an empty query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-search.ac2",
+            "title": "Given an archived conversation titled 'Personal portfolio deployment to GitHub', searchConversationTitles('portfolio') returns it with archived: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-search.ac3",
+            "title": "Given conversations named agent-x, planning-x and specialist-x with matching titles, searchConversationTitles excludes them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-search.ac4",
+            "title": "Given a conversation titled '500 errors', searchConversationTitles('50%') returns no rows (LIKE wildcards are escaped), and results are ordered newest activity first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-server-grouping",
+        "title": "Return grouped, tiered conversation rows from GET /api/palette/search",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/palette.ts",
+            "src/dashboard/server/services/conversation-search-service.ts",
+            "src/dashboard/server/routes/__tests__/palette.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/palette.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "palette.test.ts passes",
+            "typecheck completes without errors",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and the Wire contract section. In conversation-search-service.ts add an optional candidateLimit passed to rankConversationSearch, and make filterLiveHits stat each distinct path once (before/after snippet in the PRD). In palette.ts add CONVERSATION_CHUNK_POOL = 300, extend RouteableConversation with title and archived, replace PaletteConversationHit with the wire contract (title, archived, matchTier, hitCount, byteOffset: number | null, role '' and excerpt '' for title-only rows), and rewrite searchConversations to run chunk search (pool 300) and searchConversationTitles(rawQuery) in parallel (title-search errors logged and treated as []), then groupConversationHits with limit = the request limit, then map rows per the PRD (title-only projectKey: explicit project_key match, else cwd-encoded resolveConversationProjectKey). Update the stale Phase-2 header comment. Extend palette.test.ts with a vi.mock of conversation-title-search.js and the cases listed in WI-4."
+        },
+        "items": [
+          {
+            "id": "palette-server-grouping.ac1",
+            "title": "Given two indexed messages in one session both matching 'needle', GET /api/palette/search returns one conversation row with hitCount 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-server-grouping.ac2",
+            "title": "Given a mocked title match for a conversation with no indexed chunk, runPaletteSearch returns it as conversations[0] with matchTier 'title', byteOffset null and role ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-server-grouping.ac3",
+            "title": "Given getConversationSearchConfig returns enabled: false, runPaletteSearch still returns the mocked title matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-server-grouping.ac4",
+            "title": "Given one session matching 'needle' only in '/home/u/needle/x' and another matching 'needle' in prose, the prose conversation ranks first and the other has matchTier 'path'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-server-grouping.ac5",
+            "title": "Given getConversationByClaudeSessionId returns archivedAt set and title 'T', the conversation row has archived: true and title 'T'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-grouped-rows",
+        "title": "Render one titled palette row per conversation with hit-count and archived chips",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/palette-conversation-hits.ts",
+            "src/dashboard/frontend/src/components/palette-conversation-hits.test.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/palette-conversation-hits.test.ts src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint exits 0 (including lint:circular and lint:file-size)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and decisions D12, D14. Create palette-conversation-hits.ts (must not import CommandPalette.tsx): move PaletteConversationHit (updated to the wire contract) and ConversationPaletteOpenRequest (byteOffset: number | null) there, move friendlyProjectLabel/issueIdFromProjectLabel/formatHitDate there unchanged, export MATCH_TIER_ORDER and a pure describeConversationHit(hit) per the PRD (label = title, else displayContent/conversationId/sessionId; project = friendlyProjectLabel(projectId) || projectKey; '{n} hits' chip when hitCount > 1; 'archived' chip when archived; tier number; openRequest with nullable byteOffset). CommandPalette.tsx re-exports the ConversationPaletteOpenRequest type, builds conversation actions from describeConversationHit, adds PaletteAction.tier, and compareConversationActionsNewestFirst compares tier before timestamp. CommandPalette.tsx must end at <= 1124 lines."
+        },
+        "items": [
+          {
+            "id": "palette-grouped-rows.ac1",
+            "title": "Given a hit with title 'Personal portfolio deployment to GitHub', describeConversationHit returns that title as label; given title null it falls back to displayContent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-grouped-rows.ac2",
+            "title": "describeConversationHit emits a '3 hits' chip for hitCount 3, no hits chip for hitCount 1, and an 'archived' chip when archived is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-grouped-rows.ac3",
+            "title": "Given a matchTier 'title' hit with an older ts and a matchTier 'text' hit with a newer ts, the palette renders the title hit first in the default newest-first order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-grouped-rows.ac4",
+            "title": "wc -l src/dashboard/frontend/src/components/CommandPalette.tsx reports at most 1124 lines and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-title-only-hit",
+        "title": "Open a title-only conversation hit without a message target",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/api.ts",
+            "src/dashboard/frontend/src/App/api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/App/api.test.ts src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "api.test.ts and CommandPalette.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and decision D13. Export conversationHitNeedsLocator(hit) from src/dashboard/frontend/src/App/api.ts (returns hit.byteOffset !== null, typed as a guard). In App.tsx handleOpenConversationHit, when it returns false skip fetchConversationMessageLocator and setPendingConversationTarget and open the pane with updatePane(projectKey, paneId, { viewMode: 'conversation' }) only; the numeric path is unchanged. fetchConversationMessageLocator keeps a number parameter. Unit-test the helper in the existing src/dashboard/frontend/src/App/api.test.ts. Browser UAT must use an isolated Playwright profile."
+        },
+        "items": [
+          {
+            "id": "open-title-only-hit.ac1",
+            "title": "conversationHitNeedsLocator returns false for byteOffset null and true for byteOffset 0 and 1234, and handleOpenConversationHit skips the /message-locator request when it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-title-only-hit.ac2",
+            "title": "Given a hit with a numeric byteOffset, handleOpenConversationHit still fetches the message locator and sets the pending message target as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-title-only-hit.ac3",
+            "title": "UAT (isolated Playwright profile): given a conversation titled with a distinctive word absent from its transcript, Ctrl+K with that word renders it as the first Conversations row labelled by its title, and selecting it opens that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-conversation-search",
+        "title": "Document conversation search ranking, grouping and archived marking",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T03:38:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            "docs/DESKTOP-APP.md",
+            "docs/CONVERSATION-SUBAGENTS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Command palette conversation search' docs/USAGE.md",
+            "grep -n 'archived' docs/DESKTOP-APP.md"
+          ],
+          "expected_outputs": [
+            "USAGE.md contains the new subsection heading",
+            "DESKTOP-APP.md mentions archived conversation results"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. docs/USAGE.md: add a '### Command palette conversation search' subsection after the Desktop App Key Features table (before '### `pan up` Electron Detection') stating one row per conversation labelled by title with best excerpt and hit count; ranking title matches, then message-text matches, then matches only inside file paths/code blocks/tool output; archived conversations included and marked 'archived'; title matching works with indexing off; link to DESKTOP-APP.md. docs/DESKTOP-APP.md: add a '### Conversation results' paragraph under Scope chips with the same rules, make the newest-first sentence say title matches stay first, and change the indexing-off sentence to say titles are still found but no transcript matches are shown. docs/CONVERSATION-SUBAGENTS.md line 73: a subagent chunk groups into its parent conversation's row and, when it is the best match, the row carries parentSessionId/subagentId."
+        },
+        "items": [
+          {
+            "id": "docs-conversation-search.ac1",
+            "title": "docs/USAGE.md renders a 'Command palette conversation search' subsection that lists the order title matches, then message-text matches, then path/code/tool-output-only matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-search.ac2",
+            "title": "docs/DESKTOP-APP.md renders a 'Conversation results' paragraph stating that archived conversations appear marked 'archived' and that with indexing off the palette still returns conversations whose title matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-search.ac3",
+            "title": "docs/CONVERSATION-SUBAGENTS.md renders a statement that a subagent match groups into its parent conversation's single palette row, which carries parentSessionId and subagentId when the subagent chunk is the best match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "match-classifier",
+        "to": "conversation-grouper",
+        "type": "blocks"
+      },
+      {
+        "from": "match-classifier",
+        "to": "title-search",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-grouper",
+        "to": "title-search",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-grouper",
+        "to": "palette-server-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "title-search",
+        "to": "palette-server-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-grouped-rows",
+        "to": "open-title-only-hit",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4358-ctrl-k-conversation-search-ignores-titles-and-returns-duplicate-chunks-a-conversation-can-t-be-found-by-its-topic.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

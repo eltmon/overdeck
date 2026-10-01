@@ -195,9 +195,6 @@ async function mockAppShell(page: Page): Promise<void> {
   await page.route('**/api/deploy/staleness', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
   });
-  await page.route('**/api/services/tldr/status', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"daemons":[]}' });
-  });
   await page.route('**/api/deacon/status', async (route) => {
     await route.fulfill({
       status: 200,

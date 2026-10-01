@@ -18,11 +18,11 @@ import {
   isComplianceMode,
   isFeatureRegistryClassificationProvider,
   mergeCavemanConfig,
+  mergeDashboardConfig,
   mergeDocsConfig,
   mergeRemoteConfig,
   mergeRtkConfig,
   mergeShadowConfig,
-  mergeTldrConfig,
   mergeTtsConfig,
 } from './domain-mergers.js';
 import {
@@ -732,9 +732,6 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge RTK configuration
     mergeRtkConfig(result.rtk, config);
 
-    // Merge TLDR configuration
-    mergeTldrConfig(result.tldr, config);
-
     // Merge docs RAG configuration
     mergeDocsConfig(result.docs, config);
 
@@ -956,6 +953,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge remote work-agent provisioning settings
     mergeRemoteConfig(result, config);
+
+    // Merge dashboard access settings (PAN-4435)
+    mergeDashboardConfig(result, config);
 
     // Merge conversationSearch configuration
     if (config.conversationSearch) {

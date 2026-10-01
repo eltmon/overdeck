@@ -65,7 +65,7 @@ describe('core services resources payload', () => {
     });
   });
 
-  it('returns one aggregated support-fleet row across traefik, smee, pty, and tldr processes', () => {
+  it('returns one aggregated support-fleet row across traefik, smee, and pty processes', () => {
     const rows = buildCoreServices({
       nowMs: NOW_MS,
       processInfo: dashboardFixture(),
@@ -75,7 +75,6 @@ describe('core services resources payload', () => {
         process(10, 'traefik --configFile=traefik.yml', 1.5, 20_000_000),
         process(11, 'smee --url https://smee.io/test', 2.25, 30_000_000),
         process(12, 'node dist/dashboard/pty-supervisor.js', 3.75, 40_000_000),
-        process(13, 'tldr daemon', 4, 50_000_000),
         process(14, 'node unrelated-worker.js', 100, 900_000_000),
       ],
     });
@@ -83,15 +82,14 @@ describe('core services resources payload', () => {
     expect(rows[2]).toMatchObject({
       id: 'support-fleet',
       status: 'running',
-      memberCount: 4,
-      cpuPercent: 11.5,
-      memoryBytes: 140_000_000,
+      memberCount: 3,
+      cpuPercent: 7.5,
+      memoryBytes: 90_000_000,
     });
     expect(rows[2].members).toEqual([
       'traefik --configFile=traefik.yml',
       'smee --url https://smee.io/test',
       'node dist/dashboard/pty-supervisor.js',
-      'tldr daemon',
     ]);
   });
 });

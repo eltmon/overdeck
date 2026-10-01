@@ -12,10 +12,6 @@ hooks:
       hooks:
         - type: command
           command: "$HOME/.overdeck/bin/pre-tool-hook"
-    - matcher: "Read"
-      hooks:
-        - type: command
-          command: "$HOME/.overdeck/bin/tldr-read-enforcer"
     - matcher: "Bash"
       hooks:
         - type: command
@@ -31,10 +27,6 @@ hooks:
           command: "$HOME/.overdeck/bin/heartbeat-hook"
         - type: command
           command: "$HOME/.overdeck/bin/permission-event-hook"
-    - matcher: "Edit|Write"
-      hooks:
-        - type: command
-          command: "$HOME/.overdeck/bin/tldr-post-edit"
   Stop:
     - matcher: ".*"
       hooks:

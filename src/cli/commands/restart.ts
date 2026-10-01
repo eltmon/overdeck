@@ -4,8 +4,8 @@ import { exitCli } from '../exit.js';
  *
  * Scopes:
  *   pan restart                    (default: --dashboard)
- *   pan restart --dashboard        Restart only the dashboard. Leaves CLIProxy,
- *                                  Traefik, and TLDR untouched. This is the
+ *   pan restart --dashboard        Restart only the dashboard. Leaves CLIProxy
+ *                                  and Traefik untouched. This is the
  *                                  fix for the "restart killed my CLIProxy"
  *                                  failure mode.
  *   pan restart --cliproxy         Restart only CLIProxy.
@@ -658,7 +658,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         console.log(chalk.green(result.ownershipVerified
           ? '✓ Dashboard restarted and healthy'
           : '✓ Dashboard restarted and healthy — ownership unverified: could not resolve the spawned server pid'));
-        console.log(chalk.dim('  CLIProxy, Traefik, and TLDR were left running.'));
+        console.log(chalk.dim('  CLIProxy and Traefik were left running.'));
         break;
       }
       case 'cliproxy': {
@@ -717,17 +717,13 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
  * Full restart: stop everything, then start everything. Uses the same shared
  * lifecycle primitives so the health-gating is identical to scoped restarts.
  *
- * Covers the same four components that `pan down` + `pan up` cover — dashboard,
- * CLIProxy, Traefik, TLDR — so `pan restart --full` is a true stack rebuild.
+ * Covers the same three components that `pan down` + `pan up` cover — dashboard,
+ * CLIProxy, Traefik — so `pan restart --full` is a true stack rebuild.
  */
 async function runFullRestart(
   config: PlatformConfig,
   opts: { healthTimeoutMs?: number; bootGateOptions?: BootGateOptions },
 ): Promise<void> {
-  const projectRoot = process.cwd();
-  const venvPath = join(projectRoot, '.venv');
-  const tldrAvailable = existsSync(venvPath);
-
   // ── Stop phase ──
   // Dashboard first so it doesn't spam errors while sidecars die.
   await stopDashboard(config);
@@ -739,23 +735,13 @@ async function runFullRestart(
     // non-fatal
   }
 
-  if (tldrAvailable) {
-    try {
-      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonService(projectRoot, venvPath).stop();
-    } catch {
-      // non-fatal — daemon may already be down
-    }
-  }
-
   if (config.traefikEnabled) {
     await stopTraefik(config);
   }
 
   // ── Start phase ──
   // Traefik first so routes exist before anything binds; CLIProxy before
-  // dashboard so GPT-backed agents have their router from t=0; TLDR last
-  // because it's non-critical and shouldn't block the dashboard coming up.
+  // dashboard so GPT-backed agents have their router from t=0.
   if (config.traefikEnabled) {
     await startTraefik(config);
   }
@@ -787,15 +773,6 @@ async function runFullRestart(
     startSupervisorProcess();
   } catch {
     // non-fatal
-  }
-
-  if (tldrAvailable) {
-    try {
-      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonService(projectRoot, venvPath).start(true);
-    } catch {
-      // non-fatal — dashboard is already healthy; TLDR just won't be available
-    }
   }
 
   console.log(chalk.green(spawnedPid !== null

@@ -46,6 +46,14 @@ import {
   type WorkspaceRegistryRow,
 } from './Sidebar';
 import type { Issue, Agent } from '../types';
+import {
+  describeConversationHit,
+  type ConversationHitChip,
+  type ConversationPaletteOpenRequest,
+  type PaletteConversationHit,
+} from './palette-conversation-hits';
+
+export type { ConversationPaletteOpenRequest } from './palette-conversation-hits';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +73,8 @@ export interface PaletteAction {
   // Sort hint within group: lower = earlier.
   rank?: number;
   sortTs?: string | null;
+  /** Conversation match-tier band (title < text < path); newest-first sorts by this first (PAN-4358). */
+  tier?: number;
   /**
    * Run the action without closing the palette. For in-palette affordances that
    * change what is listed rather than navigating away — e.g. expanding the
@@ -79,19 +89,6 @@ export interface PaletteAction {
    * chips.
    */
   alsoScopes?: Array<Exclude<PaletteScope, 'all'>>;
-}
-
-export interface ConversationPaletteOpenRequest {
-  sessionId: string;
-  conversationId: string;
-  projectId: string;
-  /** Resolved dashboard project key (name ?? key), or null when under no registered project. */
-  projectKey: string | null;
-  byteOffset: number;
-  label: string;
-  sourceLabel?: string;
-  /** Bare subagent id when the hit is a subagent transcript; opens on the parent (PAN-3982). */
-  subagentId?: string | null;
 }
 
 interface CommandPaletteProps {
@@ -131,24 +128,6 @@ interface PaletteSearchHit {
   rank: number;
 }
 
-interface PaletteConversationHit {
-  sessionId: string;
-  conversationId: string;
-  projectId: string;
-  projectKey: string | null;
-  /** Parent session UUID when the hit is a Claude subagent transcript (PAN-3982). */
-  parentSessionId?: string | null;
-  /** Bare subagent id (`agent-<id>.jsonl` → `<id>`). */
-  subagentId?: string | null;
-  role: string;
-  ts: string | null;
-  byteOffset: number;
-  displayContent: string;
-  excerpt: string;
-  excerptSegments: Array<{ text: string; match: boolean }>;
-  rank: number;
-}
-
 interface PaletteSearchResponse {
   memory: PaletteSearchHit[];
   observations: PaletteSearchHit[];
@@ -163,56 +142,24 @@ export const PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY = 'overdeck.ui.paletteConver
 
 // ─── Display helpers ────────────────────────────────────────────────────────────
 
+/** Maps a conversation-hit chip kind (PAN-4358) to today's icon/pill styling. */
+function conversationChipMeta(chip: ConversationHitChip): NonNullable<PaletteAction['meta']>[number] {
+  if (chip.kind === 'project') return { icon: FolderOpen, text: chip.text, pill: true };
+  if (chip.kind === 'issue') return { text: chip.text, pill: true };
+  if (chip.kind === 'date') return { icon: Clock, text: chip.text };
+  return { text: chip.text };
+}
+
 /**
- * Turn a Claude project-dir id (the cwd with '/' encoded as '-', e.g.
- * `-home-eltmon-Projects-overdeck`) into a human label like
- * `overdeck`, or `overdeck · feature-pan-1053` for a workspace.
- * The encoding is lossy (a real '-' is indistinguishable from a path separator),
- * so we anchor on the `Projects` segment and fall back to the trailing segment.
+ * Order conversation actions newest first while preserving search rank for
+ * timestamp ties (PAN-3704). Tier (title < text < path) sorts first so title
+ * matches and prose stay above path/tool-output noise even in newest-first
+ * order (PAN-4358 D14).
  */
-function friendlyProjectLabel(projectId: string): string {
-  if (!projectId) return '';
-  const segs = projectId.replace(/^-+/, '').split('-').filter(Boolean);
-  if (segs.length === 0) return projectId;
-  const projectsIdx = segs.lastIndexOf('Projects');
-  const after = projectsIdx >= 0 ? segs.slice(projectsIdx + 1) : segs;
-  const wsIdx = after.indexOf('workspaces');
-  if (wsIdx >= 0) {
-    const base = after.slice(0, wsIdx).join('-') || segs[segs.length - 1] || projectId;
-    const ws = after.slice(wsIdx + 1).join('-');
-    return ws ? `${base} · ${ws}` : base;
-  }
-  if (projectsIdx >= 0) return after.join('-') || projectId;
-  // No `Projects` anchor — best effort: the cwd basename (last segment).
-  return after[after.length - 1] || projectId;
-}
-
-function issueIdFromProjectLabel(label: string): string | null {
-  const match = label.match(/\bfeature-([a-z]+)-(\d+)\b/i);
-  if (!match) return null;
-  return `${match[1]!.toUpperCase()}-${match[2]}`;
-}
-
-/** Compact, human-friendly timestamp: "Today 18:30", "Yesterday 09:12", "Jun 9", "Jun 9, 2025". */
-function formatHitDate(ts: string | null): string {
-  if (!ts) return '';
-  const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  if (d.toDateString() === now.toDateString()) return `Today ${hhmm}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${hhmm}`;
-  const opts: Intl.DateTimeFormatOptions =
-    d.getFullYear() === now.getFullYear()
-      ? { month: 'short', day: 'numeric' }
-      : { month: 'short', day: 'numeric', year: 'numeric' };
-  return d.toLocaleDateString(undefined, opts);
-}
-
-/** Order conversation actions newest first while preserving search rank for timestamp ties (PAN-3704). */
 export function compareConversationActionsNewestFirst(a: PaletteAction, b: PaletteAction): number {
+  const tierDiff = (a.tier ?? 0) - (b.tier ?? 0);
+  if (tierDiff !== 0) return tierDiff;
+
   const aTs = a.sortTs ? Date.parse(a.sortTs) : Number.NaN;
   const bTs = b.sortTs ? Date.parse(b.sortTs) : Number.NaN;
   const aValid = !Number.isNaN(aTs);
@@ -804,52 +751,28 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     };
     push(searchResults.observations, 'Observations', Eye);
     for (const hit of searchResults.conversations) {
-      const label = hit.displayContent || hit.conversationId || hit.sessionId;
-      const project = friendlyProjectLabel(hit.projectId);
-      const issueId = issueIdFromProjectLabel(project);
-      // A subagent hit opens through its parent conversation (PAN-3982).
-      const subagentId = hit.subagentId ?? null;
-      const rootSessionId = hit.parentSessionId ?? hit.sessionId;
-      const isDashboardConversation = hit.conversationId !== rootSessionId;
-      const rootLabel = isDashboardConversation
-        ? `Conversation ${hit.conversationId}`
-        : `Claude session ${rootSessionId.slice(0, 8)}`;
-      const sourceLabel = subagentId ? `Subagent of ${rootLabel}` : rootLabel;
-      const date = formatHitDate(hit.ts);
-      const metaChips: PaletteAction['meta'] = [];
-      if (project) metaChips.push({ icon: FolderOpen, text: project, pill: true });
-      if (issueId) metaChips.push({ text: issueId, pill: true });
-      metaChips.push({ text: sourceLabel });
-      if (date) metaChips.push({ icon: Clock, text: date });
-      if (hit.role) metaChips.push({ text: hit.role });
+      const described = describeConversationHit(hit);
+      const metaChips: PaletteAction['meta'] = described.chips.map((chip) => conversationChipMeta(chip));
       out.push({
-        id: `conv-${hit.sessionId}-${hit.byteOffset}`,
-        label: label.length > 80 ? `${label.slice(0, 77)}…` : label,
+        id: `conv-${hit.sessionId}-${hit.byteOffset ?? 'title'}`,
+        label: described.label,
         meta: metaChips,
-        icon: subagentId ? MessagesSquare : MessageCircle,
+        icon: described.subagentId ? MessagesSquare : MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
         sortTs: hit.ts,
+        tier: described.tier,
         excerptSegments: hit.excerptSegments.map((seg) => ({
           kind: seg.match ? 'match' : 'text',
           value: seg.text,
         })),
-        keywords: ['conversation', hit.sessionId, hit.conversationId, hit.projectId, hit.role],
+        keywords: ['conversation', hit.sessionId, hit.conversationId, hit.projectId, hit.role, hit.title ?? ''],
         onSelect: () => {
           if (onOpenConversationHit) {
-            void onOpenConversationHit({
-              sessionId: hit.sessionId,
-              conversationId: hit.conversationId,
-              projectId: hit.projectId,
-              projectKey: hit.projectKey,
-              byteOffset: hit.byteOffset,
-              label,
-              sourceLabel,
-              subagentId,
-            });
+            void onOpenConversationHit(described.openRequest);
             return;
           }
-          toast.message(label, { description: hit.excerpt || [project, date].filter(Boolean).join(' · ') || undefined });
+          toast.message(described.label, { description: hit.excerpt || described.sourceLabel || undefined });
         },
       });
     }

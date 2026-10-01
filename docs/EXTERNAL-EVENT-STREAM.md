@@ -80,11 +80,12 @@ On initial connect, the server sends a keepalive comment every 15 s (`:\n\n`) so
 
 ## Authentication & Network Exposure
 
-- **Default binding: `127.0.0.1` only.** The endpoint is not reachable from the LAN unless the dashboard is already exposed.
-- **Optional bearer token:** set `OVERDECK_EVENTS_TOKEN=<secret>` in `~/.overdeck.env`. When set, the endpoint requires `Authorization: Bearer <secret>`. When unset, any local process can subscribe.
+- **Remote callers need a credential.** The server binds `0.0.0.0`, and the remote request gate (`src/dashboard/server/remote-request-gate.ts`) answers `401` to any caller that is not on this machine and carries no credential. See [DASHBOARD-AUTH.md](DASHBOARD-AUTH.md).
+- **Scoped access token (PAN-2351):** a `read:events` token from `pan token create <name> --scopes read:events` works as `Authorization: Bearer odk_…`, from any host. It reaches `GET /events/stream` and `GET /events/version` and nothing else, and `pan token revoke <id>` ends an open stream at once.
+- **Optional shared bearer token:** set `OVERDECK_EVENTS_TOKEN=<secret>` in `~/.overdeck.env`. When set, the endpoint requires `Authorization: Bearer <secret>` or a `read:events` access token. When unset, any local process can subscribe.
 - **No per-event ACLs.** Subscribers receive the full public event catalog. If you need to hide sensitive fields, redact at the emission site, not here.
 
-Rationale: the primary use case is local sidecars on the same machine as pan. Anything cross-host should tunnel over existing infrastructure (Tailscale, Cloudflare tunnel, SSH forward) rather than reinvent auth here.
+Rationale: the primary use case is local sidecars on the same machine as pan. A cross-host consumer should hold a `read:events` access token rather than a paired device or the shared `OVERDECK_EVENTS_TOKEN`, so revoking it touches nothing else.
 
 ## Public Event Catalog
 
@@ -100,7 +101,7 @@ External subscribers may only depend on events in the **public catalog**. Events
 | `workspace.created`              | Workspace provisioned                        | `issueId`, `path` |
 | `workspace.destroyed`            | Workspace torn down                          | `issueId` |
 | `issue.status_changed`           | Tracker status transition                    | `issueId`, `from`, `to` |
-| `project.ci_suite_observed`      | Verified GitHub Actions suite update for the current default-branch head | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt`, `authoritativeHead?` |
+| `project.ci_suite_observed`      | Verified GitHub Actions suite update for the current default-branch head (emitted by the `check_suite` webhook handler) | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt`, `authoritativeHead?` |
 | `project.ci_head_observed`       | Complete REST projection for the verified default-branch head | yes | `projectKey`, `repo`, `branch`, `headSha`, `suites`, `observedAt` |
 | `dashboard.lifecycle_started`    | Dashboard restarting                         | `reason`, `trigger` |
 | `dashboard.lifecycle_completed`  | Dashboard restart finished                   | `reason`, `durationMs` |

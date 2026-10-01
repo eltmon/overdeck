@@ -8,7 +8,6 @@ import {
   type NormalizedFeatureRegistryConfig,
   type NormalizedRtkConfig,
   type NormalizedShadowConfig,
-  type NormalizedTldrConfig,
   type NormalizedTtsDaemonConfig,
   type ResiliencyTier,
   type YamlConfig,
@@ -62,6 +61,19 @@ export function mergeRemoteConfig(result: NormalizedConfig, config: YamlConfig |
       maxConcurrentAgents: remote.max_concurrent_agents,
     };
   }
+}
+
+/**
+ * Merge `dashboard.*`. Anything but a literal `true` is false, never an
+ * error (PAN-4435 D-2). Global config only: whichever source sets it first
+ * in merge order wins, so a project `.pan.yaml` cannot override the value
+ * a machine's global config.yaml already set (PAN-4435 AC4).
+ */
+export function mergeDashboardConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  if (result.dashboard !== undefined) return;
+  const dashboard = config?.dashboard;
+  if (!dashboard || typeof dashboard !== 'object' || !('require_token_mint' in dashboard)) return;
+  result.dashboard = { requireTokenMint: dashboard.require_token_mint === true };
 }
 
 /**
@@ -131,15 +143,6 @@ export function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig |
 
   if (rtk.enabled !== undefined) {
     result.enabled = rtk.enabled;
-  }
-}
-
-export function mergeTldrConfig(result: NormalizedTldrConfig, config: YamlConfig | null): void {
-  const tldr = config?.agents?.tldr;
-  if (!tldr) return;
-
-  if (tldr.enabled !== undefined) {
-    result.enabled = tldr.enabled;
   }
 }
 

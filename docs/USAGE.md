@@ -388,12 +388,17 @@ pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]
+pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]
 pan skills pack update <id> [--ref <ref>] [--yes]
 pan skills pack list [--json] [--offline]
 pan skills pack remove <id>
 pan skills pack sync [id]
 pan skills pack gc [--max-age-days <n>]
+
+# Deft Directive: detection, ownership report, and managed mode (read-only toward the project)
+pan skills deft status [--project <key>] [--json]
+pan skills deft enable --project <key> [--yes]
+pan skills deft disable --project <key>
 ```
 
 ### Release Commands
@@ -732,6 +737,15 @@ The Overdeck desktop app wraps the dashboard in a native Electron window with sy
 | **Auto-start** | Launch at login with a gentle nag flow (up to 5 reminders) |
 | **Cmd+K Palette** | Command palette for quick actions and workspace navigation |
 | **Desktop Settings** | Settings → Desktop App section for tray, notifications, and auto-start config |
+
+### Command palette conversation search
+
+Conversation results in the Cmd+K palette are one row per conversation, labelled by
+its title, with the best-matching excerpt and a hit count. Ranking is title matches
+first, then conversations matching in message text, then conversations matching
+only inside file paths, code blocks, or tool output. Archived conversations are
+included and marked **archived**. Title matching works even when conversation
+search indexing is off. See [DESKTOP-APP.md#cmdk-command-palette](DESKTOP-APP.md#cmdk-command-palette).
 
 ### `pan up` Electron Detection
 

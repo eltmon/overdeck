@@ -2,7 +2,7 @@
  * teardown-workspace — Full workspace cleanup.
  *
  * Consolidates workspace teardown from close-out.ts and workspace-manager.ts.
- * Handles: tmux sessions, TLDR daemon, Docker containers, git worktrees,
+ * Handles: tmux sessions, Docker containers, git worktrees,
  * agent state directories, and (optionally) git branches.
  *
  * The workspace-manager's removeWorkspace() handles additional project-specific
@@ -142,36 +142,6 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     return stepOk(step, details);
   }
   return stepSkipped(step, ['No tmux sessions or Herdr panes found']);
-}
-
-/**
- * Stop TLDR daemon if workspace has a .venv.
- */
-function stopTldrDaemon(workspacePath: string): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => stopTldrDaemonImpl(workspacePath),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch(() =>
-      Effect.succeed(stepSkipped('teardown:tldr-daemon', ['TLDR daemon not running or failed to stop (non-fatal)'])),
-    ),
-  );
-}
-
-async function stopTldrDaemonImpl(workspacePath: string): Promise<StepResult> {
-  const step = 'teardown:tldr-daemon';
-  const venvPath = join(workspacePath, '.venv');
-  if (!existsSync(venvPath)) {
-    return stepSkipped(step, ['No .venv found']);
-  }
-  try {
-    const { getTldrDaemonService } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonService(workspacePath, venvPath);
-    await tldrService.stop();
-    return stepOk(step, ['Stopped TLDR daemon']);
-  } catch {
-    return stepSkipped(step, ['TLDR daemon not running or failed to stop (non-fatal)']);
-  }
 }
 
 /**
@@ -756,13 +726,8 @@ export function teardownWorkspace(
     // 3. Clear legacy planning directory (always runs)
     results.push(yield* clearLegacyPlanningDir(ctx.projectPath, issueLower));
 
-    // 4-9: Workspace-specific cleanup
+    // 5-9: Workspace-specific cleanup
     if (workspacePath && existsSync(workspacePath)) {
-      // 4. Stop TLDR daemon (only if deleting workspace)
-      if (shouldDeleteWorkspace) {
-        results.push(yield* stopTldrDaemon(workspacePath));
-      }
-
       // 5. Stop Docker containers (only if deleting workspace)
       if (shouldDeleteWorkspace && !opts.skipDocker) {
         results.push(yield* stopDocker(workspacePath, issueLower));

@@ -61,7 +61,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
 | `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |
 | `pan admin seed-uat-fixtures` | Guidance lives in `roles/test.md` (when to seed) and `docs/WORKSPACE-CONTAINERS.md` (what it does); `--help` covers the mechanics. |
-| `pan pair`, `pan devices` | `--help` plus `configuration/remote-access.mdx` cover it. |
+| `pan pair`, `pan devices`, `pan token` | `--help` plus `configuration/remote-access.mdx` cover it. |
 
 This list is **deliberate, not aspirational.** Adding a wrapper for any of these should be justified case-by-case.
 
