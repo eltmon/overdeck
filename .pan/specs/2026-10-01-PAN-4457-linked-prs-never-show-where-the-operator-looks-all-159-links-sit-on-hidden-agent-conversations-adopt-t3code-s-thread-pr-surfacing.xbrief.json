@@ -4,17 +4,17 @@
     "created": "2026-10-01T22:10:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4457: Linked PRs never show where the operator looks",
-    "updated": "2026-10-01T21:41:21.554Z"
+    "updated": "2026-10-01T21:42:19.388Z"
   },
   "plan": {
     "id": "pan-4457",
     "title": "Linked PRs never show where the operator looks: all 159 links sit on hidden agent conversations; adopt t3code's thread PR surfacing",
-    "status": "proposed",
+    "status": "running",
     "uid": "dd137e3e-4bcd-4d42-8f11-fe6947137187",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T22:10:00Z",
-    "updated": "2026-10-01T21:41:21.554Z",
+    "updated": "2026-10-01T21:42:19.388Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4457",
@@ -670,5 +670,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
