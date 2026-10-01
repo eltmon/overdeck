@@ -323,10 +323,17 @@ async function runContinue(vaultId: string, body: ContinueBody, deps: VaultConti
 
   if (harness === 'codex') {
     // D-9: the managed conversation reads its rollout from its own agent directory.
-    deps.recordCodexRolloutSession(names.tmuxSession, outcome.newSessionId, outcome.path);
     const resolvedRollout = await deps.resolveCodexRolloutPath(names.tmuxSession);
     if (resolvedRollout !== outcome.path) {
       return { status: 500, body: { error: `Codex continue could not place the rollout where the managed conversation reads it. Run: pan vault resume ${id8}` } };
+    }
+    // The thread-id record indexes the session; resume finds the rollout without it.
+    // It resolves the agent directory from homedir(), which differs from a custom
+    // OVERDECK_HOME, so a failure here must not fail an adopted continue.
+    try {
+      deps.recordCodexRolloutSession(names.tmuxSession, outcome.newSessionId, outcome.path);
+    } catch (error) {
+      console.warn(`[vault] continue: could not record codex thread id for ${names.tmuxSession}: ${(error as Error).message}`);
     }
   } else {
     const expected = sessionFilePath(targetCwd, outcome.newSessionId);

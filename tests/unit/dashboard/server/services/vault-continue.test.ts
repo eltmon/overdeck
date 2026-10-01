@@ -225,6 +225,24 @@ describe('continueHere (PAN-4437 WI-4)', () => {
     expect(h.mocks.createVaultContinuedConversation).toHaveBeenCalledWith(expect.objectContaining({ harness: 'codex' }));
   });
 
+  it('codex: a thread-id record failure does not fail an adopted continue', async () => {
+    const h = harness(record({ harness: 'codex' }, null));
+    const rollout = join(getOverdeckHome(), 'agents', 'conv-20260930-abcd', 'codex-home', 'sessions', 'r.jsonl');
+    h.mocks.adoptRecord.mockResolvedValue({ adopted: true, vaultId: VAULT_ID, path: rollout, newSessionId: NEW_SESSION, lines: 1 });
+    h.mocks.resolveCodexRolloutPath.mockResolvedValue(rollout);
+    h.mocks.recordCodexRolloutSession.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect((await continueHere(VAULT_ID, { expectedOwnerToken: TOKEN }, h.deps)).status).toBe(200);
+    expect(h.mocks.createVaultContinuedConversation).toHaveBeenCalled();
+  });
+
+  it('codex: a rollout the conversation would not resolve returns 500 and creates no row', async () => {
+    const h = harness(record({ harness: 'codex' }, null));
+    h.mocks.adoptRecord.mockResolvedValue({ adopted: true, vaultId: VAULT_ID, path: '/elsewhere/r.jsonl', newSessionId: NEW_SESSION, lines: 1 });
+    h.mocks.resolveCodexRolloutPath.mockResolvedValue(null);
+    expect((await continueHere(VAULT_ID, { expectedOwnerToken: TOKEN }, h.deps)).status).toBe(500);
+    expect(h.mocks.createVaultContinuedConversation).not.toHaveBeenCalled();
+  });
+
   it('a materialized path mismatch returns 500 and creates no row', async () => {
     const h = harness(record());
     h.mocks.adoptRecord.mockResolvedValue({ adopted: true, vaultId: VAULT_ID, path: '/elsewhere.jsonl', newSessionId: NEW_SESSION, lines: 1 });
