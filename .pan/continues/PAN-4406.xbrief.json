@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T21:55:06.387Z",
+  "updated": "2026-10-01T21:56:06.349Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "e2-requirements-evidence.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T21:55:06.386Z"
+    },
+    "cli-route-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:56:06.349Z"
     }
   }
 }
