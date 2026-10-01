@@ -20,11 +20,11 @@ import { PASSPHRASE_LATER_HINT, checkPassphraseStrength, generatePassphrase, wra
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
 import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
 import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../../lib/vault/store/types.js';
+import { KEY_LOSS_WARNING } from '../../../lib/vault/setup-core.js';
 import { syncOnce } from '../../../lib/vault/sync.js';
 import { DIR_BACKEND_PREFIX, GENERATED_PASSPHRASE_PREFIX, defaultIo, readPassphrase, type CliIo } from './shared.js';
 
-export const KEY_LOSS_WARNING =
-  'Anyone with these words can read your vault. Losing every device and these words loses the vault.';
+export { KEY_LOSS_WARNING };
 
 export interface SetupOptions {
   hooks?: boolean;
