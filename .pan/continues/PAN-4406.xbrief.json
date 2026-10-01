@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4406",
   "created": "2026-10-01T21:14:51.269Z",
-  "updated": "2026-10-01T22:05:36.641Z",
+  "updated": "2026-10-01T22:06:40.650Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "e3-cap-and-live-check.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T22:05:36.641Z"
+    },
+    "e3-cap-and-live-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:06:40.649Z"
     }
   }
 }
