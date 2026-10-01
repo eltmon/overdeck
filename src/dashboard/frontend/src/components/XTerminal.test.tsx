@@ -359,6 +359,49 @@ describe('XTerminal', () => {
     });
   });
 
+  it('opts in to the terminal heartbeat', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].url).toContain('heartbeat=1');
+    });
+  });
+
+  it('answers a ping frame with a pong', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ write: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({ data: `\u0000${JSON.stringify({ type: 'ping' })}` });
+
+    await waitFor(() => {
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong' }));
+    });
+    expect(ws.send.mock.calls.filter(([msg]) => msg === JSON.stringify({ type: 'pong' }))).toHaveLength(1);
+    expect(term.write.mock.calls.some(([data]) => typeof data === 'string' && data.includes('ping'))).toBe(false);
+  });
+
+  it('drops unknown control frames', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const term = (Terminal as unknown as { instances: Array<{ write: ReturnType<typeof vi.fn> }> }).instances[0];
+
+    ws.onmessage?.({ data: `\u0000${JSON.stringify({ type: 'future' })}` });
+
+    expect(term.write.mock.calls.some(([data]) => typeof data === 'string' && data.includes('future'))).toBe(false);
+  });
+
   it('never fits or sends a resize while the host is hidden', async () => {
     render(<XTerminal sessionName="test-session" />);
 

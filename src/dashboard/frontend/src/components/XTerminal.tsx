@@ -14,7 +14,7 @@ import {
 } from '../lib/terminalReconnectPolicy';
 import { ensureDashboardSession } from '../lib/wsTransport';
 import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
-import { parseTerminalControlFrame, TERMINAL_CONTROL_PREFIX } from './terminal/terminalControlFrames';
+import { parseTerminalControlFrame, TERMINAL_CONTROL_PREFIX, TERMINAL_PONG_MESSAGE } from './terminal/terminalControlFrames';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -563,7 +563,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
+    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
     if (token) {
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
@@ -725,6 +725,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           }
           return;
         }
+
+        if (control?.type === 'ping') {
+          ws.send(TERMINAL_PONG_MESSAGE);
+          return;
+        }
+        if (control !== null) return; // unknown control frames never reach xterm (PAN-4434)
       }
 
       if (!firstLiveByteLogged) {

@@ -18,7 +18,13 @@ export interface TerminalSizeMessage {
   rows: number;
 }
 
-export type TerminalControlFrame = TerminalSnapshotMessage | TerminalSizeMessage;
+export interface TerminalPingMessage {
+  type: 'ping';
+}
+/** The client's answer to a ping frame (PAN-4434). */
+export const TERMINAL_PONG_MESSAGE = JSON.stringify({ type: 'pong' });
+
+export type TerminalControlFrame = TerminalSnapshotMessage | TerminalSizeMessage | TerminalPingMessage;
 
 /** Parse a frame that starts with TERMINAL_CONTROL_PREFIX; null when the JSON is malformed. */
 export function parseTerminalControlFrame(dataStr: string): TerminalControlFrame | null {
