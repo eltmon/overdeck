@@ -1,0 +1,990 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-01T21:13:36Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4456: Overdeck Anywhere docs are stale: pricing page says nothing has shipped, CLI references and changelog entries missing",
+    "updated": "2026-10-01T21:15:07.958Z"
+  },
+  "plan": {
+    "id": "pan-4456",
+    "title": "Overdeck Anywhere docs are stale: pricing page says nothing has shipped, CLI references and changelog entries missing",
+    "status": "proposed",
+    "uid": "6b97c879-fee1-44b6-92e2-ee0929486151",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-01T21:13:36Z",
+    "updated": "2026-10-01T21:15:07.958Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4456",
+        "label": "PAN-4456",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "overdeck-anywhere",
+      "session-vault",
+      "remote-access",
+      "changelog"
+    ],
+    "metadata": {
+      "sizeJustification": "13 files, all documentation, one subsystem (user docs); items are per-page and mostly parallel.",
+      "canonicalFilename": "2026-10-01-PAN-4456-overdeck-anywhere-docs-are-stale-pricing-page-says-nothing-has-shipped-cli-references-and-changelog-entries-missing.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Overdeck Anywhere user docs contradict main: anywhere.mdx says nothing has shipped and promises a non-existent pan vault migrate; remote-access.mdx describes a dashboard vault unlock that does not exist (PAN-4446 is open); changelog.mdx's v0.65.0 block misses six merged Anywhere PRs; CHANGELOG.md has no Anywhere coverage; there are no CLI pages for pan vault, pan pair, pan devices or pan token; conversations.mdx omits browse rows and Continue here; the docs.json Anywhere group holds only the pricing page; the pan-vault skill omits the dashboard flows.",
+      "Proposal": "Per-page documentation edits lowered from .pan/drafts/pan-4456.md: rewrite the anywhere.mdx status with version attribution (v0.64.0 vs next release v0.65.0 vs planned), correct remote-access.mdx and session-vault.mdx, add six changelog.mdx entries and an insert-only CHANGELOG.md subsection, create four CLI reference pages from command source, link them from cli/overview.mdx, regroup docs.json, document browse rows and Continue here, and extend the pan-vault skill. Every statement is verified against the source files named in the PRD.",
+      "NonGoals": "- No change to any file under src/, including stale strings in src/lib/remote-access/anywhere-status.ts and src/cli/commands/pair.ts\n- No dashboard vault set-up, join or unlock (PAN-4446)\n- No edit to the released v0.64.0 changelog block or to existing CHANGELOG.md content\n- No rewrite of the anywhere.mdx pricing analysis beyond the lines named in WI-1\n- No removal of pre-existing em dashes outside text this issue writes\n- No new test files and no Mintlify dependency\n- No change to docs/SESSION-VAULT.md, docs/DASHBOARD-AUTH.md or .overdeck/context/codebase/*\n- No changelog entries for non-Anywhere PRs\n- No claim that /ws/terminal heartbeats exist (PAN-4434 is open)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Attribute every shipped claim to v0.64.0 or 'next release (v0.65.0)'",
+        "rationale": "Six of the features are merged to main but unreleased; the docs site deploys from main, so an unqualified 'shipped' is false for npm 0.64.0 users."
+      },
+      {
+        "summary": "Move session-vault and remote-access from the Configuration group into the Overdeck Anywhere group instead of listing them twice; list the four CLI pages only in the Anywhere group and link them from cli/overview.mdx",
+        "rationale": "The issue asks for these pages in the Anywhere group; a page listed in two Mintlify groups gives ambiguous navigation. URLs do not change, so the DOCS_PAGE strings in pair.ts and token.ts stay correct."
+      },
+      {
+        "summary": "CHANGELOG.md gets one insert-only '### Added: Overdeck Anywhere' subsection under Unreleased",
+        "rationale": "docs/RELEASING.md line 120 names changelog.mdx as the maintained public changelog; CHANGELOG.md's Unreleased section is stale developer content that this docs issue should not restructure."
+      },
+      {
+        "summary": "Em dash rule: zero in the pages this issue owns; unchanged counts in features/conversations.mdx (39) and cli/overview.mdx (1)",
+        "rationale": "Surgical-change rule: rewriting unrelated existing prose is out of scope, while all new text obeys the no-em-dash acceptance."
+      },
+      {
+        "summary": "Keep pan vault migrate in anywhere.mdx only as a planned hosted-vault exit promise; remove 'moving your vault to another backend' from the free Phase A list",
+        "rationale": "The command does not exist (src/cli/commands/vault/index.ts); the exit promise is pricing policy tied to PAN-4297, so it stays, phrased as future."
+      },
+      {
+        "summary": "Four separate CLI pages (vault, pair, devices, token)",
+        "rationale": "The issue names four commands; one page each matches cli/hygiene.mdx and keeps items parallel."
+      },
+      {
+        "summary": "No source changes, including stale code strings in anywhere-status.ts and pair.ts",
+        "rationale": "The issue is documentation only; the vault-locked message belongs to PAN-4446."
+      },
+      {
+        "summary": "Nav check via a node one-liner, with `npx mint broken-links` as an implementation checkpoint; no new test file",
+        "rationale": "No Mintlify CLI or docs CI exists in the repo; adding a dependency or test file is beyond the issue's scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "anywhere-status",
+        "title": "Rewrite the status sections of anywhere.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '—' anywhere.mdx",
+            "grep -n 'planned and not yet available' anywhere.mdx || echo none",
+            "grep -n 'vault migrate' anywhere.mdx"
+          ],
+          "expected_outputs": [
+            "0",
+            "none",
+            "every printed line contains 'planned'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-1. Replace the 'planned and not yet available' Warning with the Note given in WI-1, change the frontmatter description, add a '### What has shipped' table (Feature | Available in | Docs) with v0.64.0 and next release (v0.65.0) rows per decision D-1, add a Status column to the Roadmap table (row 1 Shipped (v0.64.0), row 2 Partly shipped with the D-5 wording and PAN-3762/4402/4403/3863/4404 links, rows 3-6 Planned), drop 'moving your vault to another backend' from the free list, and mark every `pan vault migrate` mention planned (D-7). Leave pricing sections 1-9 otherwise unchanged."
+        },
+        "items": [
+          {
+            "id": "anywhere-status.ac1",
+            "title": "Given anywhere.mdx after the change, when grepping for 'planned and not yet available', then grep returns no match and the frontmatter description no longer ends 'Planned, not yet available.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status.ac2",
+            "title": "anywhere.mdx renders a 'What has shipped' table whose Available in column names v0.64.0 for Session Vault and terminal pairing and 'next release (v0.65.0)' for the dashboard Settings screens, browse rows and scoped tokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status.ac3",
+            "title": "Every line of anywhere.mdx that mentions `pan vault migrate` also contains the word 'planned', and the free Session Vault bullet no longer mentions moving a vault to another backend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status.ac4",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the Roadmap table has a Status column where row 2 states machine identity and pairing shipped and links PAN-4402 and PAN-3863 as planned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status.ac5",
+            "title": "grep -c '—' anywhere.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-access-vault-unlock",
+        "title": "Correct the vault unlock path and version notes in remote-access.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '—' configuration/remote-access.mdx",
+            "grep -c '4446' configuration/remote-access.mdx",
+            "grep -c -- '--label' configuration/remote-access.mdx"
+          ],
+          "expected_outputs": [
+            "0",
+            "2 or more",
+            "1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-2. Replace the locked-vault Fix cell (line 149) with the `pan vault join <backend>` path and a PAN-4446 link, rewrite the status-card Set up sentence (lines 140-142), add the version Note after the intro, and document `pan pair --label`. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "remote-access-vault-unlock.ac1",
+            "title": "Given the Anywhere status problem table, the row 'Session Vault is set up, but this machine cannot open it.' names `pan vault join <backend>` and links https://github.com/eltmon/overdeck/issues/4446 as planned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-access-vault-unlock.ac2",
+            "title": "grep -n 'where you unlock it' configuration/remote-access.mdx returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-access-vault-unlock.ac3",
+            "title": "The page contains a Note stating pairing from the terminal is in v0.64.0 and Settings → Anywhere, Settings → Access Tokens and `pan token` arrive in the next release (v0.65.0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-access-vault-unlock.ac4",
+            "title": "The 'From the terminal' section documents the `--label <name>` flag of `pan pair`, and grep -c '—' configuration/remote-access.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-vault-version-notes",
+        "title": "Add version notes, the dir: backend and PAN-4446 to session-vault.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '—' configuration/session-vault.mdx",
+            "grep -c 'dir:' configuration/session-vault.mdx",
+            "grep -c 'v0.65.0' configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "0",
+            "1 or more",
+            "3 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-3. Add the dir:<path> backend sentence (D-6), the PAN-4446 sentence for dashboard set-up/join/unlock, and 'next release (v0.65.0)' sentences to the auto-save paragraph (line 140), the from-<machine> paragraph (line 160, plus a link to /features/conversations#conversations-from-your-other-machines) and the Settings → Session Vault eviction paragraph (line 218)."
+        },
+        "items": [
+          {
+            "id": "session-vault-version-notes.ac1",
+            "title": "configuration/session-vault.mdx shows `pan vault setup dir:/mnt/nas/session-vault` as a backend example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-vault-version-notes.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the page links https://github.com/eltmon/overdeck/issues/4446 as planned dashboard set-up, join and unlock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-vault-version-notes.ac3",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the auto-save, browse-row and eviction-review paragraphs each state they arrive in the next release (v0.65.0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-vault-version-notes.ac4",
+            "title": "grep -c '—' configuration/session-vault.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-mdx-anywhere",
+        "title": "Add the six Anywhere entries to the v0.65.0 block of changelog.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '—' changelog.mdx",
+            "for n in 4441 4444 4449 4448 4450 4454; do grep -c \"pull/$n\" changelog.mdx; done",
+            "grep -n -i 'heartbeat' changelog.mdx || echo none"
+          ],
+          "expected_outputs": [
+            "0",
+            "each count 1 or more",
+            "none"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-4. Add a '#### New' heading above '#### Changed' inside the v0.65.0 Unreleased Update block with the six drafted bullets (#4441, #4450, #4449, #4444, #4448, #4454). Re-check each claim against the listed commit SHAs. No heartbeat claim (D-8). Do not touch the v0.64.0 block (D-10)."
+        },
+        "items": [
+          {
+            "id": "changelog-mdx-anywhere.ac1",
+            "title": "Given changelog.mdx, grep finds pull/4441, pull/4444, pull/4449, pull/4448, pull/4450 and pull/4454 inside the v0.65.0 Update block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-mdx-anywhere.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that git diff origin/main -- changelog.mdx changes no line inside the v0.64.0 Update block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-mdx-anywhere.ac3",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the #4441 entry mentions no heartbeat, and the #4444 entry links PAN-4446 for set-up, join and unlock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-mdx-anywhere.ac4",
+            "title": "grep -c '—' changelog.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-md-anywhere",
+        "title": "Add an Overdeck Anywhere subsection to CHANGELOG.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CHANGELOG.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Added: Overdeck Anywhere' CHANGELOG.md",
+            "git diff --numstat origin/main -- CHANGELOG.md"
+          ],
+          "expected_outputs": [
+            "1",
+            "second column (deletions) is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-5. Insert the '### Added: Overdeck Anywhere' subsection given in WI-5 directly after '## Unreleased' and before '### Breaking changes'. Insert only (D-3)."
+        },
+        "items": [
+          {
+            "id": "changelog-md-anywhere.ac1",
+            "title": "CHANGELOG.md contains exactly one '### Added: Overdeck Anywhere' heading, placed under '## Unreleased' before '### Breaking changes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-md-anywhere.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the subsection lists #4441, #4450, #4449, #4444, #4448 and #4454 and links changelog.mdx for the v0.64.0 Session Vault and pairing release",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-md-anywhere.ac3",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that git diff --numstat origin/main -- CHANGELOG.md reports 0 deleted lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-vault-page",
+        "title": "Create the cli/vault.mdx reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in $(grep -o \"'--[a-z-]*\" src/cli/commands/vault/index.ts | tr -d \"'\" | sort -u); do grep -q -- \"$f\" cli/vault.mdx || echo \"missing $f\"; done",
+            "grep -c '—' cli/vault.mdx"
+          ],
+          "expected_outputs": [
+            "no output",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-6. New page with one section per verb registered in src/cli/commands/vault/index.ts (lines 23-140), each with synopsis and flag table, the 'Session Vault is off' behavior, and an 'In the dashboard' section (next release v0.65.0; PAN-4446 planned). No migrate or stats."
+        },
+        "items": [
+          {
+            "id": "cli-vault-page.ac1",
+            "title": "Running the flag cross-check from AC-6 (every '--flag' in src/cli/commands/vault/index.ts searched in cli/vault.mdx) prints no 'missing' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-vault-page.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that cli/vault.mdx documents every verb: setup, join, passphrase set, passphrase remove, rotate-key, status, save, sync, list, show, resume, exclude, include, allow-secret, evict, restore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-vault-page.ac3",
+            "title": "grep -c 'migrate\\|vault stats' cli/vault.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-vault-page.ac4",
+            "title": "grep -c '—' cli/vault.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pair-page",
+        "title": "Create the cli/pair.mdx reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pair.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in --label --url --json; do grep -q -- \"$f\" cli/pair.mdx || echo \"missing $f\"; done",
+            "grep -c '—' cli/pair.mdx"
+          ],
+          "expected_outputs": [
+            "no output",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-7. New page for `pan pair [--label <name>] [--url <base>] [--json]` from src/cli/commands/pair.ts: output, single-use 10-minute credential, loopback warning, not-running and rejected-token errors, v0.64.0 vs next-release dialog."
+        },
+        "items": [
+          {
+            "id": "cli-pair-page.ac1",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that cli/pair.mdx documents --label, --url and --json with the `{ url, credential, expiresAt }` JSON shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair-page.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the page states the credential works once, expires after 10 minutes and is invalidated by a dashboard restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair-page.ac3",
+            "title": "The page states that without a running dashboard the command prints the 'Overdeck dashboard is not running' message and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pair-page.ac4",
+            "title": "grep -c '—' cli/pair.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-devices-page",
+        "title": "Create the cli/devices.mdx reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/devices.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Dashboard not running' cli/devices.mdx",
+            "grep -c '—' cli/devices.mdx"
+          ],
+          "expected_outputs": [
+            "1",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-8. New page for `pan devices list [--json]` and `pan devices revoke <id>` from src/cli/commands/pair.ts lines 106-177, including the registry fallback when the dashboard is down."
+        },
+        "items": [
+          {
+            "id": "cli-devices-page.ac1",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that cli/devices.mdx documents `pan devices list` with columns ID, NAME, CREATED, LAST USED, REVOKED and the --json flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-devices-page.ac2",
+            "title": "The page states `pan devices list` needs a running dashboard while `pan devices revoke` falls back to writing ~/.overdeck/access-tokens.json and prints 'Dashboard not running; revoked in the registry. No live connections were open.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-devices-page.ac3",
+            "title": "grep -c '—' cli/devices.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-token-page",
+        "title": "Create the cli/token.mdx reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/token.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in --scopes --json; do grep -q -- \"$f\" cli/token.mdx || echo \"missing $f\"; done",
+            "grep -c '—' cli/token.mdx"
+          ],
+          "expected_outputs": [
+            "no output",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-9. New page for `pan token create <name> --scopes <list> [--json]`, `pan token list [--json]`, `pan token revoke <id>` from src/cli/commands/token.ts, with a next-release (v0.65.0) Note and a link to the scope table in remote-access.mdx."
+        },
+        "items": [
+          {
+            "id": "cli-token-page.ac1",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that cli/token.mdx documents create with the required --scopes flag listing read:events, read:state, read:conversations, tell, operate and admin, and the `{ id, name, scopes, token }` --json shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token-page.ac2",
+            "title": "The page states create and list work without a running dashboard and revoke falls back to the registry when the dashboard is down",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token-page.ac3",
+            "title": "The page shows a Note that `pan token` arrives in the next release (v0.65.0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token-page.ac4",
+            "title": "grep -c '—' cli/token.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-overview-links",
+        "title": "Link the four new CLI pages from cli/overview.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '](/cli/\\(vault\\|pair\\|devices\\|token\\))' cli/overview.mdx",
+            "grep -c '—' cli/overview.mdx"
+          ],
+          "expected_outputs": [
+            "4",
+            "1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-10. Append the four bullets given in WI-10 to the 'Next Steps' list. Do not edit other lines."
+        },
+        "items": [
+          {
+            "id": "cli-overview-links.ac1",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that cli/overview.mdx Next Steps list links /cli/vault, /cli/pair, /cli/devices and /cli/token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-overview-links.ac2",
+            "title": "grep -c '—' cli/overview.mdx still prints 1 (no em dash added, none rewritten)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-json-anywhere-nav",
+        "title": "Put the Anywhere pages in the docs.json nav",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e 'JSON.parse(require(\"fs\").readFileSync(\"docs.json\",\"utf8\"))'",
+            "grep -c '\"configuration/session-vault\"\\|\"configuration/remote-access\"' docs.json",
+            "npx -y mint@latest broken-links"
+          ],
+          "expected_outputs": [
+            "exit 0",
+            "2",
+            "no broken links, or the checkpoint fallback is recorded in the commit body"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-11. Set the 'Overdeck Anywhere' group pages to anywhere, configuration/session-vault, configuration/remote-access, cli/vault, cli/pair, cli/devices, cli/token and remove the two configuration pages from the Configuration group (D-2). Implementation checkpoint: run `npx -y mint@latest broken-links`; if it cannot run, note it in the commit body and rely on the AC-11 node check."
+        },
+        "items": [
+          {
+            "id": "docs-json-anywhere-nav.ac1",
+            "title": "Running the AC-11 node command from the PRD prints ok: the Overdeck Anywhere group lists exactly the seven pages in order and every page in docs.json resolves to an .mdx or .md file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-anywhere-nav.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that configuration/session-vault and configuration/remote-access each appear exactly once in docs.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-anywhere-nav.ac3",
+            "title": "docs.json parses as JSON (node -e 'JSON.parse(require(\"fs\").readFileSync(\"docs.json\",\"utf8\"))' exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-browse-continue",
+        "title": "Document browse copies and Continue here in features/conversations.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Continue here' features/conversations.mdx",
+            "grep -c '—' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "2 or more",
+            "39"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-12. Add a '## Conversations from your other machines' section before '## See also' describing the 'from <machine>' chip, the read-only composer notice with `pan vault resume <id>`, and the Continue here dialog cases (code snapshot, drift buttons Continue / Continue with a note / Cancel, Clone and register <slug>, 'Already continued on <machine>.', no native resume). Link Session Vault for the CLI path."
+        },
+        "items": [
+          {
+            "id": "conversations-browse-continue.ac1",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that features/conversations.mdx has a '## Conversations from your other machines' section that names the 'from `<machine>`' chip and states browse rows are Claude Code and Codex only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-browse-continue.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the section describes the Continue here dialog including 'Continue with a note', 'Clone and register' and 'Already continued on'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-browse-continue.ac3",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that the section states the feature arrives in the next release (v0.65.0) and links /configuration/session-vault",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-browse-continue.ac4",
+            "title": "grep -c '—' features/conversations.mdx still prints 39",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-vault-skill-dashboard",
+        "title": "Mention the dashboard flows in the pan-vault skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:13:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4456",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-vault/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '## In the dashboard' sync-sources/skills/pan-vault/SKILL.md",
+            "grep -c 'PAN-4446' sync-sources/skills/pan-vault/SKILL.md"
+          ],
+          "expected_outputs": [
+            "1",
+            "1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-4456.md WI-13. Append a '## In the dashboard' section covering auto-save and sync, Settings → Session Vault, read-only rows and Continue here, CLI-only setup/join/unlock (PAN-4446) and the status card vault states. Do not edit frontmatter; do not run pan sync."
+        },
+        "items": [
+          {
+            "id": "pan-vault-skill-dashboard.ac1",
+            "title": "sync-sources/skills/pan-vault/SKILL.md contains exactly one '## In the dashboard' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-vault-skill-dashboard.ac2",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that that section names Settings → Session Vault, Continue here and PAN-4446",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-vault-skill-dashboard.ac3",
+            "title": "Given the edited file, when a reviewer reads it, then it shows that git diff origin/main -- sync-sources/skills/pan-vault/SKILL.md changes no frontmatter line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-vault-page",
+        "to": "cli-overview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-vault-page",
+        "to": "docs-json-anywhere-nav",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-pair-page",
+        "to": "cli-overview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-pair-page",
+        "to": "docs-json-anywhere-nav",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-devices-page",
+        "to": "cli-overview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-devices-page",
+        "to": "docs-json-anywhere-nav",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-token-page",
+        "to": "cli-overview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-token-page",
+        "to": "docs-json-anywhere-nav",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
