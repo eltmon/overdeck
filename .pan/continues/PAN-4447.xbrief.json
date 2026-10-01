@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4447",
   "created": "2026-10-01T21:15:13.276Z",
-  "updated": "2026-10-01T22:45:28.377Z",
+  "updated": "2026-10-01T22:46:16.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "round-trip-states.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T22:45:28.377Z"
+    },
+    "round-trip-states.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:46:16.258Z"
     }
   }
 }
