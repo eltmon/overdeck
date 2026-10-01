@@ -4,17 +4,17 @@
     "created": "2026-10-01T21:10:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4434: Overdeck Anywhere P0: /ws/terminal app-level heartbeat (ping/pong control frames)",
-    "updated": "2026-10-01T21:14:25.021Z"
+    "updated": "2026-10-01T21:15:11.012Z"
   },
   "plan": {
     "id": "pan-4434",
     "title": "Overdeck Anywhere P0: /ws/terminal app-level heartbeat (ping/pong control frames)",
-    "status": "proposed",
+    "status": "running",
     "uid": "348290c6-1214-44c7-8617-55bf9d43b82e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T21:10:38Z",
-    "updated": "2026-10-01T21:14:25.021Z",
+    "updated": "2026-10-01T21:15:11.012Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4434",
@@ -438,5 +438,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
