@@ -4,17 +4,17 @@
     "created": "2026-10-01T14:10:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4451: Approved PRs that turn conflicting never get CI, so conflict repair never fires; blocked agents aren't re-woken when their blockers merge",
-    "updated": "2026-10-01T13:31:39.408Z"
+    "updated": "2026-10-01T13:32:20.215Z"
   },
   "plan": {
     "id": "pan-4451",
     "title": "Approved PRs that turn conflicting never get CI, so conflict repair never fires; blocked agents aren't re-woken when their blockers merge",
-    "status": "proposed",
+    "status": "running",
     "uid": "87a9349b-5728-4a7f-bc58-c24582bbc05e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T14:10:00.000Z",
-    "updated": "2026-10-01T13:31:39.408Z",
+    "updated": "2026-10-01T13:32:20.215Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4451",
@@ -741,5 +741,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
