@@ -48,6 +48,11 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => ({
   tmuxExecAsync: (args: string[], options?: unknown) => tmuxExecAsyncMock(args, options),
 }));
 
+vi.mock('../backend-inventory.js', () => ({
+  getBackendPanes: async () => [],
+  isBackendInventoryDegraded: () => false,
+}));
+
 const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
 const { setConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
@@ -173,11 +178,38 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     expect(listConversationPullRequests(name)).toEqual([]);
   });
 
-  it('never links an operator conversation in the primary checkout by branch', async () => {
+  it('links a live operator conversation in the primary checkout by its branch', async () => {
     const name = conversation('feature/pan-3822', { primaryCheckout: true });
     prRows = [pr(12, 'feature/pan-3822')];
 
-    await runPullRequestSyncOnce();
+    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set([`conv-${name}`]));
+
+    expect(listConversationPullRequests(name).map((link) => link.number)).toEqual([12]);
+  });
+
+  it('does not link an operator conversation in the primary checkout whose pane is not live', async () => {
+    const name = conversation('feature/pan-3823', { primaryCheckout: true });
+    prRows = [pr(13, 'feature/pan-3823')];
+
+    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set());
+
+    expect(listConversationPullRequests(name)).toEqual([]);
+  });
+
+  it('skips primary-checkout operator matching when pane liveness is unknown', async () => {
+    const name = conversation('feature/pan-3824', { primaryCheckout: true });
+    prRows = [pr(14, 'feature/pan-3824')];
+
+    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => null);
+
+    expect(listConversationPullRequests(name)).toEqual([]);
+  });
+
+  it('stays unlinked on the default branch in the primary checkout even when live', async () => {
+    const name = conversation('main', { primaryCheckout: true });
+    prRows = [pr(15, 'main')];
+
+    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set([`conv-${name}`]));
 
     expect(listConversationPullRequests(name)).toEqual([]);
   });
@@ -214,6 +246,33 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     invalidateConversationListEnrichmentCache();
     const rows = await getEnrichedConversationList(50, 0) as Array<{ name: string; pullRequest: unknown }>;
     expect(rows.find((row) => row.name === name)?.pullRequest).toBeNull();
+  });
+
+  // FR-6: the sweep never deletes a link and never re-reads a merged
+  // snapshot, so a merged branch link survives the checkout returning to the
+  // default branch, and even the workspace directory being removed.
+  it('keeps a merged branch link after the checkout returns to the default branch', async () => {
+    const cwd = join(REPO_PATH, 'wt-fr6-merged');
+    branchByCwd.set(cwd, 'feature/pan-12');
+    createConversation({ name: 'fr6-merged', tmuxSession: 'conv-fr6-merged', cwd, title: 'fr6-merged' });
+    prRows = [pr(12, 'feature/pan-12', { state: 'MERGED', mergedAt: '2026-09-20T00:00:00Z' })];
+
+    await runPullRequestSyncOnce();
+    expect(listConversationPullRequests('fr6-merged')[0]?.snapshot?.state).toBe('merged');
+
+    branchByCwd.set(cwd, 'main');
+    prRows = [];
+    await runPullRequestSyncOnce();
+    const afterReturn = listConversationPullRequests('fr6-merged');
+    expect(afterReturn).toHaveLength(1);
+    expect(afterReturn[0]?.dismissedAt).toBeNull();
+    expect(afterReturn[0]?.snapshot?.state).toBe('merged');
+
+    branchByCwd.set(cwd, null);
+    await runPullRequestSyncOnce();
+    const afterWorkspaceRemoved = listConversationPullRequests('fr6-merged');
+    expect(afterWorkspaceRemoved).toHaveLength(1);
+    expect(afterWorkspaceRemoved[0]?.snapshot?.state).toBe('merged');
   });
 });
 

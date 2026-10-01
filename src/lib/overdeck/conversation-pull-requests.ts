@@ -43,6 +43,7 @@ export interface PullRequestSyncConversation {
   readonly name: string;
   readonly cwd: string;
   readonly issueId: string | null;
+  readonly tmuxSession: string;
 }
 
 const LINK_SELECT = `
@@ -76,9 +77,12 @@ function rowToLink(row: LinkRow): PullRequestLink {
 /** Every non-archived conversation, operator and agent alike, for the sweep. */
 export function listConversationsForPullRequestSync(): PullRequestSyncConversation[] {
   const rows = getOverdeckDatabase()
-    .prepare(`SELECT id, name, cwd, issue_id FROM conversations WHERE archived_at IS NULL AND origin <> 'vault'`)
-    .all<{ id: string; name: string; cwd: string; issue_id: string | null }>();
-  return rows.map((row) => ({ id: row.id, name: row.name, cwd: row.cwd, issueId: row.issue_id }));
+    .prepare(`SELECT id, name, cwd, issue_id, tmux_session FROM conversations WHERE archived_at IS NULL AND origin <> 'vault'`)
+    .all<{ id: string; name: string; cwd: string; issue_id: string | null; tmux_session: string | null }>();
+  return rows.map((row) => ({
+    id: row.id, name: row.name, cwd: row.cwd, issueId: row.issue_id,
+    tmuxSession: row.tmux_session ?? `conv-${row.name}`,
+  }));
 }
 
 /** All links for one conversation, dismissed ones included. */
