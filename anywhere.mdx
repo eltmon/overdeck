@@ -1,15 +1,15 @@
 ---
 title: "Overdeck Anywhere: plans and pricing"
-description: "What Overdeck Anywhere is, what stays free and open source, the planned paid plan, and how we arrived at its price. Planned, not yet available."
+description: "What Overdeck Anywhere is, what has shipped, what stays free and open source, the planned paid plan, and how we arrived at its price."
 ---
 
 # Overdeck Anywhere: plans and pricing
 
-<Warning>
-Everything on this page is **planned and not yet available**. Nothing here can be bought
-today. The prices below are the ones we intend to charge at launch; we publish them now,
-with the reasoning, so you can see how we got there and tell us where we are wrong.
-</Warning>
+<Note>
+Session Vault and device pairing are available today and free. The hosted services and
+every price on this page are **planned**: nothing here can be bought yet. We publish the
+prices now, with the reasoning, so you can see how we got there and tell us where we are wrong.
+</Note>
 
 ## What Overdeck Anywhere is
 
@@ -26,19 +26,34 @@ The plan lives in the Overdeck Anywhere epic,
 [PAN-2350](https://github.com/eltmon/overdeck/issues/2350). "Overdeck Anywhere" and
 "Session Vault" are working names.
 
+### What has shipped
+
+| Feature | Available in | Docs |
+| --- | --- | --- |
+| Session Vault: `pan vault` setup, join, save, sync, list, show, resume, passphrase unlock, key rotation, code snapshots, eviction | v0.64.0 | [Session Vault](/configuration/session-vault) |
+| Pair a device from the terminal (`pan pair`, `pan devices`), machine identity (`GET /api/environment`) | v0.64.0 | [Remote access](/configuration/remote-access) |
+| Session Vault in the dashboard: Settings → Session Vault, automatic save and sync | next release (v0.65.0) | [Session Vault](/configuration/session-vault) |
+| Conversations from your other machines: "from `<machine>`" rows and **Continue here** | next release (v0.65.0) | [Conversations](/features/conversations) |
+| Settings → Anywhere: pair dialog, paired devices, status card | next release (v0.65.0) | [Remote access](/configuration/remote-access) |
+| Scoped API tokens (`pan token`, Settings → Access Tokens) | next release (v0.65.0) | [Remote access](/configuration/remote-access) |
+
+Setting up, joining and unlocking the vault from the dashboard is planned:
+[PAN-4446](https://github.com/eltmon/overdeck/issues/4446). Today you do these with
+`pan vault` in a terminal.
+
 ### Roadmap
 
 Most of Anywhere is open-source software you run yourself. The paid part comes last and
 consists of hosted services.
 
-| Order | What | Issue | Cost to you |
-| --- | --- | --- | --- |
-| 1 | **Session Vault, Phase A.** Saves agent conversations (Claude Code and Codex) as versioned, encrypted records on a backend you choose: a private git remote or a directory. Browse every saved conversation from any of your machines and continue one from any saved version. | [PAN-2609](https://github.com/eltmon/overdeck/issues/2609) | Free, open source |
-| 2 | **One Overdeck server per machine**, with machine identity, pairing and federation, so your machines can see each other. Then SSH hosts and remote servers on top of it. | [PAN-3762](https://github.com/eltmon/overdeck/issues/3762), [PAN-3863](https://github.com/eltmon/overdeck/issues/3863) | Free, open source |
-| 3 | **Needs-you notifications sent to a notification service you configure, remote dashboard access through a tunnel you control, and a mobile web app.** | [PAN-2354](https://github.com/eltmon/overdeck/issues/2354), [PAN-2352](https://github.com/eltmon/overdeck/issues/2352), [PAN-2355](https://github.com/eltmon/overdeck/issues/2355) | Free, open source |
-| 4 | **Remote agent workspaces on Fly.io** that you run yourself. | [PAN-1775](https://github.com/eltmon/overdeck/issues/1775), [PAN-1676](https://github.com/eltmon/overdeck/issues/1676) | Free, open source; you pay Fly directly |
-| 5 | **Hosted services on overdeck.ai:** an account, the subscription, the hosted Session Vault, then the relay (reach your machines from anywhere, with hosted push notifications delivered through it), then shared sessions. | [PAN-4293](https://github.com/eltmon/overdeck/issues/4293), [PAN-4294](https://github.com/eltmon/overdeck/issues/4294), [PAN-4297](https://github.com/eltmon/overdeck/issues/4297), [PAN-2356](https://github.com/eltmon/overdeck/issues/2356), [PAN-658](https://github.com/eltmon/overdeck/issues/658) | The paid plan below |
-| 6 | **Hosted agent capacity:** your agents running on machines we manage. | [PAN-4298](https://github.com/eltmon/overdeck/issues/4298) | Billed separately by usage |
+| Order | What | Status | Issue | Cost to you |
+| --- | --- | --- | --- | --- |
+| 1 | **Session Vault, Phase A.** Saves agent conversations (Claude Code and Codex) as versioned, encrypted records on a backend you choose: a private git remote or a directory. Browse every saved conversation from any of your machines and continue one from any saved version. | Shipped (v0.64.0) | [PAN-2609](https://github.com/eltmon/overdeck/issues/2609) | Free, open source |
+| 2 | **One Overdeck server per machine.** Shipped: machine identity, pairing and device sessions. Planned: a list of your machines with an environment switcher, advertised endpoints, then SSH hosts and remote servers. | Partly shipped | [PAN-3762](https://github.com/eltmon/overdeck/issues/3762), [PAN-4402](https://github.com/eltmon/overdeck/issues/4402), [PAN-4403](https://github.com/eltmon/overdeck/issues/4403), [PAN-3863](https://github.com/eltmon/overdeck/issues/3863), [PAN-4404](https://github.com/eltmon/overdeck/issues/4404) | Free, open source |
+| 3 | **Needs-you notifications sent to a notification service you configure, remote dashboard access through a tunnel you control, and a mobile web app.** | Planned | [PAN-2354](https://github.com/eltmon/overdeck/issues/2354), [PAN-2352](https://github.com/eltmon/overdeck/issues/2352), [PAN-2355](https://github.com/eltmon/overdeck/issues/2355) | Free, open source |
+| 4 | **Remote agent workspaces on Fly.io** that you run yourself. | Planned | [PAN-1775](https://github.com/eltmon/overdeck/issues/1775), [PAN-1676](https://github.com/eltmon/overdeck/issues/1676) | Free, open source; you pay Fly directly |
+| 5 | **Hosted services on overdeck.ai:** an account, the subscription, the hosted Session Vault, then the relay (reach your machines from anywhere, with hosted push notifications delivered through it), then shared sessions. | Planned | [PAN-4293](https://github.com/eltmon/overdeck/issues/4293), [PAN-4294](https://github.com/eltmon/overdeck/issues/4294), [PAN-4297](https://github.com/eltmon/overdeck/issues/4297), [PAN-2356](https://github.com/eltmon/overdeck/issues/2356), [PAN-658](https://github.com/eltmon/overdeck/issues/658) | The paid plan below |
+| 6 | **Hosted agent capacity:** your agents running on machines we manage. | Planned | [PAN-4298](https://github.com/eltmon/overdeck/issues/4298) | Billed separately by usage |
 
 ## What stays free and open source
 
@@ -46,13 +61,12 @@ These are not trials and do not expire:
 
 - **Overdeck itself**, including every feature that runs on your own machines.
 - **All of Session Vault Phase A**: the `pan vault` commands, the git and directory
-  backends, end-to-end encryption, full version history, resume from any saved version,
-  and moving your vault to another backend. Your vault can be as large as your own
-  backend allows.
+  backends, end-to-end encryption, full version history, and resume from any saved
+  version. Your vault can be as large as your own backend allows.
 - **Per-machine servers, federation and SSH hosts.** Connecting your own machines to each
   other needs no account and no subscription.
-- **Leaving.** `pan vault migrate` copies every record out of the hosted vault to a backend
-  you run, whether or not your subscription is active.
+- **Leaving.** When the hosted vault launches, `pan vault migrate` (planned) will copy
+  every record out of it to a backend you run, whether or not your subscription is active.
 
 Self-hosting has no feature gate, and we do not plan to add one.
 
@@ -197,7 +211,8 @@ until the relay ships or 500 people have joined.
 - It is the promise the project was built on. Weakening the free git backend would break
   that promise, and the promise is worth more than the subscriptions it might add.
 - It removes lock-in. You can start self-hosted, move to the hosted vault, and move back
-  with `pan vault migrate`.
+  with `pan vault migrate` once it ships (planned with the hosted vault,
+  [PAN-4297](https://github.com/eltmon/overdeck/issues/4297)).
 - It does not take much away from the paid plan. Encrypted records cannot be delta
   compressed, so a heavy user outgrows a free git host's recommended repository size in a
   few months. The people who value the vault most are the ones most likely to want someone
