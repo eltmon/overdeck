@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T22:00:37.721Z",
+  "updated": "2026-10-01T22:01:19.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "cli-pair-page.ac4": {
       "status": "completed",
       "doneAt": "2026-10-01T22:00:37.721Z"
+    },
+    "cli-devices-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:01:19.120Z"
     }
   }
 }
