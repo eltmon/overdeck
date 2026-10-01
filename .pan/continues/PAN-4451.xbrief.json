@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:56:16.715Z",
+  "updated": "2026-10-01T13:56:31.762Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "conflict-prompt-wording.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T13:56:16.715Z"
+    },
+    "conflict-prompt-wording.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:31.761Z"
     }
   }
 }
