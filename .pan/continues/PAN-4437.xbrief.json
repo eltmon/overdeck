@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4437",
   "created": "2026-09-30T19:30:30.547Z",
-  "updated": "2026-10-01T14:18:35.018Z",
+  "updated": "2026-10-01T14:18:48.549Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "vault-continue-service.ac5": {
       "status": "completed",
       "doneAt": "2026-10-01T14:18:35.017Z"
+    },
+    "vault-continue-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:18:48.548Z"
     }
   }
 }
