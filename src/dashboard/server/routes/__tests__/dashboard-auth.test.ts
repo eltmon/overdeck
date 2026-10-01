@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Option } from 'effect';
 
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import type { NetworkInterfaceInfo } from 'node:os';
 
@@ -12,6 +17,7 @@ import {
   hasDashboardAuthHeaders,
   peerIsHostLocalDockerBridge,
   peerIsLocalContainerNetwork,
+  rejectUnauthorizedDashboardRequest,
   rejectUnauthorizedDashboardSessionMintRequest,
 } from '../dashboard-auth.js';
 
@@ -223,5 +229,56 @@ describe('peerIsLocalContainerNetwork — in-container Traefik trust', () => {
       eth0: [ipv4('8.8.0.1', '255.255.0.0')],
     };
     expect(peerIsLocalContainerNetwork('8.8.0.2', publicIface)).toBe(false);
+  });
+});
+
+describe('per-route scope check (PAN-2351)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'pan-2351-route-scope-'));
+    process.env.OVERDECK_HOME = home;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'route-scope-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetAccessTokensForTests();
+  });
+
+  afterEach(async () => {
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  function routeRequest(method: string, url: string, headers: Record<string, string>) {
+    return { method, url, headers, remoteAddress: Option.none() } as unknown as Parameters<typeof rejectUnauthorizedDashboardRequest>[0];
+  }
+
+  async function bodyOf(response: ReturnType<typeof rejectUnauthorizedDashboardRequest>) {
+    const raw = response as unknown as { body: { body?: Uint8Array } };
+    return JSON.parse(new TextDecoder().decode(raw.body.body));
+  }
+
+  it('403s a read:events token on admin routes and passes it on /events/stream', async () => {
+    const { token } = await createAccessToken({ name: 'sidecar', scopes: ['read:events'], kind: 'token' });
+    const headers = { authorization: `Bearer ${token}` };
+
+    for (const url of ['/knowledge-viewer/x', '/api/settings']) {
+      const response = rejectUnauthorizedDashboardRequest(routeRequest('GET', url, headers));
+      expect(response?.status, url).toBe(403);
+      expect(await bodyOf(response)).toEqual({ error: 'insufficient_scope', missingScope: 'admin' });
+    }
+    expect(rejectUnauthorizedDashboardRequest(routeRequest('GET', '/events/stream', headers))).toBeNull();
+  });
+
+  it('passes root credentials on every route', () => {
+    const headers = { [INTERNAL_TOKEN_HEADER]: 'route-scope-internal-token' };
+    expect(rejectUnauthorizedDashboardRequest(routeRequest('GET', '/api/settings', headers))).toBeNull();
   });
 });

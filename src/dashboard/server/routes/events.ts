@@ -10,8 +10,10 @@
  *   - One-way SSE (server → client); consumers use the EventSource API.
  *   - Resumable via Last-Event-ID header or ?since= query param.
  *   - Filterable via ?types=, ?sources=, ?issueId= query params.
- *   - Local-only by default (the dashboard binds to 127.0.0.1).
- *   - Optional bearer token auth via OVERDECK_EVENTS_TOKEN env var.
+ *   - The server binds 0.0.0.0; the remote request gate requires a credential
+ *     from non-local callers.
+ *   - Bearer auth: a `read:events` access token (PAN-2351), or the
+ *     OVERDECK_EVENTS_TOKEN env var when it is set.
  *
  * Stability: only the event types in PUBLIC_CATALOG are part of the public
  * contract. Internal events are not exposed on this route.
@@ -24,7 +26,8 @@ import { getEventStore, type StoredEvent } from '../event-store.js';
 import { retainAllAgentOutputInterest } from '../services/agent-output-service.js';
 import { jsonResponse } from '../http-helpers.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
-import { resolveDashboardCredential } from './dashboard-auth.js';
+import { scopeSatisfies } from '../../../lib/access-tokens.js';
+import { credentialScopes, resolveDashboardCredential } from './dashboard-auth.js';
 import type { HeaderMap } from './origin-validation.js';
 import { httpHandler } from './http-handler.js';
 
@@ -111,6 +114,9 @@ function getHeader(
 function authorized(request: HttpServerRequest.HttpServerRequest): boolean {
   const expected = process.env['OVERDECK_EVENTS_TOKEN'];
   if (!expected) return true;
+  // PAN-2351: a dashboard credential with read:events works alongside the env token.
+  const credential = resolveDashboardCredential(request.headers as HeaderMap);
+  if (credential && scopeSatisfies(credentialScopes(credential), 'read:events')) return true;
   const header = getHeader(request, 'authorization');
   if (!header) return false;
   const [scheme, token] = header.split(/\s+/);

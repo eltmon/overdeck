@@ -48,7 +48,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────
-  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
 
   // ── artifacts.ts (actual paths from codebase) ─────────────────────────────
@@ -332,6 +332,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/prd',                             kind: 'http', disposition: 'READ',        door: 'getIssuePrd → findDraftPrd + readPrdContent' },
   { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },
   { surface: 'GET /api/issues/:id/verification',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Verification artifact + ReviewStatus verification state' },
+  { surface: 'GET /api/issues/:id/test-removal-waiver',             kind: 'http', disposition: 'READ',        door: 'readTestSkipWaiver + snapshotWorkspaceHeads' },
+  { surface: 'POST /api/issues/:id/test-removal-waiver',            kind: 'http', disposition: 'WRITE',       door: 'grantTestSkipWaiver → <workspace>/.overdeck/test-removal-waiver.json' },
   { surface: 'GET /api/issues/:issueId/staffing',                   kind: 'http', disposition: 'READ',        door: 'Issue record staffing override + resolved configuration' },
   { surface: 'POST /api/issues/:issueId/staffing',                  kind: 'http', disposition: 'WRITE',       door: 'Issue record writer updates the work-model override' },
   { surface: 'GET /api/issues/:id/tasks',                           kind: 'http', disposition: 'READ',        door: 'readWorkspacePlanSync (merged xBRIEF items) + issue record claims' },
@@ -410,6 +412,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/pairing/exchange',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (pairing)' },
   { surface: 'GET /api/devices',                          kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind device)' },
   { surface: 'DELETE /api/devices/:id',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
+  { surface: 'POST /api/anywhere/trusted-origins',        kind: 'http', disposition: 'WRITE',       door: 'remote-access/trusted-origins.addSavedTrustedOrigin (PAN-4445)' },
+  { surface: 'GET /api/anywhere/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'environment-identity + trusted origins + access-tokens + vault config (PAN-4445)' },
+  { surface: 'GET /api/access-tokens',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind token)' },
+  { surface: 'POST /api/access-tokens',                   kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (kind token)' },
+  { surface: 'DELETE /api/access-tokens/:id',             kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
   { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },
@@ -427,10 +434,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/planning/:issueId/status',         kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (planning status)' },
   { surface: 'POST /api/planning/:issueId/message',       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver (planning session)' },
   { surface: 'DELETE /api/planning/:issueId',             kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
-  { surface: 'GET /api/services/tldr/status',             kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/start',             kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/stop',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
-  { surface: 'POST /api/services/tldr/reload',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR service; outside 8 remodel domains' },
+  { surface: 'GET /api/services/tldr/status',             kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/start',             kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/stop',              kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
+  { surface: 'POST /api/services/tldr/reload',            kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'GET /api/cache-status',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Cache diagnostics; outside 8 remodel domains' },
   { surface: 'POST /api/cache/clear',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Cache diagnostics; outside 8 remodel domains' },
   { surface: 'GET /api/metrics/runtimes',                 kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents (runtime metrics)' },
@@ -539,6 +546,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/model-presets/:id/plan',                      kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via model-presets plan (read-only)' },
   { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
   { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
+
+  // ── vault.ts ──────────────────────────────────────────────────────────────
+  { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
+  { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/confirm',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts confirmEviction → transcript-deletion-door (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/decline',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts declineEntry (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/clear',                 kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts clearBatch (PAN-4307)' },
+  { surface: 'POST /api/vault/eviction-batch/reoffer',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts reofferEntry (PAN-4307)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },
@@ -668,7 +683,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/issues/:issueId/forge-merge',                kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.merge (per-repo path)' },
   { surface: 'POST /api/issues/:issueId/approve',                    kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("merging")' },
   { surface: 'DELETE /api/review/:issueId/pending',                  kind: 'http', disposition: 'DELETE',      door: 'ready_for_merge is now derived; explicit clear verb unnecessary' },
-  { surface: 'GET /api/workspaces/:issueId/tldr',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR workspace context; outside 8 remodel domains' },
+  { surface: 'GET /api/workspaces/:issueId/tldr',                    kind: 'http', disposition: 'DELETE',      door: 'TLDR removed (PAN-4429)' },
   { surface: 'POST /api/workspaces/:issueId/refresh-token',          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Auth token refresh; outside 8 remodel domains' },
   { surface: 'GET /api/merge-queue',                                 kind: 'http', disposition: 'READ',        door: 'MergeResolver.listQueues' },
   { surface: 'POST /api/internal/pipeline/notify',                   kind: 'http', disposition: 'DELETE',      door: 'replaced by writer\'s own bus.emit; side-channel eliminated' },
@@ -799,6 +814,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'schema: api_cache (panopticon.db)',        kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real api_cache lives in cache.db with different schema (cache-service.ts)' },
   { surface: 'schema: rate_limits (panopticon.db)',      kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real rate_limits lives in cache.db with different schema (cache-service.ts)' },
 
+  // PAN-4429: TLDR removed — its read hook cost more model turns than it saved.
+  { surface: 'pan admin tldr',                           kind: 'cli', disposition: 'DELETE',       door: 'TLDR removed (PAN-4429); the daemon it managed no longer exists' },
+  { surface: 'pan status --tldr',                        kind: 'cli', disposition: 'DELETE',       door: 'TLDR removed (PAN-4429); there is no TLDR index to report on' },
+
   // scripts/create-overdeck-db.ts and scripts/drizzle-node-sqlite-smoke.ts exempted
   // from the overdeck boundary lint. These are intentional dev/setup tools that
   // legitimately import the DB driver directly — they create and smoke-test
@@ -916,6 +935,5 @@ export const HEALTH_NO_LOSS_MATRIX: HealthNoLossMatrixEntry[] = [
   { surface: 'Capacity guardrail', disposition: 'V2_HOME', target: 'mapSpawnGateDecision preserves blocking enforcement decisions while attaching accepted health evidence' },
   { surface: 'Summary cards', disposition: 'V2_HOME', target: 'HealthDashboard renders all accepted AgentHealthStatus counts with accessible names' },
   { surface: 'Deacon section', disposition: 'V2_HOME', target: 'HealthDashboard DeaconStatus remains visible while loading, unavailable, or agent-empty' },
-  { surface: 'TLDR section', disposition: 'V2_HOME', target: 'HealthDashboard TldrServiceStatus distinguishes optional unconfigured from request unavailable' },
   { surface: 'pan doctor', disposition: 'V2_HOME', target: 'Independent dependency, installation, state-worktree, and system diagnostic command; it is not a live V2 snapshot view' },
 ];

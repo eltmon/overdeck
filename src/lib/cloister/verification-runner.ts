@@ -526,7 +526,7 @@ export async function runVerificationForIssueInProcess(
     // repository root and violations aggregate, so a skipped test in a secondary
     // repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkip = await evaluateTestSkipGate(issueId, repoRoots, testSkipHead);
+    const testSkip = await evaluateTestSkipGate(workspacePath, repoRoots, testSkipHead);
     // PAN-1728: the spec is immutable after planning; a work-agent edit to it fails
     // a required `plan-integrity` check before the quality gates run.
     const planIntegrityStart = Date.now();

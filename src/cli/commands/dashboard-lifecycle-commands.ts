@@ -43,11 +43,11 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .action(lazyAction(() => import('./reload.js'), 'reloadCommand'));
 
   // Scoped restart: `pan restart` defaults to the dashboard only and never
-  // touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
+  // touches CLIProxy / Traefik. Use `--full` for the nuclear option.
   // See src/cli/commands/restart.ts for the scope contract.
   const restart = program
     .command('restart')
-    .description('Restart a platform component (default: dashboard only — leaves CLIProxy, Traefik, TLDR running)')
+    .description('Restart a platform component (default: dashboard only — leaves CLIProxy and Traefik running)')
     // Set before `approve` is created so the subcommand inherits it. The help
     // shown after the error lists the real subcommands.
     .allowExcessArguments(false)

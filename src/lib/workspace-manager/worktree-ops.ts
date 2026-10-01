@@ -17,54 +17,6 @@ export function validateFeatureName(name: string): boolean {
   return /^[a-zA-Z0-9-]+$/.test(name);
 }
 
-/**
- * Make a `cp -a`-copied Python venv self-contained by pointing its scripts at
- * the destination venv's OWN interpreter.
- *
- * Python venvs are not relocatable: every bin/* console script carries an
- * absolute `#!<source venv>/bin/python3` shebang, and the activate scripts set
- * `VIRTUAL_ENV=<source venv>`. Copying a venv to a new path leaves those
- * pointing at the old location — a repo rename (e.g. panopticon-cli → overdeck)
- * then breaks every copied script with "bad interpreter: No such file". The
- * TLDR MCP server silently fails to spawn and the read-enforcer hook silently
- * no-ops, so every agent pays full token cost on Reads with nothing erroring.
- *
- * Rewrites each bin/* shebang and the activate `VIRTUAL_ENV` to the destination
- * venv's own path. Best-effort and non-fatal: unreadable/binary files skipped.
- */
-export function relocateVenvScripts(sourceVenv: string, destVenv: string): void {
-  const sourceBin = join(sourceVenv, 'bin');
-  const destBin = join(destVenv, 'bin');
-  const destPy = join(destBin, 'python3');
-  if (!existsSync(destBin) || !existsSync(destPy)) return;
-  for (const entry of readdirSync(destBin)) {
-    const script = join(destBin, entry);
-    try {
-      if (!statSync(script).isFile()) continue;
-      const content = readFileSync(script, 'utf8');
-      const firstLine = content.split('\n', 1)[0] ?? '';
-      if (firstLine.startsWith('#!') && firstLine.includes(sourceBin)) {
-        const restFrom = content.indexOf('\n');
-        writeFileSync(script, `#!${destPy}${restFrom === -1 ? '\n' : content.slice(restFrom)}`);
-      }
-    } catch {
-      // Non-fatal: skip unreadable or binary files.
-    }
-  }
-  for (const name of ['activate', 'activate.csh', 'activate.fish']) {
-    const act = join(destBin, name);
-    if (!existsSync(act)) continue;
-    try {
-      const content = readFileSync(act, 'utf8');
-      if (content.includes(sourceVenv)) {
-        writeFileSync(act, content.split(sourceVenv).join(destVenv));
-      }
-    } catch {
-      // Non-fatal.
-    }
-  }
-}
-
 const PRE_REBASE_HOOK_MARKER = '# OVERDECK MANAGED PRE-REBASE GUARD';
 const PRE_REBASE_ORIGINAL_SUFFIX = '.overdeck-original';
 const PRE_REBASE_HOOK_PREFIX = [

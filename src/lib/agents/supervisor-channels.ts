@@ -373,7 +373,7 @@ export async function writeChannelsBridgeMcpConfig(
  * is delivered, otherwise the channel listener never registers and every
  * early channel push silently falls back to tmux.
  *
- * Polling budget is 20s because cold-start claude with TLDR + Playwright MCP
+ * Polling budget is 20s because cold-start claude with Playwright MCP
  * servers attached commonly takes 8–15s to render the first frame; a tighter
  * budget false-negatives. If the dialog is not detected within the timeout,
  * we proceed — the dialog is suppressed in some auth states (e.g. when the

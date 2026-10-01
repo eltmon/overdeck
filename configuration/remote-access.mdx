@@ -36,6 +36,22 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 
 ## Pair a device
 
+### From the dashboard
+
+1. On the machine, open **Settings → Anywhere** and click **Pair a device**.
+2. Pick the address the other device opens, for example your Tailscale name.
+   If it is not in the list, choose **Another address…**, type it, and click
+   **Add to trusted addresses**. It is trusted at once, with no restart.
+   **Use this machine only** makes a link that works only on this machine.
+3. Click **Create pairing link**. Scan the QR code with the other device, or
+   copy the link and open it there. The dialog names the device when it pairs.
+
+Only a browser on the machine itself can create pairing links or add
+addresses. A paired device that opens the dialog sees an explanation instead
+of a link.
+
+### From the terminal
+
 1. On the machine, run `pan pair` with an address the other device can reach:
 
    ```bash
@@ -50,7 +66,7 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 
 The pairing credential:
 
-- works once, and expires 10 minutes after `pan pair` printed it;
+- works once, and expires 10 minutes after it was created;
 - lives only in the running dashboard's memory, so a dashboard restart
   invalidates every credential that has not been used yet;
 - always travels in the URL fragment (`#pair=`), never in a query string, so
@@ -66,20 +82,36 @@ credentials.
 
 ### Open the dashboard at a non-default address
 
-The dashboard only accepts browser requests from origins it trusts. If you
-open it at an address other than the default (for example through Tailscale),
-add that origin before starting the dashboard:
+The dashboard only accepts browser requests from origins it trusts. To open it
+at an address other than the default (for example through Tailscale), add that
+address in the pair dialog with **Add to trusted addresses**. It takes effect on
+the next request, with no restart, and is stored in
+`~/.overdeck/trusted-origins.json`:
+
+```json
+{ "version": 1, "origins": ["https://desk.tailnet.ts.net"] }
+```
+
+Loopback addresses (`localhost`, `127.0.0.1`, `::1`, `*.localhost`) cannot be
+added: they are already trusted for this port and never help another device.
+To remove an address, edit the file and restart the dashboard.
+
+`OVERDECK_TRUSTED_ORIGINS` still works and is merged with the file. Separate
+several origins with commas, and set it before starting the dashboard:
 
 ```bash
 export OVERDECK_TRUSTED_ORIGINS=https://desk.tailnet.ts.net
 pan up
 ```
 
-Separate several origins with commas. A later release discovers and advertises
-endpoints automatically
+A later release discovers and advertises endpoints automatically
 ([PAN-4403](https://github.com/eltmon/overdeck/issues/4403)).
 
 ## List and revoke devices
+
+**Settings → Anywhere** lists paired devices with their scopes, when each was
+paired and when it was last seen. **Revoke** there has the same effect as
+`pan devices revoke`. From the terminal:
 
 ```bash
 pan devices list            # id, name, created, last used, revoked
@@ -96,11 +128,97 @@ Device sessions are stored in `~/.overdeck/access-tokens.json` (mode `0600`).
 The file keeps only a SHA-256 hash of each token. If the file is corrupt, the
 dashboard accepts no device session and logs an error naming the file.
 
+## Anywhere status
+
+The **Anywhere** card shows whether other devices can use this machine. It
+appears in **Settings → Anywhere** and on the **Health** page, and shows:
+
+- **This machine:** its label and the start of its environment id.
+- **Reachable at:** the trusted addresses another device can open, or "Only
+  this machine".
+- **Paired devices:** how many device sessions are active (not revoked).
+- **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
+  unfinished", or "Ready" with its backend. **Set up** opens Session Vault
+  settings. Not using the vault is a valid choice, not a problem.
+
+Below that, the card lists each problem with its fix:
+
+| Problem | Fix |
+| --- | --- |
+| No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
+| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to its settings, where you unlock it with the vault passphrase or the recovery phrase. |
+| A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
+| This machine's identity file is unreadable. | **How to fix** links to this page. Repair or restore `~/.overdeck/environment-id.json`; it is never re-created automatically. |
+
+The card reads `GET /api/anywhere/status`, which any dashboard credential may
+call.
+
+## Scoped API tokens
+
+A paired device can do everything the dashboard can. A program that needs only
+part of that (an event sidecar, Hermes, a script that sends messages to agents)
+should hold a **scoped API token** instead. A leaked scoped token exposes only
+the routes its scopes name, and it can never create a session, a pairing
+credential or another token.
+
+Create one on the machine:
+
+```bash
+pan token create sidecar --scopes read:events
+pan token create notifier --scopes read:state,tell --json   # { id, name, scopes, token }
+```
+
+`pan token create` prints the token (`odk_…`) once. Store it right away; it
+cannot be shown again. A running dashboard accepts a new token within 5 seconds.
+
+The scopes:
+
+| Scope | Allows |
+| --- | --- |
+| `read:events` | The live event stream (`GET /events/stream`) and `GET /events/version`. |
+| `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
+| `read:conversations` | Conversation lists, one conversation, its messages and its summary. |
+| `tell` | Sending a message to an agent or a conversation. |
+| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`). |
+| `admin` | Everything, like a paired device. |
+
+Anything not in the table needs `admin`. A request whose token lacks the scope
+gets `403` with `{ "error": "insufficient_scope", "missingScope": "<scope>" }`.
+
+Send the token on every request as `Authorization: Bearer odk_…`. It works over
+HTTP, the event stream and WebSocket upgrades. It does not work as a cookie or a
+URL parameter, and a request carrying it needs no `Origin` header or CSRF token.
+
+```bash
+curl -N -H "Authorization: Bearer odk_…" https://desk.tailnet.ts.net/events/stream
+```
+
+List and revoke tokens:
+
+```bash
+pan token list              # id, name, scopes, created, last used, revoked
+pan token revoke <id>
+```
+
+Revoking a token stops its next request and closes its open WebSocket and
+event-stream connections at once. If the dashboard is not running,
+`pan token revoke` writes the revocation into the registry, and a dashboard that
+starts later never accepts the token. Only this machine's internal token or root
+session can create or revoke tokens. The dashboard API is
+`GET`/`POST /api/access-tokens` and `DELETE /api/access-tokens/:id`.
+
+You can also manage tokens in **Settings → Access Tokens**: the table shows
+each token's name, scopes, created, last used and revoked times; **Create
+token** shows the plaintext once with a Copy button; **Revoke** asks for
+confirmation. A browser signed in as a paired device can see the list but
+cannot create or revoke tokens; the section explains why.
+
 ## What the LAN can reach
 
 The dashboard binds every interface. Every `/api/*` and `/events/*` request that
 does not come from this machine must carry a credential (the root session, a
-device session, or the internal token), or it gets `401`. "From this machine"
+device session, a scoped API token, or the internal token), or it gets `401`.
+A scoped token is always judged by its scopes, even from this machine. "From this machine"
 means a loopback address, or the host-local Traefik and Docker networks that
 front `overdeck.localhost`.
 
@@ -116,7 +234,7 @@ These routes answer without a credential:
 
 `GET /events/stream` also accepts its `OVERDECK_EVENTS_TOKEN` bearer token when
 that variable is set, so an external consumer such as a TTS sidecar keeps
-working. The dashboard's static page files stay public.
+working. A `read:events` scoped token works there too, set or not. The dashboard's static page files stay public.
 
 ## Local reverse proxies: `require_token_mint`
 
@@ -139,8 +257,11 @@ With it on:
   `X-Forwarded-Host` or `Forwarded`) counts as remote, so it needs a credential.
 
 A browser that already holds a session keeps working. A new browser behind the
-proxy needs the `#overdeck_token=` fragment or pairing. The setting is read once at
-startup, so restart the dashboard after changing it.
+proxy needs the `#overdeck_token=` fragment or pairing. You can also turn it on
+in **Settings → Access Tokens → Require a token to sign in**. A Settings change
+applies at once. A hand edit of `config.yaml` needs a dashboard restart. The key
+is read only from the global `~/.overdeck/config.yaml`, never from a project
+`.pan.yaml`.
 
 ## What pairing is not
 
@@ -160,5 +281,5 @@ startup, so restart the dashboard after changing it.
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
-- Scoped API tokens, `pan token` and a Settings toggle for
-  `require_token_mint`: [PAN-2351](https://github.com/eltmon/overdeck/issues/2351).
+- A heartbeat on terminal WebSockets, so idle terminals survive proxies with
+  short idle timeouts: [PAN-4434](https://github.com/eltmon/overdeck/issues/4434).

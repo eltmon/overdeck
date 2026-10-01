@@ -2,9 +2,8 @@
  * Merge Agent - Automatic merge conflict resolution using Claude Code
  */
 
-import { existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
-import { join, dirname, basename } from 'path';
+import { dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
@@ -181,70 +180,6 @@ export interface MergeResult {
   reason?: string;
   notes?: string;
   output?: string;
-}
-
-/**
- * Timeout for merge agent in milliseconds (15 minutes)
- */
-/**
- * Notify TLDR daemon to reindex changed files after merge
- */
-export async function notifyTldrDaemon(projectPath: string, _sourceBranch: string): Promise<void> {
-  try {
-    console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
-
-    // Check if TLDR daemon is available
-    const venvPath = join(projectPath, '.venv');
-    if (!existsSync(venvPath)) {
-      console.log(`[merge-agent] No .venv found, skipping TLDR notification`);
-      return;
-    }
-
-    // Get changed files from the merge
-    const { stdout } = await execAsync(`git diff --name-only HEAD~1 HEAD`, {
-      cwd: projectPath,
-      encoding: 'utf-8'
-    });
-
-    const changedFiles = stdout
-      .trim()
-      .split('\n')
-      .filter(f => f.trim().length > 0)
-      .filter(f => {
-        // Only include source code files (skip docs, configs, etc)
-        const ext = f.split('.').pop()?.toLowerCase();
-        return ext && ['ts', 'js', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'h'].includes(ext);
-      });
-
-    if (changedFiles.length === 0) {
-      console.log(`[merge-agent] No source files changed, skipping TLDR notification`);
-      return;
-    }
-
-    console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
-
-    // Get TLDR daemon service
-    const { getTldrDaemonService } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonService(projectPath, venvPath);
-
-    // Check if daemon is running
-    const status = await tldrService.getStatus();
-    if (!status.running) {
-      console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
-      return;
-    }
-
-    // Trigger warm to reindex (this will update the index incrementally)
-    console.log(`[merge-agent] Triggering TLDR index warm...`);
-    await tldrService.warm(true);  // background mode
-
-    console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
-    logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
-  } catch (error: any) {
-    // Non-fatal - log warning and continue
-    console.warn(`[merge-agent] Failed to notify TLDR daemon: ${error.message}`);
-    logActivity('tldr_notify_error', `TLDR notification failed: ${error.message}`);
-  }
 }
 
 /**
@@ -491,7 +426,6 @@ export async function postMergeLifecycle(
     } catch (err) {
       console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
     }
-    await notifyTldrDaemon(projectPath, sourceBranch ?? '');
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
     _completedPostMerge.add(issueId); void capturePipelineStageForIssue(issueId, 'merged');

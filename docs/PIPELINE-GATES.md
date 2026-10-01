@@ -26,7 +26,13 @@ the **CI test job on the PR head is the test gate**:
   test job; `PrFacts.testJobSucceeded` is the positive evidence.
 - A red CI test job reaches the work agent through
   `src/lib/cloister/ci-failure-feedback.ts` (fired by the `check_run`,
-  `check_suite` and `status` webhooks). For a CI-mode project the relay reads
+  `check_suite` and `status` webhooks). The webhook route runs the handlers
+  detached after the 200 response and logs a failed dispatch as
+  `[webhook] Dispatch failed for <event>` (until PAN-4432 an interrupted
+  `Effect.forkChild` meant no handler ran). When a `check_run` or failing
+  `check_suite` payload lists no pull requests, the handler resolves the PR
+  from the head branch and accepts it only when the forge reports it open at
+  the same head SHA. For a CI-mode project the relay reads
   the PR's checks, and when the test job is red on the head the webhook
   reported, it records the failure once per head as a per-run verification
   artifact (`via: 'ci'`), appends
@@ -34,7 +40,11 @@ the **CI test job on the PR head is the test gate**:
   pipeline journal, and delivers `VERIFICATION FAILED … Failed check: test`
   through the same feedback door as the local gate
   (`cloister/verification-escalation.ts`: rework owed, slot resolution,
-  resurrection, needs-you when nothing is reachable).
+  resurrection, needs-you when nothing is reachable). On the plain CI FAILED
+  path, a message the work agent does not accept raises a needs-you row.
+  Every relay decision not to deliver logs one `[ci-failure-feedback]` line
+  with its reason. A webhook missed while the dashboard is down is not
+  replayed; nothing polls for it.
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
   from the same per-run artifacts. The local count is per head — every commit
@@ -159,14 +169,21 @@ Two escapes exist for a genuine net removal:
   total. The subject is resolved by stripping a `__tests__/` segment and the
   `.test`/`.spec` infix, then matching `.ts`/`.tsx`/`.js`/`.jsx` among the
   diff's deleted files.
-- **Operator waiver (judgment).** `pan verify waive-test-removal <id> --reason "…"`
-  records the waiver (sha, reason, timestamp, operator) as a workspace
-  verification artifact, not a pipeline record. The gate demotes
-  `removed-test` to evidence only when the waiver's anchored sha equals the
-  head under verification, and prints the waiver as gate evidence. It
+- **Operator waiver (judgment).** Grant with `pan review waive-test-removal <id>
+  --reason "…"`, or from the dashboard Test/Lint panel's waiver control when the
+  `test-skip` gate has failed (reason required; the control shows the head it
+  pins to and refuses a head that moved since the page loaded). The waiver is
+  stored untracked at `<workspace>/.overdeck/test-removal-waiver.json` (sha,
+  reason, at, by), so granting one never dirties the tree or moves the branch.
+  The gate demotes `removed-test` to evidence only when the stored sha equals
+  the head under verification, and prints the waiver as gate evidence. It
   expires the moment the branch head moves, it never waives an added
-  `.skip`/`.only`, and it is operator-conversation-only — a pipeline agent
-  cannot waive the coverage loss it just produced.
+  `.skip`/`.only`, and both doors are operator-only — the CLI refuses any agent
+  identity (including the Flywheel), and the route requires a trusted Origin. A
+  work agent still has filesystem access to its own workspace and could write
+  the file directly; that limit is not solved, which is why the evidence line
+  names who granted it. After granting, run `pan review request <id>` to
+  re-run verification with no new commit.
 
 The test-skip gate stays local in both modes: it is a diff check, not a test
 run. CI runs vitest on every push; the `overdeck/test` commit status records

@@ -149,7 +149,6 @@ model's context:
 | ACP `--context-file`, Muse developer-prompt file, Kimi first-message context envelope | delivered | skipped |
 | `session-start-hook`: memory briefing from `/api/memory/session/start`, post-compaction note | injected as `additionalContext` | hook stops after its observing half |
 | `user-prompt-submit-hook`: `/api/memory/inject` (`overdeck-memory-context`, `overdeck-briefing-update`) | printed into every prompt | skipped |
-| `tldr-read-enforcer`: file summaries in place of large reads | active | native reads |
 | Resume contract (`CONVERSATION RESUME: …`) and Kimi resume context | typed on resume | not sent |
 
 The launcher exports `OVERDECK_BARE_CONTEXT=1`; the injecting hooks check it and

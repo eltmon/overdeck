@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import yaml from 'js-yaml';
 import type { HttpServerRequest } from 'effect/unstable/http';
 
+import { ACCESS_TOKEN_PREFIX } from '../../../lib/access-tokens.js';
+import { readSavedTrustedOriginsSync } from '../../../lib/remote-access/trusted-origins.js';
+
 export type HeaderMap = Record<string, string | string[] | undefined>;
 
 let cachedTrustedOrigins: string[] | undefined;
@@ -80,6 +83,11 @@ export function getTrustedOrigins(): string[] {
     }
   }
 
+  // PAN-4445 D-4: origins saved from Settings → Anywhere apply in every launch mode.
+  for (const origin of readSavedTrustedOriginsSync()) {
+    addTrustedOrigin(origins, origin);
+  }
+
   if (process.env['NODE_ENV'] === 'development') {
     addTrustedOrigin(origins, 'http://localhost:3000');
     addTrustedOrigin(origins, 'http://127.0.0.1:3000');
@@ -110,6 +118,12 @@ export function getHeaderFromMap(headers: HeaderMap, name: string): string | und
   return undefined;
 }
 
+/** True when the request carries `Authorization: Bearer odk_…` (the prefix only; the gate authenticates it). */
+function hasAccessTokenBearer(headers: HeaderMap): boolean {
+  const [scheme, token] = (getHeaderFromMap(headers, 'authorization') ?? '').split(/\s+/);
+  return scheme?.toLowerCase() === 'bearer' && !!token && token.startsWith(ACCESS_TOKEN_PREFIX);
+}
+
 export function validateOriginHeaders(
   headers: HeaderMap,
   method: string,
@@ -123,6 +137,11 @@ export function validateOriginHeaders(
     if (upperMethod === 'GET' || upperMethod === 'HEAD') {
       return { ok: true };
     }
+    // PAN-2351 FR-9: a programmatic client sending `Authorization: Bearer odk_…`
+    // has no Origin. A browser cannot attach an Authorization header to a
+    // cross-site request without a CORS preflight the server does not grant,
+    // and the remote request gate has already authenticated the token.
+    if (hasAccessTokenBearer(headers)) return { ok: true };
     return { ok: false, error: 'Missing origin' };
   }
 
@@ -150,8 +169,13 @@ export function validateOrigin(
   return validateOriginHeaders(request.headers as HeaderMap, request.method);
 }
 
-export function _resetTrustedOriginsForTests(): void {
+/** Drop the cached list so the next call re-reads the saved origins (PAN-4445 FR-3). */
+export function invalidateTrustedOriginsCache(): void {
   cachedTrustedOrigins = undefined;
+}
+
+export function _resetTrustedOriginsForTests(): void {
+  invalidateTrustedOriginsCache();
 }
 
 /**

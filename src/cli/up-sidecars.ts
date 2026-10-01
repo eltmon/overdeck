@@ -1,5 +1,4 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
 import { mkdir, open } from 'fs/promises';
 import { dirname, join } from 'path';
 import chalk from 'chalk';
@@ -92,23 +91,6 @@ export async function startPostLaunchSidecars(config: {
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start smee-client:'), errorMessage(error));
     console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
-  }
-
-  try {
-    const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
-    const venvPath = join(config.projectRoot, '.venv');
-    if (existsSync(venvPath)) {
-      console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-      const tldrService = getTldrDaemonService(config.projectRoot, venvPath);
-      await tldrService.start(true);
-      console.log(chalk.green('✓ TLDR daemon started'));
-    } else {
-      console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-      console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
-    }
-  } catch (error: unknown) {
-    console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), errorMessage(error));
-    console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
   }
 
   try {

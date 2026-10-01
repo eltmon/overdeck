@@ -17,7 +17,7 @@ allowed-tools:
 
 ## Overview
 
-Cleanly stops every running work agent plus its review and test specialists, and (optionally) the dashboard — without touching conversations (`conv-*`) or shared sidecars (CLIProxy, Traefik, TLDR).
+Cleanly stops every running work agent plus its review and test specialists, and (optionally) the dashboard — without touching conversations (`conv-*`) or shared sidecars (CLIProxy, Traefik).
 
 ## When to Use
 
@@ -35,7 +35,7 @@ Cleanly stops every running work agent plus its review and test specialists, and
 | Planning (`planning-<issue>`) and strike (`strike-<issue>`) agents | **kill** | Same issue-scoped runs |
 | Conversations (`conv-*`)                          | **PRESERVE** | Chats behind `overdeck.localhost/conv/<id>`, not work runs |
 | Dashboard                                         | **PRESERVE** unless stopping it |
-| CLIProxy, Traefik, TLDR                           | **PRESERVE** | Shared sidecars |
+| CLIProxy, Traefik                                 | **PRESERVE** | Shared sidecars |
 
 Agents run on the host's terminal backend: Herdr by default, tmux only under
 `terminal.backend: tmux`. List them with `GET /api/agents`, which reads that
@@ -119,7 +119,7 @@ Only if the user asked to stop the dashboard. Use `pan down`, NOT `kill -9`.
 pan down
 ```
 
-Sidecars (CLIProxy, Traefik, TLDR) are intentionally left running — `pan down` only
+Sidecars (CLIProxy, Traefik) are intentionally left running — `pan down` only
 takes the dashboard down. If the user wants a full teardown including sidecars,
 they should ask explicitly; do not assume.
 
@@ -145,9 +145,9 @@ that specific session by name.
 
 ## Why preserve sidecars
 
-CLIProxy, Traefik, and TLDR are shared infrastructure. Other tools and agents on the
+CLIProxy and Traefik are shared infrastructure. Other tools and agents on the
 machine depend on them (CLIProxy bridges ChatGPT subscription auth; Traefik routes all
-`*.localhost`; TLDR serves code summaries). `pan restart`'s default behavior already
+`*.localhost`). `pan restart`'s default behavior already
 encodes this: dashboard restarts, sidecars are left alone. Mirror that here.
 
 ## Common Mistakes

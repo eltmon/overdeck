@@ -186,9 +186,6 @@ async function mockHealthPage(page: Page, agents: unknown[] = []): Promise<void>
   await page.route('**/api/health/agents', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(agents) });
   });
-  await page.route('**/api/services/tldr/status', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"daemons":[]}' });
-  });
   await page.route('**/api/deacon/status', async (route) => {
     await route.fulfill({
       status: 200,
@@ -249,13 +246,12 @@ test.describe('PAN-2647 Health page', () => {
     await stopThrowawayDashboard(dashboard);
   });
 
-  test('keeps host, Deacon, and neutral optional TLDR visible with zero agents', async ({ page }) => {
+  test('keeps host and Deacon visible with zero agents', async ({ page }) => {
     await mockHealthPage(page);
     await page.goto(`${dashboard.baseUrl}/health`);
 
     await expect(page.getByRole('heading', { name: 'Host health' })).toBeVisible();
     await expect(page.getByRole('main').getByText('Deacon', { exact: true })).toBeVisible();
-    await expect(page.getByText('TLDR · Not configured (optional)')).toBeVisible();
     await expect(page.getByText('No agents to monitor')).toBeVisible();
     await expect(page.getByLabel('Wedged agents: 0')).toBeVisible();
   });

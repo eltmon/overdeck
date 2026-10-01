@@ -122,8 +122,7 @@ export async function provisionClaudeHooks(
       }
     }
 
-    const python3Available = await commandAvailable('python3', ['--version']);
-    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir, { python3Available });
+    const { added, removed } = applyOverdeckHookRegistrations(settings, binDir);
 
     if (added.length === 0 && removed.length === 0) {
       return { ok: true, changed: false, binariesSynced, registered: [], pruned: [] };

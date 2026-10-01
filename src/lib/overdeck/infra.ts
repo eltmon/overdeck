@@ -128,6 +128,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // The critic link: the builder row a critic or verifier lane judges (D26).
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `critic_of_conversation_id` text REFERENCES `conversations`(`id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_critic_of_idx` ON `conversations` (`critic_of_conversation_id`)');
+  // PAN-4436: Session Vault browse copies (`vault-<vaultId>` rows) are origin 'vault'.
+  runSchemaTopUp(db, "ALTER TABLE `conversations` ADD COLUMN `origin` text NOT NULL DEFAULT 'local'");
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `vault_owner_label` text');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

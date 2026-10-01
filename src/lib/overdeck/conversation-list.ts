@@ -28,6 +28,7 @@ import {
   listConversations,
   listFavoritedIds,
   listLaneConversations,
+  listVaultBrowseConversations,
   markConversationRunning,
 } from './conversations.js';
 import {
@@ -152,6 +153,26 @@ export function getEnrichedConversationList(limit: number, offset: number): Prom
     }
   }
   return entry.promise;
+}
+
+/**
+ * PAN-4436: GET /api/conversations — local rows, then Session Vault browse copies on the
+ * first page. The Agents Directory and lanes keep getEnrichedConversationList, so they never
+ * see browse copies.
+ */
+export async function getConversationListWithVaultCopies(limit: number, offset: number): Promise<readonly unknown[]> {
+  const enriched = await getEnrichedConversationList(limit, offset);
+  if (offset !== 0) return enriched;
+  const favorites = getCachedFavoritedIds();
+  const copies = listVaultBrowseConversations().map((conv) => ({
+    ...conv,
+    totalCost: 0, totalTokens: 0, sessionAlive: false, isWorking: false, currentTool: null,
+    isFavorited: favorites.has(conv.name), compacting: false, contextUsage: null,
+    lastActivityAt: conv.endedAt, branch: null, isWorktree: false,
+    pullRequest: null, pullRequestCount: 0, pendingInputCount: 0, pendingInputKinds: [],
+    transcriptMissing: false, needsTerminal: false, providerError: null,
+  }));
+  return [...enriched, ...copies];
 }
 
 async function enrichConversationList(limit: number, offset: number): Promise<readonly unknown[]> {

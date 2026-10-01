@@ -47,7 +47,7 @@ import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
 import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { authorizeDashboardUpgrade } from './ws-auth.js';
-import { registerDeviceConnection } from './device-connections.js';
+import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
 import type { HeaderMap } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
@@ -1202,12 +1202,13 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       const request = yield* HttpServerRequest.HttpServerRequest;
       const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
       if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
-      if (auth.credential.kind !== 'device') return yield* rpcWebSocketHttp;
+      const revocableId = revocableCredentialId(auth.credential);
+      if (revocableId === null) return yield* rpcWebSocketHttp;
       // PAN-3762: revoking the device interrupts this socket's handler, which
       // closes the socket (Effect's release closes it without a code, so this
       // one cannot send 4401). The client's reconnect then gets 401.
       const revoked = Deferred.makeUnsafe<void>();
-      const unregister = registerDeviceConnection(auth.credential.deviceId, () => {
+      const unregister = registerDeviceConnection(revocableId, () => {
         Deferred.doneUnsafe(revoked, Effect.void);
       });
       return yield* Effect.raceFirst(

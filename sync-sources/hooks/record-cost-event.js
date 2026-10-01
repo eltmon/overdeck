@@ -29068,7 +29068,6 @@ const DEFAULT_CONFIG = {
 		}
 	},
 	rtk: { enabled: false },
-	tldr: { enabled: true },
 	tts: {
 		enabled: false,
 		lifecycle: true,
@@ -29183,11 +29182,6 @@ function mergeRtkConfig(result, config) {
 	const rtk = config?.agents?.rtk;
 	if (!rtk) return;
 	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
-}
-function mergeTldrConfig(result, config) {
-	const tldr = config?.agents?.tldr;
-	if (!tldr) return;
-	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
 }
 function cloneDocsConfig(config) {
 	return {
@@ -29604,7 +29598,6 @@ function mergeConfigs(...configs) {
 		mergeShadowConfig(result.shadow, config);
 		mergeCavemanConfig(result.caveman, config);
 		mergeRtkConfig(result.rtk, config);
-		mergeTldrConfig(result.tldr, config);
 		mergeDocsConfig(result.docs, config);
 		mergeTtsConfig(result.tts, config);
 		if (config.tts?.summarizer) {
@@ -32972,120 +32965,6 @@ function appendCostEvent(event) {
 	}
 }
 //#endregion
-//#region ../../src/lib/tldr-daemon.ts
-/**
-* TLDR Daemon Service
-*
-* Manages llm-tldr daemon lifecycle for project root and workspaces.
-* Provides code analysis and summarization for token-efficient agent work.
-*/
-function readMetricsCheckpoint(checkpointFile) {
-	if (!existsSync(checkpointFile)) return null;
-	try {
-		return JSON.parse(readFileSync(checkpointFile, "utf-8"));
-	} catch {
-		return null;
-	}
-}
-function readLogLines(logFile, startByte, startLine = 0) {
-	if (!existsSync(logFile)) return {
-		lines: [],
-		size: 0
-	};
-	const size = statSync(logFile).size;
-	if (startByte !== void 0) {
-		const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
-		return {
-			lines: readFileSync(logFile).subarray(safeStart).toString("utf-8").split("\n").filter((l) => l.trim()),
-			size
-		};
-	}
-	return {
-		lines: readFileSync(logFile, "utf-8").split("\n").filter((l) => l.trim()).slice(startLine),
-		size
-	};
-}
-/**
-* Read TLDR session metrics for a workspace from log files.
-*
-* @param workspacePath - Workspace root (where .tldr/ lives)
-* @param sinceCheckpoint - Only return metrics since the last captured checkpoint
-*/
-function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
-	const tldrDir = join(workspacePath, ".tldr");
-	const interceptionsLog = join(tldrDir, "interceptions.log");
-	const bypassesLog = join(tldrDir, "bypasses.log");
-	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
-	const checkpoint = sinceCheckpoint ? readMetricsCheckpoint(checkpointFile) : null;
-	const interceptionsStartByte = checkpoint?.interceptionsByte;
-	const bypassesStartByte = checkpoint?.bypassesByte;
-	const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
-	const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
-	const newInterceptions = readLogLines(interceptionsLog, sinceCheckpoint ? interceptionsStartByte : void 0, sinceCheckpoint && interceptionsStartByte === void 0 ? interceptionsStartLine : 0).lines;
-	let estimatedTokensSaved = 0;
-	const filesAnalyzed = [];
-	for (const line of newInterceptions) {
-		const parts = line.trim().split(" ");
-		if (parts.length >= 3) {
-			const fileSizeBytes = parseInt(parts[1], 10) || 0;
-			const relPath = parts.slice(2).join(" ");
-			const fullTokens = Math.round(fileSizeBytes / 4);
-			estimatedTokensSaved += Math.max(0, fullTokens - 1e3);
-			if (relPath && !filesAnalyzed.includes(relPath)) filesAnalyzed.push(relPath);
-		}
-	}
-	const newBypasses = readLogLines(bypassesLog, sinceCheckpoint ? bypassesStartByte : void 0, sinceCheckpoint && bypassesStartByte === void 0 ? bypassesStartLine : 0).lines;
-	const bypassReasons = {};
-	for (const line of newBypasses) {
-		const parts = line.trim().split(" ");
-		if (parts.length >= 2) {
-			const reason = parts[1];
-			bypassReasons[reason] = (bypassReasons[reason] || 0) + 1;
-		}
-	}
-	return {
-		interceptions: newInterceptions.length,
-		bypasses: newBypasses.length,
-		estimatedTokensSaved,
-		filesAnalyzed,
-		bypassReasons
-	};
-}
-/**
-* Capture TLDR metrics since the last checkpoint and advance the checkpoint.
-*
-* Call this once per cost event batch to get the delta metrics for that batch,
-* then update the checkpoint so the next call starts from here.
-*
-* @param workspacePath - Workspace root (where .tldr/ lives)
-* @returns Metrics delta since last capture, or null if no .tldr/ directory exists
-*/
-function captureTldrMetrics(workspacePath) {
-	const tldrDir = join(workspacePath, ".tldr");
-	if (!existsSync(tldrDir)) return null;
-	const metrics = getTldrMetrics(workspacePath, true);
-	const interceptionsLog = join(tldrDir, "interceptions.log");
-	const bypassesLog = join(tldrDir, "bypasses.log");
-	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
-	const previous = readMetricsCheckpoint(checkpointFile);
-	const interceptionsByte = existsSync(interceptionsLog) ? statSync(interceptionsLog).size : 0;
-	const bypassesByte = existsSync(bypassesLog) ? statSync(bypassesLog).size : 0;
-	const previousInterceptionsLine = previous?.interceptionsByte !== void 0 && previous.interceptionsByte > interceptionsByte ? 0 : previous?.interceptionsLine ?? 0;
-	const previousBypassesLine = previous?.bypassesByte !== void 0 && previous.bypassesByte > bypassesByte ? 0 : previous?.bypassesLine ?? 0;
-	const checkpoint = {
-		interceptionsLine: previousInterceptionsLine + metrics.interceptions,
-		bypassesLine: previousBypassesLine + metrics.bypasses,
-		interceptionsByte,
-		bypassesByte,
-		capturedAt: (/* @__PURE__ */ new Date()).toISOString()
-	};
-	try {
-		writeFileSync(checkpointFile, JSON.stringify(checkpoint, null, 2), "utf-8");
-	} catch {}
-	return metrics;
-}
-promisify$1(exec);
-//#endregion
 //#region record-cost-event.ts
 /**
 * Record cost events from Claude Code transcript data
@@ -33157,20 +33036,6 @@ if (!issueId || issueId === "UNKNOWN") try {
 	if (branchMatch) issueId = `${branchMatch[1].toUpperCase()}-${branchMatch[2]}`;
 } catch {}
 if (!issueId) issueId = "UNKNOWN";
-let tldrMetrics = null;
-try {
-	const workspaceRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-		encoding: "utf-8",
-		timeout: 2e3,
-		stdio: [
-			"pipe",
-			"pipe",
-			"pipe"
-		]
-	}).trim();
-	if (workspaceRoot) tldrMetrics = captureTldrMetrics(workspaceRoot);
-} catch {}
-let tldrAttachedToFirstEvent = false;
 for (const line of lines) {
 	if (!line.trim()) continue;
 	try {
@@ -33201,13 +33066,6 @@ for (const line of lines) {
 			cacheWriteTokens,
 			cacheTTL: "5m"
 		}, pricing);
-		const tldrFields = tldrMetrics && !tldrAttachedToFirstEvent && tldrMetrics.interceptions + tldrMetrics.bypasses > 0 ? {
-			tldrInterceptions: tldrMetrics.interceptions,
-			tldrBypasses: tldrMetrics.bypasses,
-			tldrTokensSaved: tldrMetrics.estimatedTokensSaved,
-			tldrBypassReasons: Object.keys(tldrMetrics.bypassReasons).length > 0 ? tldrMetrics.bypassReasons : void 0
-		} : {};
-		if (tldrMetrics && !tldrAttachedToFirstEvent) tldrAttachedToFirstEvent = true;
 		appendCostEvent({
 			ts: (/* @__PURE__ */ new Date()).toISOString(),
 			type: "cost",
@@ -33223,7 +33081,6 @@ for (const line of lines) {
 			cost,
 			...requestId ? { requestId } : {},
 			sessionId,
-			...tldrFields,
 			...cavemanVariant ? { cavemanVariant } : {}
 		});
 	} catch {}

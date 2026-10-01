@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 import {
   DEFAULT_MODEL_REFS,
@@ -15,6 +16,7 @@ import {
   type NormalizedConfig,
 } from '../config-yaml.js';
 import type { Role } from '../agents.js';
+import type { YamlConfig } from '../config-yaml/schema.js';
 
 const WORKHORSES = {
   expensive: 'claude-opus-4-7',
@@ -560,5 +562,16 @@ describe('tts daemon configuration', () => {
       model: 'claude-haiku-4-5',
       batchWindowSeconds: 30,
     });
+  });
+});
+
+describe('retired agents.tldr key (PAN-4429)', () => {
+  it('loads a config that still sets agents.tldr.enabled and ignores the key', () => {
+    const yaml = parse('agents:\n  tldr:\n    enabled: true\n  rtk:\n    enabled: true\n') as YamlConfig;
+
+    const { config } = mergeConfigs(yaml);
+
+    expect(config).not.toHaveProperty('tldr');
+    expect(config.rtk.enabled).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -12,7 +12,7 @@ import { join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isTldrEnabled, loadConfigSync } from '../config-yaml.js';
+import { loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn, setConversationClaudeSessionId } from '../overdeck/conversations.js';
 import { startWork } from '../cv.js';
 import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
@@ -769,25 +769,6 @@ async function spawnAgentWithoutConsentClaim(
   if (prompt && tracksKickoffDelivery) {
     state.kickoffDelivered = false;
     saveAgentStateSync(state);
-  }
-
-  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
-  // Gated by the operator TLDR toggle: when disabled, the daemon is not started
-  // and the agent (whose prompt reports TLDR_AVAILABLE=false) degrades to direct
-  // file reads.
-  try {
-    const venvPath = join(options.workspace, '.venv');
-    if (isTldrEnabled() && existsSync(venvPath)) {
-      const { getTldrDaemonService } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonService(options.workspace, venvPath);
-      const status = await tldrService.getStatus();
-      if (!status.running) {
-        await tldrService.start(true);
-        console.log(`[${agentId}] Started TLDR daemon for workspace`);
-      }
-    }
-  } catch {
-    // Non-fatal — agents degrade to direct file reads if TLDR unavailable
   }
 
   // Write initial task cache for heartbeat hook

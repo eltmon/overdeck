@@ -80,6 +80,8 @@ import { conversationPendingPermission, readConversationPermission, type Pending
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
+import { isBrowsableVaultId, vaultBrowseFilePath } from '../vault/browse.js';
+import { vaultIdFromBrowseName } from './conversation-vault-rows.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -118,6 +120,10 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
 }
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  if (conv.origin === 'vault') {
+    const vaultId = vaultIdFromBrowseName(conv.name);
+    return vaultId && isBrowsableVaultId(vaultId) ? vaultBrowseFilePath(vaultId, conv.harness ?? 'claude-code') : null;
+  }
   if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
   if (conv.harness === 'prime-agent') return readPrimeAgentSessionFile(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
@@ -549,6 +555,7 @@ export async function getConversationMessagesRead(
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name);
+    const browseCopy = conv?.origin === 'vault';
     let sessionFile: string | null = conv
       ? await deps.resolveSessionFile(conv)
       : await resolveUnregisteredClaudeSessionFile(name);
@@ -579,7 +586,7 @@ export async function getConversationMessagesRead(
 
     try {
       const parsed = await getCachedMessages(sessionFile, false);
-      if (agentId === undefined && conv && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
+      if (agentId === undefined && conv && !browseCopy && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
 
@@ -594,8 +601,8 @@ export async function getConversationMessagesRead(
         messages: parsed.messages,
         workLog: parsed.workLog,
         streaming: parsed.streaming,
-        totalCost: parsed.totalCost,
-        totalTokens: parsed.totalTokens,
+        totalCost: browseCopy ? 0 : parsed.totalCost,
+        totalTokens: browseCopy ? 0 : parsed.totalTokens,
         proposedPlan: parsed.proposedPlan,
         compactBoundaries: (parsed.compactBoundaries?.length ?? 0) > 0 ? parsed.compactBoundaries : undefined,
         compacting: isCompacting(sessionFile) || undefined,

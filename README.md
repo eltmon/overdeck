@@ -150,7 +150,6 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 | **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote via Fly.io |
 | **Convoys** | Run parallel agents on related issues with automatic result synthesis |
 | **Cost Tracking** | Per-issue, per-stage token costs with model attribution and daily rollups |
-| **TLDR Code Analysis** | Token-efficient codebase understanding (500-1,200 tokens/file vs 10-25k) so agents stay within context |
 
 ---
 

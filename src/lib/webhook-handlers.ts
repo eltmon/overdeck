@@ -54,6 +54,8 @@ export interface WebhookPayload {
     name?: string;
     status?: string;
     conclusion?: string | null;
+    head_sha?: string;
+    check_suite?: { head_branch?: string | null; head_sha?: string };
     pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
   repository?: { full_name: string };
@@ -129,6 +131,39 @@ export function isTrackedRepository(fullName: string | undefined): boolean {
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
 const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
+type PayloadPr = { number: number; head: { ref: string; sha?: string } };
+
+/**
+ * PAN-4432: GitHub leaves `pull_requests` empty for some check events. Find
+ * the PR from the head branch and accept it only when the forge says it is
+ * open at exactly this head SHA.
+ */
+async function resolvePullRequestsForHead(
+  listed: PayloadPr[] | undefined,
+  headBranch: string | null | undefined,
+  headSha: string | undefined,
+  label: string,
+): Promise<PayloadPr[]> {
+  if (listed && listed.length > 0) return listed;
+  const issueId = headBranch ? issueIdFromBranch(headBranch) : null;
+  if (!issueId || !headSha) {
+    console.log(`[webhook] ${label}: no pull_requests and no issue branch (head_branch=${headBranch ?? 'null'}); skipping`);
+    return [];
+  }
+  try {
+    const { fetchIssuePullRequest } = await import('./overdeck/pull-requests.js');
+    const facts = await getPrFacts(issueId, { fetchGitHubPr: fetchIssuePullRequest });
+    if (!facts.open || facts.number == null || facts.headSha !== headSha) {
+      console.log(`[webhook] ${label}: no open PR for ${issueId} at ${headSha.slice(0, 8)} (open=${facts.open}, head=${facts.headSha?.slice(0, 8) ?? 'none'}); skipping`);
+      return [];
+    }
+    return [{ number: facts.number, head: { ref: facts.headBranch ?? headBranch!, sha: headSha } }];
+  } catch (err) {
+    console.warn(`[webhook] ${label}: could not resolve the PR for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+}
+
 /** Handle a `check_suite` GitHub webhook payload. */
 export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
@@ -169,11 +204,17 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
-  if (!suite.pull_requests || suite.pull_requests.length === 0) return;
 
   const repo = payload.repository!.full_name;
 
-  for (const pr of suite.pull_requests) {
+  const failing = Boolean(suite.conclusion) && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion!.toUpperCase());
+  const listed = suite.pull_requests ?? [];
+  const prs = listed.length > 0 || !failing
+    ? listed
+    : await resolvePullRequestsForHead(listed, suite.head_branch, suite.head_sha, 'check_suite');
+  if (prs.length === 0) return;
+
+  for (const pr of prs) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
@@ -200,13 +241,24 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
-  if (!run.pull_requests || run.pull_requests.length === 0) return;
 
   const repo = payload.repository!.full_name;
   const sourceKey = `check_run:${run.name ?? String(run.id ?? 'unknown')}`;
   const isAdvisory = isAdvisoryCheckName(run.name);
 
-  for (const pr of run.pull_requests) {
+  const conclusion = run.conclusion?.toUpperCase();
+  const actionable = Boolean(conclusion) && (
+    FAILING_CHECK_CONCLUSIONS.has(conclusion!)
+    || (conclusion === 'SUCCESS' && isCiTestCheckName(run.name))
+  );
+  const listed = run.pull_requests ?? [];
+  // NFR-1: only an event the loop below acts on is worth a forge read.
+  const prs = listed.length > 0 || !actionable || isAdvisory
+    ? listed
+    : await resolvePullRequestsForHead(listed, run.check_suite?.head_branch, run.head_sha, sourceKey);
+  if (prs.length === 0) return;
+
+  for (const pr of prs) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 

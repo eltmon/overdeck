@@ -190,23 +190,6 @@ async function startSidecars(): Promise<void> {
     console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
   }
 
-  // TLDR
-  try {
-    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-    const projectRoot = process.cwd();
-    const venvPath = join(projectRoot, '.venv');
-    if (existsSync(venvPath)) {
-      console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-      const tldrService = getTldrDaemonService(projectRoot, venvPath);
-      await tldrService.start(true);
-      console.log(chalk.green('✓ TLDR daemon started'));
-    } else {
-      console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-    }
-  } catch (error: any) {
-    console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
-  }
-
   // Supervisor
   try {
     const { startSupervisorProcess, getSupervisorPort } = await import('../../lib/supervisor.js');

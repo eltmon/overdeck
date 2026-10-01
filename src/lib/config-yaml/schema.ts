@@ -9,6 +9,7 @@ import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
+import type { DashboardYamlConfig, NormalizedDashboardConfig } from './schema-dashboard.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
@@ -610,8 +611,6 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
     /** RTK Bash output compression configuration */
     rtk?: RtkConfig;
-    /** TLDR token-efficient code-analysis configuration */
-    tldr?: TldrConfig;
   };
 
   /** TTS configuration */
@@ -696,6 +695,9 @@ export interface YamlConfig {
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
   remote?: RemoteConfig;
+
+  /** Dashboard access settings (PAN-4435). */
+  dashboard?: DashboardYamlConfig;
 }
 
 /**
@@ -767,21 +769,6 @@ export interface CavemanConfig {
 }
 
 export interface RtkConfig {
-  enabled?: boolean;
-}
-
-/**
- * TLDR (token-efficient code analysis) configuration.
- *
- * When enabled, work/planning agents whose workspace has a TLDR `.venv` get the
- * TLDR MCP tools wired in and their prompt advertises TLDR as available; the
- * per-workspace TLDR daemon is started at spawn. When disabled, agents fall back
- * to direct file reads regardless of whether a `.venv` is present. Default ON to
- * preserve historical behaviour (TLDR was implicitly on whenever a `.venv`
- * existed). Changing this only affects sessions launched/resumed AFTER the
- * change — running agents must be resumed to pick it up.
- */
-export interface TldrConfig {
   enabled?: boolean;
 }
 
@@ -962,9 +949,6 @@ export interface NormalizedConfig {
   /** RTK Bash output compression configuration (normalised, never undefined) */
   rtk: NormalizedRtkConfig;
 
-  /** TLDR token-efficient code-analysis configuration (normalised, never undefined) */
-  tldr: NormalizedTldrConfig;
-
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
 
@@ -1042,6 +1026,9 @@ export interface NormalizedConfig {
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */
   remote?: NormalizedRemoteConfig;
+
+  /** Dashboard access settings (PAN-4435). */
+  dashboard?: NormalizedDashboardConfig;
 }
 
 /**
@@ -1078,11 +1065,6 @@ export interface NormalizedCavemanConfig {
 }
 
 export interface NormalizedRtkConfig {
-  enabled: boolean;
-}
-
-/** Normalized TLDR configuration (never undefined). */
-export interface NormalizedTldrConfig {
   enabled: boolean;
 }
 

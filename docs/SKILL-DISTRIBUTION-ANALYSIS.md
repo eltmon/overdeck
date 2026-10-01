@@ -780,7 +780,6 @@ Rules are a new content type Overdeck should distribute. Some content currently 
 | `pan-sync-main` | Sync workspace with main branch |
 | `pan-tell` | Send message to running agent |
 | `pan-test-config` | Test configuration helper |
-| `pan-tldr` | TLDR code analysis setup |
 | `pan-tracker` | Configure issue tracker integration |
 | `pan-up` | Start dashboard and services |
 | `pan-workspace-config` | Workspace configuration |

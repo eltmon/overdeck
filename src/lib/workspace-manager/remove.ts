@@ -44,20 +44,6 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     return result;
   }
 
-  // Stop TLDR daemon for workspace (if it exists)
-  const venvPath = join(workspacePath, '.venv');
-  if (existsSync(venvPath)) {
-    try {
-      const { getTldrDaemonService } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonService(workspacePath, venvPath);
-      await tldrService.stop();
-      result.steps.push('Stopped TLDR daemon');
-    } catch (error: any) {
-      // Non-fatal - daemon may not be running
-      console.warn(`⚠ Failed to stop TLDR daemon: ${error?.message}`);
-    }
-  }
-
   // Stop Docker containers and clean up Docker-created files
   const dockerResult = await stopWorkspaceDocker(workspacePath, featureName);
   result.steps.push(...dockerResult.steps);

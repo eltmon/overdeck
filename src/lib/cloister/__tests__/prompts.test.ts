@@ -364,93 +364,6 @@ optional:
       })
     );
 
-    it.effect('renders resume-work TLDR guidance only when TLDR_AVAILABLE is true', () =>
-      Effect.gen(function* () {
-        const baseVars = {
-          ISSUE_ID: 'PAN-611',
-          INSTRUCTIONS_BLOCK: 'Continue the task.',
-        };
-        const enabled = yield* renderPrompt({
-          name: 'resume-work',
-          vars: { ...baseVars, TLDR_AVAILABLE: true },
-        });
-        const disabled = yield* renderPrompt({
-          name: 'resume-work',
-          vars: { ...baseVars, TLDR_AVAILABLE: false },
-        });
-        const absent = yield* renderPrompt({ name: 'resume-work', vars: baseVars });
-
-        expect(enabled).toContain('## TLDR: Fast Re-Orientation');
-        expect(enabled).toContain('PreToolUse hook on `Read`');
-        expect(enabled).toContain('.venv/bin/tldr context');
-        expect(disabled).not.toContain('## TLDR: Fast Re-Orientation');
-        expect(absent).not.toContain('## TLDR: Fast Re-Orientation');
-      })
-    );
-
-    it.effect('renders review TLDR guidance only when TLDR_AVAILABLE is true', () =>
-      Effect.gen(function* () {
-        const baseVars = {
-          ISSUE_ID: 'PAN-611',
-          BRANCH: 'feature/pan-611',
-          WORKSPACE: '/workspace',
-          DIFF_BASE: 'main',
-          IS_POLYREPO: false,
-          GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
-          GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
-          API_URL: 'http://localhost:3011',
-          RUN_ID: 'agent-pan-611-review-abcdef12',
-        };
-        const enabled = yield* renderPrompt({
-          name: 'review',
-          vars: { ...baseVars, TLDR_AVAILABLE: true },
-        });
-        const disabled = yield* renderPrompt({
-          name: 'review',
-          vars: { ...baseVars, TLDR_AVAILABLE: false },
-        });
-        const absent = yield* renderPrompt({ name: 'review', vars: baseVars });
-
-        expect(enabled).toContain('## TLDR: Efficient Review Context');
-        expect(enabled).toContain('PreToolUse hook on `Read`');
-        expect(enabled).toContain('.venv/bin/tldr context');
-        expect(disabled).not.toContain('## TLDR: Efficient Review Context');
-        expect(absent).not.toContain('## TLDR: Efficient Review Context');
-      })
-    );
-
-    it.effect('renders test TLDR guidance only when TLDR_AVAILABLE is true', () =>
-      Effect.gen(function* () {
-        const baseVars = {
-          ISSUE_ID: 'PAN-611',
-          BRANCH: 'feature/pan-611',
-          WORKSPACE: '/workspace',
-          IS_POLYREPO: false,
-          TEST_COMMANDS: 'npm test',
-          BASELINE_COMMANDS: 'git checkout main && npm test',
-          TEST_CONFIG_SUMMARY: 'default test suite',
-          TIMEOUT_MS: 600000,
-          FEATURE_NAME: 'pan-611',
-          DOCKER_PS_FORMAT: '{{.Names}}',
-        };
-        const enabled = yield* renderPrompt({
-          name: 'test',
-          vars: { ...baseVars, TLDR_AVAILABLE: true },
-        });
-        const disabled = yield* renderPrompt({
-          name: 'test',
-          vars: { ...baseVars, TLDR_AVAILABLE: false },
-        });
-        const absent = yield* renderPrompt({ name: 'test', vars: baseVars });
-
-        expect(enabled).toContain('## TLDR: Efficient Failure Diagnosis');
-        expect(enabled).toContain('PreToolUse hook on `Read`');
-        expect(enabled).toContain('.venv/bin/tldr context');
-        expect(disabled).not.toContain('## TLDR: Efficient Failure Diagnosis');
-        expect(absent).not.toContain('## TLDR: Efficient Failure Diagnosis');
-      })
-    );
-
     it.effect('renders Playwright isolation guidance in the work prompt', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
@@ -467,7 +380,6 @@ optional:
             POLYREPO_CONTEXT: '',
             PENDING_FEEDBACK: '',
             NEW_TRACKER_CONTEXT: '',
-            TLDR_AVAILABLE: false,
           },
         });
 
@@ -493,7 +405,6 @@ optional:
             POLYREPO_CONTEXT: '',
             PENDING_FEEDBACK: 'Fix the failed test.',
             NEW_TRACKER_CONTEXT: '',
-            TLDR_AVAILABLE: false,
           },
         });
 
@@ -521,7 +432,6 @@ optional:
           POLYREPO_CONTEXT: '',
           PENDING_FEEDBACK: '',
           NEW_TRACKER_CONTEXT: '',
-          TLDR_AVAILABLE: false,
         };
         const remote = yield* renderPrompt({
           name: 'work',

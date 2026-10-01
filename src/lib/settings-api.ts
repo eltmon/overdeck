@@ -42,6 +42,7 @@ import { effortConfigErrors } from './agents/effort-support.js';
 import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
+import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from './remote-access/config.js';
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -193,9 +194,6 @@ export interface ApiSettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
-    tldr?: {
-      enabled?: boolean;
-    };
   };
   telemetry?: ApiTelemetryConfig;
   tts?: ApiTtsConfig;
@@ -271,6 +269,8 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  /** Dashboard access (PAN-4435). `require_token_mint` persists under `dashboard` in config.yaml. */
+  dashboard?: { require_token_mint?: boolean };
   tiered_execution?: ApiTieredExecutionConfig;
 }
 
@@ -368,7 +368,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * unknown keys (and their comments) survive untouched. Shallow on purpose —
  * nested entries (e.g. a single provider's object) are replaced wholesale so
  * a cleared override actually clears. Matches the existing per-key precedent
- * for `tts` and `agents.rtk`/`agents.tldr` below.
+ * for `tts` and `agents.rtk` below.
  */
 function setBlockMergePreserving(doc: ReturnType<typeof parseDocument>, path: string[], value: Record<string, unknown>): void {
   const existing = doc.getIn(path);
@@ -703,9 +703,6 @@ export function loadSettingsApi(): ApiSettingsConfig {
       rtk: {
         enabled: config.rtk?.enabled ?? false,
       },
-      tldr: {
-        enabled: config.tldr?.enabled ?? true,
-      },
     },
     telemetry: telemetrySettingsFromConfig(config.telemetry),
     tts: toApiTtsConfig(config.tts),
@@ -763,6 +760,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       resiliency_tier: config.remote?.resiliencyTier ?? 'ephemeral',
       max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
     },
+    // D-1: reports the enforced value (raw config.yaml), not the merged
+    // config — a project .pan.yaml never reaches enforcement.
+    dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint },
     tiered_execution: config.tieredExecution,
   };
 }
@@ -798,6 +798,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
   // models.overrides is retired (#4131); an explicit Settings save drops it.
   doc.deleteIn(['models', 'overrides']);
+  // agents.tldr is retired (PAN-4429); an explicit Settings save drops it.
+  if (doc.hasIn(['agents', 'tldr'])) doc.deleteIn(['agents', 'tldr']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
     doc.setIn(['models', 'gemini_thinking_level'], config.models.gemini_thinking_level);
@@ -842,10 +844,6 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.setIn(['agents', 'rtk'], config.agents.rtk);
   }
 
-  if (config.agents?.tldr !== undefined) {
-    doc.setIn(['agents', 'tldr'], config.agents.tldr);
-  }
-
   if (config.tts !== undefined) {
     for (const [key, value] of Object.entries(config.tts)) {
       doc.setIn(['tts', key], value);
@@ -860,6 +858,11 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   } else {
     doc.deleteIn(['remote']);
+  }
+
+  // PAN-4435 D-3: never delete the block when a PUT omits it (security flag).
+  if (isRecord(config.dashboard)) {
+    setBlockMergePreserving(doc, ['dashboard'], config.dashboard as Record<string, unknown>);
   }
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
@@ -963,11 +966,8 @@ async function saveSettingsApiPromiseUnlocked(
       dashscope: settings.api_keys.dashscope,
       typesafe: settings.api_keys.typesafe,
     },
-    agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
-      ? {
-          ...(settings.agents?.rtk !== undefined ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } } : {}),
-          ...(settings.agents?.tldr !== undefined ? { tldr: { enabled: settings.agents.tldr.enabled ?? true } } : {}),
-        }
+    agents: settings.agents?.rtk !== undefined
+      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
       : undefined,
     tts: settings.tts_summarizer
       ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
@@ -1046,6 +1046,7 @@ async function saveSettingsApiPromiseUnlocked(
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
+    dashboard: settings.dashboard,
     tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
       providerAuth: currentConfig.providerAuth,
       workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
@@ -1056,6 +1057,7 @@ async function saveSettingsApiPromiseUnlocked(
 
   // Clear the cache because rapid writes or coarse filesystem mtime resolution can miss invalidation.
   clearConfigCache();
+  invalidateRemoteAccessConfig();
   await synchronizeAnalyticsServices();
   // PAN-4264: turning operator grouping on derives the hash (one gh call).
   if (settings.telemetry?.operatorGrouping === true) void ensureOperatorHash();
@@ -1094,10 +1096,6 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       rtk: {
         ...current.agents?.rtk,
         ...updates.agents?.rtk,
-      },
-      tldr: {
-        ...current.agents?.tldr,
-        ...updates.agents?.tldr,
       },
     },
     tts: {
@@ -1166,6 +1164,7 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       ...current.remote,
       ...updates.remote,
     },
+    dashboard: { ...current.dashboard, ...updates.dashboard },
   };
 
   // Save and return
@@ -1251,13 +1250,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push('agents.rtk.enabled must be a boolean');
         }
       }
-      if (settings.agents.tldr !== undefined) {
-        if (!isRecord(settings.agents.tldr)) {
-          errors.push('agents.tldr must be an object');
-        } else if (settings.agents.tldr.enabled !== undefined && typeof settings.agents.tldr.enabled !== 'boolean') {
-          errors.push('agents.tldr.enabled must be a boolean');
-        }
-      }
     }
   }
 
@@ -1327,6 +1319,17 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       ) {
         errors.push('remote.max_concurrent_agents must be a non-negative integer');
       }
+    }
+  }
+
+  if (settings.dashboard !== undefined) {
+    if (!isRecord(settings.dashboard)) {
+      errors.push('dashboard must be an object');
+    } else if (
+      settings.dashboard.require_token_mint !== undefined &&
+      typeof settings.dashboard.require_token_mint !== 'boolean'
+    ) {
+      errors.push('dashboard.require_token_mint must be a boolean');
     }
   }
 

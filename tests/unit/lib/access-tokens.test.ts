@@ -1,7 +1,8 @@
 /**
  * PAN-3762 W2.1: the access-token registry — create/verify/revoke, the 5 s
  * cross-process refresh, the lastUsedAt throttle, file mode, hash-only storage,
- * and fail-closed handling of a corrupt file.
+ * and fail-closed handling of a corrupt file. PAN-2351 W1 adds the scope model:
+ * scopeSatisfies, parseAccessTokenScopes, and createAccessToken input checks.
  */
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -111,5 +112,68 @@ describe('access-token registry (PAN-3762)', () => {
     expect(registry.verifyAccessToken(token)).toEqual({ ok: false });
     expect(errors).toHaveBeenCalled();
     errors.mockRestore();
+  });
+});
+
+describe('access-token scopes (PAN-2351)', () => {
+  const ALL = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'admin'] as const;
+
+  it('scopeSatisfies: admin covers every scope, operate covers tell, each other scope covers only itself', () => {
+    expect(registry.ACCESS_TOKEN_SCOPES).toEqual(ALL);
+    for (const granted of ALL) {
+      for (const required of ALL) {
+        const expected = granted === 'admin' || granted === required || (granted === 'operate' && required === 'tell');
+        expect(registry.scopeSatisfies([granted], required), `${granted} => ${required}`).toBe(expected);
+      }
+    }
+    expect(registry.scopeSatisfies(['operate'], 'tell')).toBe(true);
+    expect(registry.scopeSatisfies(['operate'], 'read:events')).toBe(false);
+    expect(registry.scopeSatisfies(['tell'], 'operate')).toBe(false);
+    expect(registry.scopeSatisfies(['read:events', 'tell'], 'tell')).toBe(true);
+  });
+
+  it('scopeSatisfies: an unknown scope string satisfies nothing', () => {
+    for (const required of ALL) {
+      expect(registry.scopeSatisfies(['read:bogus'], required)).toBe(false);
+      expect(registry.scopeSatisfies([], required)).toBe(false);
+    }
+  });
+
+  it('parseAccessTokenScopes trims, deduplicates, and names an unknown scope', () => {
+    expect(registry.parseAccessTokenScopes('read:events, tell')).toEqual(['read:events', 'tell']);
+    expect(registry.parseAccessTokenScopes(['tell', ' tell ', 'admin'])).toEqual(['tell', 'admin']);
+    expect(() => registry.parseAccessTokenScopes('write:all')).toThrow(/write:all/);
+    expect(() => registry.parseAccessTokenScopes('tell,write:all,bad')).toThrow(/write:all/);
+    expect(() => registry.parseAccessTokenScopes('')).toThrow(/at least one/);
+    expect(() => registry.parseAccessTokenScopes(['  '])).toThrow(/at least one/);
+  });
+
+  it('createAccessToken rejects an empty name or empty scopes and persists nothing', async () => {
+    await expect(registry.createAccessToken({ name: '', scopes: ['tell'] })).rejects.toThrow(/name/);
+    await expect(registry.createAccessToken({ name: '   ', scopes: ['tell'] })).rejects.toThrow(/name/);
+    await expect(registry.createAccessToken({ name: 'x'.repeat(201), scopes: ['tell'] })).rejects.toThrow(/name/);
+    await expect(registry.createAccessToken({ name: 'x', scopes: [] })).rejects.toThrow(/scopes/);
+    await expect(registry.listAccessTokens()).resolves.toEqual([]);
+  });
+
+  it('createAccessToken stores the trimmed name and deduplicated scopes', async () => {
+    const { record } = await registry.createAccessToken({ name: '  sidecar ', scopes: ['read:events', 'read:events', 'tell'], kind: 'token' });
+    expect(record.name).toBe('sidecar');
+    expect(record.scopes).toEqual(['read:events', 'tell']);
+    expect(record.kind).toBe('token');
+  });
+
+  it('parses a registry file holding an unknown scope, and that record verifies but satisfies nothing', async () => {
+    const { token, record } = await registry.createAccessToken({ name: 'old', scopes: ['tell'], kind: 'token' });
+    const path = join(home, 'access-tokens.json');
+    const file = JSON.parse(await readFile(path, 'utf8'));
+    file.tokens[0].scopes = ['read:bogus'];
+    await writeFile(path, JSON.stringify(file), 'utf8');
+
+    await registry.refreshAccessTokens();
+    const verified = registry.verifyAccessToken(token);
+    expect(verified.ok && verified.record.id).toBe(record.id);
+    const scopes = verified.ok ? verified.record.scopes : [];
+    for (const required of ALL) expect(registry.scopeSatisfies(scopes, required)).toBe(false);
   });
 });

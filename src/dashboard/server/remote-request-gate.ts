@@ -9,7 +9,11 @@
  *
  *   1. The path is not under `/api/` or `/events/` (the static SPA): pass.
  *   2. `METHOD path` is on REMOTE_GATE_ALLOWLIST: pass.
- *   3. The request carries a dashboard credential: pass.
+ *   3. The request carries a dashboard credential: pass when its scopes satisfy
+ *      the route-scope table (`route-scopes.ts`; unlisted routes need `admin`),
+ *      else 403 `{ "error": "insufficient_scope", "missingScope": "<scope>" }`.
+ *      A registry credential is judged by its scopes, never by the peer
+ *      (PAN-2351 D-7): a narrow token from 127.0.0.1 still gets 403.
  *   4. The request is a trusted local caller: pass. A loopback peer (the local
  *      browser, or the host-local Traefik) is local, except that with
  *      `dashboard.require_token_mint` a loopback peer carrying a proxy
@@ -28,10 +32,14 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
 import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
 import { jsonResponse } from './http-helpers.js';
-import { hasProxyForwardingHeader, isLoopbackPeer, resolveDashboardCredential } from './routes/dashboard-auth.js';
+import { gatePathname, requiredScopeFor } from './route-scopes.js';
+import { credentialScopes, hasProxyForwardingHeader, isLoopbackPeer, resolveDashboardCredential } from './routes/dashboard-auth.js';
 import { getHeaderFromMap, type HeaderMap } from './routes/origin-validation.js';
+
+export { gatePathname } from './route-scopes.js';
 
 /** `METHOD path` pairs that answer without a credential. */
 export const REMOTE_GATE_ALLOWLIST: ReadonlySet<string> = new Set([
@@ -43,37 +51,6 @@ export const REMOTE_GATE_ALLOWLIST: ReadonlySet<string> = new Set([
   // HMAC-verified by its own route.
   'POST /api/webhooks/github',
 ]);
-
-/**
- * The request path as the gate judges it. The router matches loosely (a
- * request for `//api/x` reaches `/api/x`), so the gate normalizes before it
- * decides: it drops the query, takes the path of an absolute-form target,
- * decodes percent escapes, collapses repeated slashes and resolves `.` and
- * `..` segments. An undecodable path returns `null`, which the gate rejects.
- */
-export function gatePathname(url: string): string | null {
-  let path = url.split(/[?#]/, 1)[0] ?? '';
-  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) {
-    try {
-      path = new URL(path).pathname;
-    } catch {
-      return null;
-    }
-  }
-  try {
-    path = decodeURIComponent(path);
-  } catch {
-    return null;
-  }
-  const segments: string[] = [];
-  for (const segment of path.split(/[/\\]+/)) {
-    if (segment === '' || segment === '.') continue;
-    if (segment === '..') segments.pop();
-    else segments.push(segment);
-  }
-  const trailing = /[/\\]$/.test(path) && segments.length > 0 ? '/' : '';
-  return `/${segments.join('/')}${trailing}`;
-}
 
 function isGatedPath(pathname: string): boolean {
   const lower = pathname.toLowerCase();
@@ -95,14 +72,21 @@ export function isTrustedLocalRequest(request: HttpServerRequest.HttpServerReque
   return !(readRemoteAccessConfig().requireTokenMint && hasProxyForwardingHeader(request.headers as HeaderMap));
 }
 
+export type RemoteGateRejection = { status: 401 } | { status: 403; missingScope: AccessTokenScope };
+
 /** The gate decision for one request: `null` lets it through. */
-export function remoteGateRejection(request: HttpServerRequest.HttpServerRequest): { status: 401 } | null {
+export function remoteGateRejection(request: HttpServerRequest.HttpServerRequest): RemoteGateRejection | null {
   const pathname = gatePathname(request.url);
   if (pathname === null) return { status: 401 };
   if (!isGatedPath(pathname)) return null;
   if (REMOTE_GATE_ALLOWLIST.has(`${request.method} ${pathname}`)) return null;
   const headers = request.headers as HeaderMap;
-  if (resolveDashboardCredential(headers) !== null) return null;
+  const credential = resolveDashboardCredential(headers);
+  if (credential !== null) {
+    // PAN-2351 D-7: a registry credential is judged by its scopes, never by the peer.
+    const required = requiredScopeFor(request.method, pathname);
+    return scopeSatisfies(credentialScopes(credential), required) ? null : { status: 403, missingScope: required };
+  }
   if (pathname === '/events/stream' && hasEventsStreamToken(headers)) return null;
   if (isTrustedLocalRequest(request)) return null;
   return { status: 401 };
@@ -112,7 +96,11 @@ export const remoteRequestGateLayer = HttpRouter.middleware(
   (httpEffect) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      if (remoteGateRejection(request)) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+      const rejection = remoteGateRejection(request);
+      if (rejection?.status === 403) {
+        return jsonResponse({ error: 'insufficient_scope', missingScope: rejection.missingScope }, { status: 403 });
+      }
+      if (rejection) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
       return yield* httpEffect;
     }),
   { global: true },

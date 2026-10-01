@@ -1,11 +1,12 @@
 /**
- * Live connections held by paired devices (PAN-3762 D-3762-10).
+ * Live connections held by registry credentials: a paired device or an access
+ * token (PAN-3762 D-3762-10, PAN-2351 FR-4).
  *
- * Revoking a device in the access-token registry stops its next request, but
+ * Revoking a record in the access-token registry stops its next request, but
  * WebSockets and SSE streams authenticated once at connect time stay open. Each
- * such connection registers a close callback here under its device id, and
- * `DELETE /api/devices/:id` calls `closeDeviceConnections(id)` right after the
- * revocation so every live connection of that device ends at once.
+ * such connection registers a close callback here under its record id, and the
+ * revoking route calls `closeDeviceConnections(id)` right after the revocation
+ * so every live connection of that record ends at once.
  */
 import { Deferred, Effect, Stream } from 'effect';
 
@@ -44,20 +45,27 @@ export function closeDeviceConnections(deviceId: string): number {
   return set.size;
 }
 
+/** The registry record id behind a revocable credential (device or token); null for root credentials. */
+export function revocableCredentialId(credential: DashboardCredential | null): string | null {
+  if (credential?.kind === 'device') return credential.deviceId;
+  if (credential?.kind === 'token') return credential.tokenId;
+  return null;
+}
+
 /**
- * End a stream (the `/events/stream` SSE body) when the device that opened it
- * is revoked. Streams opened with any other credential are returned as-is.
+ * End a stream (the `/events/stream` SSE body) when the device or token that
+ * opened it is revoked. Streams opened with a root credential are returned as-is.
  */
 export function endStreamOnDeviceRevocation<A, E, R>(
   stream: Stream.Stream<A, E, R>,
   credential: DashboardCredential | null,
 ): Stream.Stream<A, E, R> {
-  if (credential?.kind !== 'device') return stream;
-  const { deviceId } = credential;
+  const recordId = revocableCredentialId(credential);
+  if (recordId === null) return stream;
   // Register when the stream starts, so a stream that never runs leaves no entry.
   return Stream.unwrap(Effect.sync(() => {
     const revoked = Deferred.makeUnsafe<void>();
-    const unregister = registerDeviceConnection(deviceId, () => {
+    const unregister = registerDeviceConnection(recordId, () => {
       Deferred.doneUnsafe(revoked, Effect.void);
     });
     return stream.pipe(

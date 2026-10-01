@@ -232,9 +232,15 @@ async function assessCiTestGateFailure(
   workspacePath: string | undefined,
   deps: CiFailureFeedbackDeps,
 ): Promise<CiTestGateFailure | 'repeat' | null> {
-  if (!isFeatureHead(opts.headRef)) return null;
-  if (!isCiTestsProject(projectPath)) return null;
   const head8 = opts.headSha.slice(0, 8);
+  if (!isFeatureHead(opts.headRef)) {
+    console.log(`[ci-failure-feedback] Not a test-gate failure for ${issueId} @ ${head8}: head ${opts.headRef} is not a feature branch`);
+    return null;
+  }
+  if (!isCiTestsProject(projectPath)) {
+    console.log(`[ci-failure-feedback] Not a test-gate failure for ${issueId} @ ${head8}: tests are not in CI mode for ${projectPath ?? 'an unresolved project'}`);
+    return null;
+  }
   const hasWorkspace = Boolean(workspacePath) && existsSync(workspacePath!);
   if (lastJournaledTestFailureSha.get(issueId) === opts.headSha) return 'repeat';
   if (hasWorkspace && readLatestCiTestResult(workspacePath!, head8) === 'failed') return 'repeat';
@@ -248,9 +254,15 @@ async function assessCiTestGateFailure(
     );
     return null;
   }
-  if (facts.testChecks !== 'red') return null;
+  if (facts.testChecks !== 'red') {
+    console.log(`[ci-failure-feedback] Not a test-gate failure for ${issueId} @ ${head8}: PR test checks are ${facts.testChecks}`);
+    return null;
+  }
   // A late webhook for an older head is not a verdict on the current one.
-  if (facts.headSha && facts.headSha !== opts.headSha) return null;
+  if (facts.headSha && facts.headSha !== opts.headSha) {
+    console.log(`[ci-failure-feedback] Not a test-gate failure for ${issueId} @ ${head8}: the PR head is now ${facts.headSha.slice(0, 8)}`);
+    return null;
+  }
   const uncounted = await uncountedTestFailureReason(facts.testCheckFailures, opts.repo, deps);
   if (uncounted) {
     console.log(`[ci-failure-feedback] Not counting the red CI test job for ${issueId} @ ${head8}: ${uncounted}`);
@@ -625,6 +637,7 @@ async function relayCiFailureFeedbackInQueue(
   const agentId = agentIdForIssue(issueId);
   const agentState = getAgentState(agentId);
   if (!testGateFailed && (!agentState || agentState.role !== 'work')) {
+    console.log(`[ci-failure-feedback] No CI feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}: ${agentState ? `agent role is ${agentState.role}` : 'no work agent'}`);
     return { agentMessageSent: false, ...testGateFlag };
   }
 
@@ -714,13 +727,27 @@ async function relayCiFailureFeedbackInQueue(
     // throwing (PR #3874), so success is the outcome, not the absence of a throw.
     agentMessageSent = outcome?.delivered === true;
     if (!agentMessageSent) {
+      const reason = outcome?.reason ?? 'no delivery outcome';
       console.warn(
-        `[ci-failure-feedback] Message to ${agentId} was not delivered (${outcome?.reason ?? 'no delivery outcome'}); feedback file remains at ${fileResult.filePath}`,
+        `[ci-failure-feedback] Message to ${agentId} was not delivered (${reason}); feedback file remains at ${fileResult.filePath}`,
+      );
+      await surfaceNeedsYou(
+        issueId,
+        `CI failure feedback for ${opts.headSha.slice(0, 8)} was not delivered to ${agentId}: ${reason}`,
+        { specialist: 'ci-monitor', feedbackPath: fileResult.filePath, via: 'ci' },
+        deps,
       );
     }
   } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`,
+      `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${reason}`,
+    );
+    await surfaceNeedsYou(
+      issueId,
+      `CI failure feedback for ${opts.headSha.slice(0, 8)} was not delivered to ${agentId}: ${reason}`,
+      { specialist: 'ci-monitor', feedbackPath: fileResult.filePath, via: 'ci' },
+      deps,
     );
   }
 
