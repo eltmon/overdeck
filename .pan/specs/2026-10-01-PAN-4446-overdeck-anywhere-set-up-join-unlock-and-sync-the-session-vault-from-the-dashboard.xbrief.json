@@ -4,17 +4,17 @@
     "created": "2026-10-01T21:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4446: Overdeck Anywhere: set up, join, unlock and sync the Session Vault from the dashboard",
-    "updated": "2026-10-01T21:17:30.859Z"
+    "updated": "2026-10-01T21:18:13.666Z"
   },
   "plan": {
     "id": "pan-4446",
     "title": "Overdeck Anywhere: set up, join, unlock and sync the Session Vault from the dashboard",
-    "status": "proposed",
+    "status": "running",
     "uid": "c403ba6a-5de4-4b34-b056-5e2473825241",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-01T21:30:00Z",
-    "updated": "2026-10-01T21:17:30.859Z",
+    "updated": "2026-10-01T21:18:13.666Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4446",
@@ -910,5 +910,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
