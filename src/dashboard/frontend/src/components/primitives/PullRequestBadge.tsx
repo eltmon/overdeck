@@ -4,13 +4,16 @@ import { cn } from '../../lib/utils';
 
 export type PullRequestBadgeTone = 'muted' | 'info' | 'warning' | 'success' | 'destructive';
 
+/** The fields the badge reads — a stored conversation link, or an issue's derived PR. */
+export type PullRequestBadgeLink = Pick<PullRequestLink, 'url' | 'number' | 'repository' | 'snapshot'>;
+
 /**
  * PAN-3822 tone law: blue = open (a machine is working), amber = a human must
  * act on review, emerald = merged, destructive = closed unmerged, muted = draft
  * or not yet synced. Failing checks never change the tone (one colored signal
  * per row); they show as a glyph and in the tooltip.
  */
-export function pullRequestBadgeTone(link: PullRequestLink): PullRequestBadgeTone {
+export function pullRequestBadgeTone(link: PullRequestBadgeLink): PullRequestBadgeTone {
   const snapshot = link.snapshot;
   if (!snapshot) return 'muted';
   if (snapshot.state === 'merged') return 'success';
@@ -20,12 +23,20 @@ export function pullRequestBadgeTone(link: PullRequestLink): PullRequestBadgeTon
   return 'info';
 }
 
-export function pullRequestBadgeLabel(link: PullRequestLink): string {
+const CHECKS_LABEL = { green: 'checks passing', red: 'checks failing', pending: 'checks pending' } as const;
+const REVIEW_LABEL = {
+  approved: 'approved',
+  'changes-requested': 'changes requested',
+  'review-requested': 'review requested',
+  commented: 'commented',
+} as const;
+
+export function pullRequestBadgeLabel(link: PullRequestBadgeLink): string {
   const snapshot = link.snapshot;
   const parts = [`${link.repository} #${link.number}`, snapshot ? snapshot.state : 'not synced yet'];
   if (snapshot?.isDraft) parts.push('draft');
-  if (snapshot?.checks === 'red') parts.push('checks failing');
-  if (snapshot?.reviewState === 'changes-requested') parts.push('changes requested');
+  if (snapshot) parts.push(CHECKS_LABEL[snapshot.checks]);
+  if (snapshot && snapshot.reviewState !== 'none') parts.push(REVIEW_LABEL[snapshot.reviewState]);
   if (snapshot?.title) parts.push(snapshot.title);
   return parts.join(' · ');
 }
@@ -38,7 +49,7 @@ const TONE_CLASSES: Record<PullRequestBadgeTone, string> = {
   destructive: 'badge-bg-destructive badge-border-destructive text-destructive-foreground',
 };
 
-function StateIcon({ link }: { link: PullRequestLink }) {
+function StateIcon({ link }: { link: PullRequestBadgeLink }) {
   const state = link.snapshot?.state;
   if (state === 'merged') return <GitMerge size={10} aria-hidden />;
   if (state === 'closed') return <GitPullRequestClosed size={10} aria-hidden />;
@@ -52,7 +63,7 @@ function StateIcon({ link }: { link: PullRequestLink }) {
  * surrounding row. `extraCount` appends `+N` for additional live links.
  */
 export function PullRequestBadge({ link, extraCount = 0, className }: {
-  link: PullRequestLink;
+  link: PullRequestBadgeLink;
   extraCount?: number;
   className?: string;
 }) {
