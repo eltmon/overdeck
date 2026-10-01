@@ -110,3 +110,15 @@ pan vault restore <id> --to <path>
 ```
 
 Eviction only runs when `vault.evict` is `true` in `~/.overdeck/vault/config.json`. Even then, transcripts wait in a pending-deletion batch until `--confirm` with the fingerprint printed by the review; anything that changed since the review is skipped.
+
+## In the dashboard
+
+With the dashboard running, conversations it started are saved 30 seconds after they go quiet and synced every 5 minutes; no hook is needed.
+
+Settings → Session Vault shows backend, last sync, blocked lines with the `pan vault allow-secret` command, machines, and the pending-deletion batch, which can be confirmed there.
+
+Conversations another machine owns (Claude Code and Codex) appear read-only, marked "from `<machine>`"; **Continue here** adopts one on this machine (same rules as `pan vault resume`).
+
+Setup, join and unlock are CLI-only; dashboard support is PAN-4446.
+
+Settings → Anywhere's status card reports the vault as Not set up, Locked on this machine, Key rotation unfinished, or Ready.
