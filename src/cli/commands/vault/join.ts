@@ -30,6 +30,7 @@ import {
   parseKeywrap,
   unwrapVaultKey,
 } from '../../../lib/vault/keywrap.js';
+import { PASSPHRASE_KEY_RETIRED_MESSAGE, PHRASE_MISMATCH_MESSAGE } from '../../../lib/vault/join-core.js';
 import { clearNextKey } from '../../../lib/vault/rotate.js';
 import { DirVaultStore } from '../../../lib/vault/store/dir.js';
 import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
@@ -37,10 +38,7 @@ import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../.
 import { syncOnce } from '../../../lib/vault/sync.js';
 import { DIR_BACKEND_PREFIX, defaultIo, readPassphrase, readPhrase, type CliIo } from './shared.js';
 
-export const PHRASE_MISMATCH_MESSAGE =
-  'The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.';
-export const PASSPHRASE_KEY_RETIRED_MESSAGE =
-  'The passphrase unlocked a key this vault no longer uses. The vault key was rotated; use the new recovery phrase, or finish the rotation with pan vault rotate-key on the machine that started it.';
+export { PASSPHRASE_KEY_RETIRED_MESSAGE, PHRASE_MISMATCH_MESSAGE };
 
 export interface JoinOptions {
   phraseFile?: string;
