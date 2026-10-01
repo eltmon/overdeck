@@ -100,4 +100,34 @@ describe('resolveEvalModelConfig', () => {
       resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: 'gpt-6-luna', OVERDECK_EVAL_OPENAI_VIA: 'other', OPENAI_API_KEY: 'sk-test' }),
     ).toThrow(/OVERDECK_EVAL_OPENAI_VIA="other" is not supported/);
   });
+
+  describe('OVERDECK_EVAL_ANTHROPIC_VIA (PAN-4406)', () => {
+    it('defaults an Anthropic model to the api route', () => {
+      expect(resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: 'claude-sonnet-5-5' }).anthropicVia).toBe('api');
+    });
+
+    it('selects claude-cli when set, trimming whitespace', () => {
+      expect(resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: 'claude-opus-5-5', OVERDECK_EVAL_ANTHROPIC_VIA: 'claude-cli' }).anthropicVia).toBe(
+        'claude-cli',
+      );
+      expect(resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: 'claude-opus-5-5', OVERDECK_EVAL_ANTHROPIC_VIA: '  claude-cli ' }).anthropicVia).toBe(
+        'claude-cli',
+      );
+    });
+
+    it('rejects an unsupported route before any request', () => {
+      expect(() => resolveEvalModelConfig({ OVERDECK_EVAL_MODEL: 'claude-sonnet-5-5', OVERDECK_EVAL_ANTHROPIC_VIA: 'cli' })).toThrow(
+        'OVERDECK_EVAL_ANTHROPIC_VIA="cli" is not supported (use api or claude-cli).',
+      );
+    });
+
+    it('ignores the variable for an OpenAI model', () => {
+      const config = resolveEvalModelConfig({
+        OVERDECK_EVAL_MODEL: 'gpt-6-luna',
+        OVERDECK_EVAL_OPENAI_VIA: 'cliproxy',
+        OVERDECK_EVAL_ANTHROPIC_VIA: 'claude-cli',
+      });
+      expect(config.anthropicVia).toBeNull();
+    });
+  });
 });
