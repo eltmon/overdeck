@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T22:04:00.057Z",
+  "updated": "2026-10-01T22:04:48.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "cli-token-page.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T22:04:00.057Z"
+    },
+    "cli-token-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:04:48.462Z"
     }
   }
 }
