@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4446",
   "created": "2026-10-01T21:18:31.027Z",
-  "updated": "2026-10-01T22:32:59.025Z",
+  "updated": "2026-10-01T22:33:47.585Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "join-form.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T22:32:59.025Z"
+    },
+    "join-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:33:47.585Z"
     }
   }
 }
