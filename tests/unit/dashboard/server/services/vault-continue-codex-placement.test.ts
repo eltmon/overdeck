@@ -21,7 +21,7 @@ describe('vault continue codex placement (PAN-4437 D-9)', () => {
   let previous: { home?: string; overdeckHome?: string };
 
   // The default layout: OVERDECK_HOME is <HOME>/.overdeck, as on an operator machine.
-  // (runtimes/codex.ts resolves agent directories from homedir(), not OVERDECK_HOME.)
+  // (runtimes/codex.ts resolves agent directories from the user home, not OVERDECK_HOME; see #4453.)
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'pan-4437-codex-'));
     previous = { home: process.env.HOME, overdeckHome: process.env.OVERDECK_HOME };
