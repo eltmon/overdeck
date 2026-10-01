@@ -7,22 +7,13 @@
  * stores the backend URL and prints the 24-word recovery phrase exactly once.
  * Then it offers passphrase unlock (PAN-4328): the key wrapped under a
  * passphrase as `keywrap/v1`, so a new machine can join without the 24 words.
+ *
+ * The state changes live in `setupVault()` (`src/lib/vault/setup-core.ts`,
+ * PAN-4446); this wrapper owns the flags, the prompts and every output line.
  */
-import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
-import { readVaultConfig, vaultDir, writeVaultConfig } from '../../../lib/vault/config.js';
-import { HEADER_REF_NAME, encryptRef, newVaultHeader, readVaultHeader, VaultAuthenticationError } from '../../../lib/vault/format.js';
-import { createVaultKey, deriveSubkeys, keyToPhrase, loadVaultKey, saveVaultKey } from '../../../lib/vault/identity.js';
-import { PASSPHRASE_LATER_HINT, checkPassphraseStrength, generatePassphrase, wrapVaultKey } from '../../../lib/vault/keywrap.js';
-import { DirVaultStore } from '../../../lib/vault/store/dir.js';
-import { GitVaultStore, gitVaultCloneDir, initGitVault } from '../../../lib/vault/store/git.js';
-import { KEYWRAP_OBJECT_NAME, VaultOfflineError, type VaultStore } from '../../../lib/vault/store/types.js';
-import { KEY_LOSS_WARNING } from '../../../lib/vault/setup-core.js';
-import { syncOnce } from '../../../lib/vault/sync.js';
-import { DIR_BACKEND_PREFIX, GENERATED_PASSPHRASE_PREFIX, defaultIo, readPassphrase, type CliIo } from './shared.js';
+import { PASSPHRASE_LATER_HINT, checkPassphraseStrength, generatePassphrase } from '../../../lib/vault/keywrap.js';
+import { KEY_LOSS_WARNING, setupVault, type SetupPassphrase } from '../../../lib/vault/setup-core.js';
+import { GENERATED_PASSPHRASE_PREFIX, defaultIo, readPassphrase, type CliIo } from './shared.js';
 
 export { KEY_LOSS_WARNING };
 
@@ -35,25 +26,6 @@ export interface SetupOptions {
 }
 
 const PASSPHRASE_PROMPT_ATTEMPTS = 3;
-
-const execFileAsync = promisify(execFile);
-
-async function openOrInitStore(url: string): Promise<VaultStore> {
-  if (url.startsWith(DIR_BACKEND_PREFIX)) return DirVaultStore.open(url.slice(DIR_BACKEND_PREFIX.length));
-  const cloneDir = gitVaultCloneDir();
-  let existing: GitVaultStore | null = null;
-  try {
-    existing = await GitVaultStore.open(cloneDir);
-  } catch {
-    existing = null;
-  }
-  if (!existing) return initGitVault(url, cloneDir);
-  const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: cloneDir, encoding: 'utf8' });
-  if (stdout.trim() !== url) {
-    throw new Error(`The vault clone at ${cloneDir} tracks ${stdout.trim()}, not ${url}. Remove it or run pan vault setup with that URL.`);
-  }
-  return existing;
-}
 
 export async function setupCommand(url: string, options: SetupOptions = {}, io: CliIo = defaultIo): Promise<void> {
   // Validate a passphrase file before anything is created, so a weak one
@@ -72,74 +44,38 @@ export async function setupCommand(url: string, options: SetupOptions = {}, io: 
     }
   }
 
-  const config = await readVaultConfig();
-  if (config.backend && config.backend !== url) {
-    io.err(`Session Vault is already enabled with backend ${config.backend}. Run pan vault status, or remove that backend from vault/config.json first.`);
+  const result = await setupVault({
+    url,
+    // Called only for a new key, once the vault is live: print the phrase, then ask for a passphrase.
+    passphrase: async ({ recoveryPhrase, machine }): Promise<SetupPassphrase> => {
+      io.out(`Session Vault enabled for ${machine.label} (${machine.environmentId}) with backend ${url}.`);
+      io.out('');
+      io.out('Write down your recovery phrase. It is shown only now:');
+      io.out('');
+      io.out(`  ${recoveryPhrase}`);
+      io.out('');
+      io.out(KEY_LOSS_WARNING);
+      const chosen = await choosePassphraseAtSetup(io, options, filePassphrase);
+      if (!chosen) return { mode: 'none' };
+      return chosen.generated ? { mode: 'generate' } : { mode: 'custom', value: chosen.passphrase };
+    },
+  });
+  if (result.status === 'error') {
+    io.err(result.message);
     return io.exit(1);
   }
-  const existingKey = await loadVaultKey();
-  if (config.backend === url && existingKey) {
+  if (result.status === 'already-set-up') {
     io.out(`Session Vault is already set up with ${url}. The recovery phrase is shown only at setup.`);
     if (options.hooks) await installHooks(io);
     return;
   }
-
-  const key = existingKey ?? createVaultKey();
-  const keys = deriveSubkeys(key);
-  let store: VaultStore;
-  try {
-    store = await openOrInitStore(url);
-  } catch (error) {
-    if (error instanceof VaultOfflineError) {
-      io.err(`Could not reach ${url}: ${error.message}`);
-      return io.exit(1);
-    }
-    io.err((error as Error).message);
-    return io.exit(1);
-  }
-
-  // Save the key BEFORE the header reaches the remote: a crash in between must
-  // never leave a vault locked by a key that was neither stored nor shown.
-  if (!existingKey) await saveVaultKey(key);
-  const forgetNewKey = async (): Promise<void> => {
-    if (!existingKey) await rm(join(vaultDir(), 'key'), { force: true });
-  };
-
-  const header = await store.readRef(HEADER_REF_NAME);
-  if (header) {
-    try {
-      const value = await readVaultHeader(header.value, keys);
-      if (!value) throw new Error('header is not a vault header');
-    } catch (error) {
-      if (!(error instanceof VaultAuthenticationError) && !(error instanceof Error)) throw error;
-      io.err(`${url} is already a vault protected by another key. Run: pan vault join ${url}`);
-      await forgetNewKey();
-      if (!existingKey && !url.startsWith(DIR_BACKEND_PREFIX)) await rm(gitVaultCloneDir(), { recursive: true, force: true });
-      return io.exit(1);
-    }
-  } else {
-    const outcome = await store.casRef(HEADER_REF_NAME, null, await encryptRef(HEADER_REF_NAME, newVaultHeader(), keys));
-    if (outcome !== 'ok') {
-      io.err(`Another machine initialized ${url} first. Run: pan vault join ${url}`);
-      await forgetNewKey();
-      return io.exit(1);
-    }
-  }
-
-  const me = await ensureEnvironmentIdentity();
-  await writeVaultConfig({ backend: url });
-  // Register this machine (m/ ref) and prime the list cache.
-  await syncOnce({ store, keys });
-
-  io.out(`Session Vault enabled for ${me.label} (${me.environmentId}) with backend ${url}.`);
-  if (!existingKey) {
-    io.out('');
-    io.out('Write down your recovery phrase. It is shown only now:');
-    io.out('');
-    io.out(`  ${keyToPhrase(key)}`);
-    io.out('');
-    io.out(KEY_LOSS_WARNING);
-    await offerPassphrase(io, store, key, options, filePassphrase);
+  if (result.recoveryPhrase === null) {
+    io.out(`Session Vault enabled for ${result.machine.label} (${result.machine.environmentId}) with backend ${url}.`);
+  } else if (result.passphrase.stored) {
+    if (result.passphrase.generated) io.out(`${GENERATED_PASSPHRASE_PREFIX}${result.passphrase.generated}`);
+    io.out('Passphrase unlock is on: a new machine can join with the passphrase instead of the 24 words.');
+  } else if (result.passphrase.error) {
+    io.err(`Could not store the passphrase: ${result.passphrase.error}. Run: pan vault passphrase set`);
   }
   if (options.hooks) await installHooks(io);
 }
@@ -170,26 +106,6 @@ async function choosePassphraseAtSetup(
   }
   io.out(PASSPHRASE_LATER_HINT);
   return null;
-}
-
-async function offerPassphrase(
-  io: CliIo,
-  store: VaultStore,
-  key: Buffer,
-  options: SetupOptions,
-  filePassphrase: string | null,
-): Promise<void> {
-  const chosen = await choosePassphraseAtSetup(io, options, filePassphrase);
-  if (!chosen) return;
-  try {
-    await store.putSlot(KEYWRAP_OBJECT_NAME, await wrapVaultKey(key, chosen.passphrase));
-  } catch (error) {
-    if (!(error instanceof VaultOfflineError)) throw error;
-    io.err(`Could not store the passphrase: ${error.message}. Run: pan vault passphrase set`);
-    return;
-  }
-  if (chosen.generated) io.out(`${GENERATED_PASSPHRASE_PREFIX}${chosen.passphrase}`);
-  io.out('Passphrase unlock is on: a new machine can join with the passphrase instead of the 24 words.');
 }
 
 async function installHooks(io: CliIo): Promise<void> {
