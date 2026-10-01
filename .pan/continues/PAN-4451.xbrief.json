@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:57:48.640Z",
+  "updated": "2026-10-01T13:58:00.711Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "task-block-on.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T13:57:48.640Z"
+    },
+    "task-block-on.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:00.711Z"
     }
   }
 }
