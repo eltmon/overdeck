@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:23:46.340Z",
+  "updated": "2026-10-01T21:24:18.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-01T21:23:44.950Z"
     },
     "cli-devices-page": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4456",
-      "claimedAt": "2026-10-01T21:23:46.339Z"
+      "claimedAt": "2026-10-01T21:23:46.339Z",
+      "doneAt": "2026-10-01T21:24:18.035Z"
     }
   }
 }
