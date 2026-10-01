@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T22:07:58.788Z",
+  "updated": "2026-10-01T22:08:44.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,10 @@
     "cli-overview-links.ac1": {
       "status": "completed",
       "doneAt": "2026-10-01T22:07:58.788Z"
+    },
+    "cli-overview-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:08:44.875Z"
     }
   }
 }
