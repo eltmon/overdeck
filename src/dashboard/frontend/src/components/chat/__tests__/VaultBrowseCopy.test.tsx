@@ -105,6 +105,7 @@ describe('ComposerFooter read-only notice (PAN-4436)', () => {
     const notice = screen.getByTestId('vault-read-only-notice');
     expect(notice).toHaveTextContent('Read-only copy from laptop-a.');
     expect(notice).toHaveTextContent(`To continue it here, run: pan vault resume ${VAULT_ID}`);
+    expect(screen.getByRole('button', { name: 'Continue here' })).toBeInTheDocument(); // PAN-4437
     expect(screen.queryByTestId('composer-editor')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });

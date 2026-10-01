@@ -27,6 +27,7 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import { ContextWindowMeter } from './ContextWindowMeter';
+import { VaultContinueDialog } from './VaultContinueDialog';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentRoutingNotice } from '../../lib/subagentRouting';
@@ -898,8 +899,18 @@ function ComposerFooterInput({
   );
 }
 
-/** PAN-4436: a Session Vault browse copy is read-only — show how to continue it instead of an input. */
+/** Select a conversation the way /conv/<name> deep links do (client-side route). */
+function openConversationRoute(name: string): void {
+  window.history.pushState(null, '', `/conv/${encodeURIComponent(name)}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/**
+ * PAN-4436: a Session Vault browse copy is read-only — show how to continue it
+ * instead of an input. PAN-4437: "Continue here" continues it from the dashboard.
+ */
 function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
+  const [continuing, setContinuing] = useState(false);
   const label = conversation.vaultOwnerLabel ?? 'another machine';
   const vaultId = conversation.name.startsWith('vault-') ? conversation.name.slice('vault-'.length) : conversation.name;
   return (
@@ -908,8 +919,19 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
         <div className={`${styles.composerEditor} ${styles.composerEditable}`}>
           <p>{`Read-only copy from ${label}.`}</p>
           <p>To continue it here, run: <code>{`pan vault resume ${vaultId}`}</code></p>
+          <button
+            type="button"
+            aria-label="Continue here"
+            className="mt-2 rounded-[var(--radius-sm)] border border-border px-3 py-1 text-[12px] hover:bg-accent"
+            onClick={() => setContinuing(true)}
+          >
+            Continue here
+          </button>
         </div>
       </div>
+      {continuing && (
+        <VaultContinueDialog vaultId={vaultId} onClose={() => setContinuing(false)} onContinued={openConversationRoute} />
+      )}
     </div>
   );
 }
