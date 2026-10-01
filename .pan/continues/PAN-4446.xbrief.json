@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4446",
   "created": "2026-10-01T21:18:31.027Z",
-  "updated": "2026-10-01T22:18:21.997Z",
+  "updated": "2026-10-01T22:19:16.758Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "cli-setup-wrapper.ac3": {
       "status": "completed",
       "doneAt": "2026-10-01T22:18:21.996Z"
+    },
+    "cli-join-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:19:16.758Z"
     }
   }
 }
