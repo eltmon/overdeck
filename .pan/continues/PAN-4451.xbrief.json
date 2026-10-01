@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:45:59.779Z",
+  "updated": "2026-10-01T13:55:28.660Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4451",
       "claimedAt": "2026-10-01T13:44:22.483Z",
       "doneAt": "2026-10-01T13:45:59.778Z"
+    },
+    "conflict-gate-waive-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:55:28.660Z"
     }
   }
 }
