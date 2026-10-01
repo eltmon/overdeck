@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4437",
   "created": "2026-09-30T19:30:30.547Z",
-  "updated": "2026-10-01T14:22:12.477Z",
+  "updated": "2026-10-01T14:22:26.646Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "docs-continue-here.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T14:22:12.476Z"
+    },
+    "docs-continue-here.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:22:26.646Z"
     }
   }
 }
