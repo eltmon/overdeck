@@ -368,7 +368,7 @@ export async function reviewEvictionBatch(): Promise<EvictionBatchResponse> {
 }
 
 /** The message shown when an eviction operation needs the vault open but it is not (D-12). */
-function vaultUnavailableMessage(opened: Exclude<VaultOpenResult, { status: 'open' }>): string {
+export function vaultUnavailableMessage(opened: Exclude<VaultOpenResult, { status: 'open' }>): string {
   switch (opened.status) {
     case 'off':
       return VAULT_OFF_MESSAGE;
