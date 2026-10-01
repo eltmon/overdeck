@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4451",
   "created": "2026-10-01T13:32:34.793Z",
-  "updated": "2026-10-01T13:42:37.470Z",
+  "updated": "2026-10-01T13:43:08.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-10-01T13:42:36.412Z"
     },
     "show-blocked-entries": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4451",
-      "claimedAt": "2026-10-01T13:42:37.470Z"
+      "claimedAt": "2026-10-01T13:42:37.470Z",
+      "doneAt": "2026-10-01T13:43:08.685Z"
     }
   }
 }
