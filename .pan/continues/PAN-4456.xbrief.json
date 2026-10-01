@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4456",
   "created": "2026-10-01T21:16:10.329Z",
-  "updated": "2026-10-01T21:41:27.263Z",
+  "updated": "2026-10-01T21:42:08.015Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "anywhere-status.ac2": {
       "status": "completed",
       "doneAt": "2026-10-01T21:41:27.263Z"
+    },
+    "anywhere-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:42:08.015Z"
     }
   }
 }
