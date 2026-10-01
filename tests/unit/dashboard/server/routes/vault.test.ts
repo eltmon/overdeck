@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../src/dashboard/server/services/vault-service.js', () => mocks);
 
+const continueMocks = vi.hoisted(() => ({ previewContinue: vi.fn(), continueHere: vi.fn() }));
+vi.mock('../../../../../src/dashboard/server/services/vault-continue.js', () => continueMocks);
+
 const { vaultRouteLayer } = await import('../../../../../src/dashboard/server/routes/vault.js');
 
 const SESSION = 'test-session-token';
@@ -58,6 +61,7 @@ beforeEach(() => {
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   for (const mock of Object.values(mocks)) mock.mockReset();
+  for (const mock of Object.values(continueMocks)) mock.mockReset();
 });
 
 afterEach(() => {
@@ -172,5 +176,36 @@ describe('vault routes', () => {
     const result = await call('POST', '/api/vault/eviction-batch/reoffer', { body: { vaultId: 'v1' } });
     expect(result).toEqual({ status: 200, body: refreshed });
     expect(mocks.reofferEvictionEntry).toHaveBeenCalledWith('v1');
+  });
+
+  const VAULT_ID = 'abcdef12-3456-4789-8abc-def012345678';
+  const TOKEN = '0123456789abcdef';
+
+  it('GET continue-preview passes the service status and body through (PAN-4437)', async () => {
+    continueMocks.previewContinue.mockResolvedValue({ status: 200, body: { vaultId: VAULT_ID, ownerToken: TOKEN } });
+    const result = await call('GET', `/api/vault/records/${VAULT_ID}/continue-preview`);
+    expect(result).toEqual({ status: 200, body: { vaultId: VAULT_ID, ownerToken: TOKEN } });
+    expect(continueMocks.previewContinue).toHaveBeenCalledWith(VAULT_ID);
+
+    const bad = await call('GET', '/api/vault/records/NOT_AN_ID/continue-preview');
+    expect(bad.status).toBe(400);
+    expect(continueMocks.previewContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST continue passes a 409 already-continued body through (PAN-4437)', async () => {
+    const body = { code: 'already-continued', label: 'laptop-b', error: 'Already continued on laptop-b.', codeAppliedAt: null };
+    continueMocks.continueHere.mockResolvedValue({ status: 409, body });
+    const result = await call('POST', `/api/vault/records/${VAULT_ID}/continue`, { body: { expectedOwnerToken: TOKEN, onDrift: 'note' } });
+    expect(result).toEqual({ status: 409, body });
+    expect(continueMocks.continueHere).toHaveBeenCalledWith(VAULT_ID, { expectedOwnerToken: TOKEN, onDrift: 'note' });
+  });
+
+  it('POST continue refuses a bad onDrift, a missing token and a missing CSRF header (PAN-4437)', async () => {
+    const path = `/api/vault/records/${VAULT_ID}/continue`;
+    expect((await call('POST', path, { body: { expectedOwnerToken: TOKEN, onDrift: 'cancel' } })).status).toBe(400);
+    expect((await call('POST', path, { body: {} })).status).toBe(400);
+    expect((await call('POST', path, { body: { expectedOwnerToken: 'short' } })).status).toBe(400);
+    expect((await call('POST', path, { body: { expectedOwnerToken: TOKEN }, csrf: false })).status).toBe(403);
+    expect(continueMocks.continueHere).not.toHaveBeenCalled();
   });
 });

@@ -554,6 +554,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/vault/eviction-batch/decline',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts declineEntry (PAN-4307)' },
   { surface: 'POST /api/vault/eviction-batch/clear',                 kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts clearBatch (PAN-4307)' },
   { surface: 'POST /api/vault/eviction-batch/reoffer',               kind: 'http', disposition: 'WRITE',       door: 'FILE via evict.ts reofferEntry (PAN-4307)' },
+  { surface: 'GET /api/vault/records/:vaultId/continue-preview',     kind: 'http', disposition: 'READ',        door: 'FILE via vault-continue previewContinue (PAN-4437)' },
+  { surface: 'POST /api/vault/records/:vaultId/continue',            kind: 'http', disposition: 'WRITE',       door: 'FILE+DB via vault-continue continueHere → adoptRecord, conversation-vault-continue (PAN-4437)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },

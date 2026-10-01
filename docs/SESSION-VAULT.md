@@ -369,7 +369,9 @@ works the same way against the same on-disk vault.
   eviction still requires the explicit confirm, from the CLI or the panel.
 - **Routes.** `GET /api/vault/status`, `GET /api/vault/eviction-batch`,
   `POST /api/vault/eviction-batch/confirm`, `POST /api/vault/eviction-batch/decline`,
-  `POST /api/vault/eviction-batch/clear`, and `POST /api/vault/eviction-batch/reoffer`.
+  `POST /api/vault/eviction-batch/clear`, `POST /api/vault/eviction-batch/reoffer`,
+  `GET /api/vault/records/:vaultId/continue-preview` and
+  `POST /api/vault/records/:vaultId/continue` (Continue here, see "Resume, versions and drift").
   `confirm` re-runs the same eligibility checks as `pan vault evict --confirm` but skips
   re-checking entries already marked `failed` (`skipFailed`), so one failing entry never
   blocks confirming the rest.
@@ -383,8 +385,9 @@ works the same way against the same on-disk vault.
   the pull-request sweep. A record that is tombstoned, now owned by this machine, or gone from
   the vault loses its row and its file at the next sync. The browse cache is a derived copy,
   not a transcript, so it is removed directly and never goes through the deletion door. While
-  the vault is off, browse rows stay as the last successful sync left them. "Continue here"
-  from the panel is [PAN-4437](https://github.com/eltmon/overdeck/issues/4437).
+  the vault is off, browse rows stay as the last successful sync left them. The panel's
+  **Continue here** button continues the conversation on this machine (see "Resume, versions
+  and drift").
 - `OVERDECK_VAULT_IN_PEER=1` starts the vault service and the browse copies in a peer
   dashboard. It exists for isolated UAT fixtures that own a throwaway `OVERDECK_HOME`; never
   set it on a peer that shares the primary's home.
@@ -505,7 +508,7 @@ src/lib/overdeck/conversation-vault-rows.ts             browse-row door: upsert/
 src/dashboard/server/services/vault-continue.ts         Continue here: previewContinue, continueHere
 src/lib/overdeck/conversation-vault-continue.ts         Continue here: managed conversation row and resume launch
 src/lib/projects/origin-match.ts                        git origin -> registered project (Continue here target)
-src/dashboard/server/routes/vault.ts                    the six /api/vault/* routes
+src/dashboard/server/routes/vault.ts                    the eight /api/vault/* routes
 src/dashboard/frontend/.../sections/SessionVaultSection.tsx   Settings -> Session Vault panel
 ```
 
