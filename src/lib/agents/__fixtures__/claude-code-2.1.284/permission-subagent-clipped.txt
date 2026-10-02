@@ -1,0 +1,21 @@
+   │ lectorAll(\"button\").forEach(b=>{const t=b.textContent.trim(); if([\"eltmon/krux\",\"eltmon/lexerra\",\"Mind
+   │ Your Now\"].includes(t)) b.style.display=\"none\";})"},{"wait":500}]}'
+   │ sleep 20
+   │ run "$LS" '{"path":"/god-view","name":"06-god-view","wait":20000}'
+   │ cp $S/b1/board-overdeck.png $O/03-board-overdeck.png; cp $S/b1/conv-posthog.png
+   │ $O/08-alt-command-deck-posthog.png; rm -f $O/*.txt
+   │ python3 -c "
+   │ from PIL import Image
+   │ im=Image.open('$O/07-cost-tracking.png'); w,h=im.size;
+   │ im.crop((0,0,w,int(885*1.44))).save('$O/07-cost-tracking.png')"
+   Retake pipeline and god view sequentially; assemble finals
+
+ │ Dangerous rm operation on possibly-empty variable path: $O/*.txt in `rm -f $O/*.txt` (rewrite it as "${O:?}"/*.txt
+ │ or use a literal path)
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+
+ Esc to cancel · Tab to amend
+
