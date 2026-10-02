@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-658",
   "created": "2026-10-02T05:23:15.999Z",
-  "updated": "2026-10-02T05:38:52.518Z",
+  "updated": "2026-10-02T05:47:25.886Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,9 +30,10 @@
       "doneAt": "2026-10-02T05:38:47.546Z"
     },
     "share-room-do": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-658",
-      "claimedAt": "2026-10-02T05:38:52.518Z"
+      "claimedAt": "2026-10-02T05:38:52.518Z",
+      "doneAt": "2026-10-02T05:47:25.886Z"
     }
   }
 }
