@@ -1,0 +1,1292 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T03:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4455: Overdeck Anywhere: \"Continue on another device\" from the conversation itself",
+    "updated": "2026-10-02T03:13:10.853Z"
+  },
+  "plan": {
+    "id": "pan-4455",
+    "title": "Overdeck Anywhere: \"Continue on another device\" from the conversation itself",
+    "status": "proposed",
+    "uid": "a0c16dca-435c-4633-8541-d6b4003b8d32",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-02T03:30:00Z",
+    "updated": "2026-10-02T03:13:10.853Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4455",
+        "label": "PAN-4455",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4455.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "overdeck-anywhere",
+      "session-vault",
+      "pairing",
+      "dashboard",
+      "conversation-ui"
+    ],
+    "narratives": {
+      "Problem": "Nothing on the conversation the operator is looking at says 'take this with you'. Opening it on a paired phone needs a reachable link (Copy link uses the loopback origin) and pairing lives only in Settings; handing it to another Overdeck machine means waiting out the 30 s settle debounce and the other machine's 5-minute sync, with nothing on this machine saying the conversation will split if it keeps going.",
+      "Proposal": "One menu entry, 'Continue on another device', in the conversation header and row menus opens a dialog (global zustand host) with two tabs. 'Open on another screen' shows a QR code and Copy link for <trusted non-loopback address>/conv/<id>, optionally with a one-time #pair credential for root sessions (credential kind exposed as viewer.kind on GET /api/anywhere/status). 'Hand off to another machine' calls a new POST /api/vault/sessions/by-conversation/:name/settle that settles the transcript now through the vault-service queue (shared settleOnQueue, WIP force), reports the version or the blocked reason with its fix command, and leaves a per-browser composer notice. Vault browse rows get 'Check for new conversations' (PAN-4446 Sync now). PRD: .pan/drafts/PAN-4455.md.",
+      "NonGoals": "- Live mirroring or push notifications to the other machine (PAN-4402, PAN-4405, PAN-2354)\n- A tunnel or relay to reach this machine from outside the LAN or tailnet (PAN-2352, PAN-2356)\n- A mobile-specific conversation layout (PAN-2355)\n- Any change to settle, adoption or fork semantics, or to the vault list-cache shape\n- Stopping the session automatically on hand-off\n- A server-side record of hand-offs; the composer notice is per browser\n- Any new server route besides POST /api/vault/sessions/by-conversation/:name/settle\n- Changes to PairDeviceDialog.tsx or Settings → Anywhere\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hand-off uses WIP mode 'force'.",
+        "rationale": "pan vault save and the poller's leave-list path use force; a hand-off is exactly when uncommitted code should travel (D-7)."
+      },
+      {
+        "summary": "A noop settle is reported as a successful hand-off with the latest version.",
+        "rationale": "The poller usually settled the conversation already; reporting the existing version is truthful and avoids a confusing failure (D-8)."
+      },
+      {
+        "summary": "The browser learns its credential kind from a new viewer.kind field on GET /api/anywhere/status.",
+        "rationale": "The issue forbids a new route for the screen tab and the frontend has no other way to know root vs device before requesting a credential (D-3)."
+      },
+      {
+        "summary": "The plain link always shows; 'Also pair the device' mints a credential only when 'Create pairing link' is clicked.",
+        "rationale": "Opening the dialog must not burn a one-use credential; the issue says the fragment is appended when the link is created (D-4)."
+      },
+      {
+        "summary": "Default tab: hand-off only when there is no reachable address and the vault is ready and the harness is supported; otherwise the screen tab.",
+        "rationale": "Deterministic rule matching 'chosen by default from what this machine can do'; the screen tab works on any machine with an address (D-2)."
+      },
+      {
+        "summary": "A code-snapshot problem after a saved transcript is shown as not-a-success and records no composer notice.",
+        "rationale": "The issue lists a snapshot over wipMaxBytes among blocked saves that must not claim success (D-10)."
+      },
+      {
+        "summary": "The composer notice is per-browser state in localStorage, shown only while the session is alive and superseded by PAN-4447's continuity notice.",
+        "rationale": "A hand-off is an operator act, not derivable state; stacking two notices would contradict each other (D-15, D-16)."
+      },
+      {
+        "summary": "'Check for new conversations' is a menu item on vault browse rows, visible only when the vault service runs.",
+        "rationale": "Sync now returns 409 on a dashboard without the sync loop (PAN-4446 D-6); querying status only while the menu is open avoids per-row polling (D-17)."
+      },
+      {
+        "summary": "No line-count field is added to the vault list cache; the integration test reads the line count from the synced record.",
+        "rationale": "Changing list-cache shape is outside the issue's scope (D-19)."
+      },
+      {
+        "summary": "ConversationPanel.tsx stays at or under its 1531-line cap by extracting the About drawer.",
+        "rationale": "The file sits exactly at its allowlist cap and agents may not raise caps (D-20)."
+      },
+      {
+        "summary": "Hand-off messages are built in the dashboard service instead of importing src/cli/commands/vault/save.ts.",
+        "rationale": "The dashboard server never imports src/cli; the strings are few and fixed in the PRD (D-12)."
+      },
+      {
+        "summary": "Plan carries a sizeJustification instead of splitting into sibling issues.",
+        "rationale": "Every acceptance criterion hangs off one menu entry and one dialog; a sibling split would leave PAN-4455's own AC list unmet."
+      }
+    ],
+    "items": [
+      {
+        "id": "settle-on-queue",
+        "title": "Export settleOnQueue() from vault-service as the one queued dashboard settle path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-service.ts",
+            "tests/unit/dashboard/server/services/vault-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-service.test.ts tests/unit/dashboard/server/services/vault-settle-poller.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-service.test.ts and vault-settle-poller.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4455.md WI-1 and D-6. In src/dashboard/server/services/vault-service.ts replace queuedSettle (lines 252-264) with the exported settleOnQueue(path, harness, wip, { readBack }) returning QueuedSettleOutcome ({status:'unavailable', opened} | {status:'settled', result, record}) exactly as the PRD's After snippet, plus a module-private readRecordOrNull(store, keys, vaultId) copying loadRecord (src/cli/commands/vault/show.ts lines 29-35: refName -> store.readRef -> readSessionRecord -> null if missing or isTombstone). The record is read inside the same enqueueVaultOperation slot. Keep queuedSettle as a thin wrapper that awaits settleOnQueue and console.warns failures, still passed to createVaultSettlePoller at line 285. Add the three WI-1 tests to vault-service.test.ts using its injected deps."
+        },
+        "items": [
+          {
+            "id": "settle-on-queue.ac1",
+            "title": "Given openVaultContext returns {status:'off'}, when settleOnQueue runs, then it returns {status:'unavailable'} and the injected settle is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-on-queue.ac2",
+            "title": "Given an injected settle returning an append verdict and a store holding that record, when settleOnQueue runs with readBack true, then it returns {status:'settled'} with record.vaultId equal to the verdict's vaultId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-on-queue.ac3",
+            "title": "Given a slow operation already enqueued, when settleOnQueue is called, then the injected settle starts only after that operation resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-on-queue.ac4",
+            "title": "Given the existing poller tests, when vault-settle-poller.test.ts runs after the change, then every test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-service",
+        "title": "Add handOffConversation(name) in services/vault-handoff.ts with the HandOffBody contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/vault-handoff.ts",
+            "tests/unit/dashboard/server/services/vault-handoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-handoff.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "handoff-route",
+            "handoff-two-machine",
+            "handoff-tab"
+          ],
+          "parallelSafeReason": "Touches only the new services/vault-handoff.ts and its new test file; no other item writes either file."
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D-8..D-12. Create src/dashboard/server/services/vault-handoff.ts exporting VaultHandoffDeps, HandOffBody (exact union in the PRD), wipProblemOf(wip, vaultId) and handOffConversation(name, deps) returning {status, body}. Steps in order: getConversationByName (src/lib/overdeck/conversations.ts:613) -> 404 not-found; harness = conv.harness ?? 'claude-code', not claude-code/codex -> 422 unsupported-harness; resolveSessionFile (conversation-reads.ts:122) null -> 404 not-found; settleOnQueue(path, harness, 'force', {readBack:true}); unavailable -> 409 vault-unavailable with vaultUnavailableMessage(outcome.opened); then map blocked/offline/diverged/excluded/noop-without-record/append-or-noop exactly as PRD step 6, using the PRD's exact message strings and fixes (blocked fix: `pan vault allow-secret <nativePath> <line>`; offline fix: `pan vault save <nativePath>`). saved computes version/savedAt/logLines/title from the read-back record (append uses result.version) and machineLabel from ensureEnvironmentIdentity(). wipProblemOf handles secret/too-large/error and returns null otherwise. Never log a body. Write one test per mapping row plus not-found x2, unsupported-harness (settle not called), vault-unavailable, and wipProblemOf cases."
+        },
+        "items": [
+          {
+            "id": "handoff-service.ac1",
+            "title": "Given an append verdict at version 3 with a read-back record, when handOffConversation runs, then it returns status 200 with result 'saved', version 3, alreadySaved false and the record's title and last settlement logLines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-service.ac2",
+            "title": "Given a blocked verdict with hit {line: 7, pattern: 'aws-access-key'} for /tmp/t.jsonl, when handOffConversation runs, then it returns 422 with result 'blocked' and fixes ['pan vault allow-secret /tmp/t.jsonl 7']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-service.ac3",
+            "title": "Given a conversation whose harness is 'ohmypi', when handOffConversation runs, then it returns 422 with result 'unsupported-harness' and the injected settle is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-service.ac4",
+            "title": "Given settleOnQueue returns {status:'unavailable', opened:{status:'off'}}, when handOffConversation runs, then it returns 409 with result 'vault-unavailable' and state 'off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-service.ac5",
+            "title": "Given a skipped wip with skipped 'too-large', when wipProblemOf runs, then it returns a message naming the size in MB and a fix mentioning wipMaxBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-route",
+        "title": "Mount POST /api/vault/sessions/by-conversation/:name/settle behind the operator credential shell",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/vault.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/vault-setup-routes.test.ts",
+            "tests/unit/dashboard/server/routes/vault.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/vault-setup-routes.test.ts tests/unit/dashboard/server/routes/vault.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-setup-routes.test.ts, vault.test.ts and the no-loss matrix test pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, D-13. In routes/vault.ts extend operatorVaultMutation (lines 255-272) so handle receives (body, params) with params from `yield* HttpRouter.params`; existing callers unchanged. Add postVaultHandOffRoute for POST /api/vault/sessions/by-conversation/:name/settle exactly as the PRD snippet (empty or >200-char name -> 400; else jsonResponse(outcome.body, {status: outcome.status}) from handOffConversation), add it to vaultRouteLayer, add the header-comment line and the PRD's no-loss-matrix row after the POST /api/vault/sync row. In vault-setup-routes.test.ts add a hoisted handoffMock with vi.mock('../services/vault-handoff.js') and the five WI-3 tests. If tests/unit/dashboard/server/routes/vault.test.ts mocks vault-service with a fixed export list, add settleOnQueue there or mock vault-handoff.js so the route module loads. If no no-loss-matrix test file exists at that path, run the test that imports no-loss-matrix.ts (grep -rl no-loss-matrix tests)."
+        },
+        "items": [
+          {
+            "id": "handoff-route.ac1",
+            "title": "Given an internal-token request, when it POSTs the settle route, then the response is 403 with Cache-Control no-store and handOffConversation is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-route.ac2",
+            "title": "Given a scoped token credential, when it POSTs the settle route, then the response is 403 and handOffConversation is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-route.ac3",
+            "title": "Given a root session cookie with the CSRF header, when it POSTs /api/vault/sessions/by-conversation/demo/settle, then handOffConversation is called with 'demo' and the response carries the mock's status and body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-route.ac4",
+            "title": "Given a 201-character conversation name, when it POSTs the settle route, then the response is 400 and handOffConversation is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-route.ac5",
+            "title": "Given no-loss-matrix.ts, when the matrix test runs, then it finds a WRITE row for 'POST /api/vault/sessions/by-conversation/:name/settle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-two-machine",
+        "title": "Two-home dir: integration test: hand off on A, sync on B, read the new line count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/server/services/vault-handoff.e2e.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-handoff.e2e.test.ts"
+          ],
+          "expected_outputs": [
+            "vault-handoff.e2e.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-19. New test file with two machines switched by HOME/OVERDECK_HOME (pattern of tests/unit/lib/vault/two-machine.e2e.test.ts useMachine), backend `dir:<root>/backend`. A: setupVault({url, passphrase:{mode:'none'}}) keeping recoveryPhrase; write a 2-line Claude transcript in a non-git cwd; handOffConversation('conv-a', {getConversation, resolvePath}) with the real default settleOnQueue (vault service never started) -> version 1, logLines 2; append 2 lines -> version 2, logLines 4; hand off again -> alreadySaved true. B: joinVault with the phrase, openVaultContext, syncOnce, then assert readListCache row and the record's last settlement lines === 4. Follow the PRD's implementation checkpoint (child-process CLI for B) if env switching leaks A's identity."
+        },
+        "items": [
+          {
+            "id": "handoff-two-machine.ac1",
+            "title": "Given machine A with a dir: vault and a 4-line transcript handed off twice, when handOffConversation returns, then the second response has result 'saved', version 2 and logLines 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-two-machine.ac2",
+            "title": "Given no new transcript lines, when handOffConversation runs again on A, then it returns alreadySaved true with version 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-two-machine.ac3",
+            "title": "Given machine B joined with the recovery phrase, when B runs syncOnce, then readListCache contains the handed-off vaultId with ownerIsHere false and the synced record's last settlement has lines 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-viewer",
+        "title": "Report the caller's credential kind as viewer.kind on GET /api/anywhere/status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/anywhere-status.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/server/__tests__/anywhere-status-route.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/anywhere-status-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "anywhere-status-route.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-3. Add AnywhereViewerKind and `viewer: { kind: AnywhereViewerKind | null }` to AnywhereStatus in src/lib/remote-access/anywhere-status.ts; buildAnywhereStatus in routes/anywhere.ts takes the kind and the GET handler passes resolveDashboardCredential(request.headers as HeaderMap)?.kind ?? null; update the route header comment; mirror the field in Settings/anywhere/anywhereApi.ts. Add three route tests (root session, device, internal token). Fix any frontend fixture typed AnywhereStatus that stops compiling by adding viewer: { kind: 'root-session' }."
+        },
+        "items": [
+          {
+            "id": "anywhere-viewer.ac1",
+            "title": "Given a root session cookie, when GET /api/anywhere/status is called, then the body includes viewer.kind 'root-session'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-viewer.ac2",
+            "title": "Given a paired device credential, when GET /api/anywhere/status is called, then the body includes viewer.kind 'device'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-viewer.ac3",
+            "title": "Given the internal token, when GET /api/anywhere/status is called, then the body includes viewer.kind 'internal-token'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "continue-store",
+        "title": "Add the continue-on-device store, API client and hand-off notice store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/continueOnDeviceStore.ts",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/continueOnDeviceApi.ts",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/handoffNoticeStore.ts",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/__tests__/continueOnDeviceStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/continueOnDevice/__tests__/continueOnDeviceStore.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "continueOnDeviceStore.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-13",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "open-on-screen-tab",
+            "handoff-tab",
+            "dialog-shell",
+            "panel-menu-entry",
+            "row-continue-entry",
+            "vault-row-sync-entry",
+            "handoff-notice"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-1, D-15. Create continueOnDeviceStore.ts (ContinueTarget, useContinueOnDeviceStore, openContinueOnDevice, continueTargetOf(conversation, viewMode='conversation') with title <- name and harness <- 'claude-code' fallbacks, HANDOFF_HARNESSES), continueOnDeviceApi.ts (frontend HandOffBody mirror of PRD WI-2; handOffConversation(name) POSTing /api/vault/sessions/by-conversation/<encoded>/settle with dashboardMutationJsonHeaders and body '{}'; syncVaultNow() POST /api/vault/sync; fetchVaultStatus(); VAULT_STATUS_QUERY_KEY = ['vault-status']; openSessionVaultSettings() = requestSettingsSection('session-vault') + pushState('/settings') + PopStateEvent) and handoffNoticeStore.ts (zustand persist, name 'overdeck:handoff-notices', createJSONStorage(() => localStorage); record/clear; useHandoffNotice(conversation) returns the entry only while sessionAlive and clears it in an effect when sessionAlive is false). Pattern: LinkPullRequestDialog.tsx lines 17-31."
+        },
+        "items": [
+          {
+            "id": "continue-store.ac1",
+            "title": "Given openContinueOnDevice is called with a target, when the store is read, then target equals it, and close() sets it back to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-store.ac2",
+            "title": "Given a conversation with no title and no harness, when continueTargetOf runs, then title equals the conversation name and harness equals 'claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-store.ac3",
+            "title": "Given a recorded notice for a live conversation, when useHandoffNotice renders, then it returns the entry; given the same conversation with sessionAlive false, then it returns null and the entry is cleared from the store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-on-screen-tab",
+        "title": "Build the 'Open on another screen' tab with QR, Copy and optional pairing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/OpenOnScreenTab.tsx",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/__tests__/OpenOnScreenTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/continueOnDevice/__tests__/OpenOnScreenTab.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OpenOnScreenTab.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only the new OpenOnScreenTab.tsx and its new test; it reads shared modules but writes no file another item writes."
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-4, D-5, D-21. OpenOnScreenTab({target, status}): reachable = non-loopback addresses in a select (aria-label 'Address the other device opens'); none -> no QR, text 'No address another device can reach is trusted yet.', and for viewer.kind 'root-session' an Address input + 'Add an address' button calling addTrustedAddress then invalidating ANYWHERE_STATUS_QUERY_KEY, else the 'Add an address from a browser on this machine (Settings → Anywhere).' sentence. base = `${origin}/conv/${target.id}` + '?view=terminal' when viewMode is terminal. The plain link, Copy and QR always render once an address is selected (issue AC 2). 'Also pair the device' checkbox only for root-session, default checked; when checked a 'Create pairing link' button below calls issuePairingLink() once and replaces the shown link/Copy/QR with base + '#pair=' + body.credential plus expiry text and 'New link' on expiry; unchecking or changing the address reverts to the plain link; 403 shows the pair dialog's root-only sentence. Read-only input data-testid 'continue-link', Copy button, QR img alt 'Conversation QR code' via qrcode-generator. Never render a loopback origin. Mock anywhereApi as PairDeviceDialog.test.tsx does; any expiry test uses vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "open-on-screen-tab.ac1",
+            "title": "Given a reachable origin https://desk.example and a root session with the checkbox at its default, when the tab renders for conversation 42, then continue-link holds https://desk.example/conv/42, a QR image renders before any click, issuePairingLink is not called, and no loopback origin appears in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-on-screen-tab.ac2",
+            "title": "Given viewMode 'terminal', when the tab renders, then continue-link holds https://desk.example/conv/42?view=terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-on-screen-tab.ac3",
+            "title": "Given viewer.kind 'root-session', when 'Create pairing link' is clicked, then issuePairingLink is called once and continue-link matches https://desk.example/conv/42#pair=odp_, and unchecking the box restores https://desk.example/conv/42",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-on-screen-tab.ac4",
+            "title": "Given viewer.kind 'device', when the tab renders, then no 'Also pair the device' checkbox exists and issuePairingLink is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-on-screen-tab.ac5",
+            "title": "Given no reachable address, when the tab renders, then no QR image renders and clicking 'Add an address' with https://desk.example calls addTrustedAddress('https://desk.example')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-tab",
+        "title": "Build the 'Hand off to another machine' tab with result, blocked and unavailable states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/HandOffTab.tsx",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/__tests__/HandOffTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/continueOnDevice/__tests__/HandOffTab.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HandOffTab.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ],
+          "parallelSafeReason": "Touches only the new HandOffTab.tsx and its new test; no other item writes either file."
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-8, D-10, D-11. HandOffTab({target, status}): unavailable states never call the API (unsupported harness text; vault off -> 'Set up' button; locked -> 'Open Session Vault' button; both call openSessionVaultSettings() and close the dialog via useContinueOnDeviceStore close; rotation-pending -> 'How to finish it' docs link). Ready -> 'Hand off now' calling continueOnDeviceApi.handOffConversation(target.name) and rendering the exact PRD texts for saved, saved+forkedFrom, saved+wipProblem, blocked (rows 'line N: pattern' and each fix in <code>), offline, other errors. Record the composer notice via useHandoffNoticeStore.getState().record(target.name, savedAt) only for saved with wipProblem null and target.sessionAlive true. Result container data-testid 'handoff-result'."
+        },
+        "items": [
+          {
+            "id": "handoff-tab.ac1",
+            "title": "Given vault ready, harness claude-code and a saved response {version: 3, title: 'Demo', machineLabel: 'desk'}, when 'Hand off now' is clicked, then the tab renders 'Saved as version 3 at' and 'open \"Demo\" from desk' and the notice store holds an entry for the conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tab.ac2",
+            "title": "Given a blocked response with hit {line: 7, pattern: 'aws-access-key'}, when 'Hand off now' is clicked, then the tab renders 'line 7: aws-access-key' and 'pan vault allow-secret /tmp/t.jsonl 7' and no text matching /Saved as version/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tab.ac3",
+            "title": "Given vault.state 'off', 'locked' or harness 'ohmypi', when the tab renders, then it shows the matching reason and fix control, no 'Hand off now' button, and the API is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tab.ac4",
+            "title": "Given a saved response with a wipProblem, when 'Hand off now' is clicked, then the tab renders the problem message, no text matching /Saved as version/, and the notice store stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-shell",
+        "title": "Add ContinueOnDeviceDialog with its tabs and mount its host in main.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/ContinueOnDeviceDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/__tests__/ContinueOnDeviceDialog.test.tsx",
+            "src/dashboard/frontend/src/main.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/continueOnDevice/__tests__/ContinueOnDeviceDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ContinueOnDeviceDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D-1, D-2. ContinueOnDeviceDialogHost renders ContinueOnDeviceDialog for the store target; the dialog copies PairDeviceDialog's shell (overlay, role dialog, aria-labelledby 'continue-on-device-title', data-component 'continue-on-device-dialog', title 'Continue on another device', conversation title, X button, Escape closes), loads AnywhereStatus with ANYWHERE_STATUS_QUERY_KEY/loadAnywhereStatus, renders a tablist with 'Open on another screen' and 'Hand off to another machine' (role tab, aria-selected), picks the initial tab by D-2 once (handoff only when no reachable address and vault ready and harness supported), and renders OpenOnScreenTab or HandOffTab. Mount <ContinueOnDeviceDialogHost /> in main.tsx right after <LinkPullRequestDialogHost /> (line 63)."
+        },
+        "items": [
+          {
+            "id": "dialog-shell.ac1",
+            "title": "Given no target in the store, when the host renders, then nothing renders; given openContinueOnDevice is called, then the continue-on-device-dialog renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac2",
+            "title": "Given a status with a reachable address, when the dialog opens, then 'Open on another screen' is the selected tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac3",
+            "title": "Given a status with no reachable address, vault state 'ready' and harness 'claude-code', when the dialog opens, then 'Hand off to another machine' is the selected tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-shell.ac4",
+            "title": "Given the dialog is open, when Escape is pressed or the close button is clicked, then the store target becomes null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panel-menu-entry",
+        "title": "Extract the About drawer and add the header menu entry within ConversationPanel's 1531-line cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationAboutDrawer.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationAboutDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationAboutDrawer.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationAboutDrawer.test.tsx passes",
+            "file-size guard passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-18, D-20. Move the About drawer markup (ConversationPanel.tsx lines 1001-1036) into ConversationAboutDrawer.tsx with the PRD's props (loading, error, summary, messageCount, refreshing, onRefresh) and identical markup/classes; ConversationPanel renders it inside the existing {!embedded && aboutOpen && ...} guard. Add the 'Continue on another device' MenuItemButton (MonitorSmartphone icon) after 'Export transcript' (line 914), hidden when conversation.origin === 'vault', calling openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')) and closing the menu. Remove imports made unused. Never raise the allowlist cap; wc -l must be <= 1531."
+        },
+        "items": [
+          {
+            "id": "panel-menu-entry.ac1",
+            "title": "Given the edited ConversationPanel.tsx, when scripts/lint-file-size.sh runs, then it passes and the file has at most 1531 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-menu-entry.ac2",
+            "title": "Given loading true, error true, or a summary with messageCount 1, when ConversationAboutDrawer renders, then it shows 'Summarizing conversation…', the load-error sentence, or 'Summary of 1 message' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panel-menu-entry.ac3",
+            "title": "Given a summary is shown, when the regenerate button is clicked, then onRefresh is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-continue-entry",
+        "title": "Add 'Continue on another device' to the conversation row menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, D-18. In ConversationRow.tsx add the PRD's MenuItemButton directly above 'Copy link' (line 764), rendered only when conv.origin !== 'vault', calling openContinueOnDevice(continueTargetOf(conv)) and closing the menu. Add the two tests to ConversationRow.test.tsx."
+        },
+        "items": [
+          {
+            "id": "row-continue-entry.ac1",
+            "title": "Given a local conversation row, when its menu is opened and 'Continue on another device' is clicked, then useContinueOnDeviceStore target.name equals the row's name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-continue-entry.ac2",
+            "title": "Given a vault browse row (origin 'vault'), when its menu is opened, then no 'Continue on another device' item renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vault-row-sync-entry",
+        "title": "Add 'Check for new conversations' to vault browse row menus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/VaultRowSyncMenuItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12, D-17. New VaultRowSyncMenuItem({onDone}) querying VAULT_STATUS_QUERY_KEY with fetchVaultStatus, rendering nothing unless running is true, else a MenuItemButton (RefreshCw, 'Check for new conversations', 'Checking…' while pending) that calls syncVaultNow(): 200 -> invalidate ['conversations'] and ['vault-status'] and toast.success('Checked for new conversations'); otherwise toast.error with the body error or 'Sync failed (<status>).'; always onDone(). In ConversationRow render it for conv.origin === 'vault' above 'Copy link'. Add the three tests."
+        },
+        "items": [
+          {
+            "id": "vault-row-sync-entry.ac1",
+            "title": "Given /api/vault/status reports running true, when a vault row's menu is opened and 'Check for new conversations' is clicked, then a POST to /api/vault/sync is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-row-sync-entry.ac2",
+            "title": "Given /api/vault/status reports running false, when a vault row's menu is opened, then no 'Check for new conversations' item renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vault-row-sync-entry.ac3",
+            "title": "Given a local conversation row, when its menu is opened, then no 'Check for new conversations' item renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-notice",
+        "title": "Show the 'Handed off at' notice above the composer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/HandoffNotice.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/HandoffNotice.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/HandoffNotice.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HandoffNotice.test.tsx passes",
+            "file-size guard passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13, D-15, D-16. New HandoffNotice({conversation, at}) styled like VaultContinuityNotice (styles.composerBox, role status, data-testid 'handoff-notice') with text 'Handed off at <time>. New messages here will be saved as a separate copy.', 'Keep working here' (clear) and 'Stop this session' (useConversationMutations(conversation.name, () => {}).stop(name) then clear). Change ComposerFooter (lines 940-952) to the PRD's version with ComposerFooterWithHandoff so the hook call is unconditional and PAN-4447's continuity notice wins when vaultContinuity is set. ComposerFooter.tsx stays under 1000 lines. Tests mock ../DialogProvider useConfirm and wrap in a QueryClientProvider as CommandDeck/__tests__/ConversationRow.test.tsx does."
+        },
+        "items": [
+          {
+            "id": "handoff-notice.ac1",
+            "title": "Given a recorded notice and sessionAlive true, when ComposerFooter renders, then it shows 'Handed off at' and 'New messages here will be saved as a separate copy.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-notice.ac2",
+            "title": "Given the notice is shown, when 'Keep working here' is clicked, then the notice disappears and the store entry is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-notice.ac3",
+            "title": "Given a recorded notice and sessionAlive false, when ComposerFooter renders, then no handoff-notice renders and the entry is cleared",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-notice.ac4",
+            "title": "Given a recorded notice and vaultContinuity set, when ComposerFooter renders, then vault-continuity-notice renders and handoff-notice does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pairing-e2e",
+        "title": "Playwright: the dialog's pairing link pairs a fresh browser and opens the conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4455-continue-on-device.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4455-continue-on-device.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-4455-continue-on-device.spec.ts passes with screenshots in test-results/pan-4455/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Touches only a new Playwright spec and runs against its own isolated dashboard home and port."
+        },
+        "narrative": {
+          "Action": "PRD WI-14, NFR-5. New spec using startIsolatedDashboard({home}) in fresh browser contexts only (never the live dashboard). Seed one claude-code conversation 'pan-4455-demo' titled 'PAN-4455 demo' in the temp home before start (in-process createConversation with OVERDECK_HOME set, or the child-process fallback in the PRD's implementation checkpoint). Root context: open /conv/<id>, header menu 'More conversation actions' -> 'Continue on another device'; add https://desk.example.test via 'Add an address'; assert continue-link first holds the plain https://desk.example.test/conv/<id>; 'Also pair the device' checked; 'Create pairing link'; assert continue-link matches ^https://desk\\.example\\.test/conv/<id>#pair=odp_. Fresh context: goto baseUrl + the link's pathname + hash; poll until the hash is empty and pathname is /conv/<id> and 'PAN-4455 demo' is visible. Root GET /api/devices lists one active device. Screenshots to test-results/pan-4455/."
+        },
+        "items": [
+          {
+            "id": "pairing-e2e.ac1",
+            "title": "Given an isolated dashboard with a seeded conversation, when the operator opens its header menu, then 'Continue on another device' is present and opens the continue-on-device-dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-e2e.ac2",
+            "title": "Given trusted address https://desk.example.test, when the screen tab shows, then continue-link holds https://desk.example.test/conv/<id>; and when 'Create pairing link' is clicked with 'Also pair the device' checked, then continue-link matches https://desk.example.test/conv/<id>#pair=odp_",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-e2e.ac3",
+            "title": "Given a fresh browser context, when it opens the link rewritten to the fixture origin, then the address bar fragment is empty, the path is /conv/<id>, the conversation title is visible, and GET /api/devices lists one active device",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-test-subset",
+        "title": "List the new frontend test files in test:frontend-subset so CI runs them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=require('./package.json').scripts['test:frontend-subset']; for (const f of ['continueOnDeviceStore.test.ts','OpenOnScreenTab.test.tsx','HandOffTab.test.tsx','ContinueOnDeviceDialog.test.tsx','HandoffNotice.test.tsx','ConversationAboutDrawer.test.tsx']) if (!s.includes(f)) { console.error('missing '+f); process.exit(1) }\""
+          ],
+          "expected_outputs": [
+            "the node check exits 0 with no 'missing' line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Append the six new frontend test paths from the PRD to the root package.json script test:frontend-subset (paths relative to src/dashboard/frontend). ConversationRow.test.tsx is already listed."
+        },
+        "items": [
+          {
+            "id": "frontend-test-subset.ac1",
+            "title": "Given the root package.json, when the node check in verify_commands runs, then it exits 0 because all six new test files appear in test:frontend-subset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-test-subset.ac2",
+            "title": "Given the updated script, when `npm run test:frontend-subset` is parsed, then every listed path exists on disk under src/dashboard/frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Continue on another device, the hand-off route and viewer.kind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4455",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/session-vault.mdx",
+            "configuration/remote-access.mdx",
+            "docs/SESSION-VAULT.md",
+            "docs/DASHBOARD-AUTH.md",
+            "CHANGELOG.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Continue on another device' configuration/session-vault.mdx configuration/remote-access.mdx docs/SESSION-VAULT.md CHANGELOG.md",
+            "grep -n 'by-conversation/:name/settle' docs/SESSION-VAULT.md docs/DASHBOARD-AUTH.md",
+            "grep -n 'viewer' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line per named file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. session-vault.mdx 'Continue on another machine' (line 179): add 'From the conversation' (menu path, Hand off now, the 'Saved as version … click Continue here' result, the composer notice and its two buttons, blocked-save output with pan vault allow-secret, Check for new conversations on the receiving machine). remote-access.mdx 'Pair a device' (line 43): add 'Open one conversation on another screen' (non-loopback trusted addresses only, Also pair the device for root sessions, one use / 10 minutes / fragment only, lands on that conversation). docs/SESSION-VAULT.md 'Dashboard (Overdeck mode)' (line 351): the route, settleOnQueue as the single settle path, force WIP mode, result values, per-browser notice store. docs/DASHBOARD-AUTH.md 'Anywhere routes (PAN-4445)' (line 263): viewer.kind and the new route's credential rule. CHANGELOG.md Unreleased 'Added: Overdeck Anywhere' bullet. conventions.md: add ContinueOnDeviceDialogHost to the existing dialog-host bullet and bump last-verified."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/session-vault.mdx, when a reader opens 'Continue on another machine', then a 'From the conversation' subsection names the menu entry, 'Hand off now', the composer notice, and 'Check for new conversations'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/remote-access.mdx, when a reader opens 'Pair a device', then a subsection explains that the link opens one conversation and that 'Also pair the device' adds a one-use 10-minute credential in the URL fragment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/DASHBOARD-AUTH.md, when grepped for 'by-conversation/:name/settle', then it states root session or device only and 403 for the internal token and scoped tokens, and it documents viewer.kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given CHANGELOG.md, when the Unreleased 'Added: Overdeck Anywhere' list is read, then it contains a 'Continue on another device' bullet citing PAN-4455",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "settle-on-queue",
+        "to": "handoff-service",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-service",
+        "to": "handoff-route",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-service",
+        "to": "handoff-two-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "open-on-screen-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-viewer",
+        "to": "open-on-screen-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "handoff-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "open-on-screen-tab",
+        "to": "dialog-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-tab",
+        "to": "dialog-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "panel-menu-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "row-continue-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "vault-row-sync-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "row-continue-entry",
+        "to": "vault-row-sync-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-store",
+        "to": "handoff-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-shell",
+        "to": "pairing-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "panel-menu-entry",
+        "to": "pairing-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "open-on-screen-tab",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-tab",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-shell",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "panel-menu-entry",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-notice",
+        "to": "frontend-test-subset",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue's acceptance criteria all hang off one menu entry and one two-tab dialog: the server route, the credential-kind field, both tabs, the composer notice and the receiving-side action are each required by a numbered AC of PAN-4455, so a sibling split would leave this issue's own AC list unmet. The surface is wide (server route + service, Anywhere status, frontend dialog, two menus, composer, four doc pages) but every item is a small vertical slice with its own tests, and the DAG lets the frontend and backend halves run in parallel.",
+      "canonicalFilename": "2026-10-02-PAN-4455-overdeck-anywhere-continue-on-another-device-from-the-conversation-itself.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
