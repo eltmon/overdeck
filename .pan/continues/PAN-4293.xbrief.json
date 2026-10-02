@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T03:50:15.203Z",
+  "updated": "2026-10-02T03:50:28.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "account-device-credentials.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T03:50:15.202Z"
+    },
+    "account-device-credentials.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:28.803Z"
     }
   }
 }
