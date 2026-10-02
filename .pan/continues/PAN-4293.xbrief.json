@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T03:42:44.810Z",
+  "updated": "2026-10-02T03:49:23.823Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,10 @@
       "doneAt": "2026-10-02T03:42:13.754Z"
     },
     "account-device-credentials": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4293",
-      "claimedAt": "2026-10-02T03:42:44.810Z"
+      "claimedAt": "2026-10-02T03:42:44.810Z",
+      "doneAt": "2026-10-02T03:49:23.823Z"
     }
   }
 }
