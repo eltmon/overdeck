@@ -199,10 +199,12 @@ logic lives in `src/lib/linear-mcp-auth-connect.ts` and
 | | refresh request delivered (or throttled) | `202 { action: 'refreshing', requestedFrom, previousAuthUrl }` |
 | | no open lifecycle | `409 { success: false, error: 'No Linear authorization is pending' }` |
 | | no candidate reachable | `409 { success: false, error }` |
+| | no trusted origin | `403 { error }` |
 | `POST /api/linear-mcp-auth/verify` | no open lifecycle | `200 { alreadyConnected: true }` |
 | | owner messaged (or throttled) | `202 { requestedFrom }` |
 | | no `authUrlAgentId` | `409 { success: false, error: 'No blocked agent owns the active Linear authorization URL' }` |
 | | owner not delivered | `409 { success: false, error }` |
+| | no trusted origin | `403 { error }` |
 
 - **Usable link.** `status === 'active'`, `authUrl !== null`, and the owner is
   not confirmed dead (`isConfirmedDead(await isAlive(owner))` from
