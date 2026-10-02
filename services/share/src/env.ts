@@ -4,15 +4,8 @@
  * PUBLIC_BASE_URL is the only required value: without it every route except /healthz returns 503.
  * Missing TURN secrets are not a 503: rooms still work with STUN, and /healthz reports `turn: false`.
  */
-
-/**
- * Placeholder for the account service's `AccountRpc` service binding (PAN-4293).
- * Typed structurally because `Service<T>` needs the entrypoint class, which lives in the account Worker.
- * The full result type and `verifyIdentity()` arrive with the room-creation work item (src/account.ts).
- */
-export interface AccountBinding {
-  verifyDevice(token: string): Promise<unknown>;
-}
+import type { ShareIdentity, ShareScope } from '../../../packages/contracts/src/sharing.ts';
+import type { AccountBinding } from './account.ts';
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
@@ -75,6 +68,11 @@ export function parseConfig(env: Env): ConfigResult {
 /**
  * Internal Worker→Durable Object paths. A Durable Object stub is reachable only from this Worker,
  * so the DO trusts the headers below and never reads the public `Authorization` header.
+ *
+ * - `POST /init`, JSON `RoomInitBody` → 201 with a `RoomSnapshot` body, or 409 when the code exists.
+ * - `POST /delete` with `HDR_HOST_TOKEN_HASH` → 204, or 404 for no room, an ended room or a wrong hash.
+ * - `GET /status` → 200 `RoomStatusBody`, or 404 when there is no record.
+ * - `GET /host` (upgrade) with `HDR_HOST_TOKEN_HASH`; `GET /join` (upgrade) with `HDR_IDENTITY`.
  */
 export const INTERNAL = {
   init: '/init',
@@ -88,3 +86,15 @@ export const INTERNAL = {
 export const HDR_HOST_TOKEN_HASH = 'X-Share-Host-Token-Hash';
 /** JSON `ShareIdentity` of the verified viewer. */
 export const HDR_IDENTITY = 'X-Share-Identity';
+
+export interface RoomInitBody {
+  shortCode: string;
+  scope: ShareScope;
+  dataOwner: ShareIdentity;
+  hostTokenHash: string;
+  createdAt: number;
+}
+
+export interface RoomStatusBody {
+  status: 'active' | 'ended';
+}
