@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:26:50.095Z",
+  "updated": "2026-10-02T02:27:49.589Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-02T02:26:48.481Z"
     },
     "wi2-conv-title": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4464",
-      "claimedAt": "2026-10-02T02:26:50.095Z"
+      "claimedAt": "2026-10-02T02:26:50.095Z",
+      "doneAt": "2026-10-02T02:27:49.588Z"
     }
   }
 }
