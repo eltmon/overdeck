@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4466",
   "created": "2026-10-02T02:46:23.902Z",
-  "updated": "2026-10-02T03:51:40.557Z",
+  "updated": "2026-10-02T03:51:56.347Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "open-terminal-route.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T03:51:40.557Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:56.347Z"
     }
   }
 }
