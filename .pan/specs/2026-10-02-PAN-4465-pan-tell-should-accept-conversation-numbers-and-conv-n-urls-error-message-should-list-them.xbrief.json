@@ -1,0 +1,669 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T02:33:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4465: pan tell should accept conversation numbers and /conv/<n> URLs; error message should list them",
+    "updated": "2026-10-02T02:34:45.098Z"
+  },
+  "plan": {
+    "id": "pan-4465",
+    "title": "pan tell should accept conversation numbers and /conv/<n> URLs; error message should list them",
+    "status": "proposed",
+    "uid": "15420e9f-07c7-4fd8-be6f-b9710fdf21cd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-02T02:33:21Z",
+    "updated": "2026-10-02T02:34:45.098Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4465",
+        "label": "PAN-4465",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cli",
+      "pan-tell",
+      "agent-targeting",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "pan tell, pause, unpause, untroubled and kill only accept issue IDs and agent IDs. Operators know conversations by their dashboard number (/conv/2972), so `pan tell 2972` fails with an error that never mentions conversations, and agents must query /api/conversations to map the number to conv-YYYYMMDD-NNNN. A successful tell to a conversation also prints a noisy 'Skipping tell intervention' line.",
+      "Proposal": "Add one CLI-side resolver, src/cli/agent-target.ts, that parses explicit conversation forms (conv/<n>, conv:<n>, dashboard URLs), qualified agent IDs, bare numbers (issue agent vs conversation, refusing when both exist) and issue IDs into a discriminated result, plus one failure printer that lists every accepted form. A new listBareNumericIssueMatches export in issue-id.ts lets the resolver tell zero from multiple issue matches. tell, pause, unpause, untroubled and kill route through it; kill keeps its issue-wide fan-out for issue results. messaging.ts skips the intervention debug line for conv-* targets. Docs in cli/agent-commands.mdx and the pan-tell/pause/unpause/kill skills describe the forms.",
+      "NonGoals": "- No change to pan inbox, pan monitor or pan recover targeting\n- No change to resolveAgentTarget, normalizeAgentId or any other code in src/lib/agents/identity.ts\n- No change to dashboard routes, the /api/conversations/:id resolver, or conversation delivery\n- No interactive picker for ambiguous targets; the command refuses and lists the choices\n- No change to how pan kill fans an issue ID out to every agent of the issue\n- No new environment variable or logger for debug output"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement the resolver as a new CLI module src/cli/agent-target.ts and leave src/lib/agents/identity.ts untouched",
+        "rationale": "identity.ts is an import-cycle leaf and conversations.ts imports the dashboard event store; tell.ts already dynamic-imports conversations.ts for that reason, and a src/cli leaf cannot close a cycle."
+      },
+      {
+        "summary": "A bare number counts a conversation candidate only when the row exists and origin is not 'vault'; archived and ended conversations count",
+        "rationale": "Vault rows are browse copies that cannot receive messages; archived rows still make the number ambiguous and the explicit forms always resolve it."
+      },
+      {
+        "summary": "An issue candidate is any agent-*-<n> state dir with a matching state.json issueId, running or not (today's resolveBareNumericId rule); two or more issue candidates are also reported as ambiguous",
+        "rationale": "Keeps the existing issue meaning for bare numbers; distinguishing zero from many matches prevents silently picking a conversation when two projects share the number."
+      },
+      {
+        "summary": "Include pan untroubled alongside tell, pause, unpause and kill/stop",
+        "rationale": "It carries the identical duplicated resolver call and error text; inbox, monitor and recover have different fallback semantics and stay out of scope."
+      },
+      {
+        "summary": "Explicit conversation forms accept a conversation number (rowid) or a YYYYMMDD-NNNN name, matching the dashboard's resolveConversationKey rule",
+        "rationale": "The dashboard routes both /conv/<n> and /conv/<name>, and a pasted URL can carry either."
+      },
+      {
+        "summary": "Silence the intervention-skip line only for conv-* IDs and keep the existing console.debug for other agents",
+        "rationale": "The issue asks to keep it at debug level for issue agents with missing state; the existing test asserts that line."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4465-pan-tell-should-accept-conversation-numbers-and-conv-n-urls-error-message-should-list-them.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "bare-numeric-matches",
+        "title": "Export listBareNumericIssueMatches from issue-id.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/issue-id.ts",
+            "src/lib/__tests__/issue-id-bare-numeric-matches.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/issue-id-bare-numeric-matches.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-id-bare-numeric-matches.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4465.md). Extract the digit-scan loop of resolveBareNumericId in src/lib/issue-id.ts into a new export listBareNumericIssueMatches(input, overdeckHome?) returning every matching issueId (deduplicated with a Set; [] for non-digit input or unreadable dir). Rewrite resolveBareNumericId's digit branch to return matches[0] when exactly one match, else null. Non-digit behavior (resolveIssueId) is unchanged. Add src/lib/__tests__/issue-id-bare-numeric-matches.test.ts with a mkdtemp overdeckHome fixture."
+        },
+        "items": [
+          {
+            "id": "bare-numeric-matches.ac1",
+            "title": "Given agent-pan-12 and agent-min-12 state dirs whose state.json issueIds are PAN-12 and MIN-12, listBareNumericIssueMatches('12', home) returns both issueIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-numeric-matches.ac2",
+            "title": "Given that same two-issue fixture, resolveBareNumericId('12', home) returns null, and given a one-issue fixture it returns that single issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-numeric-matches.ac3",
+            "title": "listBareNumericIssueMatches('PAN-12', home) returns an empty array for non-digit input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-target-resolver",
+        "title": "Add the shared CLI agent-target resolver and failure printer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/agent-target.ts",
+            "src/cli/__tests__/agent-target.test.ts",
+            "src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+            "src/cli/commands/__tests__/kill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/__tests__/agent-target.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts src/cli/commands/__tests__/kill.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "agent-target.test.ts, bare-numeric-id-resolution.test.ts and kill.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "wire-tell",
+            "wire-pause",
+            "wire-unpause",
+            "wire-untroubled",
+            "wire-kill"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and Decisions 1-7 (.pan/drafts/PAN-4465.md). Create src/cli/agent-target.ts exporting AgentTargetResolution (agent | issue | ambiguous | unresolved), resolveCliAgentTarget(input), resolveCliSingleAgentId(input), printAgentTargetFailure(failure, verb) and ACCEPTED_TARGET_FORMS, with the exact parse order and regexes in the PRD. Import resolveAgentTarget/isQualifiedAgentId via ../lib/agents.js, listBareNumericIssueMatches/resolveIssueId via ../lib/issue-id.js, and load ../lib/overdeck/conversations.js only via dynamic import() inside try/catch. The conversation agent ID is row.tmuxSession; vault-origin rows never count. Do not modify src/lib/agents/identity.ts. Write src/cli/__tests__/agent-target.test.ts with every case listed in WI-2. Also do WI-2's mock prep: add listBareNumericIssueMatches and a conversations.js mock to the issue-id.js mock factories in bare-numeric-id-resolution.test.ts and kill.test.ts."
+        },
+        "items": [
+          {
+            "id": "agent-target-resolver.ac1",
+            "title": "resolveCliAgentTarget returns { kind: 'agent', agentId: 'conv-20260928-7563', via: 'conversation' } for conv/2972, conv:2972, https://overdeck.localhost/conv/2972 and https://overdeck.localhost/conv/2972?view=terminal when getConversationById(2972) returns that row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-target-resolver.ac2",
+            "title": "Given bare '2972' with one issue candidate PAN-2972 and a non-vault conversation 2972, resolveCliAgentTarget returns kind 'ambiguous' with explicit forms PAN-2972 and conv/2972; with no issue candidate it returns the conversation agent; with no conversation it returns kind 'issue'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-target-resolver.ac3",
+            "title": "An explicit conversation form whose row is missing or has origin 'vault' returns kind 'unresolved' and never falls back to an issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-target-resolver.ac4",
+            "title": "Given an ambiguous or unresolved result, printAgentTargetFailure prints to stderr every ACCEPTED_TARGET_FORMS line, including conv/2972, conv:2972 and https://overdeck.localhost/conv/2972",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-target-resolver.ac5",
+            "title": "git diff origin/main -- src/lib/agents/identity.ts produces no output, and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-tell",
+        "title": "Route pan tell through the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tell.ts",
+            "src/cli/commands/__tests__/tell-conv-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/tell-conv-target.test.ts src/cli/commands/__tests__/tell.test.ts src/cli/commands/__tests__/tell-lane-guard.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "tell-conv-target.test.ts, tell.test.ts and tell-lane-guard.test.ts pass",
+            "typecheck completes without errors",
+            "lint:file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (.pan/drafts/PAN-4465.md). In tellCommand replace the resolveAgentTarget call and its hand-written error with resolveCliSingleAgentId(id) and printAgentTargetFailure(failure, 'tell') followed by exitCli(1). Add src/cli/commands/__tests__/tell-conv-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-tell.ac1",
+            "title": "Given conversation 2972 with tmuxSession conv-20260928-7563 and no issue candidate, tellCommand with conv/2972, https://overdeck.localhost/conv/2972 and bare 2972 each calls messageAgent with 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-tell.ac2",
+            "title": "Given bare 2972 with both an issue candidate and a conversation, tellCommand exits 1, prints PAN-2972 and conv/2972 to stderr, and does not call messageAgent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-tell.ac3",
+            "title": "tellCommand('PAN-123', ...) still delivers to the agent resolveAgentTarget returns for PAN-123",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pause",
+        "title": "Route pan pause through the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pause.ts",
+            "src/cli/commands/__tests__/pause-conv-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/pause-conv-target.test.ts src/cli/commands/__tests__/agent-targeting.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pause-conv-target.test.ts, agent-targeting.test.ts and bare-numeric-id-resolution.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (.pan/drafts/PAN-4465.md). In pauseCommand replace resolveAgentTarget and its error with resolveCliSingleAgentId(id); on failure call printSwarmPauseGuidance(id) first (return exitCli(1) when it prints), else printAgentTargetFailure(failure, 'pause') then exitCli(1). Add src/cli/commands/__tests__/pause-conv-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-pause.ac1",
+            "title": "When pauseCommand('conv/2972', {}) runs, then setAgentPaused receives agent ID 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pause.ac2",
+            "title": "Given an ambiguous bare number, pauseCommand exits 1 and never calls setAgentPaused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pause.ac3",
+            "title": "pauseCommand for a swarm issue with no single agent still prints the pan swarm stop guidance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-unpause",
+        "title": "Route pan unpause through the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/unpause.ts",
+            "src/cli/commands/__tests__/unpause-conv-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/unpause-conv-target.test.ts src/cli/commands/__tests__/agent-targeting.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "unpause-conv-target.test.ts, agent-targeting.test.ts and bare-numeric-id-resolution.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (.pan/drafts/PAN-4465.md). In unpauseCommand replace resolveAgentTarget and its error with resolveCliSingleAgentId(id) and printAgentTargetFailure(failure, 'unpause') then exitCli(1). Add src/cli/commands/__tests__/unpause-conv-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-unpause.ac1",
+            "title": "When unpauseCommand('conv/2972') runs, then clearAgentPaused receives agent ID 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-unpause.ac2",
+            "title": "Given an ambiguous bare number, unpauseCommand exits 1 and never calls clearAgentPaused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-untroubled",
+        "title": "Route pan untroubled through the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/untroubled.ts",
+            "src/cli/commands/__tests__/untroubled-conv-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/untroubled-conv-target.test.ts src/cli/commands/__tests__/agent-targeting.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "untroubled-conv-target.test.ts and agent-targeting.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (.pan/drafts/PAN-4465.md). In untroubledCommand replace resolveAgentTarget and its error with resolveCliSingleAgentId(id) and printAgentTargetFailure(failure, 'untroubled') then exitCli(1). Add src/cli/commands/__tests__/untroubled-conv-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-untroubled.ac1",
+            "title": "When untroubledCommand('conv/2972') runs, then clearAgentTroubled receives agent ID 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-untroubled.ac2",
+            "title": "Given an unresolved target such as conv/9999 with no row, untroubledCommand exits 1 and prints the accepted target forms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-kill",
+        "title": "Route pan kill/stop through the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/kill.ts",
+            "src/cli/commands/__tests__/kill-conv-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/kill-conv-target.test.ts src/cli/commands/__tests__/kill.test.ts src/cli/commands/__tests__/agent-targeting.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "kill-conv-target.test.ts, kill.test.ts, agent-targeting.test.ts and bare-numeric-id-resolution.test.ts pass",
+            "typecheck completes without errors",
+            "lint:file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (.pan/drafts/PAN-4465.md). In killCommand replace the isQualifiedAgentId / resolveBareNumericId branch with resolveCliAgentTarget(id): ambiguous/unresolved -> printAgentTargetFailure(target, 'kill') and exitCli(1); agent -> agentIds = [agentId], issueId from state or the agentId; issue -> existing issue-wide findAgentIdsForIssue fan-out unchanged. Remove now-unused imports. Add src/cli/commands/__tests__/kill-conv-target.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-kill.ac1",
+            "title": "When killCommand('conv/2972', {}) runs, then stopAgent receives exactly one call, with 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-kill.ac2",
+            "title": "killCommand('PAN-1148', {}) still stops every agent dir findAgentIdsForIssue discovers for PAN-1148",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-kill.ac3",
+            "title": "Given an ambiguous bare number, killCommand exits 1 and calls stopAgent zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "silence-conv-intervention",
+        "title": "Skip the tell-intervention debug line for conv-* targets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/__tests__/message-agent-interventions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/message-agent-interventions.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "message-agent-interventions.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (.pan/drafts/PAN-4465.md). In appendTellInterventionForUserSource (src/lib/agents/messaging.ts, grep 'Skipping tell intervention for') return early when normalizedId.startsWith('conv-'), after the USER_MESSAGE_INTERVENTION_SOURCES guard and before the console.debug. Leave the console.debug line unchanged for other IDs. Add a test for the conv-* case."
+        },
+        "items": [
+          {
+            "id": "silence-conv-intervention.ac1",
+            "title": "messageAgent('conv-20260928-7563', 'hi', 'pan-tell') with a state.json lacking issueId emits no console.debug call containing 'Skipping tell intervention'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "silence-conv-intervention.ac2",
+            "title": "messageAgent('agent-pan-1487', ..., 'pan-tell') with no issueId still emits the existing '[agents] Skipping tell intervention for agent-pan-1487; state.json has no issueId' debug line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-targets",
+        "title": "Document conversation targets for tell/pause/unpause/kill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:33:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/agent-commands.mdx",
+            "sync-sources/skills/pan-tell/SKILL.md",
+            "sync-sources/skills/pan-pause/SKILL.md",
+            "sync-sources/skills/pan-unpause/SKILL.md",
+            "sync-sources/skills/pan-kill/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills",
+            "npm run lint:slash-commands",
+            "grep -n 'Targeting an agent' cli/agent-commands.mdx"
+          ],
+          "expected_outputs": [
+            "lint:skills and lint:slash-commands exit 0",
+            "grep prints the new section heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (.pan/drafts/PAN-4465.md). Add '## Targeting an agent' to cli/agent-commands.mdx before '## pan tell' with the accepted-forms table and the bare-number ambiguity rule; add conv/2972 and URL examples to '## pan tell'; one sentence in '## pan kill' on conversation vs issue targets; short '## pan pause' and '## pan unpause' sections linking to the targeting section. In sync-sources/skills/pan-tell/SKILL.md replace the 'usually agent-ISSUE-ID' prerequisite with the target forms and add a pan tell conv/2972 example. Add one line to pan-pause, pan-unpause and pan-kill SKILL.md bodies. Do not change any skill frontmatter."
+        },
+        "items": [
+          {
+            "id": "docs-agent-targets.ac1",
+            "title": "cli/agent-commands.mdx renders a '## Targeting an agent' section that lists conv/2972, conv:2972 and https://overdeck.localhost/conv/2972 and states that an ambiguous bare number is refused with both choices",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-targets.ac2",
+            "title": "sync-sources/skills/pan-tell/SKILL.md no longer contains 'usually `agent-ISSUE-ID`' and shows a pan tell conv/2972 example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-targets.ac3",
+            "title": "The pan-pause, pan-unpause and pan-kill SKILL.md bodies each state that <id> accepts conv/<n> and dashboard URLs, with frontmatter unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bare-numeric-matches",
+        "to": "agent-target-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-target-resolver",
+        "to": "wire-tell",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-target-resolver",
+        "to": "wire-pause",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-target-resolver",
+        "to": "wire-unpause",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-target-resolver",
+        "to": "wire-untroubled",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-target-resolver",
+        "to": "wire-kill",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
