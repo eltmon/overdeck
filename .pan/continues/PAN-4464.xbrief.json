@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T03:51:24.362Z",
+  "updated": "2026-10-02T03:51:36.366Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "wi9-wake-all-regression.ac1": {
       "status": "completed",
       "doneAt": "2026-10-02T03:51:24.362Z"
+    },
+    "wi9-wake-all-regression.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:36.366Z"
     }
   }
 }
