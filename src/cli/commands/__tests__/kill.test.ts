@@ -104,6 +104,9 @@ vi.mock('../../../lib/projects.js', () => ({
 vi.mock('../../../lib/issue-id.js', () => ({
   resolveBareNumericId: issueIdMocks.resolveBareNumericId,
   listBareNumericIssueMatches: issueIdMocks.listBareNumericIssueMatches,
+  // PAN-4465: killCommand's non-digit, non-qualified-agent-ID branch now
+  // reaches resolveIssueId through resolveCliAgentTarget.
+  resolveIssueId: (id: string) => id.replace(/^agent-/i, '').toUpperCase(),
 }));
 
 vi.mock('../../../lib/overdeck/conversations.js', () => ({

@@ -421,13 +421,17 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Unexpected non-whitespace character'));
   });
 
-  it('prints the shared unresolved-ID error path for pan kill', async () => {
+  it('prints the shared unresolved-target error path for pan kill', async () => {
+    // PAN-4465: pan kill now routes through resolveCliAgentTarget, which calls
+    // listBareNumericIssueMatches directly rather than resolveBareNumericId —
+    // the derived mock above returns [] whenever resolveBareNumericId does.
     issueIdMocks.resolveBareNumericId.mockReturnValue(null);
     const { killCommand } = await import('../kill.js');
 
     await expect(killCommand('9999', {})).rejects.toThrow('process.exit:1');
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve issue ID "9999"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve agent target "9999"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('no issue agent or conversation matches 9999'));
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
   });
 
