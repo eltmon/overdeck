@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:47:24.664Z",
+  "updated": "2026-10-02T04:47:38.081Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "settle-on-queue.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T04:47:24.664Z"
+    },
+    "handoff-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:47:38.081Z"
     }
   }
 }
