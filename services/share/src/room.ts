@@ -9,11 +9,12 @@
  * env.ts are trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
-import type { ServiceToHostFrame, ServiceToViewerFrame, ShareIdentity } from '../../../packages/contracts/src/sharing.ts';
+import type { IceServer, ServiceToHostFrame, ServiceToViewerFrame, ShareIdentity } from '../../../packages/contracts/src/sharing.ts';
 import { timingSafeEqualHex } from './codes.ts';
 import type { Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
-import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL } from './env.ts';
+import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseTurnConfig } from './env.ts';
 import { decodeHostFrame, decodeViewerFrame } from './protocol.ts';
+import { fetchIceServers } from './turn.ts';
 import {
   createRoom,
   HOST_RECONNECT_WINDOW_MS,
@@ -242,15 +243,19 @@ export class RoomHost {
           await this.ctx.storage.deleteAll();
           break;
         case 'fetch-ice-servers':
-          this.sendIceError(effect.target);
+          await this.sendIceServers(effect.target);
           break;
       }
     }
   }
 
-  /** TURN credentials arrive with the share-turn work item; until then ICE requests answer turn_unavailable. */
-  private sendIceError(target: 'host' | { githubId: number }): void {
+  /** Mints TURN credentials for the host or an admitted viewer; any failure is `turn_unavailable`. */
+  private async sendIceServers(target: 'host' | { githubId: number }): Promise<void> {
+    const result = await fetchIceServers(parseTurnConfig(this.env), this.deps);
+    const frame: { type: 'ice-servers'; iceServers: IceServer[] } | { type: 'error'; code: 'turn_unavailable' } = result.ok
+      ? { type: 'ice-servers', iceServers: result.iceServers }
+      : { type: 'error', code: 'turn_unavailable' };
     const tag = target === 'host' ? HOST_TAG : viewerTag(target.githubId);
-    for (const ws of this.ctx.getWebSockets(tag)) safeSend(ws, { type: 'error', code: 'turn_unavailable' });
+    for (const ws of this.ctx.getWebSockets(tag)) safeSend(ws, frame);
   }
 }

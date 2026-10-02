@@ -48,9 +48,18 @@ export class AccountRpc extends WorkerEntrypoint {
 export default { fetch() { return new Response('account stub'); } };
 `;
 
+const TURN_KEY_ID = 'turn-key-test';
+const TURN_API_TOKEN = 'turn-api-token-test';
+const STUB_ICE_SERVERS = [
+  { urls: ['stun:stun.cloudflare.com:3478'] },
+  { urls: ['turns:turn.cloudflare.com:443?transport=tcp'], username: 'stub-user', credential: 'stub-cred' },
+];
+
 let tmp = '';
 let mf: Miniflare;
 const unexpectedOutbound: string[] = [];
+/** Requests that reached the stubbed Cloudflare TURN credential API. */
+const turnRequests: Array<{ authorization: string | null; body: string }> = [];
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), 'overdeck-share-mf-'));
@@ -72,6 +81,8 @@ beforeAll(async () => {
             ROOMS: { type: 'durable-object', worker: 'overdeck-share', exportName: 'ShareRoom' },
             ACCOUNT: { type: 'worker', worker: 'account-stub', exportName: 'AccountRpc' },
             PUBLIC_BASE_URL: { type: 'text', value: BASE },
+            TURN_KEY_ID: { type: 'text', value: TURN_KEY_ID },
+            TURN_KEY_API_TOKEN: { type: 'text', value: TURN_API_TOKEN }, // a Worker secret in production; same string binding at runtime
           },
           exports: { ShareRoom: { type: 'durable-object', storage: 'sqlite' } },
         },
@@ -79,6 +90,17 @@ beforeAll(async () => {
           outboundService: {
             type: 'fetcher',
             handler: async (request: Request) => {
+              const url = new URL(request.url);
+              if (
+                request.method === 'POST' &&
+                url.href === `https://rtc.live.cloudflare.com/v1/turn/keys/${TURN_KEY_ID}/credentials/generate-ice-servers`
+              ) {
+                turnRequests.push({ authorization: request.headers.get('Authorization'), body: await request.text() });
+                return new Response(JSON.stringify({ iceServers: STUB_ICE_SERVERS }), {
+                  status: 201,
+                  headers: { 'Content-Type': 'application/json' },
+                });
+              }
               unexpectedOutbound.push(`${request.method} ${request.url}`);
               return new Response('unexpected outbound request', { status: 599 });
             },
@@ -172,10 +194,10 @@ const offer = { sdp: { type: 'offer', sdp: 'v=0' } };
 const answer = { sdp: { type: 'answer', sdp: 'v=0' } };
 
 describe('share service on real workerd (PAN-658 share-room-do)', () => {
-  it('GET /healthz reports configured: true and turn: false', async () => {
+  it('GET /healthz reports configured: true and turn: true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
   }, SLOW);
 
   it('refuses a non-upgrade request with 426 and an unknown protocol version with 400', async () => {
@@ -219,6 +241,14 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
     a.send({ type: 'ice-servers' });
     await a.waitFor(isType('error'));
     expect(a.frames).toEqual([{ type: 'status', status: 'lobby' }, { type: 'error', code: 'not_admitted' }]);
+    // The lobby viewer's ice-servers request never reached the TURN API.
+    expect(turnRequests).toEqual([]);
+
+    // The host gets fresh ICE servers from the TURN credential API.
+    mark = host.frames.length;
+    host.send({ type: 'ice-servers' });
+    expect(await host.waitFor(isType('ice-servers'), mark)).toEqual({ type: 'ice-servers', iceServers: STUB_ICE_SERVERS });
+    expect(turnRequests).toEqual([{ authorization: `Bearer ${TURN_API_TOKEN}`, body: '{"ttl":3600}' }]);
 
     // Admit A as a contributor.
     host.send({ type: 'admit', githubId: VIEWER_A.id, contributor: true });
@@ -230,6 +260,11 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
     expect(await a.waitFor(isType('signal'))).toEqual({ type: 'signal', data: offer });
     a.send({ type: 'signal', data: answer, extra: 'dropped' });
     expect(await host.waitFor(isType('signal'), mark)).toEqual({ type: 'signal', githubId: VIEWER_A.id, data: answer });
+
+    // Once admitted, A gets ICE servers too.
+    a.send({ type: 'ice-servers' });
+    expect(await a.waitFor(isType('ice-servers'))).toEqual({ type: 'ice-servers', iceServers: STUB_ICE_SERVERS });
+    expect(turnRequests).toHaveLength(2);
 
     // Kick: A's socket closes 4010 and a rejoin lands in the lobby.
     host.send({ type: 'kick', githubId: VIEWER_A.id });
