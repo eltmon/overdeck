@@ -2,11 +2,11 @@ import { exitCli } from '../exit.js';
 import { existsSync, readdirSync } from 'fs';
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { stopAgent, getAgentState, isQualifiedAgentId } from '../../lib/agents.js';
+import { printAgentTargetFailure, resolveCliAgentTarget } from '../agent-target.js';
+import { stopAgent, getAgentState } from '../../lib/agents.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent, loadRemoteAgentState } from '../../lib/remote/remote-agents.js';
-import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
@@ -70,22 +70,19 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   let issueId: string;
   let agentIds: string[];
 
-  if (isQualifiedAgentId(id)) {
-    // PAN-1760: a fully-qualified agent ID (strike-pan-1723, inspect-…,
-    // agent-…-ship) targets exactly that agent — no issue-wide discovery.
-    const agentId = id.toLowerCase();
-    agentIds = [agentId];
-    issueId = getAgentState(agentId)?.issueId ?? agentId;
+  const target = await resolveCliAgentTarget(id);
+  if (target.kind === 'ambiguous' || target.kind === 'unresolved') {
+    printAgentTargetFailure(target, 'kill');
+    return exitCli(1);
+  }
+  if (target.kind === 'agent') {
+    // A fully-qualified agent ID (strike-pan-1723, inspect-…, agent-…-ship)
+    // or a conversation targets exactly that agent — no issue-wide discovery
+    // (PAN-1760, PAN-4465).
+    agentIds = [target.agentId];
+    issueId = getAgentState(target.agentId)?.issueId ?? target.agentId;
   } else {
-    const resolved = resolveBareNumericId(id);
-    if (!resolved) {
-      console.error(chalk.red(`Could not resolve issue ID "${id}"`));
-      console.error(chalk.dim(
-        'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
-      ));
-      return exitCli(1);
-    }
-    issueId = resolved;
+    issueId = target.issueId;
     const issueLower = issueId.toLowerCase();
 
     // Discover every agent tied to this issue (work + plan + pipeline specialists

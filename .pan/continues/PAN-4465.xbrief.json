@@ -1,0 +1,198 @@
+{
+  "version": "1",
+  "issueId": "PAN-4465",
+  "created": "2026-10-02T02:35:56.189Z",
+  "updated": "2026-10-02T03:48:34.943Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-02T03:42Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-02T03:42:58.426Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-02T03:48Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-02T03:48:34.942Z"
+    }
+  ],
+  "items": {
+    "bare-numeric-matches": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:35:56.189Z",
+      "doneAt": "2026-10-02T02:40:35.474Z"
+    },
+    "agent-target-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:40:52.576Z",
+      "doneAt": "2026-10-02T02:46:35.342Z"
+    },
+    "wire-tell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:46:44.012Z",
+      "doneAt": "2026-10-02T02:51:08.687Z"
+    },
+    "wire-pause": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:51:18.942Z",
+      "doneAt": "2026-10-02T02:55:10.470Z"
+    },
+    "wire-unpause": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:55:17.187Z",
+      "doneAt": "2026-10-02T02:58:33.204Z"
+    },
+    "wire-untroubled": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:58:37.206Z",
+      "doneAt": "2026-10-02T03:02:03.272Z"
+    },
+    "wire-kill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T03:02:09.287Z",
+      "doneAt": "2026-10-02T03:16:32.757Z"
+    },
+    "silence-conv-intervention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T03:16:43.001Z",
+      "doneAt": "2026-10-02T03:25:36.567Z"
+    },
+    "docs-agent-targets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T03:25:41.497Z",
+      "doneAt": "2026-10-02T03:28:22.657Z"
+    },
+    "bare-numeric-matches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:31:59.465Z"
+    },
+    "bare-numeric-matches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:32:16.259Z"
+    },
+    "bare-numeric-matches.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:32:33.844Z"
+    },
+    "agent-target-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:32:50.769Z"
+    },
+    "agent-target-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:33:06.754Z"
+    },
+    "agent-target-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:33:22.682Z"
+    },
+    "agent-target-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:33:38.020Z"
+    },
+    "agent-target-resolver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:33:55.433Z"
+    },
+    "wire-tell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:34:11.328Z"
+    },
+    "wire-tell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:34:25.864Z"
+    },
+    "wire-tell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:34:41.201Z"
+    },
+    "wire-pause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:34:55.467Z"
+    },
+    "wire-pause.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:35:09.912Z"
+    },
+    "wire-pause.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:35:25.656Z"
+    },
+    "wire-unpause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:35:40.802Z"
+    },
+    "wire-unpause.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:35:54.441Z"
+    },
+    "wire-untroubled.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:36:08.462Z"
+    },
+    "wire-untroubled.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:36:25.570Z"
+    },
+    "wire-kill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:36:41.514Z"
+    },
+    "wire-kill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:36:57.103Z"
+    },
+    "wire-kill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:37:12.870Z"
+    },
+    "silence-conv-intervention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:37:28.062Z"
+    },
+    "silence-conv-intervention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:37:42.917Z"
+    },
+    "docs-agent-targets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:37:58.100Z"
+    },
+    "docs-agent-targets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:38:13.879Z"
+    },
+    "docs-agent-targets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:38:28.938Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-02T03:42:58Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4465\n\nPull request: https://github.com/eltmon/overdeck/pull/4468 (head `e4bae41e`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-02T03:48:34Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4465 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (0ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4465/.overdeck/verification/2026-10-02T03-39-06-930Z-e4bae41e.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4465/.overdeck/verification/2026-10-02T03-39-06-930Z-e4bae41e.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4465 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4465 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

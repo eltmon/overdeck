@@ -42,6 +42,8 @@ pan kill ISSUE-123
 pan kill agent-issue-123-test
 ```
 
+`<id>` also accepts `conv/<n>` or `conv:<n>` and a dashboard URL such as `https://overdeck.localhost/conv/2972` — a conversation target stops only that conversation, unlike an issue ID's issue-wide fan-out.
+
 ## Workflow
 
 ### 1. Check Agent Status First

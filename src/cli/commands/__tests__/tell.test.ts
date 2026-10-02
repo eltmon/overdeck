@@ -24,20 +24,26 @@ const remoteMocks = vi.hoisted(() => ({
 // Keep a focused resolver implementation for the PAN-1749/PAN-1820 regressions:
 // singleton IDs and known prefixes must not get a naive `agent-` prefix, and
 // issue IDs can resolve to non-work agents when that is the registered run.
+// PAN-4465: tellCommand now routes through the shared agent-target resolver,
+// which calls isQualifiedAgentId directly (not just through resolveAgentTarget).
+const isQualifiedAgentIdForTest = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return (
+    lower === 'flywheel-orchestrator' ||
+    lower.startsWith('agent-') ||
+    lower.startsWith('planning-') ||
+    lower.startsWith('conv-') ||
+    lower.startsWith('strike-') ||
+    lower.startsWith('inspect-')
+  );
+};
+
 vi.mock('../../../lib/agents.js', () => ({
+  isQualifiedAgentId: isQualifiedAgentIdForTest,
   resolveAgentTarget: (id: string) => {
     const lower = id.toLowerCase();
     if (lower === 'pan-1820') return 'strike-pan-1820';
-    if (
-      lower === 'flywheel-orchestrator' ||
-      lower.startsWith('agent-') ||
-      lower.startsWith('planning-') ||
-      lower.startsWith('conv-') ||
-      lower.startsWith('strike-') ||
-      lower.startsWith('inspect-')
-    ) {
-      return lower;
-    }
+    if (isQualifiedAgentIdForTest(lower)) return lower;
     return `agent-${lower}`;
   },
   getAgentState: (id: string) => ({ id, issueId: 'PAN-123' }),

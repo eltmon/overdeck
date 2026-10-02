@@ -55,6 +55,19 @@ The dashboard's **Agents** page is the visual counterpart to this command. A met
 Use `pan status` from the terminal for a quick check, and the Agents page when you want to watch many agents at once and spot stuck ones at a glance.
 </Tip>
 
+## Targeting an agent
+
+`pan tell`, `pan pause`, `pan unpause`, `pan untroubled`, and `pan kill`/`pan stop` all resolve their `<id>` argument the same way:
+
+| Form | Example | Resolves to |
+| --- | --- | --- |
+| Issue ID | `PAN-1148` | The issue's work agent (or its one registered non-work agent, such as a strike session) |
+| Agent ID | `agent-pan-1148`, `strike-pan-1723`, `conv-20260928-7563` | Exactly that agent |
+| Conversation | `conv/2972`, `conv:2972`, or a dashboard URL such as `https://overdeck.localhost/conv/2972` | The conversation's agent |
+| Bare number | `2972` | An issue agent if exactly one matches; otherwise that conversation, if one exists |
+
+A bare number is convenient but can be ambiguous — a conversation's dashboard number and an issue's number can coincide. When a bare number matches more than one target (an issue agent *and* a conversation, or two issue agents), the command refuses and lists every candidate with its explicit form (`PAN-2972`, `conv/2972`, …) so you can pick one. Use the explicit form whenever you already know it.
+
 ## pan tell
 
 Send a message to a running agent.
@@ -62,6 +75,10 @@ Send a message to a running agent.
 ```bash
 # Send a message to an agent (handles Enter key automatically)
 pan tell min-123 "Please also add tests"
+
+# Message a conversation by its dashboard number, name, or URL
+pan tell conv/2972 "Please also add tests"
+pan tell https://overdeck.localhost/conv/2972 "Please also add tests"
 ```
 
 This command:
@@ -69,12 +86,32 @@ This command:
 - The agent receives it and responds accordingly
 - Useful for providing feedback, clarification, or guidance
 
+## pan pause
+
+Pause a running agent — it stops accepting new work until unpaused. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form, including `conv/<n>` and dashboard URLs.
+
+```bash
+pan pause min-123
+```
+
+## pan unpause
+
+Clear a pause gate set by `pan pause` and resume the agent immediately if it has a session to resume. See [Targeting an agent](#targeting-an-agent) for every accepted `<id>` form.
+
+```bash
+pan unpause min-123
+```
+
 ## pan kill
 
 Stop a running agent.
 
 ```bash
 pan kill min-123
+
+# A conversation target stops only that conversation; an issue ID stops
+# every agent registered for the issue (work, review, test, swarm slots, …)
+pan kill conv/2972
 ```
 
 Stops the agent. The workspace, branch, and any uncommitted work remain intact.

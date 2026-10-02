@@ -26,6 +26,8 @@ pan pause PAN-123
 pan pause PAN-123 --reason "investigating bad loop"
 ```
 
+`<id>` also accepts a full agent ID, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
+
 ## What It Does
 
 `pan pause <id>` sets a persistent pause gate in the agent state file. If the agent is currently running, it also stops the agent so it cannot keep working while paused.
