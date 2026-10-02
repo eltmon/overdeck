@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:58:35.176Z",
+  "updated": "2026-10-02T04:58:52.850Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,6 +328,9 @@
     "docs.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T04:58:35.176Z"
+    },
+    "handoff-route.ac4": {
+      "status": "cancelled"
     }
   }
 }
