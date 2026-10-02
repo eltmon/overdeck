@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:57:19.551Z",
+  "updated": "2026-10-02T04:57:35.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -304,6 +304,10 @@
     "pairing-e2e.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T04:57:19.550Z"
+    },
+    "frontend-test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:35.763Z"
     }
   }
 }
