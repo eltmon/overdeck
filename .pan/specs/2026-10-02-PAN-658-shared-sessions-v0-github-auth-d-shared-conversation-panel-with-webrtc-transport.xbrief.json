@@ -4,17 +4,17 @@
     "created": "2026-10-02T05:20:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-658: Shared Sessions v0 — slice 1, the Cloudflare share service",
-    "updated": "2026-10-02T05:22:38.047Z"
+    "updated": "2026-10-02T05:23:08.709Z"
   },
   "plan": {
     "id": "pan-658",
     "title": "Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport",
-    "status": "proposed",
+    "status": "running",
     "uid": "ce132ffb-7754-4037-aec4-7e8bdc2b4b53",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T05:20:45Z",
-    "updated": "2026-10-02T05:22:38.047Z",
+    "updated": "2026-10-02T05:23:08.709Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/658",
@@ -720,5 +720,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
