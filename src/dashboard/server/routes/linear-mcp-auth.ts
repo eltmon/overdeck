@@ -78,7 +78,7 @@ function withIssueUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIn
 /**
  * Attach each blocked conversation's canonical dashboard URL — /conv/<rowid>,
  * the DB row id, which is how conversations are displayed everywhere else in
- * the dashboard. The blocked agent id is the conversation's tmux session
+ * the dashboard — and its title, so the banner can label the row. The blocked agent id is the conversation's tmux session
  * (`conv-<name>`), so it resolves by tmux session first, then by the bare
  * DB name so an archived conversation still links (PAN-4464). Best-effort: an unresolvable conversation falls back to null and the banner
  * renders the id as plain text.
@@ -88,17 +88,19 @@ function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMc
     ...intervention,
     blockedAgents: intervention.blockedAgents.map(agent => {
       if (!agent.agentId.startsWith('conv-')) {
-        return { ...agent, conversationUrl: null };
+        return { ...agent, conversationUrl: null, conversationTitle: null };
       }
-      let conversationUrl: string | null = null;
       try {
         const conversation = getConversationByTmuxSession(agent.agentId)
           ?? getConversationByName(agent.agentId.slice('conv-'.length));
-        conversationUrl = conversation === null ? null : `/conv/${conversation.id}`;
+        return {
+          ...agent,
+          conversationUrl: conversation === null ? null : `/conv/${conversation.id}`,
+          conversationTitle: conversation?.title ?? null,
+        };
       } catch {
-        conversationUrl = null;
+        return { ...agent, conversationUrl: null, conversationTitle: null };
       }
-      return { ...agent, conversationUrl };
     }),
   };
 }

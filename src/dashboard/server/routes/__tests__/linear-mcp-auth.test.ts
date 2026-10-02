@@ -111,7 +111,7 @@ describe('Linear MCP auth routes', () => {
       status: 200,
       body: {
         ...ACTIVE,
-        blockedAgents: [{ ...ACTIVE.blockedAgents[0], issueUrl: null, conversationUrl: null }],
+        blockedAgents: [{ ...ACTIVE.blockedAgents[0], issueUrl: null, conversationUrl: null, conversationTitle: null }],
       },
     });
     expect(mocks.messageAgent).not.toHaveBeenCalled();
@@ -160,6 +160,7 @@ describe('Linear MCP auth routes', () => {
     expect((result.body['blockedAgents'] as Array<Record<string, unknown>>)[0]).toMatchObject({
       agentId: 'conv-20261001-eba1',
       conversationUrl: '/conv/3172',
+      conversationTitle: 'Fernkite: hosted Emma assessment',
     });
   });
 
@@ -207,8 +208,8 @@ describe('Linear MCP auth routes', () => {
 
     expect(result.status).toBe(200);
     const agents = result.body['blockedAgents'] as Array<Record<string, unknown>>;
-    expect(agents[0]).toMatchObject({ agentId: 'agent-min-852', conversationUrl: null });
-    expect(agents[1]).toMatchObject({ agentId: 'conv-20260815-0000', conversationUrl: null });
+    expect(agents[0]).toMatchObject({ agentId: 'agent-min-852', conversationUrl: null, conversationTitle: null });
+    expect(agents[1]).toMatchObject({ agentId: 'conv-20260815-0000', conversationUrl: null, conversationTitle: null });
     // The read door is only consulted for conv-* agents.
     expect(mocks.getConversationByTmuxSession).toHaveBeenCalledTimes(1);
     expect(mocks.getConversationByTmuxSession).toHaveBeenCalledWith('conv-20260815-0000');

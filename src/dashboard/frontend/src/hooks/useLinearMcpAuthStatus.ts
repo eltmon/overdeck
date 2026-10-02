@@ -13,6 +13,9 @@ export interface LinearMcpAuthBlockedAgent {
    * conversations read door; null for non-conversation agents or when the
    * conversation cannot be resolved. */
   conversationUrl?: string | null;
+  /** Conversation title projected by the server alongside conversationUrl;
+   * null for non-conversation agents or untitled/unresolved conversations. */
+  conversationTitle?: string | null;
 }
 
 export interface LinearMcpAuthStatus {
