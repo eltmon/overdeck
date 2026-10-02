@@ -29,13 +29,16 @@ This skill guides you through sending messages to running autonomous agents via 
 ## Prerequisites
 
 - Agent must be running in a tmux session
-- Know the agent's session name (usually `agent-ISSUE-ID`)
+- `<id>` accepts an issue ID (`PAN-1148`), a full agent ID (`agent-pan-1148`, `strike-pan-1723`, `conv-20260928-7563`), a conversation (`conv/2972`, `conv:2972`, or a dashboard URL), or a bare number when it is unambiguous
 
 ## Quick Command
 
 ```bash
 # ALWAYS use pan tell - it handles Enter correctly
 pan tell ISSUE-123 "Your message here"
+
+# Message a conversation by its dashboard number
+pan tell conv/2972 "Your message here"
 ```
 
 **DO NOT use raw `tmux send-keys`** - agents frequently forget the separate Enter command, causing messages to sit unsent in the terminal.

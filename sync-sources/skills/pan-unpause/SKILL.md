@@ -25,6 +25,8 @@ pan unpause <issue-id>
 pan unpause PAN-123
 ```
 
+`<id>` also accepts a full agent ID, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
+
 ## What It Does
 
 `pan unpause <id>` clears the persistent pause fields from the agent state file, then resumes the agent's saved session when it has one. Without a saved session it prints `pan start <id>` for the operator to run.
