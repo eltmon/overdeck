@@ -1,5 +1,5 @@
 /**
- * PAN-4384: the conflict-repair patrol's tick. An approved, green PR that
+ * PAN-4384: the conflict-repair patrol's tick. An approved PR that
  * turns CONFLICTING with main is refused by the merge gate before any merge
  * door can rebase it, and nothing else routes it back. Each tick finds such a
  * PR from the live forge facts (`evaluateConflictRepairGate`), sends the
@@ -95,7 +95,8 @@ export function buildConflictRepairPrompt(input: {
   const { issueId, head } = input;
   const paths = input.conflictPaths.length > 0 ? input.conflictPaths.join(', ') : 'run git merge-tree to list them';
   return [
-    `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) is approved and green but now conflicts with origin/main, so it cannot merge.`,
+    `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) is approved but now conflicts with origin/main, so it cannot merge.`,
+    'GitHub runs no CI on a conflicting PR; CI runs again on the head you push.',
     `Conflicting paths: ${paths}`,
     '',
     '0. Commit or discard any uncommitted work first (never git stash); pan sync-main needs a clean tree.',

@@ -11,6 +11,12 @@ state. Another device (a laptop, a tablet, a second desktop) reaches a machine
 by **pairing** with it. Pairing gives that device its own revocable session.
 The machine's root internal token never leaves the machine.
 
+<Note>
+Pairing from the terminal (`pan pair`, `pan devices`) is in v0.64.0. Settings → Anywhere,
+Settings → Access Tokens and scoped API tokens (`pan token`) arrive in the next release
+(v0.65.0).
+</Note>
+
 Every machine has a stable public identity. `GET /api/environment` returns it
 without a credential:
 
@@ -60,7 +66,8 @@ of a link.
 
    It prints a URL such as `https://desk.tailnet.ts.net/#pair=odp_…`, the
    expiry time, and the raw credential for manual entry. Use `--json` for
-   `{ url, credential, expiresAt }`.
+   `{ url, credential, expiresAt }`. `--label <name>` records a name for the
+   pairing in the activity log.
 2. Open that URL on the other device. The dashboard exchanges the credential
    for a device session, removes it from the address bar, and loads.
 
@@ -138,15 +145,18 @@ appears in **Settings → Anywhere** and on the **Health** page, and shows:
   this machine".
 - **Paired devices:** how many device sessions are active (not revoked).
 - **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
-  unfinished", or "Ready" with its backend. **Set up** opens Session Vault
-  settings. Not using the vault is a valid choice, not a problem.
+  unfinished", or "Ready" with its backend. **Set up** opens Settings → Session
+  Vault, which shows the `pan vault setup <git-url>` command to run in a
+  terminal. Setting up from the dashboard is planned
+  ([PAN-4446](https://github.com/eltmon/overdeck/issues/4446)). Not using the
+  vault is a valid choice, not a problem.
 
 Below that, the card lists each problem with its fix:
 
 | Problem | Fix |
 | --- | --- |
 | No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
-| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to its settings, where you unlock it with the vault passphrase or the recovery phrase. |
+| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to Settings → Session Vault, which shows the command to run in a terminal on this machine: `pan vault join <backend>`, then the vault passphrase or the recovery phrase. Unlocking from the dashboard is planned: [PAN-4446](https://github.com/eltmon/overdeck/issues/4446). |
 | A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
 | This machine's identity file is unreadable. | **How to fix** links to this page. Repair or restore `~/.overdeck/environment-id.json`; it is never re-created automatically. |
 
@@ -240,7 +250,10 @@ working. A `read:events` scoped token works there too, set or not. The dashboard
 
 A local reverse proxy (Tailscale Serve, cloudflared, a Traefik route) connects
 to the dashboard from `127.0.0.1`, so every visitor looks like a local caller.
-Turn on `require_token_mint` whenever such a proxy forwards outside traffic:
+Turn on `require_token_mint` whenever such a proxy forwards outside traffic.
+Idle dashboard terminals stay connected behind proxies with idle timeouts of 30s
+or more because the terminal WebSocket exchanges a ping/pong control frame every
+20s; programmatic clients opt in with `?heartbeat=1` ([PAN-4434](https://github.com/eltmon/overdeck/issues/4434)).
 
 ```yaml
 # ~/.overdeck/config.yaml
@@ -281,5 +294,3 @@ is read only from the global `~/.overdeck/config.yaml`, never from a project
   [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
-- A heartbeat on terminal WebSockets, so idle terminals survive proxies with
-  short idle timeouts: [PAN-4434](https://github.com/eltmon/overdeck/issues/4434).

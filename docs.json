@@ -56,7 +56,13 @@
           {
             "group": "Overdeck Anywhere",
             "pages": [
-              "anywhere"
+              "anywhere",
+              "configuration/session-vault",
+              "configuration/remote-access",
+              "cli/vault",
+              "cli/pair",
+              "cli/devices",
+              "cli/token"
             ]
           }
         ]
@@ -104,8 +110,6 @@
             "pages": [
               "configuration/projects",
               "configuration/telemetry",
-              "configuration/session-vault",
-              "configuration/remote-access",
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/model-presets",

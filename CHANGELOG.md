@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added: Overdeck Anywhere
+
+The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session Vault (`pan vault`) and device pairing (`pan pair`, `pan devices`) were released in v0.64.0. Merged since then:
+
+- Scoped API tokens: `pan token create|list|revoke` and `/api/access-tokens` (#4441, PAN-2351).
+- Settings → Access Tokens and the `dashboard.require_token_mint` toggle (#4450, PAN-4435).
+- Settings → Anywhere: pair dialog, trusted addresses, paired devices, Anywhere status card (#4449, PAN-4445).
+- Dashboard Session Vault: automatic save and sync, Settings → Session Vault with the eviction review (#4444, PAN-4307).
+- Read-only "from `<machine>`" conversation rows for vault conversations another machine owns (#4448, PAN-4436).
+- **Continue here** for those rows (#4454, PAN-4437).
+
 ### Breaking changes
 
 **Removed public exports.** `src/index.ts` (the `@overdeck/core` main entry) is an internal entry point, not a supported library API, so names can be removed in any release. These 38 names are gone with no bare-name replacement:

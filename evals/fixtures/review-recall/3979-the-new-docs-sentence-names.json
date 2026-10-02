@@ -39,6 +39,7 @@
       "delete",
       "prune-agent-rows",
       "close-out"
-    ]
+    ],
+    "evidence": "outside-excerpt"
   }
 }

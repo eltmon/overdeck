@@ -10,6 +10,8 @@ import type { LucideIcon } from 'lucide-react';
 import { fetchRegisteredProjects } from './CommandDeck/UnknownProjectState';
 import { fetchProjects, filterSpecOnlyPlanned, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
+import { PullRequestBadge } from './primitives/PullRequestBadge';
+import { issuePullRequestBadgeLink } from './primitives/issuePullRequest';
 import { useConversationMutations } from './CommandDeck/useConversationMutations';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
@@ -459,6 +461,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     // memory-synthesized one instead — plain text, no status dot, since it
     // reports what the workspace is doing rather than a pipeline state.
     const memoryPhase = ws.kind !== 'issue' ? ws.memoryPhase ?? null : null;
+    const prLink = ws.kind === 'issue' && ws.issueId
+      ? issuePullRequestBadgeLink(derivedByIssueId[ws.issueId.toUpperCase()]?.pr)
+      : null;
     return (
       <button
         key={ws.id}
@@ -469,10 +474,11 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       >
         <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
         <span className="truncate">{ws.name}</span>
-        {phase && (
+        {(phase || prLink) && (
           <span className="ml-auto flex items-center gap-1.5 shrink-0">
-            <span className={`h-2 w-2 rounded-full shrink-0 ${PHASE_DOT_CLASSES[phase]}`} aria-hidden="true" />
-            <span className="text-[10px] text-muted-foreground">{PHASE_LABELS[phase]}</span>
+            {prLink && <span data-testid={`sidebar-workspace-pr-${ws.id}`}><PullRequestBadge link={prLink} /></span>}
+            {phase && <span className={`h-2 w-2 rounded-full shrink-0 ${PHASE_DOT_CLASSES[phase]}`} aria-hidden="true" />}
+            {phase && <span className="text-[10px] text-muted-foreground">{PHASE_LABELS[phase]}</span>}
           </span>
         )}
         {memoryPhase && (

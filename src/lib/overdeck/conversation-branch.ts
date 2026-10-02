@@ -10,15 +10,18 @@ export interface ConversationBranchInput {
   readonly name: string;
   readonly cwd: string;
   readonly issueId: string | null;
+  /** The conversation's pane is live now; null/undefined when unknown. */
+  readonly live?: boolean | null;
 }
 
 /**
  * The conversation's branch, or null when it has none worth matching.
  *
- * - The cwd's current branch counts only in a linked git worktree or for an
- *   agent conversation. An operator conversation in the primary checkout
- *   shares that checkout's branch with every other conversation there, so it
- *   is never linked to whatever feature branch the checkout happens to be on.
+ * - The cwd's current branch counts in a linked git worktree, for an agent
+ *   conversation, or for an operator conversation in the primary checkout
+ *   whose pane is live at sweep time (PAN-4457). A primary checkout is
+ *   shared, so an idle conversation there is never linked to whatever branch
+ *   the checkout happens to be on; liveness unknown counts as not live.
  *   Explicit links are unaffected.
  * - An agent conversation whose cwd cannot be read falls back to the
  *   `feature/<issue>` workspace convention.
@@ -31,7 +34,8 @@ export async function resolveConversationBranch(
 ): Promise<string | null> {
   const isAgent = isAgentConversationName(conversation.name);
   const info = await resolveConversationGitInfo(conversation.cwd);
-  let branch = info.branch && info.branch !== 'HEAD' && (info.isWorktree || isAgent) ? info.branch : null;
+  const branchCounts = info.isWorktree || isAgent || conversation.live === true;
+  let branch = info.branch && info.branch !== 'HEAD' && branchCounts ? info.branch : null;
   if (!branch && conversation.issueId && isAgent) {
     branch = `feature/${conversation.issueId.toLowerCase()}`;
   }

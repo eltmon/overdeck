@@ -134,8 +134,9 @@ describe('review-artifacts', () => {
       },
     ]);
     expect(createReviewArtifactMock).toHaveBeenCalledOnce();
-    // PAN-3822: the opened PR is linked to the issue's agent conversations.
-    expect(linkCreatedMock).toHaveBeenCalledExactlyOnceWith('MIN-632', 'https://gitlab.example.com/merge_requests/7');
+    // PAN-3822/PAN-4457: the opened PR is linked to the issue's agent conversations
+    // and operator conversations working in the issue's workspace.
+    expect(linkCreatedMock).toHaveBeenCalledExactlyOnceWith('MIN-632', 'https://gitlab.example.com/merge_requests/7', workspacePath);
     expect(upsertMergeSetMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'reviewing',
       repos: expect.arrayContaining([

@@ -52,6 +52,7 @@ import {
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
@@ -263,6 +264,12 @@ export async function startRequestReviewPipeline(
     source: options.source ?? 'api',
     ...(options.note ? { data: { note: options.note } } : {}),
   });
+
+  // PAN-4457: the review door — every accepted request passes through here —
+  // is where the PR's existence is first certain (`pan done` opens it right
+  // before calling this), so this is where the issue row's PR badge refresh
+  // is triggered rather than waiting for the next tracker poll.
+  refreshIssuePullRequestStateNow(canonicalIssueId);
 
   const started = requestReviewPipeline.start(canonicalIssueId, {
     verify: () => Effect.runPromise(runVerificationForIssue(

@@ -1,0 +1,228 @@
+{
+  "version": "1",
+  "issueId": "PAN-4451",
+  "created": "2026-10-01T13:32:34.793Z",
+  "updated": "2026-10-01T14:11:47.133Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T14:09Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-01T14:09:00.323Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T14:11Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-01T14:11:47.133Z"
+    }
+  ],
+  "items": {
+    "conflict-gate-waive-ci": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:32:34.793Z",
+      "doneAt": "2026-10-01T13:34:36.689Z"
+    },
+    "conflict-prompt-wording": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:34:41.332Z",
+      "doneAt": "2026-10-01T13:35:30.475Z"
+    },
+    "blocked-journal-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:35:31.577Z",
+      "doneAt": "2026-10-01T13:38:01.244Z"
+    },
+    "task-block-on": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:38:06.900Z",
+      "doneAt": "2026-10-01T13:39:03.560Z"
+    },
+    "blocker-wake-tick": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:39:07.812Z",
+      "doneAt": "2026-10-01T13:41:33.358Z"
+    },
+    "blocker-wake-patrol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:41:34.512Z",
+      "doneAt": "2026-10-01T13:42:36.412Z"
+    },
+    "show-blocked-entries": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:42:37.470Z",
+      "doneAt": "2026-10-01T13:43:08.685Z"
+    },
+    "docs-conflict-repair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:43:09.779Z",
+      "doneAt": "2026-10-01T13:43:42.287Z"
+    },
+    "docs-blocker-wake": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:43:43.391Z",
+      "doneAt": "2026-10-01T13:44:21.077Z"
+    },
+    "agent-blocker-instructions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4451",
+      "claimedAt": "2026-10-01T13:44:22.483Z",
+      "doneAt": "2026-10-01T13:45:59.778Z"
+    },
+    "conflict-gate-waive-ci.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:55:28.660Z"
+    },
+    "conflict-gate-waive-ci.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:55:40.623Z"
+    },
+    "conflict-gate-waive-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:55:52.694Z"
+    },
+    "conflict-gate-waive-ci.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:04.258Z"
+    },
+    "conflict-prompt-wording.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:16.715Z"
+    },
+    "conflict-prompt-wording.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:31.761Z"
+    },
+    "blocked-journal-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:45.600Z"
+    },
+    "blocked-journal-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:56:58.593Z"
+    },
+    "blocked-journal-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:57:11.237Z"
+    },
+    "blocked-journal-types.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:57:23.789Z"
+    },
+    "task-block-on.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:57:36.466Z"
+    },
+    "task-block-on.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:57:48.640Z"
+    },
+    "task-block-on.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:00.711Z"
+    },
+    "task-block-on.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:12.810Z"
+    },
+    "blocker-wake-tick.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:24.915Z"
+    },
+    "blocker-wake-tick.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:37.618Z"
+    },
+    "blocker-wake-tick.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:58:49.721Z"
+    },
+    "blocker-wake-tick.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:59:03.006Z"
+    },
+    "blocker-wake-tick.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:59:16.414Z"
+    },
+    "blocker-wake-patrol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:59:29.187Z"
+    },
+    "blocker-wake-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:59:42.813Z"
+    },
+    "blocker-wake-patrol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T13:59:56.775Z"
+    },
+    "show-blocked-entries.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:00:11.509Z"
+    },
+    "show-blocked-entries.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:00:25.968Z"
+    },
+    "docs-conflict-repair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:00:39.455Z"
+    },
+    "docs-conflict-repair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:00:51.688Z"
+    },
+    "docs-blocker-wake.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:01:04.009Z"
+    },
+    "docs-blocker-wake.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:01:16.349Z"
+    },
+    "docs-blocker-wake.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:01:29.333Z"
+    },
+    "agent-blocker-instructions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:01:42.151Z"
+    },
+    "agent-blocker-instructions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:01:54.615Z"
+    },
+    "agent-blocker-instructions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:02:06.391Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-01T14:09:00Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4451\n\nPull request: https://github.com/eltmon/overdeck/pull/4452 (head `e1911009`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-01T14:11:47Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4451 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (0ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4451/.overdeck/verification/2026-10-01T14-02-34-163Z-176ed107.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4451/.overdeck/verification/2026-10-01T14-02-34-163Z-176ed107.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4451 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4451 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

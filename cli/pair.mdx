@@ -1,0 +1,48 @@
+---
+title: pan pair
+description: Print a one-time URL that pairs another device with this machine's dashboard
+---
+
+# `pan pair`
+
+```bash
+pan pair [--label <name>] [--url <base>] [--json]
+```
+
+Prints a one-time URL that pairs another device (a laptop, a tablet, a second desktop) with
+this machine's dashboard. Released in v0.64.0. The dashboard's **Pair a device** dialog is
+in the next release (v0.65.0). See [Remote access](/configuration/remote-access) and
+[pan devices](/cli/devices).
+
+| Flag | Effect |
+| --- | --- |
+| `--label <name>` | Name recorded for the pairing in the activity log. |
+| `--url <base>` | Base URL the other device can reach (default: this dashboard's API URL). |
+| `--json` | Print `{ url, credential, expiresAt }` as JSON. |
+
+## Output
+
+```
+Open this URL on the device to pair:
+
+  https://desk.tailnet.ts.net/#pair=odp_...
+
+Expires: 2026-10-01T12:34:56.000Z (single use; a dashboard restart invalidates it)
+Credential for manual entry: odp_...
+```
+
+The credential works once, expires 10 minutes after it is created, and a dashboard restart
+invalidates every credential that has not been used yet.
+
+When the base is `localhost`, `127.0.0.1`, `::1` or `*.localhost`, `pan pair` warns that the
+URL only works on this machine. With `--json` the warning goes to stderr; the JSON itself
+still goes to stdout.
+
+## Errors
+
+- No running dashboard: `` `Overdeck dashboard is not running; start it with `pan up`.` ``,
+  exit 1.
+- A dashboard that rejects this machine's internal token (for example a `pan serve` server,
+  which does not share it): `` `The dashboard rejected this machine's internal token. `pan
+  pair` needs a dashboard started by `pan up` (a `pan serve` server does not share
+  it).` ``, exit 1.

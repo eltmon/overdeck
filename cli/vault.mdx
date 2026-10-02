@@ -1,0 +1,234 @@
+---
+title: pan vault
+description: Session Vault commands: encrypted off-machine storage and cross-machine resume for agent conversations
+---
+
+# `pan vault`
+
+`pan vault` saves your agents' conversations, encrypted, into a backend you own, and lets
+another machine pick a conversation up where it left off. Released in v0.64.0. See
+[Session Vault](/configuration/session-vault) for the full guide. `pan vault` sends no
+telemetry.
+
+With no backend configured, every verb except `setup` and `join` prints `Session Vault is
+off. Run: pan vault setup <git-url>`.
+
+## setup
+
+```bash
+pan vault setup <git-url>
+```
+
+Enable the vault against your own git remote and print the recovery phrase once. `<git-url>`
+may also be `dir:<path>` for a local directory or NAS mount.
+
+| Flag | Effect |
+| --- | --- |
+| `--hooks` | Also register the Claude Code Stop hook that saves after each turn. |
+| `--passphrase-file <path>` | Also enable passphrase unlock with the passphrase in this file. |
+| `--generate-passphrase` | Also enable passphrase unlock with a generated 6-word passphrase, printed once. |
+| `--no-passphrase` | Do not offer passphrase unlock. |
+
+## join
+
+```bash
+pan vault join <git-url>
+```
+
+Join an existing vault from another machine with the vault passphrase or the recovery
+phrase.
+
+| Flag | Effect |
+| --- | --- |
+| `--phrase-file <path>` | Read the 24-word recovery phrase from a file instead of prompting. |
+| `--passphrase-file <path>` | Read the vault passphrase from a file instead of prompting. |
+
+## passphrase set
+
+```bash
+pan vault passphrase set
+```
+
+Wrap the vault key under a passphrase so a new machine can join without the recovery phrase.
+
+| Flag | Effect |
+| --- | --- |
+| `--passphrase-file <path>` | Read the passphrase from a file instead of prompting. |
+| `--generate` | Generate a 6-word passphrase and print it once. |
+
+## passphrase remove
+
+```bash
+pan vault passphrase remove
+```
+
+Delete the passphrase unlock object; joining then needs the recovery phrase. Takes no flags.
+
+## rotate-key
+
+```bash
+pan vault rotate-key
+```
+
+Replace the vault key after losing a device: re-encrypt refs under a new key, keep old
+chunks readable, print a new recovery phrase.
+
+| Flag | Effect |
+| --- | --- |
+| `--yes` | Rotate without the confirmation prompt. |
+| `--passphrase-file <path>` | Re-wrap passphrase unlock under the new key with the passphrase in this file. |
+| `--generate-passphrase` | Re-wrap passphrase unlock under the new key with a generated 6-word passphrase, printed once. |
+| `--no-passphrase` | Turn passphrase unlock off. |
+
+## status
+
+```bash
+pan vault status
+```
+
+Show backend, this machine, owned records, last sync and the machine list.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output in JSON format. |
+
+## save
+
+```bash
+pan vault save [session-id-or-path]
+```
+
+Settle one transcript (by session id or path) or many into the vault.
+
+| Flag | Effect |
+| --- | --- |
+| `--all` | Settle every discovered transcript. |
+| `--since <date>` | With `--all`: only transcripts modified on or after this date. |
+| `--harness <harness>` | With `--all`: only this harness (`claude-code`, `codex`, ...). |
+| `--hook` | Claude Code Stop-hook mode: read `{session_id, transcript_path}` JSON from stdin, print nothing, exit 0. |
+
+## sync
+
+```bash
+pan vault sync
+```
+
+Settle owned transcripts that grew, register this machine and refresh the list. Takes no
+flags.
+
+## list
+
+```bash
+pan vault list
+```
+
+List saved conversations from the local cache. Never contacts the backend.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output in JSON format. |
+
+## show
+
+```bash
+pan vault show <id>
+```
+
+Print a saved conversation read-only with its versions.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output in JSON format. |
+
+## resume
+
+```bash
+pan vault resume <id>
+pan vault resume <id>@<version>
+```
+
+Continue a saved conversation here; adopts it and launches the harness. `<id>@<version>`
+forks at that version instead of the latest.
+
+| Flag | Effect |
+| --- | --- |
+| `--cwd <dir>` | Working directory to resume in (default: the saved cwd). |
+| `--no-launch` | Print the launch command instead of running it. |
+| `--on-drift <choice>` | When the cwd state differs from the saved state: `continue \| note \| cancel`. |
+| `--no-code` | Do not apply the saved code snapshot; only continue the conversation. |
+| `--worktree <dir>` | Apply the code snapshot into a new git worktree at `<dir>` instead of the target checkout. |
+
+## exclude
+
+```bash
+pan vault exclude [path]
+```
+
+Exclude conversations by cwd path, git origin or session id. An excluded saved record
+becomes a tombstone.
+
+| Flag | Effect |
+| --- | --- |
+| `--origin <url>` | Exclude conversations whose git origin is this URL. |
+| `--session <id>` | Exclude one session by native session id or vault id. |
+
+## include
+
+```bash
+pan vault include [path]
+```
+
+Remove an exclusion added with `pan vault exclude`.
+
+| Flag | Effect |
+| --- | --- |
+| `--origin <url>` | Include conversations whose git origin is this URL again. |
+| `--session <id>` | Include one session again. |
+
+## allow-secret
+
+```bash
+pan vault allow-secret <id-or-path> [line]
+```
+
+Allow one blocked transcript line, or the blocked code lines of one file, for that record
+only.
+
+| Flag | Effect |
+| --- | --- |
+| `--file <path>` | Allow the blocked lines of this file in the code snapshot (path relative to the repository root). |
+
+## evict
+
+```bash
+pan vault evict
+```
+
+Review the pending-deletion batch (default) or act on it. Nothing is deleted without
+`--confirm`. Eviction needs `"evict": true` in `~/.overdeck/vault/config.json`.
+
+| Flag | Effect |
+| --- | --- |
+| `--review` | Scan and print the batch with its fingerprint (default). |
+| `--confirm <fingerprint>` | Delete the reviewed files if the batch still matches this fingerprint. |
+| `--decline <vaultId>` | Remove an entry from the batch and do not offer it again. |
+| `--reoffer <vaultId>` | Allow a declined entry to be offered again. |
+| `--clear` | Empty the batch without deleting or declining anything. |
+
+## restore
+
+```bash
+pan vault restore <id>
+```
+
+Rebuild an evicted transcript byte for byte at its original path.
+
+| Flag | Effect |
+| --- | --- |
+| `--to <path>` | Write the rebuilt file here instead of the recorded path. |
+
+## In the dashboard
+
+Settings → Session Vault and **Continue here** are in the next release (v0.65.0). Setting
+up, joining and unlocking the vault from the dashboard is planned:
+[PAN-4446](https://github.com/eltmon/overdeck/issues/4446).

@@ -14,6 +14,7 @@ export const EVAL_DEFAULT_MAX_OUTPUT_TOKENS = 16_000;
 
 export type EvalProvider = 'anthropic' | 'openai';
 export type OpenAIVia = 'api' | 'cliproxy';
+export type AnthropicVia = 'api' | 'claude-cli';
 
 export interface EvalModelConfig {
   /** Exactly the OVERDECK_EVAL_MODEL value. */
@@ -32,6 +33,8 @@ export interface EvalModelConfig {
   maxTokens: number;
   /** OpenAI only. */
   openaiVia: OpenAIVia | null;
+  /** Anthropic only. */
+  anthropicVia: AnthropicVia | null;
 }
 
 const DATED_SNAPSHOT_SUFFIX = /-\d{8}$/;
@@ -115,7 +118,17 @@ export function resolveEvalModelConfig(
     openaiVia = via;
   }
 
+  // Selected explicitly only: a missing ANTHROPIC_API_KEY never switches the route.
+  let anthropicVia: AnthropicVia | null = null;
+  if (provider === 'anthropic') {
+    const via = env['OVERDECK_EVAL_ANTHROPIC_VIA']?.trim() || 'api';
+    if (via !== 'api' && via !== 'claude-cli') {
+      throw new Error(`OVERDECK_EVAL_ANTHROPIC_VIA="${via}" is not supported (use api or claude-cli).`);
+    }
+    anthropicVia = via;
+  }
+
   const apiModel = provider === 'openai' ? apiLaunchModelId(model) : model;
 
-  return { model, catalogId, apiModel, provider, effort, thinking, temperature, maxTokens, openaiVia };
+  return { model, catalogId, apiModel, provider, effort, thinking, temperature, maxTokens, openaiVia, anthropicVia };
 }

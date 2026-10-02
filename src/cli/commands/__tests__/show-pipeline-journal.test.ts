@@ -62,6 +62,18 @@ describe('summarizePipelineEntry', () => {
     }))).toBe('agent-pan-4383-review-security needs you — silent again after re-dispatch (pane pane-dead)');
   });
 
+  it('names the item and its blockers of a blocker declaration (PAN-4451)', () => {
+    expect(summarizePipelineEntry(entry('blocked.declared', { item: 'PAN-1-a', blockers: ['PAN-2', 'eltmon/overdeck#7'] })))
+      .toBe('PAN-1-a waits on PAN-2, eltmon/overdeck#7');
+  });
+
+  it('names who a blocker wake woke, or that it needs you (PAN-4451)', () => {
+    expect(summarizePipelineEntry(entry('blocked.woken', { item: 'PAN-1-a', outcome: 'delivered', agentId: 'agent-pan-1' })))
+      .toBe('PAN-1-a woke agent-pan-1');
+    expect(summarizePipelineEntry(entry('blocked.woken', { item: 'PAN-1-a', outcome: 'unreachable' })))
+      .toBe('PAN-1-a needs you — agent unreachable');
+  });
+
   it('names who asked for the review', () => {
     expect(summarizePipelineEntry(entry('review.requested', undefined, 'pan-done'))).toBe('pan-done');
   });

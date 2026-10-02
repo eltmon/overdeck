@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ensureEnvironmentIdentity } from '../../../../src/lib/environment-identity.js';
+import { adoptRecord, forkRecordAtVersion } from '../../../../src/lib/vault/adopt.js';
 import { VAULT_CONFIG_DEFAULTS, type VaultConfig } from '../../../../src/lib/vault/config.js';
 import { encryptRef, refName } from '../../../../src/lib/vault/format.js';
 import { createVaultKey, deriveSubkeys } from '../../../../src/lib/vault/identity.js';
@@ -160,6 +161,49 @@ describe('vault sync: syncOnce', () => {
     const blind = await syncOnce({ store, keys, config });
     expect(blind.retired).toBe(0);
     expect(blind.unreadable).toBe(2);
+  });
+
+  it('list-cache-parent.ac1: a P-6 settlement fork row carries parentVaultId and forkKind "settlement"', async () => {
+    useHome(homeA);
+    const nativePath = join(root, 'a-session.jsonl');
+    writeFileSync(nativePath, `${user('first', cwd)}\n`);
+    const saved = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+    if (saved.verdict !== 'append') throw new Error(`expected append, got ${saved.verdict}`);
+    const vaultId = saved.vaultId;
+
+    useHome(homeB);
+    const adopted = await adoptRecord({ vaultId, store, keys, targetCwd: cwd, projectsRoot: join(root, 'projects-b') });
+    expect(adopted.adopted).toBe(true);
+
+    useHome(homeA);
+    appendFileSync(nativePath, `${user('typed on A later', cwd)}\n`);
+    const later = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+    expect(later).toMatchObject({ verdict: 'append', forkedFrom: { vaultId, version: 1 } });
+    if (later.verdict !== 'append') throw new Error(`expected append, got ${later.verdict}`);
+    const forkId = later.vaultId;
+
+    const report = await syncOnce({ store, keys, config });
+    expect(report.offline).toBe(false);
+    const rows = await readListCache();
+    expect(rows.find((row) => row.vaultId === forkId)).toMatchObject({ parentVaultId: vaultId, forkKind: 'settlement' });
+    const parentRow = rows.find((row) => row.vaultId === vaultId);
+    expect(parentRow).not.toHaveProperty('parentVaultId');
+    expect(parentRow).not.toHaveProperty('forkKind');
+  });
+
+  it('list-cache-parent.ac2: a forkRecordAtVersion row carries forkKind "version"', async () => {
+    useHome(homeA);
+    const nativePath = join(root, 'a-session.jsonl');
+    writeFileSync(nativePath, `${user('first', cwd)}\n`);
+    const saved = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+    if (saved.verdict !== 'append') throw new Error(`expected append, got ${saved.verdict}`);
+    const vaultId = saved.vaultId;
+
+    const fork = await forkRecordAtVersion({ vaultId, version: 1, store, keys });
+    const report = await syncOnce({ store, keys, config });
+    expect(report.offline).toBe(false);
+    const rows = await readListCache();
+    expect(rows.find((row) => row.vaultId === fork.vaultId)).toMatchObject({ parentVaultId: vaultId, forkKind: 'version' });
   });
 
   it('an offline refresh returns { offline: true } and touches nothing', async () => {
