@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-658",
+  "created": "2026-10-02T05:23:15.999Z",
+  "updated": "2026-10-02T05:23:15.999Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "share-scaffold": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-658",
+      "claimedAt": "2026-10-02T05:23:15.999Z"
+    }
+  }
+}
