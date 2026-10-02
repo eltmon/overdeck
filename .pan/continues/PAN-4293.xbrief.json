@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:29:00.304Z",
+  "updated": "2026-10-02T04:29:12.135Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,11 @@
     "account-device-api.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T04:29:00.304Z"
+    },
+    "account-deletion": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4293",
+      "claimedAt": "2026-10-02T04:29:12.135Z"
     }
   }
 }
