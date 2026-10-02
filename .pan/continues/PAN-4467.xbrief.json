@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4467",
   "created": "2026-10-02T03:04:42.079Z",
-  "updated": "2026-10-02T03:53:35.226Z",
+  "updated": "2026-10-02T03:53:47.137Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "log-declined-heads.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T03:53:35.226Z"
+    },
+    "docs-stale-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:47.136Z"
     }
   }
 }
