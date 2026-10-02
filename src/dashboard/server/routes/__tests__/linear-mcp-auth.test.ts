@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolve: vi.fn(),
   getIssues: vi.fn(),
   getConversationByName: vi.fn(),
+  getConversationByTmuxSession: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents/messaging.js', () => ({
@@ -27,6 +28,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
   getConversationByName: mocks.getConversationByName,
+  getConversationByTmuxSession: mocks.getConversationByTmuxSession,
 }));
 
 import {
@@ -97,6 +99,7 @@ describe('Linear MCP auth routes', () => {
     mocks.resolve.mockReset().mockResolvedValue(NONE);
     mocks.getIssues.mockReset().mockReturnValue([]);
     mocks.getConversationByName.mockReset().mockReturnValue(null);
+    mocks.getConversationByTmuxSession.mockReset().mockReturnValue(null);
   });
 
   it('GET returns the projection without side effects', async () => {
@@ -131,27 +134,57 @@ describe('Linear MCP auth routes', () => {
     });
   });
 
-  it('GET enriches a blocked conversation with its canonical /conv/<rowid> URL', async () => {
+  it('GET resolves a blocked conversation by its tmux session to the canonical /conv/<rowid> URL', async () => {
     mocks.resolve.mockResolvedValue({
       ...ACTIVE,
-      authUrlAgentId: 'conv-20260815-f8c3',
+      authUrlAgentId: 'conv-20261001-eba1',
       blockedAgents: [{
-        agentId: 'conv-20260815-f8c3',
+        agentId: 'conv-20261001-eba1',
         issueId: null,
-        declaredAt: '2026-08-15T12:19:35.000Z',
-        expiresAt: '2026-08-15T16:52:22.000Z',
+        declaredAt: '2026-10-01T12:19:35.000Z',
+        expiresAt: '2026-10-01T12:49:35.000Z',
         notifiedAt: null,
       }],
     });
-    mocks.getConversationByName.mockReturnValue({ id: 173, name: 'conv-20260815-f8c3' });
+    mocks.getConversationByTmuxSession.mockReturnValue({
+      id: 3172,
+      name: '20261001-eba1',
+      title: 'Fernkite: hosted Emma assessment',
+    });
 
     const result = await request('GET', '/api/linear-mcp-auth');
 
     expect(result.status).toBe(200);
-    expect(mocks.getConversationByName).toHaveBeenCalledWith('conv-20260815-f8c3');
+    expect(mocks.getConversationByTmuxSession).toHaveBeenCalledWith('conv-20261001-eba1');
+    expect(mocks.getConversationByName).not.toHaveBeenCalled();
     expect((result.body['blockedAgents'] as Array<Record<string, unknown>>)[0]).toMatchObject({
-      agentId: 'conv-20260815-f8c3',
-      conversationUrl: '/conv/173',
+      agentId: 'conv-20261001-eba1',
+      conversationUrl: '/conv/3172',
+    });
+  });
+
+  it('GET falls back to the bare conversation name when the tmux lookup misses', async () => {
+    mocks.resolve.mockResolvedValue({
+      ...ACTIVE,
+      authUrlAgentId: 'conv-20261001-eba1',
+      blockedAgents: [{
+        agentId: 'conv-20261001-eba1',
+        issueId: null,
+        declaredAt: '2026-10-01T12:19:35.000Z',
+        expiresAt: '2026-10-01T12:49:35.000Z',
+        notifiedAt: null,
+      }],
+    });
+    mocks.getConversationByName.mockReturnValue({ id: 3172, name: '20261001-eba1' });
+
+    const result = await request('GET', '/api/linear-mcp-auth');
+
+    expect(result.status).toBe(200);
+    expect(mocks.getConversationByTmuxSession).toHaveBeenCalledWith('conv-20261001-eba1');
+    expect(mocks.getConversationByName).toHaveBeenCalledWith('20261001-eba1');
+    expect((result.body['blockedAgents'] as Array<Record<string, unknown>>)[0]).toMatchObject({
+      agentId: 'conv-20261001-eba1',
+      conversationUrl: '/conv/3172',
     });
   });
 
@@ -169,7 +202,6 @@ describe('Linear MCP auth routes', () => {
         },
       ],
     });
-    mocks.getConversationByName.mockReturnValue(null);
 
     const result = await request('GET', '/api/linear-mcp-auth');
 
@@ -178,8 +210,10 @@ describe('Linear MCP auth routes', () => {
     expect(agents[0]).toMatchObject({ agentId: 'agent-min-852', conversationUrl: null });
     expect(agents[1]).toMatchObject({ agentId: 'conv-20260815-0000', conversationUrl: null });
     // The read door is only consulted for conv-* agents.
+    expect(mocks.getConversationByTmuxSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getConversationByTmuxSession).toHaveBeenCalledWith('conv-20260815-0000');
     expect(mocks.getConversationByName).toHaveBeenCalledTimes(1);
-    expect(mocks.getConversationByName).toHaveBeenCalledWith('conv-20260815-0000');
+    expect(mocks.getConversationByName).toHaveBeenCalledWith('20260815-0000');
   });
 
   it.each([

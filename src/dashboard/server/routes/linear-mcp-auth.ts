@@ -8,7 +8,7 @@ import {
   type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
-import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { getConversationByName, getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -78,8 +78,9 @@ function withIssueUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIn
 /**
  * Attach each blocked conversation's canonical dashboard URL — /conv/<rowid>,
  * the DB row id, which is how conversations are displayed everywhere else in
- * the dashboard. Resolved through the conversations read door by name.
- * Best-effort: an unresolvable conversation falls back to null and the banner
+ * the dashboard. The blocked agent id is the conversation's tmux session
+ * (`conv-<name>`), so it resolves by tmux session first, then by the bare
+ * DB name so an archived conversation still links (PAN-4464). Best-effort: an unresolvable conversation falls back to null and the banner
  * renders the id as plain text.
  */
 function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIntervention {
@@ -91,7 +92,8 @@ function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMc
       }
       let conversationUrl: string | null = null;
       try {
-        const conversation = getConversationByName(agent.agentId);
+        const conversation = getConversationByTmuxSession(agent.agentId)
+          ?? getConversationByName(agent.agentId.slice('conv-'.length));
         conversationUrl = conversation === null ? null : `/conv/${conversation.id}`;
       } catch {
         conversationUrl = null;
