@@ -474,7 +474,7 @@ async function spawnReviewRoleForIssueBody(
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, stopAgent, wipeAgentStateDirs } = await import('../agents.js');
     const workAgentState = getAgentState(`agent-${opts.issueId.toLowerCase()}`);
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
@@ -542,8 +542,9 @@ async function spawnReviewRoleForIssueBody(
     });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
+      const resumeDispatchedAt = new Date().toISOString();
       const resumeResult = await resumeAgent(reviewAgentId, prompt);
-      if (resumeResult.success) {
+      if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
           const resumed = getAgentState(reviewAgentId);
@@ -551,6 +552,8 @@ async function spawnReviewRoleForIssueBody(
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
             resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            // PAN-4433: the silent-reviewer clock starts before the resume.
+            resumed.reviewDispatchedAt = resumeDispatchedAt;
             // #3853: rewritten on every dispatch so a later automatic cycle
             // never inherits an operator's request.
             resumed.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
@@ -581,7 +584,15 @@ async function spawnReviewRoleForIssueBody(
         }
         return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
       }
-      console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeResult.error}`);
+      const resumeError = resumeResult.messageDelivered === false
+        ? 'continue prompt was not confirmed in the resumed session'
+        : resumeResult.error;
+      console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeError}`);
+      // PAN-4433: a live parent whose kickoff never landed sits idle forever; stop it
+      // before the fresh spawn, the same guard convoy lanes have (PAN-2743).
+      if (resumeResult.messageDelivered === false || resumeResult.error?.includes('it appears healthy')) {
+        await Effect.runPromise(stopAgent(reviewAgentId));
+      }
     }
     // Fresh review: wipe any stale review state (harness/model changed, or the resume above
     // failed) so the new session does not inherit a mismatched saved session id.
@@ -589,6 +600,7 @@ async function spawnReviewRoleForIssueBody(
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
+    const dispatchedAt = new Date().toISOString();
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
@@ -604,6 +616,8 @@ async function spawnReviewRoleForIssueBody(
     run.reviewRunId = runId;
     // PAN-2584: arm the parent's liveness deadline for this cycle.
     run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+    // PAN-4433: the silent-reviewer clock starts before the spawn.
+    run.reviewDispatchedAt = dispatchedAt;
     // #3853: the verdict guard lets an operator-requested run block an approved head.
     run.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
     try {

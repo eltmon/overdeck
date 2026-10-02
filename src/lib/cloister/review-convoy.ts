@@ -202,6 +202,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
     });
     if (canResumeReviewer) {
       console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
+      const resumeDispatchedAt = new Date().toISOString();
       const resumeResult = await resumeAgent(reviewerAgent, prompt);
       if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
@@ -212,6 +213,8 @@ export async function spawnReviewSubRoleForIssue(opts: {
             resumed.reviewOutputPath = outputPath;
             resumed.reviewSynthesisAgentId = synthesisAgentId;
             resumed.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+            // PAN-4433: the silent-reviewer clock starts before the resume.
+            resumed.reviewDispatchedAt = resumeDispatchedAt;
             delete resumed.reviewMonitorSignaled;
             delete resumed.reviewRetryAttempt;
             await Effect.runPromise(saveAgentState(resumed));
@@ -246,6 +249,8 @@ export async function spawnReviewSubRoleForIssue(opts: {
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
       reviewDeadlineAt,
+      // PAN-4433: the silent-reviewer clock starts before the spawn.
+      reviewDispatchedAt: new Date().toISOString(),
       allowHost: opts.allowHost ?? false,
       startedBy: 'review-convoy' as const,
     };

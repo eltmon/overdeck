@@ -146,6 +146,12 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.status ?? 'unknown'} deferred${typeof data.reason === 'string' ? ` — ${data.reason}` : ''}`;
     case 'review.verdict-replay-gave-up':
       return `replay gave up (${data.reason ?? 'unknown'})`;
+    case 'review.stalled': {
+      const silentFor = typeof data.silentForMs === 'number' ? ` ${Math.round(data.silentForMs / 60_000)}m` : '';
+      return `${data.reviewer ?? 'reviewer'} silent${silentFor} (pane ${data.paneState ?? '?'}) — re-dispatched`;
+    }
+    case 'review.stall-escalated':
+      return `${data.reviewer ?? 'reviewer'} needs you — ${data.reason ?? 'stalled again'} (pane ${data.paneState ?? '?'})`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':

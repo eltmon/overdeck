@@ -1,0 +1,164 @@
+{
+  "version": "1",
+  "issueId": "PAN-4433",
+  "created": "2026-09-30T16:40:45.395Z",
+  "updated": "2026-09-30T18:40:59.720Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-30T18:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-09-30T18:06:03.455Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-09-30T18:40:59.720Z"
+    }
+  ],
+  "items": {
+    "dispatch-stamp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T16:40:45.395Z",
+      "doneAt": "2026-09-30T16:52:33.216Z"
+    },
+    "stall-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T16:52:42.427Z",
+      "doneAt": "2026-09-30T17:00:05.580Z"
+    },
+    "parent-resume-delivery-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T17:00:11.166Z",
+      "doneAt": "2026-09-30T17:07:16.382Z"
+    },
+    "journal-types-show": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T17:07:23.578Z",
+      "doneAt": "2026-09-30T17:10:54.236Z"
+    },
+    "silent-detector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T17:11:00.223Z",
+      "doneAt": "2026-09-30T17:14:02.798Z"
+    },
+    "silent-recovery-routine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T17:14:07.917Z",
+      "doneAt": "2026-09-30T17:30:35.070Z"
+    },
+    "docs-silent-reviewers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4433",
+      "claimedAt": "2026-09-30T17:30:40.422Z",
+      "doneAt": "2026-09-30T17:31:58.375Z"
+    },
+    "dispatch-stamp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:36:13.195Z"
+    },
+    "dispatch-stamp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:36:36.382Z"
+    },
+    "dispatch-stamp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:36:55.731Z"
+    },
+    "dispatch-stamp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:37:24.046Z"
+    },
+    "stall-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:37:50.882Z"
+    },
+    "stall-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:13.931Z"
+    },
+    "stall-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:36.395Z"
+    },
+    "parent-resume-delivery-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:38:56.123Z"
+    },
+    "parent-resume-delivery-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:15.198Z"
+    },
+    "journal-types-show.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:35.378Z"
+    },
+    "journal-types-show.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:39:54.222Z"
+    },
+    "silent-detector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:24.214Z"
+    },
+    "silent-detector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:41.108Z"
+    },
+    "silent-detector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:40:55.634Z"
+    },
+    "silent-detector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:10.421Z"
+    },
+    "silent-recovery-routine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:23.512Z"
+    },
+    "silent-recovery-routine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:37.295Z"
+    },
+    "silent-recovery-routine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:41:50.208Z"
+    },
+    "silent-recovery-routine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:03.608Z"
+    },
+    "silent-recovery-routine.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:17.223Z"
+    },
+    "silent-recovery-routine.ac6": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:32.238Z"
+    },
+    "docs-silent-reviewers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:42:46.416Z"
+    },
+    "docs-silent-reviewers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:00.767Z"
+    },
+    "docs-silent-reviewers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-30T17:43:14.757Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

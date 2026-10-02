@@ -237,6 +237,7 @@ async function spawnRunWithoutConsentClaim(
     reviewSynthesisAgentId: options.reviewSynthesisAgentId,
     reviewOutputPath: options.reviewOutputPath,
     reviewDeadlineAt: options.reviewDeadlineAt,
+    reviewDispatchedAt: options.reviewDispatchedAt,
     parentId: options.parentId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,

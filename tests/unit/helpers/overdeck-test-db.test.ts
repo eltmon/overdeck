@@ -73,6 +73,7 @@ describe('overdeck test fixture', () => {
       costSoFar: 1.2345,
       reviewSubRole: 'security',
       reviewRunId: 'run-7',
+      reviewDispatchedAt: '2026-06-17T00:10:00.000Z',
     } as AgentState);
 
     const got = getOverdeckAgentStateSync('agent-restored');
@@ -91,5 +92,7 @@ describe('overdeck test fixture', () => {
     expect(got?.costSoFar).toBeCloseTo(1.2345);
     expect(got?.reviewSubRole).toBe('security');
     expect(got?.reviewRunId).toBe('run-7');
+    // PAN-4433: cleanAgentState is a whitelist; the dispatch stamp must survive it.
+    expect(got?.reviewDispatchedAt).toBe('2026-06-17T00:10:00.000Z');
   });
 });

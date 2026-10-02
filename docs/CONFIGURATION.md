@@ -298,6 +298,22 @@ roles:
         model: claude-sonnet-4-6
 ```
 
+`roles.review.stallMinutes` (a positive integer, default 15) is how long a
+dispatched reviewer may stay silent — no transcript write and no report since
+its dispatch — before deacon-lite recovers it (`reviewStallMs` in
+`src/lib/config-yaml/roles.ts`). After one period the reviewer's pane is closed
+and it is re-dispatched once. If the re-dispatched reviewer is still silent, or
+has died without a report, one more period later, the issue surfaces as
+needs-you and the reviewer is not re-dispatched again for that run. Config load
+and the Settings API reject `0`, negative, and non-integer values. See
+"Deacon-lite: eight routines" in [PIPELINE-GATES.md](PIPELINE-GATES.md).
+
+```yaml
+roles:
+  review:
+    stallMinutes: 10
+```
+
 **Removed:** the `[[specialists.review_agents]]` list in `cloister.toml`
 (`name`, `model`, `focus`, `enabled`). Nothing reads it. The reviewer lanes are
 fixed: a lane's model comes from `roles.review.sub.<lane>.model`, and whether

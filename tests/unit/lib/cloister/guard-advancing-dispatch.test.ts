@@ -20,6 +20,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   getLatestSessionId: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentState>) => mockSaveAgentState(...args),
   resumeAgent: vi.fn(async () => ({ success: false })),
+  stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
 }));
 
