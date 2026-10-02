@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-658",
   "created": "2026-10-02T05:23:15.999Z",
-  "updated": "2026-10-02T06:05:01.006Z",
+  "updated": "2026-10-02T06:05:12.996Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "share-turn.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T06:05:01.006Z"
+    },
+    "share-turn.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T06:05:12.996Z"
     }
   }
 }
