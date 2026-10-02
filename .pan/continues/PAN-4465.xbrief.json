@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4465",
+  "created": "2026-10-02T02:35:56.189Z",
+  "updated": "2026-10-02T02:35:56.189Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "bare-numeric-matches": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4465",
+      "claimedAt": "2026-10-02T02:35:56.189Z"
+    }
+  }
+}
