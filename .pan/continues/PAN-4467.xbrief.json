@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4467",
   "created": "2026-10-02T03:04:42.079Z",
-  "updated": "2026-10-02T03:51:42.595Z",
+  "updated": "2026-10-02T03:51:53.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "gate-stale-approval.ac1": {
       "status": "completed",
       "doneAt": "2026-10-02T03:51:42.595Z"
+    },
+    "gate-stale-approval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:53.994Z"
     }
   }
 }
