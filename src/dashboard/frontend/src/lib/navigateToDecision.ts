@@ -23,17 +23,22 @@ export interface DecisionSubjectTarget {
   id: string;
   source: PendingInputSource;
   issueId?: string;
+  // PAN-4466: send a conversation straight to its terminal view. Ignored for an agent target.
+  view?: 'terminal';
 }
 
 /** The path a subject resolves to, or null when there is nowhere to send the operator. */
 export function decisionSubjectPath(target: DecisionSubjectTarget): string | null {
-  if (target.source === 'conversation') return `/conv/${encodeURIComponent(target.id)}`;
+  if (target.source === 'conversation') {
+    const path = `/conv/${encodeURIComponent(target.id)}`;
+    return target.view === 'terminal' ? `${path}?view=terminal` : path;
+  }
   return target.issueId ? `/issues/${encodeURIComponent(target.issueId)}` : null;
 }
 
 export function navigateToDecisionSubject(target: DecisionSubjectTarget): void {
   const path = decisionSubjectPath(target);
   if (!path) return;
-  if (window.location.pathname !== path) window.history.pushState({}, '', path);
+  if (window.location.pathname + window.location.search !== path) window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
