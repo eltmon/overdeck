@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:34:41.885Z",
+  "updated": "2026-10-02T04:34:55.193Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,10 @@
     "account-maintenance.ac1": {
       "status": "completed",
       "doneAt": "2026-10-02T04:34:41.885Z"
+    },
+    "account-maintenance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:34:55.192Z"
     }
   }
 }
