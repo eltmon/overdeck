@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:55:12.009Z",
+  "updated": "2026-10-02T04:56:20.871Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -366,9 +366,10 @@
       "doneAt": "2026-10-02T04:54:58.585Z"
     },
     "account-deploy-checkpoint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4293",
-      "claimedAt": "2026-10-02T04:55:12.009Z"
+      "claimedAt": "2026-10-02T04:55:12.009Z",
+      "doneAt": "2026-10-02T04:56:20.870Z"
     }
   }
 }
