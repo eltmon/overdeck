@@ -1,8 +1,19 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Loader2, ExternalLink, CheckCircle2 } from 'lucide-react';
-import { useLinearMcpAuthStatus } from '../hooks/useLinearMcpAuthStatus';
+import { useLinearMcpAuthStatus, type LinearMcpAuthBlockedAgent } from '../hooks/useLinearMcpAuthStatus';
 import { trackerIssueUrl } from '../lib/issueLinks';
+
+/**
+ * A blocked agent's row label and in-dashboard link (PAN-4464): the
+ * conversation title linking its /conv/<rowid> view, else the issue id
+ * linking the issue view, else the raw agent id as plain text.
+ */
+export function blockedAgentLink(agent: LinearMcpAuthBlockedAgent): { label: string; href: string | null } {
+  const label = agent.conversationTitle ?? agent.issueId ?? agent.agentId;
+  const href = agent.conversationUrl ?? (agent.issueId ? `/issues/${agent.issueId}` : null);
+  return { label, href };
+}
 
 /**
  * Global intervention banner for Linear MCP OAuth (PAN-2997). Any agent whose
@@ -98,30 +109,27 @@ export function LinearMcpAuthBanner() {
       {blockedAgents.length > 0 && (
         <ul className="text-warning-foreground text-sm pl-8 flex flex-col gap-0.5">
           {blockedAgents.map((agent) => {
+            const { label, href } = blockedAgentLink(agent);
             const issueUrl = agent.issueUrl ?? (agent.issueId ? trackerIssueUrl(agent.issueId) : null);
-            // Conversations link to their canonical /conv/<rowid> view (the
-            // DB row id, projected by the server); agents without a
-            // conversation page stay plain text next to their issue link.
             return (
               <li key={agent.agentId}>
-                {agent.conversationUrl ? (
-                  <a href={agent.conversationUrl} className="font-semibold underline hover:opacity-80">
-                    {agent.agentId}
+                {href ? (
+                  <a href={href} title={agent.agentId} className="font-semibold underline hover:opacity-80">
+                    {label}
                   </a>
                 ) : (
-                  <span className="font-semibold">{agent.agentId}</span>
+                  <span className="font-semibold" title={agent.agentId}>{label}</span>
                 )}
-                {agent.issueId && (
-                  <>
-                    {' — '}
-                    {issueUrl ? (
-                      <a href={issueUrl} target="_blank" rel="noreferrer" className="underline hover:opacity-80">
-                        {agent.issueId}
-                      </a>
-                    ) : (
-                      agent.issueId
-                    )}
-                  </>
+                {agent.issueId && issueUrl && (
+                  <a
+                    href={issueUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${agent.issueId} in tracker`}
+                    className="inline-flex align-middle ml-1 hover:opacity-80"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 )}
                 {agent.notifiedAt && <span className="opacity-80"> (woken, re-checking)</span>}
               </li>
