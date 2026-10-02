@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:41:34.039Z",
+  "updated": "2026-10-02T04:41:48.241Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -290,6 +290,10 @@
     "account-admin-grants-screen.ac2": {
       "status": "completed",
       "doneAt": "2026-10-02T04:41:34.039Z"
+    },
+    "account-admin-grants-screen.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:41:48.240Z"
     }
   }
 }
