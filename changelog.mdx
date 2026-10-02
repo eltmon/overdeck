@@ -28,6 +28,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   - **TLDR removed:** the TLDR Read hook, its index daemon, the `pan admin tldr` and `pan status --tldr` commands, the Health and Metrics TLDR panel, the Settings toggle and the `pan-tldr`/`pan-admin-tldr` skills are gone. A 14-day audit of 2,071 agent transcripts found 282 reads the hook replaced with an outline. Within the next 8 tool calls, 74.5% re-read the file with offset/limit, 13.8% read it through Bash, 3.9% re-read it in full, and only 7.8% worked from the outline, so each denial cost an extra model turn instead of saving tokens. New workspaces no longer install a ~1.5 GB Python venv or start a daemon, and creating a workspace now refuses to run with under 10 GiB free. `pan sync` and `pan install` unregister the two hooks from `~/.claude/settings.json` (and from workspace-local `.claude/settings.json` copies) before deleting their scripts, and the dashboard stops leftover daemons when it starts. Leftover `.venv` and `.tldr/` directories are not deleted; `pan sync` tells you when some exist. An `agents.tldr` key in `config.yaml` is ignored and dropped on the next Settings save. Restart agents started before the upgrade so their sessions stop loading the old hooks. ([#4429](https://github.com/eltmon/overdeck/issues/4429))
 
+  #### Fixed
+
+  - **Permission prompts with long commands:** a Claude Code permission prompt taller than the conversation's terminal can now be answered from the dashboard; it used to show in Needs you with no buttons. Needs you shows the command and the next step, and **Open terminal** opens the conversation's terminal.
+
   [Compare v0.64.0...main](https://github.com/eltmon/overdeck/compare/v0.64.0...main)
 </Update>
 

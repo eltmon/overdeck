@@ -520,16 +520,25 @@ agent's entry. Hooks alone cannot keep it current — a user Deny fires neither 
 `Stop` — so the pane is the evidence: an entry whose prompt the pane showed and no longer shows
 is dropped on the next read, and a confirmed dashboard answer clears its entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
 reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two:
-`pendingPermission.answerable` is true only when the prompt is on screen. A registry entry
-without a prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
+`pendingPermission.answerable` is true only when the prompt is on screen. PAN-4466: a prompt
+taller than the pane loses its `───` rule and title off the top; it is still recognized as
+**clipped** when its question matches `Do you want to …`, its options and `Esc to cancel` footer
+are the last thing on screen, and no rule is in view. A clipped prompt is answerable, its agent
+comes from the hook registry (or reads `Unknown agent` when none matches), and `inputPreview`
+carries the start of the command — the pane shows only the tail. A registry entry without a
+prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
 the dialog then labels the agent from the prompt's title. `GET /api/conversations/pending-input`
 carries `pendingPermission` (and skips the PAN-3113 pane-choice check while one is pending);
 `GET /api/conversations/:id` adds `permissionRequest` to `pendingInputKinds`.
 
 **The dialog.** `TerminalPermissionDialog` opens for the oldest pending permission and names
 the conversation, the agent (`Main agent` or `Subagent: <description>`), the tool, the command
-and the reason. It offers **Allow once**, **Allow always** (only when the prompt offers it) and
-**Deny**; a non-answerable one offers only **Open terminal** and **Dismiss**. An answer posts
+and the reason. For a clipped prompt it adds a **Command (start)** field from `inputPreview`,
+labels the detail block **On screen**, and notes that the top of the prompt scrolled off. It
+offers **Allow once**, **Allow always** (only when the prompt offers it) and
+**Deny**; a non-answerable one offers only **Open terminal** and **Dismiss**, and makes
+**Open terminal** the primary action — it navigates to `/conv/<name>?view=terminal`, which
+switches the conversation's Command Deck pane into its terminal view (PAN-4466). An answer posts
 `POST /api/conversations/:id/permission {signature, choice}`, which re-reads the pane, refuses
 without sending keys when the prompt is gone (`prompt-gone`) or differs (`prompt-changed`), then
 sends **arrow keys to the chosen row and Enter** — never digits, never Escape — and confirms the
@@ -537,8 +546,12 @@ prompt left the screen (`delivery-unconfirmed` otherwise). The dialog stays in "
 until the feed stops reporting that prompt's signature.
 
 **Needs you and notifications.** A pending permission is a blocking `permissionRequest` row in
-Needs you, described `<agent> · <tool>` and showing `waiting <relative time>`; rows sort oldest
-first. A desktop notification fires when a prompt is first seen and again 5 and 30 minutes after
+Needs you, described `<agent> · <tool> · click to answer` when answerable or `<agent> · <tool> ·
+answer in the terminal` when not (PAN-4466), and showing the start of the command and `waiting
+<relative time>`; rows sort oldest first. A conversation row with no issue ref falls back to the
+conversation's title instead of its raw name. Clicking a non-answerable row navigates straight to
+the conversation's terminal view in one click, rather than reopening a dialog with nothing to
+show. A desktop notification fires when a prompt is first seen and again 5 and 30 minutes after
 it started waiting, while it is still pending.
 
 **Held messages.** The composer route checks for an on-screen prompt **before** switching the
@@ -550,7 +563,8 @@ answer first", with Discard) and resends it once a feed read newer than the hold
 on-screen (`answerable`) `pendingPermission` for that conversation, with a fresh `clientMessageId`
 and no `retry` flag —
 the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.
-Held bubbles live in memory only: a page reload drops them.
+A clipped prompt is answerable, so it holds messages exactly like any other on-screen prompt
+(PAN-4466). Held bubbles live in memory only: a page reload drops them.
 
 **Not delivered.** When `deliverAgentMessage` returns `ok: false` (for example a Herdr refusal,
 or a Herdr client failure before `agent.prompt`), the composer route logs `[conversations]
