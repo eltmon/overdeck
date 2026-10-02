@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T03:48:29.074Z",
+  "updated": "2026-10-02T03:48:46.767Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "wi5-connect-route.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T03:48:29.073Z"
+    },
+    "wi6-verify-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:48:46.767Z"
     }
   }
 }
