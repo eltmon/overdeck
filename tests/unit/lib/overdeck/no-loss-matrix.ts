@@ -561,6 +561,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/vault/setup',                                 kind: 'http', disposition: 'WRITE',       door: 'FILE via src/lib/vault/setup-core.ts setupVault through the vault-service queue (PAN-4446)' },
   { surface: 'POST /api/vault/join',                                  kind: 'http', disposition: 'WRITE',       door: 'FILE via src/lib/vault/join-core.ts joinVault through the vault-service queue (PAN-4446)' },
   { surface: 'POST /api/vault/sync',                                  kind: 'http', disposition: 'WRITE',       door: 'FILE via vault-service syncVaultNow → syncOnce (PAN-4446)' },
+  { surface: 'POST /api/vault/sessions/by-conversation/:name/settle',  kind: 'http', disposition: 'WRITE',       door: 'FILE via vault-handoff handOffConversation → vault-service settleOnQueue → settle (PAN-4455)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },

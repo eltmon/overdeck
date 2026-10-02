@@ -26,6 +26,7 @@ vi.mock('../../../../../src/dashboard/server/services/vault-service.js', () => m
 
 const continueMocks = vi.hoisted(() => ({ previewContinue: vi.fn(), continueHere: vi.fn() }));
 vi.mock('../../../../../src/dashboard/server/services/vault-continue.js', () => continueMocks);
+vi.mock('../../../../../src/dashboard/server/services/vault-handoff.js', () => ({ handOffConversation: vi.fn() }));
 
 const { vaultRouteLayer } = await import('../../../../../src/dashboard/server/routes/vault.js');
 
