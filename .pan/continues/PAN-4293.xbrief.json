@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:34:27.651Z",
+  "updated": "2026-10-02T04:34:41.885Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,6 +246,10 @@
       "claimedBy": "agent-pan-4293",
       "claimedAt": "2026-10-02T04:32:47.530Z",
       "doneAt": "2026-10-02T04:34:27.650Z"
+    },
+    "account-maintenance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:34:41.885Z"
     }
   }
 }
