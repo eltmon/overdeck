@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:55:59.916Z",
+  "updated": "2026-10-02T04:56:11.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,6 +276,10 @@
     "vault-row-sync-entry.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T04:55:59.916Z"
+    },
+    "handoff-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:11.761Z"
     }
   }
 }
