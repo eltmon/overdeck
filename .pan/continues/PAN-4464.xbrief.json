@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4464",
+  "created": "2026-10-02T02:25:19.481Z",
+  "updated": "2026-10-02T02:25:19.481Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-conv-lookup": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:25:19.481Z"
+    }
+  }
+}
