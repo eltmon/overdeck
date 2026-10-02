@@ -5,6 +5,7 @@ import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Termi
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
+import { VaultRowSyncMenuItem } from './VaultRowSyncMenuItem';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
@@ -763,6 +764,7 @@ export function ConversationRow({
             </MenuItemButton>
           )}
           <MenuSeparator />
+          {conv.origin === 'vault' && <VaultRowSyncMenuItem onDone={() => setMenuOpen(false)} />}
           {conv.origin !== 'vault' && (
             <MenuItemButton onClick={(e) => { e.stopPropagation(); openContinueOnDevice(continueTargetOf(conv)); setMenuOpen(false); }}>
               <MonitorSmartphone size={14} />

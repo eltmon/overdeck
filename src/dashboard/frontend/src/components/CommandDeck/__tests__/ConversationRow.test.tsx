@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConversationRow } from '../ConversationRow';
 import type { Conversation } from '../ConversationList';
 import type { ConversationMutations } from '../useConversationMutations';
 import { useContinueOnDeviceStore } from '../../chat/continueOnDevice/continueOnDeviceStore';
+
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
+}));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock('../../DialogProvider', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
@@ -44,13 +50,16 @@ const mutations: ConversationMutations = {
 };
 
 function renderRow(overrides: Partial<Conversation>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <ConversationRow
-      conv={{ ...conversation, ...overrides }}
-      isSelected={false}
-      onSelect={vi.fn()}
-      mutations={mutations}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ConversationRow
+        conv={{ ...conversation, ...overrides }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        mutations={mutations}
+      />
+    </QueryClientProvider>,
   );
 }
 
@@ -353,6 +362,10 @@ describe('ConversationRow vault continuity badge (PAN-4447)', () => {
 });
 
 describe('ConversationRow Continue on another device (PAN-4455 WI-11)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('a local row\'s menu opens the dialog for that conversation', () => {
     useContinueOnDeviceStore.setState({ target: null });
     renderRow({});
@@ -363,9 +376,53 @@ describe('ConversationRow Continue on another device (PAN-4455 WI-11)', () => {
   });
 
   it('a vault browse row\'s menu has no Continue on another device item', () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ running: false, state: 'off' }), { status: 200 }))));
     renderRow({ origin: 'vault', name: 'vault-12345678-aaaa-4bbb-8ccc-dddddddddddd', vaultOwnerLabel: 'laptop' });
     fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
     expect(screen.getByRole('menu', { name: 'Actions for Test conversation' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Continue on another device' })).toBeNull();
+  });
+});
+
+describe('ConversationRow Check for new conversations (PAN-4455 WI-12)', () => {
+  const VAULT_ROW = { origin: 'vault' as const, name: 'vault-12345678-aaaa-4bbb-8ccc-dddddddddddd', vaultOwnerLabel: 'laptop' };
+
+  function mockVault(running: boolean) {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/vault/status') return Promise.resolve(new Response(JSON.stringify({ running, state: 'ready' }), { status: 200 }));
+      if (url === '/api/vault/sync' && init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ running, state: 'ready' }), { status: 200 }));
+      return Promise.resolve(new Response('{}', { status: 404 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('a vault row\'s menu shows the item when the vault service runs, and clicking it posts /api/vault/sync', async () => {
+    const fetchMock = mockVault(true);
+    renderRow(VAULT_ROW);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Check for new conversations' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/vault/sync', expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('a vault row\'s menu has no item when the vault service is not running', async () => {
+    const fetchMock = mockVault(false);
+    renderRow(VAULT_ROW);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/vault/status'));
+    expect(screen.queryByRole('menuitem', { name: 'Check for new conversations' })).toBeNull();
+  });
+
+  it('a local row never shows the item or reads the vault status', () => {
+    const fetchMock = mockVault(true);
+    renderRow({});
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByRole('menuitem', { name: 'Check for new conversations' })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
