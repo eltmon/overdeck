@@ -54,7 +54,7 @@ describe('pendingPermission decisions', () => {
       agentId: 'conv-a',
       source: 'conversation',
       kinds: ['permissionRequest'],
-      permissionSummary: 'Subagent: Research Orca onboarding flow · Bash',
+      permissionSummary: 'Subagent: Research Orca onboarding flow · Bash · click to answer',
       since: '2026-09-27T15:32:21.000Z',
     })]);
   });
@@ -65,9 +65,25 @@ describe('pendingPermission decisions', () => {
       id: 'conv-a',
       kinds: ['permissionRequest'],
       blocking: true,
-      permissionSummary: 'Main agent · Bash',
+      permissionSummary: 'Main agent · Bash · click to answer',
       since: '2026-09-27T15:32:21.000Z',
     });
+  });
+
+  it('non-answerable permission summary says to answer in the terminal', () => {
+    const row = permissionRow('conv-a', '2026-09-27T15:32:21.000Z');
+    row.pendingPermission!.answerable = false;
+    const { result } = renderWithRows(() => useDecisions(), [row]);
+    expect(result.current[0]).toMatchObject({
+      permissionSummary: 'Subagent: Research Orca onboarding flow · Bash · answer in the terminal',
+    });
+  });
+
+  it('permissionCommand is the first line of the input preview', () => {
+    const row = permissionRow('conv-a', '2026-09-27T15:32:21.000Z');
+    row.pendingPermission!.inputPreview = 'S=/tmp/x; O=$S/od-cands\ncd $S;';
+    const { result } = renderWithRows(() => useDecisions(), [row]);
+    expect(result.current[0]).toMatchObject({ permissionCommand: 'S=/tmp/x; O=$S/od-cands' });
   });
 
   it('oldest permission sorts first', () => {
