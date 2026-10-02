@@ -24,6 +24,8 @@ const serviceMocks = vi.hoisted(() => ({
 }));
 vi.mock('../services/vault-service.js', () => serviceMocks);
 vi.mock('../services/vault-continue.js', () => ({ previewContinue: vi.fn(), continueHere: vi.fn() }));
+const handoffMock = vi.hoisted(() => vi.fn());
+vi.mock('../services/vault-handoff.js', () => ({ handOffConversation: handoffMock }));
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
@@ -72,7 +74,23 @@ const ROUTES = [
   { path: '/api/vault/setup', body: { url: REMOTE, passphrase: { mode: 'generate' } } },
   { path: '/api/vault/join', body: { url: REMOTE, secret: { kind: 'passphrase', value: 'quiet harbor lantern 42 mosaic' } } },
   { path: '/api/vault/sync', body: {} },
+  { path: '/api/vault/sessions/by-conversation/conv-1/settle', body: {} },
 ] as const;
+const HANDOFF_SAVED = {
+  status: 200,
+  body: {
+    result: 'saved',
+    vaultId: '12345678-aaaa-4bbb-8ccc-dddddddddddd',
+    version: 3,
+    savedAt: '2026-10-01T10:00:00.000Z',
+    title: 'Fix the parser',
+    machineLabel: 'desk',
+    logLines: 12,
+    alreadySaved: false,
+    forkedFrom: null,
+    wipProblem: null,
+  },
+};
 
 beforeEach(async () => {
   savedEnv = {};
@@ -91,6 +109,8 @@ beforeEach(async () => {
   serviceMocks.setupVaultFromDashboard.mockResolvedValue(CREATED);
   serviceMocks.joinVaultFromDashboard.mockResolvedValue(JOINED);
   serviceMocks.syncVaultNow.mockResolvedValue({ status: 'synced', snapshot: { state: 'ready', running: true } });
+  handoffMock.mockReset();
+  handoffMock.mockResolvedValue(HANDOFF_SAVED);
 });
 
 afterEach(async () => {
@@ -145,6 +165,7 @@ describe('POST /api/vault/setup, /join, /sync (PAN-4446)', () => {
     expect(serviceMocks.setupVaultFromDashboard).not.toHaveBeenCalled();
     expect(serviceMocks.joinVaultFromDashboard).not.toHaveBeenCalled();
     expect(serviceMocks.syncVaultNow).not.toHaveBeenCalled();
+    expect(handoffMock).not.toHaveBeenCalled();
   });
 
   it('a core error result returns 422 with its code', async () => {
@@ -180,5 +201,53 @@ describe('POST /api/vault/setup, /join, /sync (PAN-4446)', () => {
     expect(failed.status).toBe(500);
     expect(failed.json).toEqual({ error: 'disk full' });
     expect(failed.headers['cache-control']).toBe('no-store');
+  });
+});
+
+describe('POST /api/vault/sessions/by-conversation/:name/settle (PAN-4455)', () => {
+  const PATH = '/api/vault/sessions/by-conversation/conv-1/settle';
+
+  it('root session: returns the hand-off status and body with Cache-Control: no-store', async () => {
+    const res = await post(PATH, {}, asRootSession());
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual(HANDOFF_SAVED.body);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(handoffMock).toHaveBeenCalledWith('conv-1');
+  });
+
+  it('passes a non-200 hand-off outcome through unchanged', async () => {
+    handoffMock.mockResolvedValue({ status: 409, body: { result: 'vault-unavailable', state: 'off', error: 'off' } });
+    const res = await post(PATH, {}, asRootSession());
+    expect(res.status).toBe(409);
+    expect(res.json).toEqual({ result: 'vault-unavailable', state: 'off', error: 'off' });
+  });
+
+  it('decodes a percent-encoded conversation name', async () => {
+    await post('/api/vault/sessions/by-conversation/conv%20one/settle', {}, asRootSession());
+    expect(handoffMock).toHaveBeenCalledWith('conv one');
+  });
+
+  it('a paired device cookie with CSRF reaches the hand-off service', async () => {
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    const res = await post(PATH, {}, { cookie: `overdeck_device=${token}`, 'x-overdeck-csrf-token': dashboardCsrfToken() });
+    expect(res.status).toBe(200);
+    expect(handoffMock).toHaveBeenCalledWith('conv-1');
+  });
+
+  it('a 100-character name reaches the service; a 101-character name never matches the route', async () => {
+    const longest = 'a'.repeat(100);
+    expect((await post(`/api/vault/sessions/by-conversation/${longest}/settle`, {}, asRootSession())).status).toBe(200);
+    expect(handoffMock).toHaveBeenCalledWith(longest);
+    handoffMock.mockClear();
+
+    await expect(post(`/api/vault/sessions/by-conversation/${'a'.repeat(101)}/settle`, {}, asRootSession())).rejects.toThrow('RouteNotFound');
+    expect(handoffMock).not.toHaveBeenCalled();
+  });
+
+  it('a throw becomes 500 with only the message', async () => {
+    handoffMock.mockRejectedValue(new Error('The settled record could not be read back.'));
+    const res = await post(PATH, {}, asRootSession());
+    expect(res.status).toBe(500);
+    expect(res.json).toEqual({ error: 'The settled record could not be read back.' });
   });
 });

@@ -12,6 +12,7 @@ The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session V
 - Dashboard Session Vault: automatic save and sync, Settings → Session Vault with the eviction review (#4444, PAN-4307).
 - Read-only "from `<machine>`" conversation rows for vault conversations another machine owns (#4448, PAN-4436).
 - **Continue here** for those rows (#4454, PAN-4437).
+- **Continue on another device** from a conversation: open it on another screen (QR code, optional pairing) or hand it off through the Session Vault (PAN-4455).
 
 ### Breaking changes
 

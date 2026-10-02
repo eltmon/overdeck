@@ -27,6 +27,7 @@ import {
   getVaultServiceSnapshot,
   onVaultSyncReport,
   reviewEvictionBatch,
+  settleOnQueue,
   setupVaultFromDashboard,
   startVaultService,
   stopVaultService,
@@ -430,6 +431,83 @@ describe('vault-service (PAN-4307 WI-4)', () => {
       expect((await syncVaultNow()).status).toBe('synced');
       await vi.advanceTimersByTimeAsync(5_000);
       expect(createSyncLoop).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('PAN-4455 WI-1: settleOnQueue', () => {
+    const config: VaultConfig = { ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] }, backend: 'dir:x' };
+
+    it('settleOnQueue returns unavailable when the vault is not open', async () => {
+      const settleSpy = vi.fn();
+      startVaultService({
+        readVaultConfig: vi.fn().mockResolvedValue(config),
+        openVaultContext: vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult),
+        settle: settleSpy,
+        createVaultSettlePoller: noopPoller,
+      });
+
+      expect(await settleOnQueue('/a.jsonl', 'claude-code', 'force', { readBack: true })).toEqual({ status: 'unavailable', opened: { status: 'off' } });
+      expect(settleSpy).not.toHaveBeenCalled();
+    });
+
+    it('settleOnQueue returns the settle result and, with readBack, the record', async () => {
+      const backendDir = join(root, 'backend');
+      const keys = deriveSubkeys(createVaultKey());
+      const store = await DirVaultStore.open(backendDir);
+      expect(await store.casRef(HEADER_REF_NAME, null, await encryptRef(HEADER_REF_NAME, newVaultHeader(), keys))).toBe('ok');
+      const nativePath = join(root, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl');
+      writeFileSync(nativePath, `${JSON.stringify({ type: 'user', sessionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', message: { role: 'user', content: 'hi' } })}\n`);
+      const verdict = await settle({ nativePath, harness: 'claude-code', store, keys, config });
+      expect(verdict.verdict).toBe('append');
+
+      const settleSpy = vi.fn().mockResolvedValue(verdict);
+      const vault: OpenVault = { config, keys, store, rotatedAt: null };
+      startVaultService({
+        readVaultConfig: vi.fn().mockResolvedValue(config),
+        openVaultContext: vi.fn().mockResolvedValue({ status: 'open', vault } satisfies VaultOpenResult),
+        settle: settleSpy,
+        createVaultSettlePoller: noopPoller,
+      });
+
+      const outcome = await settleOnQueue(nativePath, 'claude-code', 'force', { readBack: true });
+      expect(settleSpy).toHaveBeenCalledWith({ nativePath, harness: 'claude-code', store, keys, config, wip: 'force' });
+      expect(outcome.status).toBe('settled');
+      if (outcome.status !== 'settled') return;
+      expect(outcome.result).toBe(verdict);
+      expect(outcome.record?.vaultId).toBe(verdict.vaultId);
+
+      const withoutReadBack = await settleOnQueue(nativePath, 'claude-code', 'auto');
+      expect(withoutReadBack).toEqual({ status: 'settled', result: verdict, record: null });
+    });
+
+    it('settleOnQueue runs on the vault queue', async () => {
+      const order: string[] = [];
+      const settleSpy = vi.fn(async () => {
+        order.push('settle');
+        return { verdict: 'noop' as const, vaultId: 'v1' };
+      });
+      startVaultService({
+        readVaultConfig: vi.fn().mockResolvedValue(config),
+        openVaultContext: vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult),
+        settle: settleSpy,
+        createVaultSettlePoller: noopPoller,
+      });
+
+      let release!: () => void;
+      const inFlight = enqueueVaultOperation('held', () => new Promise<void>((resolve) => {
+        release = () => {
+          order.push('held');
+          resolve();
+        };
+      }));
+      const settled = settleOnQueue('/a.jsonl', 'claude-code', 'force');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settleSpy).not.toHaveBeenCalled();
+
+      release();
+      await inFlight;
+      expect(await settled).toEqual({ status: 'settled', result: { verdict: 'noop', vaultId: 'v1' }, record: null });
+      expect(order).toEqual(['held', 'settle']);
     });
   });
 });

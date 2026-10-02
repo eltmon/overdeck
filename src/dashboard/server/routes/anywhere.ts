@@ -12,8 +12,9 @@
  *
  * - `GET /api/anywhere/status` returns the Anywhere status card's data
  *   (`lib/remote-access/anywhere-status.ts`): machine identity, trusted
- *   addresses, the active paired-device count, the vault state and the
- *   problems with their fix actions. Any dashboard credential may read it.
+ *   addresses, the active paired-device count, the vault state, the
+ *   problems with their fix actions, and the caller's credential kind
+ *   (PAN-4455 D-3). Any dashboard credential may read it.
  *
  * No response is cacheable.
  */
@@ -27,6 +28,7 @@ import {
   computeAnywhereProblems,
   readAnywhereVaultState,
   type AnywhereStatus,
+  type AnywhereViewerKind,
 } from '../../../lib/remote-access/anywhere-status.js';
 import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
@@ -93,7 +95,7 @@ const addTrustedOriginRoute = HttpRouter.add(
   }),
 );
 
-async function buildAnywhereStatus(): Promise<AnywhereStatus> {
+async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promise<AnywhereStatus> {
   let machine: AnywhereStatus['machine'] = null;
   let identityError: string | null = null;
   try {
@@ -113,6 +115,7 @@ async function buildAnywhereStatus(): Promise<AnywhereStatus> {
     devices: { active },
     vault,
     problems: computeAnywhereProblems({ identityError, addresses, vault }),
+    viewer: { kind: viewerKind },
   };
 }
 
@@ -123,7 +126,8 @@ const anywhereStatusRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
-    return noStore(jsonResponse(yield* Effect.promise(() => buildAnywhereStatus())));
+    const viewerKind = resolveDashboardCredential(request.headers as HeaderMap)?.kind ?? null;
+    return noStore(jsonResponse(yield* Effect.promise(() => buildAnywhereStatus(viewerKind))));
   }),
 );
 
