@@ -51,7 +51,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `agents/permission-prompt.ts` + `overdeck/conversation-permission*.ts` (PAN-4278) —
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,
-  and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
+  and the arrows + Enter answer route; recognizes clipped prompts (rule and title
+  off-screen, PAN-4466). See `docs/DASHBOARD-ARCHITECTURE.md`.
 - `vault/` (PAN-2609) — Session Vault: encrypted off-machine transcript storage. Standalone
   (Node built-ins + sibling modules only; `tests/unit/lib/vault/import-graph.test.ts`).
   `store/types.ts` is the `VaultStore` contract (immutable objects + CAS refs; reserved

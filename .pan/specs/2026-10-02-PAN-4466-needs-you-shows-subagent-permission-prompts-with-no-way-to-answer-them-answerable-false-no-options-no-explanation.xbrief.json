@@ -1,0 +1,612 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T02:41:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4466: Needs-you shows subagent permission prompts with no way to answer them (answerable:false, no options, no explanation)",
+    "updated": "2026-10-02T02:46:08.098Z"
+  },
+  "plan": {
+    "id": "pan-4466",
+    "title": "Needs-you shows subagent permission prompts with no way to answer them (answerable:false, no options, no explanation)",
+    "status": "running",
+    "uid": "c0b21a21-9d9d-48f4-99f1-e030bc8b5b23",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-02T02:41:12Z",
+    "updated": "2026-10-02T02:46:08.098Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4466",
+        "label": "PAN-4466",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4466.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "permissions",
+      "needs-you",
+      "claude-code",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "A Claude Code permission prompt taller than the conversation's terminal (a 20-row Herdr viewport and a ~40-line subagent Bash command) loses its ─── rule and title off the top of the screen. parsePermissionPrompt requires that rule and returns null, so pendingPermission falls back to the hook registry with answerable:false and no options. The operator sees a Needs-you row with no buttons and no next step; the dialog's Open terminal lands on the chat view (no ?view=terminal, and CommandDeck ignores conversationViewMode); and the composer, which holds sends only for answerable prompts, can press Down/Enter into the prompt. The bug is about clipped prompts, not subagents: a main-agent prompt with a long command fails the same way.",
+      "Proposal": "Teach the parser to accept a clipped prompt under stricter rules (question 'Do you want to …', Yes/[always]/No options with one cursor at the bottom, an 'Esc to cancel' footer, no rule in view) and mark it clipped with an unknown thread. Map clipped prompts in the feed as answerable with the registry's input preview, so the existing dialog and answer route work and the composer holds sends. Show the command start and visible tail in the dialog, put the next step and first command line on Needs-you and Decisions rows, make Open terminal (and a non-answerable row click) land on /conv/<name>?view=terminal, and make the Command Deck honor that view. Document the behavior in docs/DASHBOARD-ARCHITECTURE.md, the codebase map and changelog.mdx.",
+      "NonGoals": "- Changing the Herdr or tmux pane height for conversations or agents\n- Answering permission prompts for work, review or test agents (conversations only, as in PAN-4278)\n- An inline expand/collapse control on the Needs-you row (the row click opens the dialog with the full command)\n- Persisting the permission registry across dashboard restarts\n- Telling several subagents' clipped prompts apart by matching the command tail\n- Changes to the PAN-3113 pane-choice parser or the Codex/OpenCode permission paths\n- Raising any row in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the parser to recognize clipped prompts instead of enlarging pane viewports.",
+        "rationale": "The prompt is on screen; only the parser is too strict. A taller pane only moves the threshold, since any long enough command clips any pane."
+      },
+      {
+        "summary": "Clipped detection is not gated on a hook-registry entry.",
+        "rationale": "The registry empties on every dashboard restart, and the composer hold depends on detection: missing a prompt lets a send press keys into it, while a false positive only costs a button the answer route refuses with 409."
+      },
+      {
+        "summary": "Clipped prompts are accepted only with the stricter rules: QUESTION_LINE question, Esc-to-cancel footer, no ─── rule within 40 lines above the question, plus every existing option/cursor/bottom-of-screen rule.",
+        "rationale": "Keeps the parser's existing guarantee that it never offers keys to a pane that is not asking anything."
+      },
+      {
+        "summary": "PermissionPrompt gains clipped:boolean; header and fromAgent are null when clipped and callers treat the thread as unknown, never main.",
+        "rationale": "fromAgent===null currently means 'main thread'; reusing it would mislabel a subagent prompt and clear the wrong registry entry."
+      },
+      {
+        "summary": "'Expandable' command on the Needs-you card means the row shows a truncated first line with the full text in its title attribute, and a click opens the dialog with the full command.",
+        "rationale": "The row is a button; nesting an expander inside it is invalid HTML, and the dialog already renders the full command."
+      },
+      {
+        "summary": "A non-answerable Needs-you row navigates straight to /conv/<name>?view=terminal in one click; answerable rows keep navigate + reopen-dialog.",
+        "rationale": "The issue asks for a one-click Open in terminal when the dashboard cannot answer."
+      },
+      {
+        "summary": "Next-step text goes into permissionSummary ('· click to answer' / '· answer in the terminal').",
+        "rationale": "Both the Needs-you row and the Decisions panel render permissionSummary, so one change covers both surfaces."
+      },
+      {
+        "summary": "The command shown on rows prefers the registry input preview over the on-screen detail lines.",
+        "rationale": "The preview is the start of the command, which a clipped screen cannot show."
+      },
+      {
+        "summary": "openConversationTabIn's body moves to CommandDeck/openConversationTab.ts.",
+        "rationale": "CommandDeck/index.tsx is 1608 lines against a 1612 cap; the deep-link fix needs room and agents may not raise allowlist rows."
+      }
+    ],
+    "items": [
+      {
+        "id": "parser-clipped",
+        "title": "Parse a permission prompt whose rule and title scrolled off the screen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "feed-clipped",
+            "hold-clipped",
+            "dialog-clipped-and-next-step",
+            "needs-you-row-detail"
+          ],
+          "files_scope": [
+            "src/lib/agents/permission-prompt.ts",
+            "src/lib/agents/__tests__/permission-prompt.test.ts",
+            "src/lib/agents/__fixtures__/claude-code-2.1.284/permission-subagent-clipped.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/permission-prompt.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "permission-prompt.test.ts passes, including the six clipped-prompt tests named in PRD work item 1",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 1 (.pan/drafts/PAN-4466.md). Create the fixture claude-code-2.1.284/permission-subagent-clipped.txt with the exact 20-line capture from the PRD's Root cause section. In permission-prompt.ts: make header string|null, add clipped:boolean, add CANCEL_HINT=/\\besc to cancel\\b/i, replace the rule search (grep anchor '// The prompt block starts under the nearest ─── rule above the question.') with the windowed search from the PRD; when no rule is found the prompt is clipped and is accepted only if the question matches QUESTION_LINE and a trailing line matches CANCEL_HINT. A clipped prompt has header=null, fromAgent=null, its whole window as detail/reason lines, and signature prefix '(clipped)'. Join │-prefixed lines that follow a reason into that reason (FR-3). Update the module header comment. Add the six tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "parser-clipped.ac1",
+            "title": "Given the 2.1.284 fixture, when parsePermissionPrompt runs, then it returns clipped:true, header:null, fromAgent:null, options choices ['allow-once','deny'] and selectedIndex 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-clipped.ac2",
+            "title": "Given the 2.1.284 fixture, the parser returns a reason ending in 'or use a literal path)' and no detail line equal to 'or use a literal path)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-clipped.ac3",
+            "title": "Given the 2.1.284 fixture without its 'Esc to cancel' footer, or with its question replaced by 'Allow this tool use?', the parser returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-clipped.ac4",
+            "title": "Given permission-bash.txt (2.1.280), the parser returns clipped:false and header 'Bash command', and every pre-existing test in permission-prompt.test.ts passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-clipped",
+        "title": "Map clipped prompts to answerable pendingPermission rows with the registry input preview",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "hold-clipped",
+            "dialog-clipped-and-next-step",
+            "needs-you-row-detail"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-permission.ts",
+            "src/dashboard/frontend/src/components/TerminalPermissionDialog.tsx",
+            "src/lib/overdeck/__tests__/conversation-permission-feed.test.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-answer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-permission-feed.test.ts src/lib/overdeck/__tests__/conversation-permission-answer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the four new clipped-prompt tests from PRD work item 2",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 2. Add clipped:boolean and inputPreview:string|null to PendingPermission (conversation-permission.ts) and to its mirror TerminalPendingPermission (TerminalPermissionDialog.tsx lines 15-26; type change only). threadCandidates returns all entries when prompt.clipped; unmatchedLabel returns 'Unknown agent' when prompt.clipped; the on-screen branch sets agentKey to entry?.agentKey ?? (clipped ? null : fromAgent===null ? 'main' : null), clipped:prompt.clipped and inputPreview:entry?.toolInputPreview||null; the registry-only branch sets clipped:false and inputPreview:oldest.toolInputPreview||null. handleConversationPermissionAnswer needs no logic change. Add the four tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "feed-clipped.ac1",
+            "title": "Given the 2.1.284 fixture on the pane and one subagent registry entry, pendingPermissionFromPane returns answerable:true, clipped:true, agentLabel 'Subagent: Find better Overdeck screenshots', that entry's agentKey, toolName 'Bash', inputPreview equal to the entry's preview and two options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-clipped.ac2",
+            "title": "Given the 2.1.284 fixture and an empty registry, the feed returns answerable:true with agentLabel 'Unknown agent', agentKey null and inputPreview null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-clipped.ac3",
+            "title": "Given a clipped prompt and a deny choice with its signature, POST /api/conversations/:id/permission sends ['Down','Enter'], returns {ok:true, answered:'deny'} and the conversation's registry list becomes empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hold-clipped",
+        "title": "Prove the composer holds messages while a clipped prompt is on screen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-message-permission-hold.test.ts passes, including 'holds a message while a clipped prompt is on screen'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "One behavior (the hold) with one observable outcome; a second AC would restate it."
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 3. Add the test 'holds a message while a clipped prompt is on screen' to conversation-message-permission-hold.test.ts: inject conversationPendingPermission returning pendingPermissionFromPane(conv, <2.1.284 fixture text>, now) (or conversationPendingPermission with a read dep returning the fixture), post a message, and assert the response. No production code changes: conversation-message.ts already holds on pendingPermission.answerable."
+        },
+        "items": [
+          {
+            "id": "hold-clipped.ac1",
+            "title": "Given the 2.1.284 clipped fixture on the pane, a composer send returns 409 with code 'permission-pending' and the injected ensureMainInputTarget mock is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-clipped-and-next-step",
+        "title": "Permission dialog shows a clipped command's start and visible part, and a terminal next step when unanswerable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TerminalPermissionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/TerminalPermissionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/__tests__/TerminalPermissionDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "TerminalPermissionDialog.test.tsx passes, including the two new tests from PRD work item 4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 4. In TerminalPermissionDialog.tsx: when permission.clipped && permission.inputPreview render a 'Command (start)' Field with inputPreview; label the detailLines field 'On screen' when clipped (else 'Command'); when clipped render the note 'The top of this prompt is scrolled off the agent's screen; the visible part is shown.'; replace the non-answerable sentence (grep anchor 'The prompt is not visible on the agent&apos;s screen') with 'This prompt can't be answered from here — open the terminal and answer it there.' and use PRIMARY_BUTTON for Open terminal when !permission.answerable. Add the two tests."
+        },
+        "items": [
+          {
+            "id": "dialog-clipped-and-next-step.ac1",
+            "title": "Given a clipped answerable permission with inputPreview, the dialog renders 'Command (start)', 'On screen', both texts, the off-screen note, and Allow once and Deny buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-clipped-and-next-step.ac2",
+            "title": "Given a non-answerable permission, the dialog shows 'open the terminal and answer it there', renders no Allow button, and the Open terminal button carries the bg-warning primary class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-terminal-route",
+        "title": "Open terminal navigates to the conversation's terminal-view URL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/navigateToDecision.ts",
+            "src/dashboard/frontend/src/App/hooks/useTerminalPermissionDialog.ts",
+            "src/dashboard/frontend/src/lib/__tests__/navigateToDecision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/navigateToDecision.test.ts src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "navigateToDecision.test.ts and usePendingInputDialogs.permission-notify.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 5. DecisionSubjectTarget gains view?: 'terminal'; decisionSubjectPath returns /conv/<id>?view=terminal for a conversation with view 'terminal' (agents ignore view); navigateToDecisionSubject compares pathname+search with the path before pushState and always dispatches popstate; useTerminalPermissionDialog.onOpenTerminal passes view:'terminal'. Create navigateToDecision.test.ts with the cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "open-terminal-route.ac1",
+            "title": "decisionSubjectPath returns '/conv/c1?view=terminal' for {id:'c1', source:'conversation', view:'terminal'}, '/conv/c1' without view, and '/issues/PAN-1' for an agent target with view 'terminal'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-terminal-route.ac2",
+            "title": "Given the location is /conv/c1, navigateToDecisionSubject with view 'terminal' pushes a history entry so location becomes /conv/c1?view=terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-terminal-route.ac3",
+            "title": "When the dialog's Open terminal is clicked for conversation c1, the hook test shows navigateToDecisionSubject receives {id:'c1', source:'conversation', view:'terminal'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-terminal-deeplink",
+        "title": "Command Deck switches a conversation pane to terminal view on a ?view=terminal deep-link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/openConversationTab.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/openConversationTab.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/openConversationTab.test.ts src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "openConversationTab.test.ts and CommandDeck.test.tsx pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh reports no violation for CommandDeck/index.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 6. Move the body of openConversationTabIn (grep anchor 'const openConversationTabIn = useCallback((projectKey: string, name: string, label: string, target?: {') into new CommandDeck/openConversationTab.ts as openConversationTab(projectKey, name, label, target?, viewMode?), which also calls updatePane(projectKey, paneId, { viewMode }) on an existing pane when viewMode is given. Keep openConversationTabIn as a one-line useCallback wrapper. Destructure the conversationViewMode prop; in the deep-link effect (grep anchor '// On mount or when convId changes (popstate), apply the deep-link') key appliedConvId on `${convId}::${conversationViewMode ?? 'conversation'}`, pass conversationViewMode==='terminal' ? 'terminal' : undefined as the fifth argument, and add conversationViewMode to the deps. index.tsx must end at or below its origin/main line count; never edit scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "deck-terminal-deeplink.ac1",
+            "title": "openConversationTab with viewMode 'terminal' creates a conversation pane with viewMode 'terminal' and makes it the active pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-terminal-deeplink.ac2",
+            "title": "Given an existing conversation pane without viewMode, openConversationTab with 'terminal' updates that same paneId to viewMode 'terminal' and creates no second pane; with no viewMode it preserves the pane's view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-terminal-deeplink.ac3",
+            "title": "wc -l src/dashboard/frontend/src/components/CommandDeck/index.tsx returns a count at or below its origin/main count, and scripts/file-size-allowlist.txt is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-row-detail",
+        "title": "Needs-you and Decisions rows show the command, the next step and the conversation title",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions-permission.test.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/useDecisions-permission.test.ts src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass, including the new tests from PRD work item 7",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 7. PendingInputSubject (store.ts) gains permissionCommand?, permissionAnswerable?, conversationTitle?. In useDecisions.ts, permissionSummary becomes '<agent> · <tool> · click to answer' when answerable and '<agent> · <tool> · answer in the terminal' when not (drop ' · <tool>' when toolName is null); permissionCommand is the first non-empty trimmed line of inputPreview, else detailLines[0]; usePendingInputSubjects sets the three new fields and Decision gains permissionCommand. In SessionFeedSidebar.tsx NeedsYouSection: label falls back to conversationTitle before agentId; render the command in a truncated mono span with title=full command; a non-answerable conversation row's click calls navigateToDecisionSubject({id, source:'conversation', view:'terminal'}) and skips requestReopen. Update the existing summary assertions (useDecisions-permission.test.ts lines 55/66, SessionFeedSidebar.test.tsx line 544) to the new strings and add the new tests."
+        },
+        "items": [
+          {
+            "id": "needs-you-row-detail.ac1",
+            "title": "Given a non-answerable feed row for agent 'Subagent: X' and tool 'Bash', useDecisions returns permissionSummary 'Subagent: X · Bash · answer in the terminal'; given an answerable row it returns '… · Bash · click to answer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-row-detail.ac2",
+            "title": "Given a feed row with inputPreview 'S=/tmp/x; node shoot2.cjs\\nsleep 20' and title 'Eltmon.com tablet display', the Needs-you row renders the label 'Eltmon.com tablet display' and the command line 'S=/tmp/x; node shoot2.cjs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-row-detail.ac3",
+            "title": "When a non-answerable conversation permission row is clicked, the location becomes /conv/<name>?view=terminal and requestReopen is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document clipped permission prompts and the terminal next step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:41:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4466",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'clipped' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'view=terminal' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'Permission prompts with long commands' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 8. In docs/DASHBOARD-ARCHITECTURE.md section '## Terminal permission prompts and held messages (PAN-4278)': replace 'pendingPermission.answerable is true only when the prompt is on screen.' with the clipped-prompt rules and agent attribution; describe 'Command (start)'/'On screen', the primary Open terminal and its /conv/<name>?view=terminal target; replace 'described <agent> · <tool>' with the click-to-answer / answer-in-the-terminal forms plus the command line, conversation-title label and one-click terminal for non-answerable rows; add that a clipped prompt holds composer messages. Extend the PAN-4278 bullet in .overdeck/context/codebase/architecture.md (lines 51-54) and refresh its last-verified date. Add the changelog line from PRD decision D10 under '#### Fixed' in the Upcoming v0.65.0 block of changelog.mdx (create the heading after '#### Changed' if absent)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's PAN-4278 section states that a clipped prompt (question 'Do you want to …', options and 'Esc to cancel' footer at the bottom, no ─── rule in view) is answerable, and no longer contains the sentence 'answerable is true only when the prompt is on screen'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The same section shows that Open terminal opens /conv/<name>?view=terminal and that a non-answerable Needs-you row reads '… · answer in the terminal' and opens the terminal in one click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.mdx's Upcoming block contains the 'Permission prompts with long commands' line under '#### Fixed', and the codebase map's PAN-4278 bullet mentions clipped prompts with a refreshed last-verified date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parser-clipped",
+        "to": "feed-clipped",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-clipped",
+        "to": "hold-clipped",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-clipped",
+        "to": "dialog-clipped-and-next-step",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-clipped",
+        "to": "needs-you-row-detail",
+        "type": "blocks"
+      },
+      {
+        "from": "open-terminal-route",
+        "to": "needs-you-row-detail",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4466-needs-you-shows-subagent-permission-prompts-with-no-way-to-answer-them-answerable-false-no-options-no-explanation.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

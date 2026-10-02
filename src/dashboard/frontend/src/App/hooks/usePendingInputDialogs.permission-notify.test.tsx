@@ -21,6 +21,8 @@ const permission: TerminalPendingPermission = {
   agentKey: 'a9ef',
   toolName: 'Bash',
   header: 'Bash command',
+  clipped: false,
+  inputPreview: null,
   detailLines: ['rm -f queue/*'],
   reason: null,
   options: [],

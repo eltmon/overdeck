@@ -31,6 +31,10 @@ function fixture(name: string): string {
   return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.280/${name}`, import.meta.url), 'utf8');
 }
 
+function fixture284(name: string): string {
+  return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.284/${name}`, import.meta.url), 'utf8');
+}
+
 let testHome: string;
 
 beforeEach(() => {
@@ -109,6 +113,14 @@ describe('handleConversationMessage permission hold', () => {
     const { response, deliver } = await send();
     expect(response.status).toBe(200);
     expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds a message while a clipped prompt is on screen', async () => {
+    pane.text = fixture284('permission-subagent-clipped.txt');
+    const { response, ensure } = await send();
+    expect(response.status).toBe(409);
+    expect(response.body['code']).toBe('permission-pending');
+    expect(ensure).not.toHaveBeenCalled();
   });
 
   it('the same message delivers once the fixture pane shows no prompt', async () => {

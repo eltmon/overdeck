@@ -16,6 +16,10 @@ function fixture(name: string): string {
   return readFileSync(new URL(`../__fixtures__/claude-code-2.1.280/${name}`, import.meta.url), 'utf8');
 }
 
+function fixture284(name: string): string {
+  return readFileSync(new URL(`../__fixtures__/claude-code-2.1.284/${name}`, import.meta.url), 'utf8');
+}
+
 const RESUME_GATE_MENU = [
   'This session is 4h 5m old and 146.9k tokens.',
   '',
@@ -102,6 +106,62 @@ describe('parsePermissionPrompt', () => {
 
   it('returns null when no row carries the cursor', () => {
     expect(parsePermissionPrompt(fixture('permission-bash.txt').replace(' ❯ 1. Yes', '   1. Yes'))).toBeNull();
+  });
+
+  it('parses a clipped prompt whose rule and title scrolled off the screen', () => {
+    const prompt = parsePermissionPrompt(fixture284('permission-subagent-clipped.txt'));
+    expect(prompt).not.toBeNull();
+    expect(prompt!.clipped).toBe(true);
+    expect(prompt!.header).toBeNull();
+    expect(prompt!.fromAgent).toBeNull();
+    expect(prompt!.options.map((o) => o.choice)).toEqual(['allow-once', 'deny']);
+    expect(prompt!.selectedIndex).toBe(0);
+    expect(prompt!.reason).toMatch(/^Dangerous rm operation .* or use a literal path\)$/);
+    expect(prompt!.detailLines[0]).toMatch(/^lectorAll\(/);
+    expect(prompt!.detailLines).toContain('Retake pipeline and god view sequentially; assemble finals');
+    expect(prompt!.detailLines).not.toContain('or use a literal path)');
+  });
+
+  it('parses the 2.1.280 subagent fixture with its top cut off as clipped', () => {
+    const lines = fixture('permission-subagent.txt').split('\n');
+    const titleIndex = lines.findIndex((line) => line.includes('Bash command · from the general-purpose agent'));
+    expect(titleIndex).toBeGreaterThan(-1);
+    const clippedText = lines.slice(titleIndex + 1).join('\n');
+    const prompt = parsePermissionPrompt(clippedText);
+    expect(prompt).not.toBeNull();
+    expect(prompt!.clipped).toBe(true);
+    expect(prompt!.options.map((o) => o.choice)).toEqual(['allow-once', 'deny']);
+  });
+
+  it('rejects a clipped prompt without the Esc to cancel footer', () => {
+    const lines = fixture284('permission-subagent-clipped.txt').split('\n');
+    while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
+    lines.pop(); // drop the "Esc to cancel · Tab to amend" line
+    expect(parsePermissionPrompt(lines.join('\n'))).toBeNull();
+  });
+
+  it('rejects a clipped prompt whose question is not "Do you want to …"', () => {
+    const pane = fixture284('permission-subagent-clipped.txt').replace(
+      'Do you want to proceed?',
+      'Allow this tool use?',
+    );
+    expect(parsePermissionPrompt(pane)).toBeNull();
+  });
+
+  it('keeps an unclipped prompt unclipped', () => {
+    const prompt = parsePermissionPrompt(fixture('permission-bash.txt'));
+    expect(prompt).not.toBeNull();
+    expect(prompt!.clipped).toBe(false);
+    expect(prompt!.header).toBe('Bash command');
+  });
+
+  it('gives a clipped prompt a signature distinct from the same prompt with its title', () => {
+    const clipped = parsePermissionPrompt(fixture284('permission-subagent-clipped.txt'))!;
+    const withTitle = parsePermissionPrompt(
+      `──────────────────────────────────────\n Bash command\n\n${fixture284('permission-subagent-clipped.txt')}`,
+    )!;
+    expect(withTitle.clipped).toBe(false);
+    expect(withTitle.signature).not.toBe(clipped.signature);
   });
 });
 

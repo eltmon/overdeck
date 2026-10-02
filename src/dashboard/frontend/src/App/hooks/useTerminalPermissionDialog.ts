@@ -92,7 +92,7 @@ export function useTerminalPermissionDialog(rows: TerminalPermissionFeedRow[], b
     if (!subject) return;
     // The modal would cover the terminal it just opened, so hide this prompt too.
     dismiss();
-    navigateToDecisionSubject({ id: subject.conversationName, source: 'conversation' });
+    navigateToDecisionSubject({ id: subject.conversationName, source: 'conversation', view: 'terminal' });
   }, [dismiss, subject]);
 
   /** Bring one conversation's prompt forward (notification click), undoing a dismissal. */

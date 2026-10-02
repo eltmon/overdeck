@@ -237,6 +237,10 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
       count: number;
       title: string;
       since: string;
+      // PAN-4466 — the pending permission's command and whether it can be
+      // answered from the dashboard, so a clipped prompt routes to the terminal.
+      command?: string;
+      answerable?: boolean;
     }> = [];
     for (const subject of scoped) {
       const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
@@ -258,7 +262,7 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
       const label = formatIssueRef(
         subject.issueId,
         subject.issueId ? titleByIssueId.get(subject.issueId) : undefined,
-      ) ?? subject.agentId;
+      ) ?? subject.conversationTitle ?? subject.agentId;
       const dedupKey = (!auqResolved ? toolUseId : undefined) ?? (!planResolved ? planToolUseId : undefined) ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
@@ -272,6 +276,8 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
         count,
         title: describePendingInput(subject.kinds),
         since: subject.since,
+        command: subject.permissionCommand,
+        answerable: subject.permissionAnswerable,
       });
     }
     // PAN-4278 — oldest wait first; rows without a timestamp keep their order after.
@@ -314,11 +320,17 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
               // dead; navigating puts the operator on the session either way,
               // and the dialog is app-level so it survives the route change.
               onClick={() => {
+                // PAN-4466 — a non-answerable permission (clipped, or not on
+                // screen) has no dialog to reopen; go straight to the terminal.
+                if (row.answerable === false && row.source === 'conversation') {
+                  navigateToDecisionSubject({ id: row.agentId, source: 'conversation', view: 'terminal' });
+                  return;
+                }
                 navigateToDecisionSubject({ id: row.agentId, source: row.source, issueId: row.issueId });
                 requestReopen(row.agentId);
               }}
               className="flex w-full flex-col items-start gap-0.5 overflow-hidden rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
-              title={`${row.title} — click to open`}
+              title={row.answerable === false ? `${row.title} — click to open the terminal` : `${row.title} — click to open`}
               data-testid={`needs-you-row-${row.agentId}`}
             >
               <span className="text-xs font-medium text-foreground">
@@ -326,6 +338,9 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
                 {row.count > 1 ? ` · ${row.count} questions` : ''}
               </span>
               <span className="w-full truncate text-xs text-muted-foreground">{row.detail}</span>
+              {row.command && (
+                <span className="w-full truncate font-mono text-[11px] text-muted-foreground" title={row.command}>{row.command}</span>
+              )}
               {row.since && (
                 <span className="text-[10px] text-muted-foreground">waiting {formatRelativeTime(row.since, now)}</span>
               )}

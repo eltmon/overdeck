@@ -18,6 +18,7 @@ import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
 import { RetrospectiveButton } from './RetrospectiveButton';
+import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
@@ -201,6 +202,7 @@ export function CommandDeck({
   onProjectPrefixChange,
   cockpitIssue = null,
   onCockpitChange,
+  conversationViewMode,
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
@@ -554,22 +556,7 @@ export function CommandDeck({
     messageIndex: number;
     nonce: number;
     subagentId?: string;
-  }, viewMode?: ViewMode) => {
-    const store = usePanesStore.getState();
-    store.ensureHome(projectKey);
-    const panes = store.panesByWorkspace[projectKey] ?? [];
-    const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(viewMode ? { viewMode } : {}) });
-    store.setActivePane(projectKey, paneId);
-    if (target) {
-      usePanesStore.getState().updatePane(projectKey, paneId, {
-        targetMessageId: target.messageId,
-        targetMessageIndex: target.messageIndex,
-        targetMessageNonce: target.nonce,
-        targetSubagentId: target.subagentId,
-      });
-    }
-  }, []);
+  }, viewMode?: ViewMode) => openConversationTab(projectKey, name, label, target, viewMode), []);
 
   const openTerminalTabIn = useCallback((projectKey: string, sessionId: string) => {
     const store = usePanesStore.getState();
@@ -593,7 +580,10 @@ export function CommandDeck({
   // the conversation's project and open it as an agent tab in that deck.
   useEffect(() => {
     if (!convId || !registeredProjectsFetched || registeredProjectsError) return;
-    if (convId === appliedConvId.current) return;
+    // The view mode is part of the deep link: switching ?view=terminal on an
+    // already-open conversation must re-apply, not be skipped as "unchanged".
+    const deepLinkKey = `${convId}::${conversationViewMode ?? 'conversation'}`;
+    if (deepLinkKey === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
     if (!conv) return;
     setSelectedConversation(conv.name);
@@ -610,10 +600,16 @@ export function CommandDeck({
     // Opening a conversation: the /conv/<id> route owns the URL, so switch the
     // deck's project without writing /command-deck/<project> over it.
     onSelectProject?.(projectName, { updateUrl: false });
-    openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+    openConversationTabIn(
+      projectName,
+      conv.name,
+      pendingConversationTarget?.label ?? conv.title ?? 'Agent',
+      target,
+      conversationViewMode === 'terminal' ? 'terminal' : undefined,
+    );
     if (target) onPendingConversationTargetConsumed?.();
-    appliedConvId.current = convId;
-  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+    appliedConvId.current = deepLinkKey;
+  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed, conversationViewMode]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
@@ -1155,7 +1151,7 @@ export function CommandDeck({
         if (onConvIdChange) {
           const newId = String(conv.id);
           onConvIdChange(newId);
-          appliedConvId.current = newId;
+          appliedConvId.current = `${newId}::${conversationViewMode ?? 'conversation'}`;
           prevSelectedRef.current = conv.name;
         }
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -1166,7 +1162,7 @@ export function CommandDeck({
         return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
-    [sidebarModel, sidebarHarness, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
+    [sidebarModel, sidebarHarness, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
   );
 
   const handleNewConversation = useCallback(() => {

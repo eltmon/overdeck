@@ -29,6 +29,16 @@
  * surface of the pane, carry exactly one `❯` cursor row, and sit under a `───`
  * rule — because a false positive would offer to press keys into a pane that
  * is not asking anything.
+ *
+ * PAN-4466: a prompt taller than the pane's visible screen loses its `───`
+ * rule and title line off the top (`__fixtures__/claude-code-2.1.284/`, which
+ * prefixes every wrapped command line with `│`, the same bar the reason uses).
+ * Such a prompt is accepted as **clipped** only under the stricter D2 rules:
+ * the question must match `QUESTION_LINE` (not just `PERMISSION_TEXT`), a
+ * trailing `Esc to cancel` hint must be on screen, and no rule may appear in
+ * the scan window above the question. A clipped prompt has `header: null` and
+ * `fromAgent: null` — the asking thread is unknown — and its whole visible
+ * window becomes `detail`/`reason` lines.
  */
 
 import { looksLikeHarnessFooterHint } from '../pane-choice-menu.js';
@@ -45,8 +55,11 @@ export interface PermissionPromptOption {
 
 export interface PermissionPrompt {
   readonly signature: string;          // title line + detail + options; stable for one on-screen prompt
-  readonly header: string;             // e.g. 'Bash command'
+  readonly header: string | null;      // e.g. 'Bash command'; null when clipped
   readonly fromAgent: string | null;   // 'general-purpose' for ' · from the general-purpose agent', else null
+  // true when the rule and title scrolled off the top of the screen; header
+  // and fromAgent are then null and the asking thread is unknown.
+  readonly clipped: boolean;
   readonly detailLines: readonly string[];
   readonly reason: string | null;
   readonly options: readonly PermissionPromptOption[];
@@ -62,6 +75,7 @@ const BARE_PROMPT_LINE = /^\s*[❯›]\s*$/;
 const REASON_BAR = /^│\s*/;
 const REASON_TEXT = /^(?:Dangerous|Warning|This command|.*cannot be auto-allowed)/i;
 const QUESTION_LINE = /^do you want to\b/i;
+const CANCEL_HINT = /\besc to cancel\b/i;
 const PERMISSION_TEXT = /permission|allow(?:\s+this)?|tool use|bash command|mcp tool|do you want to proceed|do you want to continue/i;
 const ALLOW_ALWAYS_LABEL = /^yes,?\s*(?:and\s*)?(?:allow|don't ask|always)/i;
 const FROM_AGENT_SUFFIX = /^(.*?)\s+·\s+from\s+(?:the\s+)?(.+?)(?:\s+agent)?$/i;
@@ -146,25 +160,38 @@ export function parsePermissionPrompt(paneText: string): PermissionPrompt | null
   const question = lines[q]!.trim();
   if (!QUESTION_LINE.test(question) && !PERMISSION_TEXT.test(question)) return null;
 
-  // The prompt block starts under the nearest ─── rule above the question.
+  // The prompt block starts under the nearest ─── rule above the question. A
+  // prompt taller than the screen has lost its rule and title off the top: it
+  // is accepted as clipped only under the stricter rules below.
+  const windowStart = Math.max(0, q - MAX_BLOCK_LINES);
   let rule = -1;
-  for (let j = q - 1; j >= 0 && q - j <= MAX_BLOCK_LINES; j -= 1) {
+  for (let j = q - 1; j >= windowStart; j -= 1) {
     if (SEPARATOR_LINE.test(lines[j]!)) { rule = j; break; }
   }
-  if (rule < 0) return null;
+  const clipped = rule < 0;
+  if (clipped) {
+    if (!QUESTION_LINE.test(question)) return null;
+    if (!trailing.some((line) => CANCEL_HINT.test(line))) return null;
+  }
 
-  const block = lines.slice(rule + 1, q).map((line) => line.trim()).filter((line) => line !== '');
-  if (block.length === 0) return null;
-  const title = block[0]!;
-  const fromMatch = FROM_AGENT_SUFFIX.exec(title);
-  const header = fromMatch ? fromMatch[1]!.trim() : title;
+  const blockStart = clipped ? windowStart : rule + 1;
+  const rawBlock = lines.slice(blockStart, q).filter((line) => line.trim() !== '');
+  if (rawBlock.length === 0) return null;
+  const title = clipped ? null : rawBlock[0]!.trim();
+  const fromMatch = title ? FROM_AGENT_SUFFIX.exec(title) : null;
+  const header = title === null ? null : fromMatch ? fromMatch[1]!.trim() : title;
   const fromAgent = fromMatch ? fromMatch[2]!.trim() : null;
 
   const detailLines: string[] = [];
   let reason: string | null = null;
-  for (const line of block.slice(1)) {
-    const text = line.replace(REASON_BAR, '');
-    if (reason === null && REASON_TEXT.test(text)) { reason = text; continue; }
+  let inReason = false;
+  for (const rawLine of clipped ? rawBlock : rawBlock.slice(1)) {
+    const hadBar = REASON_BAR.test(rawLine.trim());
+    const text = rawLine.trim().replace(REASON_BAR, '');
+    if (reason === null && REASON_TEXT.test(text)) { reason = text; inReason = true; continue; }
+    // A long reason wraps onto further │ rows; they continue it, not the command.
+    if (inReason && hadBar) { reason = `${reason} ${text}`; continue; }
+    inReason = false;
     detailLines.push(text);
   }
 
@@ -177,9 +204,10 @@ export function parsePermissionPrompt(paneText: string): PermissionPrompt | null
 
   // The full title (with its "from the … agent" suffix) keeps a subagent's
   // prompt distinct from an identical main-thread prompt shown right after it.
-  const signature = `${title}::${detailLines.join('\n')}::${options.map((o) => `${o.number}:${o.label}`).join('|')}`;
+  // A clipped prompt has no title, so '(clipped)' stands in for it.
+  const signature = `${title ?? '(clipped)'}::${detailLines.join('\n')}::${options.map((o) => `${o.number}:${o.label}`).join('|')}`;
 
-  return { signature, header, fromAgent, detailLines, reason, options, selectedIndex: cursorRows[0]! };
+  return { signature, header, fromAgent, clipped, detailLines, reason, options, selectedIndex: cursorRows[0]! };
 }
 
 /**
