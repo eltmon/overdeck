@@ -28,6 +28,8 @@ const DANGEROUS_RM: TerminalPendingPermission = {
   agentKey: 'a9ef',
   toolName: 'Bash',
   header: 'Bash command',
+  clipped: false,
+  inputPreview: null,
   detailLines: ['Q=$(pwd)/queue; rm -f "$Q"/*', 'Clear scratch queue files'],
   reason: 'Dangerous rm operation on possibly-empty variable path: "$Q"/*',
   options: [{ choice: 'allow-once', label: 'Yes' }, { choice: 'deny', label: 'No' }],

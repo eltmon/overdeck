@@ -19,6 +19,8 @@ export interface TerminalPendingPermission {
   agentKey: string | null;
   toolName: string | null;
   header: string | null;
+  clipped: boolean;
+  inputPreview: string | null;
   detailLines: string[];
   reason: string | null;
   options: Array<{ choice: TerminalPermissionChoice; label: string }>;

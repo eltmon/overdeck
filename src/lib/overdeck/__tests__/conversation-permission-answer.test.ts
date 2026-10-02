@@ -25,9 +25,14 @@ function fixture(name: string): string {
   return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.280/${name}`, import.meta.url), 'utf8');
 }
 
+function fixture284(name: string): string {
+  return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.284/${name}`, import.meta.url), 'utf8');
+}
+
 const BASH = fixture('permission-bash.txt');
 const RM = fixture('permission-dangerous-rm.txt');
 const ANSWERED = fixture('permission-answered.txt');
+const CLIPPED = fixture284('permission-subagent-clipped.txt');
 
 createConversation({ name: 'perm-answer', tmuxSession: 'conv-perm-answer', cwd: TEST_HOME, title: 'Perm answer' });
 createConversation({ name: 'perm-answer-codex', tmuxSession: 'conv-perm-answer-codex', cwd: TEST_HOME, title: 'Codex', harness: 'codex' });
@@ -106,6 +111,18 @@ describe('handleConversationPermissionAnswer', () => {
     const result = await handleConversationPermissionAnswer('perm-answer', { choice: 'allow-always', signature: signature(RM) }, { io, sleep });
     expect(result).toMatchObject({ status: 400, body: { code: 'choice-not-offered' } });
     expect(sent).toEqual([]);
+  });
+
+  it('answers a clipped prompt and clears its registry entry', async () => {
+    recordPermissionRequest('perm-answer', {
+      agentKey: 'a022774fdd0117553', agentId: 'a022774fdd0117553', agentType: 'general-purpose', agentDescription: 'Find better Overdeck screenshots',
+      toolName: 'Bash', toolInputPreview: 'S=/tmp/x; O=$S/od-cands; cd $S;', requestedAt: '2026-09-27T15:00:00.000Z',
+    });
+    const { io, sent } = fakeIo(CLIPPED, ANSWERED);
+    const result = await handleConversationPermissionAnswer('perm-answer', { choice: 'deny', signature: signature(CLIPPED) }, { io, sleep });
+    expect(result.body).toEqual({ ok: true, answered: 'deny' });
+    expect(sent).toEqual(['Down', 'Enter']);
+    expect(listPermissionRequests('perm-answer')).toEqual([]);
   });
 
   it('validates the body and the conversation', async () => {

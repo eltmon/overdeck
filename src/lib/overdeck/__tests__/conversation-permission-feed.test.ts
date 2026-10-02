@@ -33,6 +33,10 @@ function fixture(name: string): string {
   return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.280/${name}`, import.meta.url), 'utf8');
 }
 
+function fixture284(name: string): string {
+  return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.284/${name}`, import.meta.url), 'utf8');
+}
+
 const NOW = '2026-09-27T16:00:00.000Z';
 const deps = (pane: string) => ({ read: async () => pane, now: () => NOW });
 
@@ -97,6 +101,8 @@ describe('conversationPendingPermission', () => {
       agentKey: 'main',
       toolName: 'Bash',
       header: null,
+      clipped: false,
+      inputPreview: 'npm install',
       detailLines: ['npm install'],
       reason: null,
       options: [],
@@ -178,6 +184,44 @@ describe('conversationPendingPermission', () => {
   it('null when the pane read throws and the registry is empty', async () => {
     const pending = await conversationPendingPermission(conv, { read: async () => { throw new Error('gone'); } });
     expect(pending).toBeNull();
+  });
+
+  it('answerable row for a clipped prompt with one subagent entry', async () => {
+    recordPermissionRequest('perm-feed', entry('a022774fdd0117553', {
+      agentDescription: 'Find better Overdeck screenshots',
+      toolInputPreview: 'S=/tmp/x; O=$S/od-cands; cd $S;',
+    }));
+    const pending = await conversationPendingPermission(conv, deps(fixture284('permission-subagent-clipped.txt')));
+    expect(pending).toMatchObject({
+      answerable: true,
+      clipped: true,
+      agentLabel: 'Subagent: Find better Overdeck screenshots',
+      agentKey: 'a022774fdd0117553',
+      toolName: 'Bash',
+      inputPreview: 'S=/tmp/x; O=$S/od-cands; cd $S;',
+      options: [
+        { choice: 'allow-once', label: 'Yes' },
+        { choice: 'deny', label: 'No' },
+      ],
+    });
+  });
+
+  it('Unknown agent for a clipped prompt when the registry is empty', async () => {
+    const pending = await conversationPendingPermission(conv, deps(fixture284('permission-subagent-clipped.txt')));
+    expect(pending).toMatchObject({
+      answerable: true,
+      agentLabel: 'Unknown agent',
+      agentKey: null,
+      toolName: null,
+      inputPreview: null,
+    });
+  });
+
+  it('Unknown agent for a clipped prompt with two entries', async () => {
+    recordPermissionRequest('perm-feed', entry('s1', { agentDescription: 'One', toolInputPreview: 'zzz-no-match-1' }));
+    recordPermissionRequest('perm-feed', entry('s2', { agentDescription: 'Two', toolInputPreview: 'zzz-no-match-2' }));
+    const pending = await conversationPendingPermission(conv, deps(fixture284('permission-subagent-clipped.txt')));
+    expect(pending).toMatchObject({ answerable: true, agentLabel: 'Unknown agent' });
   });
 });
 

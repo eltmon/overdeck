@@ -21,6 +21,8 @@ function permissionRow(name: string, since: string, agentLabel = 'Subagent: Rese
       agentKey: 'a9ef',
       toolName: 'Bash',
       header: 'Bash command',
+      clipped: false,
+      inputPreview: null,
       detailLines: ['rm -f queue/*'],
       reason: null,
       options: [{ choice: 'allow-once', label: 'Yes' }, { choice: 'deny', label: 'No' }],
