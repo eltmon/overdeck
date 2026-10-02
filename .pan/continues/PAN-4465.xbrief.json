@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4465",
   "created": "2026-10-02T02:35:56.189Z",
-  "updated": "2026-10-02T03:16:43.001Z",
+  "updated": "2026-10-02T03:25:36.567Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-02T03:16:32.757Z"
     },
     "silence-conv-intervention": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4465",
-      "claimedAt": "2026-10-02T03:16:43.001Z"
+      "claimedAt": "2026-10-02T03:16:43.001Z",
+      "doneAt": "2026-10-02T03:25:36.567Z"
     }
   }
 }
