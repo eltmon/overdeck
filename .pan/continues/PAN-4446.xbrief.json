@@ -1,0 +1,262 @@
+{
+  "version": "1",
+  "issueId": "PAN-4446",
+  "created": "2026-10-01T21:18:31.027Z",
+  "updated": "2026-10-01T23:13:10.659Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T23:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-01T23:13:10.659Z"
+    }
+  ],
+  "items": {
+    "setup-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:18:31.027Z",
+      "doneAt": "2026-10-01T21:21:47.045Z"
+    },
+    "join-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:21:51.690Z",
+      "doneAt": "2026-10-01T21:23:46.199Z"
+    },
+    "cli-setup-wrapper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:23:51.245Z",
+      "doneAt": "2026-10-01T21:25:08.031Z"
+    },
+    "cli-join-wrapper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:25:09.545Z",
+      "doneAt": "2026-10-01T21:26:26.248Z"
+    },
+    "vault-service-ops": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:26:28.069Z",
+      "doneAt": "2026-10-01T21:31:01.789Z"
+    },
+    "vault-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:31:06.423Z",
+      "doneAt": "2026-10-01T21:33:57.127Z"
+    },
+    "setup-form": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:33:59.369Z",
+      "doneAt": "2026-10-01T21:38:07.651Z"
+    },
+    "join-form": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:38:08.859Z",
+      "doneAt": "2026-10-01T21:41:26.340Z"
+    },
+    "sync-now": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:41:30.038Z",
+      "doneAt": "2026-10-01T21:44:47.600Z"
+    },
+    "playwright-vault-setup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:47:46.261Z",
+      "doneAt": "2026-10-01T21:48:26.715Z"
+    },
+    "docs-vault-dashboard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4446",
+      "claimedAt": "2026-10-01T21:48:28.038Z",
+      "doneAt": "2026-10-01T21:49:46.316Z"
+    },
+    "setup-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:06:01.814Z"
+    },
+    "setup-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:07:03.333Z"
+    },
+    "setup-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:07:54.243Z"
+    },
+    "setup-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:08:40.098Z"
+    },
+    "setup-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:09:42.677Z"
+    },
+    "join-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:10:53.697Z"
+    },
+    "join-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:12:06.100Z"
+    },
+    "join-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:13:29.136Z"
+    },
+    "join-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:14:29.713Z"
+    },
+    "join-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:15:35.566Z"
+    },
+    "cli-setup-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:16:26.814Z"
+    },
+    "cli-setup-wrapper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:17:18.458Z"
+    },
+    "cli-setup-wrapper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:18:21.996Z"
+    },
+    "cli-join-wrapper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:19:16.758Z"
+    },
+    "cli-join-wrapper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:20:11.517Z"
+    },
+    "cli-join-wrapper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:21:03.316Z"
+    },
+    "vault-service-ops.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:21:51.068Z"
+    },
+    "vault-service-ops.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:22:48.474Z"
+    },
+    "vault-service-ops.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:23:45.423Z"
+    },
+    "vault-service-ops.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:24:39.621Z"
+    },
+    "vault-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:25:30.884Z"
+    },
+    "vault-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:26:16.055Z"
+    },
+    "vault-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:27:03.304Z"
+    },
+    "vault-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:27:55.970Z"
+    },
+    "vault-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:28:49.692Z"
+    },
+    "setup-form.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:29:40.376Z"
+    },
+    "setup-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:30:32.640Z"
+    },
+    "setup-form.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:31:19.197Z"
+    },
+    "setup-form.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:32:08.769Z"
+    },
+    "join-form.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:32:59.025Z"
+    },
+    "join-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:33:47.585Z"
+    },
+    "join-form.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:34:32.207Z"
+    },
+    "join-form.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:35:23.462Z"
+    },
+    "sync-now.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:36:10.871Z"
+    },
+    "sync-now.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:36:56.476Z"
+    },
+    "sync-now.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:37:40.820Z"
+    },
+    "playwright-vault-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:38:25.396Z"
+    },
+    "playwright-vault-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:39:05.507Z"
+    },
+    "playwright-vault-setup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:39:44.776Z"
+    },
+    "docs-vault-dashboard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:40:30.827Z"
+    },
+    "docs-vault-dashboard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:41:21.945Z"
+    },
+    "docs-vault-dashboard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:42:14.499Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-01T23:13:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4446\n\n# Review — PAN-4446\n## Verdict: CHANGES REQUESTED — the shown-once recovery dialog unmounts on the next vault-status refetch (≤60 s, or on window refocus), losing the recovery phrase and generated passphrase before \"I wrote it down\" (FR-9)\n\n## Context\n- Run ID: agent-pan-4446-review-63dc5df9\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4446/.pan/review/agent-pan-4446-review-63dc5df9/context.json\n- Branch / workspace: feature/pan-4446 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4446\n- PR: eltmon/overdeck#4461 (from the pipeline journal; `gh` returned 401 in this session)\n- HEAD reviewed: 63dc5df92c8d5d954bf59f8fad26ef5ef87a2488\n- Base: origin/main merge-base 8a82dad552b (the PRD's planning base). Prior cycle SHA: none (first review).\n\n## Blocking Findings\n\n### [requirements/UX] Recovery dialog is destroyed by the status refetch before the operator acknowledges it — `src/dashboard/frontend/src/components/Settings/sections/SessionVaultSection.tsx:116`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-9, D-11, NFR-3; the docs added in `configuration/session-vault.mdx` also promise this behavior)\n- Trigger and changed-code connection:\n  1. The `vault-status` query (`SessionVaultSection.tsx` line 194, `useQuery({ queryKey: STATUS_QUERY_KEY, queryFn: fetchVaultStatus })`) sets no options, so it inherits the global defaults in `src/dashboard/frontend/src/main.tsx` lines 38–45: `refetchInterval: 60_000`, `staleTime: 30_000`, and react-query's default `refetchOnWindowFocus: true`.\n  2. A successful `POST /api/vault/setup` writes `vault/config.json` and `vault/key`. `getVaultServiceSnapshot()` (`vault-service.ts`) re-reads disk on every call, so the next status fetch returns `state: 'ready'`.\n  3. `VaultStatusBlock` (line 116) renders `<SessionVaultSetupForm>` only when `status.state === 'off'`. When the refetch returns `ready`, React unmounts `SessionVaultSetupForm`, and with it the `shownOnce` state and the `RecoveryDialog` it renders (`SessionVaultSetupForm.tsx` lines 114, 201).\n- Expected / observed / impact: Expected (FR-9, PRD WI-7): the dialog \"closes only after 'I wrote it down' is checked\". Observed: the dialog disappears on the first poll (at most 60 s after the last fetch, with the tab visible) or when the operator returns to the tab more than 30 s later (for example, after switching to a password manager to paste the phrase). Writing 24 words by hand normally takes longer than 60 s, so this is the normal path. The recovery phrase and the generated passphrase are lost. Nothing re-shows them: `keyToPhrase` is called only in `setup-core.ts` and `rotate-key.ts`. The operator must run `pan vault rotate-key` (CLI) for a new phrase and `pan vault passphrase set` for a new passphrase, which defeats the \"no terminal step\" goal of this issue. Until then, the second machine cannot join from the dashboard.\n- Evidence: static trace of the React tree and the QueryClient defaults (files and lines above). No runtime reproduction: a probe would need a test file inside the tracked tree. The Playwright spec (`pan-4446-vault-setup.spec.ts`) clicks \"Done\" within seconds and never waits for a refetch, so the gate passed without exercising this path. The unit test `SessionVaultSetupForm.test.tsx` renders the form alone, outside the section.\n- Fix: keep the shown-once secrets above the state-dependent branch. For example, lift `shownOnce` and the `RecoveryDialog` into `SessionVaultSection` (the form calls back with the secrets, and the section renders the dialog independent of `status.state`). Alternatively, keep `SessionVaultSetupForm` mounted while a dialog is open. Clear the secrets only from \"Done\". Add a section-level test: setup returns `created`, the status query then resolves to `ready` (invalidate or refetch), and the dialog and the phrase are still present until \"I wrote it down\" plus \"Done\".\n\n## Non-blocking Findings\n- `~` `vaultNotice` (`SessionVaultSection.tsx`, `handleVaultChanged`) is never cleared, so lines like \"Joined as …\" or \"Set up with this machine's existing vault key…\" stay visible for the rest of the page session, including after later state changes. Clear it on the next state change or after a timeout.\n- `?` `pan vault setup --generate-passphrase`: `choosePassphraseAtSetup()` still generates a passphrase that the wrapper now discards (it maps `generated: true` to `{ mode: 'generate' }`, and the core generates the stored value). The printed and stored values match, so output and behavior are correct. Only one `generatePassphrase()` call is wasted.\n- `?` Pre-existing: `joinVault()` reuses any existing clone at `gitVaultCloneDir()` without checking that its `origin` matches `url` (unlike `openOrInitStore` in setup). This behavior is unchanged from `join.ts` on main and is not introduced by this PR. It now also runs from the dashboard \"Join an existing vault\" form in state `off`.\n- Manifest stub-UI findings are false positives. `SessionVaultJoinForm.tsx:32` (`running`) is written by `setRunning` at lines 44 and 62. `SessionVaultSetupForm.tsx:38` (`acknowledged`, the dialog's `useState(false)`) is written by `setAcknowledged` from the checkbox (line 88). `SessionVaultSetupForm.tsx:112` (`running`) is written by `setRunning` at lines 120 and 147.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/lib/vault/setup-core.ts | Reviewed. The order matches old setup.ts lines 61–145. Cleanups preserved. A direct custom passphrase is strength-checked first. A non-offline putSlot error rethrows as before. |\n| src/lib/vault/join-core.ts | Reviewed. The order matches old join.ts lines 77–165. The unwrap happens before `readRef(HEADER)` (H-2). Every failure after a clone uses `fail()`. |\n| src/cli/commands/vault/setup.ts | Reviewed. Line-by-line output equivalence traced (enabled line, phrase block, prompt, generated/stored lines, stored-error line on stderr, hooks last). Exit codes unchanged. |\n| src/cli/commands/vault/join.ts | Reviewed. The D-4 order is kept. A phrase read error and a phrase parse error both reach `io.err(message)` and exit 1, as before. A passphrase-file read error still throws uncaught, as before. |\n| src/dashboard/server/services/vault-service.ts | Reviewed. Queueing, `runSync` split, `syncVaultNow` not-running guard, and the `runGeneration` guard against a stale boot read. |\n| src/dashboard/server/routes/vault.ts | Reviewed. Auth chain, body validation (D-12), 400/422/409/500 mapping, and `no-store` on every response including auth errors. |\n| src/dashboard/frontend/.../SessionVaultSetupForm.tsx | Reviewed. Blocking finding above. |\n| src/dashboard/frontend/.../SessionVaultJoinForm.tsx | Reviewed. Join/unlock modes, recovery-phrase toggle, D-9 copy for `not-a-vault`. |\n| src/dashboard/frontend/.../SessionVaultSection.tsx | Reviewed. Mounting, Sync now, `vault-last-sync`, docs link; blocking finding at line 116. |\n| src/dashboard/frontend/.../sessionVaultShared.ts | Reviewed. `postVault` moved unchanged; `vaultErrorMessage`. |\n| src/dashboard/frontend/.../__tests__/SessionVault{Setup,Join}Form.test.tsx, SessionVaultSection.test.tsx | Reviewed. They cover the WI-7/8/9 cases; none covers the dialog surviving a status refetch. |\n| src/dashboard/frontend/tests/pan-4446-vault-setup.spec.ts | Reviewed. Isolated dashboards, throwaway homes, `OVERDECK_VAULT_IN_PEER=1`, no CLI calls (NFR-6). |\n| src/dashboard/server/__tests__/vault-setup-routes.test.ts | Reviewed. Covers root/device/internal/token, 422, 400, 409, 500 and no-store. It is in the root vitest default include (`src/**/__tests__/**/*.test.ts`). |\n| tests/unit/lib/vault/setup-core.test.ts, join-core.test.ts | Reviewed. The WI-1 and WI-2 cases exist. |\n| tests/unit/dashboard/server/services/vault-service.test.ts | Reviewed. Not-running, synced snapshot, queue order, and the fake-timer single-loop case. |\n| tests/unit/dashboard/server/routes/vault.test.ts | Reviewed. Only the three mock entries were added (WI-6). |\n| tests/unit/lib/overdeck/no-loss-matrix.ts | Reviewed. Three rows added; the file is 944 lines (≤1000). |\n| configuration/session-vault.mdx, docs/SESSION-VAULT.md | Reviewed. Content matches AC-11. The mdx claim \"closes only after you check I wrote it down\" is not true until the blocker is fixed. |\n| .overdeck/context/codebase/architecture.md | Reviewed. Planning-agent context only. |\n| .pan/drafts/PAN-4446.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4446.xbrief.json | Not applicable. Planning artifacts; the PRD was read as the requirement source. |\n\n### Dimensions\n- **Correctness:** CLI output and exit-code equivalence was traced for every setup/join path (H-1). The wrong passphrase still reads only the keywrap (H-2). `syncVaultNow` cannot create a second loop, and the `runGeneration` guard prevents a stale boot read from starting a loop after stop. The cores import only `src/lib/vault/*` and `environment-identity` (H-6). One blocker, in the UI lifecycle.\n- **Security:** `rejectUnsafeDashboardMutationRequest` calls `rejectUnauthorizedDashboardRequest` first (dashboard-auth.ts lines 206–210). That enforces `requiredScopeFor`, which has no vault rows and so requires `admin` (route-scopes.ts line 85; exact `pathMatches`). A low-scope device therefore gets 403 before the kind check. `resolveDashboardCredential` returns null for an unverifiable token (line 170). The kind check refuses `internal-token` and `token` with no side effect (tested). The URL validation blocks a leading `-`, and `initGitVault` also passes `--`. Secrets are not logged (no `console.*` of results, no activity entries); the 500 path returns only `error.message`. No new exposure found.\n- **Performance:** scrypt stays async; git runs through `execFile` (async). No `execSync`. Operations are serialized on the existing queue. No issues.\n- **Requirements/UX:** see the AC matrix. FR-9 fails in practice (blocker).\n\n### Acceptance-criteria matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 (WI-1 setup core) | Met | Test cases present; verification gate passed on 63dc5df9. |\n| AC-2 (WI-2 join core) | Met | Test cases present; gate passed. |\n| AC-3 (WI-3 CLI setup wrapper) | Met | `git diff 8a82dad552b HEAD --stat -- tests/unit/cli tests/unit/lib/vault/two-machine.e2e.test.ts` is empty; output traced line by line. |\n| AC-4 (WI-4 CLI join wrapper) | Met | Same empty test diff; output traced. |\n| AC-5 (WI-5 service ops) | Met | New cases present; gate passed. |\n| AC-6 (WI-6 routes + matrix) | Met | Route tests and three matrix rows present. |\n| AC-7 (WI-7 setup form) | Unmet in behavior | The unit tests pass, but FR-9 \"closes only after I wrote it down\" fails once the status refetches (blocker). |\n| AC-8 (WI-8 join/unlock form) | Met | Tests present; unlock mode prefilled and read-only. |\n| AC-9 (WI-9 Sync now) | Met | Button appears only when `running`; `setQueryData` used; `vault-last-sync` test id present. |\n| AC-10 (WI-10 Playwright) | Unverified here | Not re-run. The spec does not exercise a refetch while the dialog is open. |\n| AC-11 (WI-11 docs) | Met | The required strings are present in both docs. |\n\n## Verification\n- Verification gate: `verification.passed` for head `63dc5df9` (from `.overdeck/pipeline.jsonl`, 2026-10-01T23:05:45Z). Reused; tests were not re-run.\n- CI test job: unverified. `gh pr checks` could not run (`HTTP 401: Requires authentication`).\n- `npm run lint:effect-diagnostics` (run once on this HEAD): `✓ Effect diagnostics guard passed (229 known findings; none new)`.\n- No runtime probe was run for the blocker (it would need a tracked test file). The evidence is the static trace above.\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4446/.pan/review/agent-pan-4446-review-63dc5df9/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4446 -m \"Fixed review issues\"`"
+    }
+  ]
+}

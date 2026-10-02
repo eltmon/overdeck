@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   declineEvictionEntry: vi.fn(),
   clearEvictionBatch: vi.fn(),
   reofferEvictionEntry: vi.fn(),
+  setupVaultFromDashboard: vi.fn(),
+  joinVaultFromDashboard: vi.fn(),
+  syncVaultNow: vi.fn(),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/vault-service.js', () => mocks);

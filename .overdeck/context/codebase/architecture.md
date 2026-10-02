@@ -175,10 +175,13 @@ to a CAS'd record through `VaultStore` (`store/dir.ts`, `store/git.ts`); `adopt.
 `materialize.ts` resume elsewhere. Must stay importable without the dashboard, Effect or
 terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 `wip-capture.ts` / `wip-apply.ts`: encrypted git-bundle snapshots of uncommitted code on
-`Settlement.wip`.
+`Settlement.wip`. Dashboard consumer (PAN-4307, verified 2026-10-01): `open.ts` `openVaultContext()`
+resolves config/key/store into a tagged state and prints nothing; `src/dashboard/server/services/vault-service.ts`
+runs every dashboard vault operation through one queue (`enqueueVaultOperation`) plus the sync loop
+(primary dashboard only, or `OVERDECK_VAULT_IN_PEER=1`); `routes/vault.ts` + Settings → Session Vault.
 
 ## Dashboard auth (verified 2026-09-30)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-09-30 -->
+<!-- last-verified: 2026-10-01 -->
