@@ -11,6 +11,19 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
+  // PAN-4465: tellCommand routes through the shared agent-target resolver,
+  // which calls isQualifiedAgentId directly (not just through resolveAgentTarget).
+  isQualifiedAgentId: (id: string) => {
+    const lower = id.toLowerCase();
+    return (
+      lower === 'flywheel-orchestrator' ||
+      lower.startsWith('agent-') ||
+      lower.startsWith('planning-') ||
+      lower.startsWith('conv-') ||
+      lower.startsWith('strike-') ||
+      lower.startsWith('inspect-')
+    );
+  },
   resolveAgentTarget: mocks.resolveAgentTarget,
   getAgentState: mocks.getAgentState,
   messageAgent: mocks.messageAgent,
