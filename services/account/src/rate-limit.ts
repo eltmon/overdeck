@@ -28,6 +28,17 @@ export function clientKey(rc: Pick<RequestContext, 'clientIp'>): Promise<string>
   return sha256Hex(rc.clientIp || 'unknown');
 }
 
+/** Reads the current window for `bucket` without counting; `ok: false` while the window is already exhausted. */
+export async function peek(rc: RateLimitContext, bucket: Bucket): Promise<HitResult> {
+  const { limit, windowMs } = LIMITS[bucket];
+  const now = rc.deps.now();
+  const row = await rc.env.DB.prepare('SELECT window_start, count FROM rate_limits WHERE bucket = ? AND client_hash = ?')
+    .bind(bucket, await clientKey(rc))
+    .first<{ window_start: number; count: number }>();
+  if (!row || row.window_start <= now - windowMs || row.count < limit) return { ok: true };
+  return { ok: false, retryAfterS: Math.max(1, Math.ceil((row.window_start + windowMs - now) / 1000)) };
+}
+
 /** Counts one request against `bucket` for this client; refuses once the window's count exceeds the limit. */
 export async function hit(rc: RateLimitContext, bucket: Bucket): Promise<HitResult> {
   const { limit, windowMs } = LIMITS[bucket];

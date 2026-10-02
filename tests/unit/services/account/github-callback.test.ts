@@ -170,6 +170,13 @@ describe('resolveSignIn (D-11 gate)', () => {
     expect(await getPendingAttempt(rc, 100)).toBeNull();
   });
 
+  it('a non-owner whose deletion job is open is refused as account_deleting, not recorded as pending', async () => {
+    const { rc, deps } = setup();
+    await dbOf(rc.env).prepare('INSERT INTO users (user_id, github_id, github_login, created_at, deleted_at) VALUES (?, ?, ?, ?, ?)').bind('u-gone', 555, 'gone', deps.now(), deps.now()).run();
+    expect(await resolveSignIn(rc, { githubId: 555, login: 'gone' }, 'pkce')).toEqual({ allowed: false, reason: 'account_deleting' });
+    expect(await getPendingAttempt(rc, 555)).toBeNull();
+  });
+
   it('the owner is allowed without a grant, and a deleting account is refused', async () => {
     const { rc, deps } = setup();
     const owner = await resolveSignIn(rc, { githubId: TEST_OWNER_GITHUB_ID, login: 'owner' }, 'pkce');

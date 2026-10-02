@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hit, LIMITS, type Bucket } from '../../../../services/account/src/rate-limit.ts';
+import { hit, LIMITS, peek, type Bucket } from '../../../../services/account/src/rate-limit.ts';
 import { call, dbOf, makeDeps, makeEnv, makeRc } from './helpers/harness.ts';
 
 const BUCKETS = Object.keys(LIMITS) as Bucket[];
@@ -19,6 +19,16 @@ describe('rate limiting (PAN-4293 account-rate-limit, D-12)', () => {
     deps.clock.advance(1_500);
     expect(await hit(rc, bucket)).toEqual({ ok: false, retryAfterS: Math.ceil((windowMs - 1_500) / 1000) });
     expect(await hit(rc, bucket)).toEqual({ ok: false, retryAfterS: Math.ceil((windowMs - 1_500) / 1000) });
+  });
+
+  it('peek reports an exhausted window without counting, and clears when the window ends', async () => {
+    const { rc, deps } = setup();
+    expect(await peek(rc, 'activate-fail')).toEqual({ ok: true });
+    for (let i = 0; i < LIMITS['activate-fail'].limit; i++) await hit(rc, 'activate-fail');
+    expect(await peek(rc, 'activate-fail')).toEqual({ ok: false, retryAfterS: LIMITS['activate-fail'].windowMs / 1000 });
+    expect(await peek(rc, 'activate-fail')).toEqual({ ok: false, retryAfterS: LIMITS['activate-fail'].windowMs / 1000 });
+    deps.clock.advance(LIMITS['activate-fail'].windowMs);
+    expect(await peek(rc, 'activate-fail')).toEqual({ ok: true });
   });
 
   it('a new window resets the count', async () => {

@@ -66,7 +66,11 @@ function matchPattern(pattern: string, pathname: string): Record<string, string>
     const g = got[i] as string;
     if (w.startsWith(':')) {
       if (g === '') return null;
-      params[w.slice(1)] = decodeURIComponent(g);
+      try {
+        params[w.slice(1)] = decodeURIComponent(g);
+      } catch {
+        return null; // malformed percent-encoding is simply not a known path
+      }
     } else if (w !== g) {
       return null;
     }

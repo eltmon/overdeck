@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, INVALID_CODE_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
+import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
 import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import type { GitHubIdentity } from '../../../../services/account/src/github.ts';
@@ -11,6 +11,7 @@ const ENV_ID = '11111111-2222-4333-8444-555555555555';
 const OWNER: GitHubIdentity = { githubId: TEST_OWNER_GITHUB_ID, login: 'owner' };
 const CLI_IP = '192.0.2.50';
 const BROWSER_IP = '198.51.100.50';
+const ORIGIN = { Origin: TEST_BASE_URL };
 
 interface CodeResponse {
   device_code: string;
@@ -19,6 +20,10 @@ interface CodeResponse {
   verification_uri_complete: string;
   expires_in: number;
   interval: number;
+}
+
+function withOrigin(f: { body: string; headers: Record<string, string> }) {
+  return { body: f.body, headers: { ...f.headers, ...ORIGIN } };
 }
 
 function setup(identity: GitHubIdentity = OWNER) {
@@ -38,9 +43,9 @@ function poll(env: Env, deps: TestDeps, deviceCode: string) {
 }
 
 async function approveInBrowser(env: Env, deps: TestDeps, userCode: string) {
-  const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: userCode }) });
+  const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: userCode })) });
   expect(submit.status).toBe(200);
-  const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...form({ user_code: userCode }) });
+  const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: userCode })) });
   expect(confirm.status).toBe(302);
   expect(confirm.headers.get('Location')).toContain('https://github.com/login/oauth/authorize');
   const state = /__Host-od_state=([0-9a-f]{64});/.exec(confirm.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
@@ -90,7 +95,7 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     expect(page.status).toBe(200);
     expect(await page.text()).toContain(`value="${code.user_code}"`);
 
-    const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: code.user_code }) });
+    const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
     expect(await submit.text()).toContain('Connect a <strong>Windows device</strong>');
 
     const done = await approveInBrowser(env, deps, code.user_code);
@@ -114,7 +119,7 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const code = await issue(env, deps);
     const letters = code.user_code.replace('-', '');
     for (const variant of [letters.toLowerCase(), `${letters.slice(0, 4)} ${letters.slice(4)}`.toLowerCase(), `${letters.slice(0, 2)}-${letters.slice(2)}`]) {
-      const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: variant }) });
+      const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: variant })) });
       expect(res.status, variant).toBe(200);
       expect(await res.text()).toContain('Linux device');
     }
@@ -148,7 +153,7 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const { env, deps } = setup();
     const code = await issue(env, deps);
     deps.clock.advance(DEVICE_GRANT_TTL_MS);
-    const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: code.user_code }) });
+    const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain(INVALID_CODE_MESSAGE);
     expect(await (await poll(env, deps, code.device_code)).json()).toEqual({ error: 'expired_token' });
@@ -158,8 +163,8 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
   it('cancelling on GitHub marks the grant denied', async () => {
     const { env, deps } = setup();
     const code = await issue(env, deps);
-    await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: code.user_code }) });
-    const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...form({ user_code: code.user_code }) });
+    await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
+    const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
     const state = /__Host-od_state=([0-9a-f]{64});/.exec(confirm.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
     const cb = await call('GET', `/auth/github/callback?error=access_denied&state=${state}`, { env, deps, headers: { Cookie: `__Host-od_state=${state}` } });
     expect(cb.status).toBe(400);
@@ -170,7 +175,7 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
 
   it('the 11th wrong code from one IP in 15 minutes is 429, and a new window accepts again', async () => {
     const { env, deps } = setup();
-    const wrong = () => call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: 'BBBB-BBBB' }) });
+    const wrong = () => call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: 'BBBB-BBBB' })) });
     for (let i = 0; i < 10; i++) {
       const res = await wrong();
       expect(res.status, `attempt ${i + 1}`).toBe(400);
@@ -180,11 +185,44 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     expect(limited.status).toBe(429);
     expect(limited.headers.get('Retry-After')).toBe('900');
     expect(await limited.text()).toContain(TOO_MANY_WRONG_CODES_MESSAGE);
-    expect((await call('POST', '/activate', { env, deps, ip: '198.51.100.51', ...form({ user_code: 'BBBB-BBBB' }) })).status).toBe(400);
+    expect((await call('POST', '/activate', { env, deps, ip: '198.51.100.51', ...withOrigin(form({ user_code: 'BBBB-BBBB' })) })).status).toBe(400);
+    // While the window is exhausted, no lookup happens: even the right code is refused from that IP.
+    const real = await issue(env, deps);
+    const stillLimited = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: real.user_code })) });
+    expect(stillLimited.status).toBe(429);
 
     deps.clock.advance(15 * 60_000);
     expect((await wrong()).status).toBe(400);
     const code = await issue(env, deps);
-    expect((await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...form({ user_code: code.user_code }) })).status).toBe(200);
+    expect((await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) })).status).toBe(200);
+  });
+
+  it('POST /activate and /activate/confirm without a same-origin Origin header are 403 and start nothing', async () => {
+    const { env, deps } = setup();
+    const code = await issue(env, deps);
+    for (const headers of [{}, { Origin: 'https://evil.example' }]) {
+      for (const path of ['/activate', '/activate/confirm']) {
+        const res = await call('POST', path, { env, deps, ip: BROWSER_IP, headers: { ...form({}).headers, ...headers }, body: form({ user_code: code.user_code }).body });
+        expect(res.status, `${path} ${JSON.stringify(headers)}`).toBe(403);
+        expect(await res.text()).toContain(REQUEST_REJECTED_MESSAGE);
+        expect(res.headers.get('Set-Cookie')).toBeNull();
+      }
+    }
+    expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM auth_requests').first<number>('n')).toBe(0);
+    expect(await dbOf(env).prepare("SELECT status FROM device_grants").first<string>('status')).toBe('pending');
+    expect(await dbOf(env).prepare("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket = 'activate-fail'").first<number>('n')).toBe(0); // rejected before any lookup
+  });
+
+  it('two concurrent polls on one approved code mint exactly one token', async () => {
+    const { env, deps } = setup();
+    const code = await issue(env, deps);
+    expect((await approveInBrowser(env, deps, code.user_code)).status).toBe(200);
+    deps.clock.advance(5_000);
+    const [a, b] = await Promise.all([poll(env, deps, code.device_code), poll(env, deps, code.device_code)]);
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([200, 400]);
+    const failed = a.status === 400 ? a : b;
+    expect(await failed.json()).toEqual({ error: 'invalid_grant' });
+    expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM devices').first<number>('n')).toBe(1);
   });
 });

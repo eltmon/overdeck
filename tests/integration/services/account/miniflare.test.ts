@@ -119,6 +119,12 @@ function formBody(fields: Record<string, string>): RequestInit {
   return { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() };
 }
 
+/** A form post from the account service's own page: carries the same-origin Origin header the /activate POSTs require. */
+function browserForm(fields: Record<string, string>): RequestInit {
+  const init = formBody(fields);
+  return { ...init, headers: { ...(init.headers as Record<string, string>), Origin: BASE } };
+}
+
 function stateFrom(res: Response): string {
   return /__Host-od_state=([0-9a-f]{64});/.exec(res.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
 }
@@ -206,10 +212,12 @@ describe('account service on real workerd (PAN-4293 account-miniflare-integratio
     const code = (await issued.json()) as { device_code: string; user_code: string; verification_uri: string; interval: number };
     expect(code.verification_uri).toBe(`${BASE}/activate`);
 
-    const submit = await req('/activate', { ...formBody({ user_code: code.user_code.toLowerCase() }), ip: '192.0.2.78' });
+    const crossSite = await req('/activate/confirm', { ...formBody({ user_code: code.user_code }), ip: '192.0.2.78' });
+    expect(crossSite.status).toBe(403);
+    const submit = await req('/activate', { ...browserForm({ user_code: code.user_code.toLowerCase() }), ip: '192.0.2.78' });
     expect(submit.status).toBe(200);
     expect(await submit.text()).toContain('macOS device');
-    const confirm = await req('/activate/confirm', { ...formBody({ user_code: code.user_code }), ip: '192.0.2.78' });
+    const confirm = await req('/activate/confirm', { ...browserForm({ user_code: code.user_code }), ip: '192.0.2.78' });
     expect(confirm.status).toBe(302);
     const done = await githubCallback(stateFrom(confirm), '192.0.2.78');
     expect(done.status).toBe(200);

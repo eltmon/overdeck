@@ -45,6 +45,9 @@ export type SignInResolution =
  * Allowed → upsert the user (login refreshed) unless the account is mid-deletion.
  */
 export async function resolveSignIn(rc: RequestContext, identity: GitHubIdentity, flow: SignInFlow): Promise<SignInResolution> {
+  // A deleting account has already lost its grant; refuse it as such instead of recording a pending attempt.
+  const existing = await rc.env.DB.prepare('SELECT deleted_at FROM users WHERE github_id = ?').bind(identity.githubId).first<{ deleted_at: number | null }>();
+  if (existing?.deleted_at != null) return { allowed: false, reason: 'account_deleting' };
   if (!(await isAllowed(rc, identity.githubId))) {
     await recordPendingAttempt(rc, identity.githubId, identity.login, flow);
     return { allowed: false, reason: 'invite_only' };

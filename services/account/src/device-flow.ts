@@ -13,7 +13,7 @@ import type { GitHubIdentity } from './github.ts';
 import { isAllowed } from './grants.ts';
 import { html, json, readForm } from './http.ts';
 import { errorPage, escapeHtml, inviteOnlyPage, layout, messagePage, rateLimitedPage } from './pages.ts';
-import { hit } from './rate-limit.ts';
+import { hit, peek } from './rate-limit.ts';
 import { resolveSignIn, startGitHubLeg, type Payload } from './sign-in.ts';
 
 export const DEVICE_GRANT_TTL_MS = 900_000;
@@ -23,6 +23,15 @@ export const TOO_MANY_WRONG_CODES_MESSAGE = 'Too many wrong codes. Wait 15 minut
 export const CODE_EXPIRED_MESSAGE = 'This code expired. Run the sign-in command again.';
 export const DEVICE_CONNECTED_MESSAGE = 'Device connected. You can close this tab and return to your terminal.';
 export const ACCOUNT_DELETING_MESSAGE = 'This account is being deleted. Try again after deletion finishes.';
+export const REQUEST_REJECTED_MESSAGE = 'Request rejected.';
+
+/**
+ * The /activate POSTs must come from the activate page itself: a cross-site form post could otherwise walk a
+ * victim's browser through the GitHub leg and approve an attacker's device code with the victim's account.
+ */
+function sameOrigin(req: Request, rc: RequestContext): boolean {
+  return req.headers.get('Origin') === new URL(rc.config.publicBaseUrl).origin;
+}
 
 type GrantStatus = 'pending' | 'approved' | 'denied';
 
@@ -113,8 +122,11 @@ async function findPendingGrantByUserCode(rc: RequestContext, rawCode: string): 
     .first<DeviceGrantRow>();
 }
 
-/** POST /activate: look the code up; wrong codes count against `activate-fail` (D-12). */
+/** POST /activate: look the code up; wrong codes count against `activate-fail` (D-12), and an exhausted window refuses before any lookup. */
 export const activateSubmit: Handler = async (req, rc) => {
+  if (!sameOrigin(req, rc)) return errorPage(403, REQUEST_REJECTED_MESSAGE, 'Request rejected');
+  const exhausted = await peek(rc, 'activate-fail');
+  if (!exhausted.ok) return rateLimitedPage(exhausted.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
   const form = await readForm(req);
   const raw = form?.get('user_code') ?? '';
   const grant = await findPendingGrantByUserCode(rc, raw);
@@ -140,6 +152,7 @@ export const activateSubmit: Handler = async (req, rc) => {
 
 /** POST /activate/confirm: re-validate, then start the GitHub leg bound to this device code. */
 export const activateConfirm: Handler = async (req, rc) => {
+  if (!sameOrigin(req, rc)) return errorPage(403, REQUEST_REJECTED_MESSAGE, 'Request rejected');
   const form = await readForm(req);
   const grant = await findPendingGrantByUserCode(rc, form?.get('user_code') ?? '');
   if (!grant) return html(activateForm('', INVALID_CODE_MESSAGE), 400);
@@ -205,12 +218,11 @@ export async function exchangeDeviceCode(rc: RequestContext, form: URLSearchPara
     await remove();
     return json({ error: 'access_denied' }, 400);
   }
-  const user = await db.prepare('SELECT github_id, deleted_at FROM users WHERE user_id = ?').bind(row.user_id).first<{ github_id: number; deleted_at: number | null }>();
-  if (!user || user.deleted_at !== null || !(await isAllowed(rc, user.github_id))) {
-    await remove();
-    return json({ error: 'access_denied' }, 400);
-  }
-  await remove();
-  const minted = await mintDevice(rc, row.user_id, row.platform, row.environment_id);
+  // Consume atomically: two concurrent polls cannot both mint from one approved grant.
+  const consumed = await db.prepare("DELETE FROM device_grants WHERE device_code_hash = ? AND status = 'approved' RETURNING *").bind(hash).first<DeviceGrantRow>();
+  if (!consumed || consumed.user_id === null) return json({ error: 'invalid_grant' }, 400);
+  const user = await db.prepare('SELECT github_id, deleted_at FROM users WHERE user_id = ?').bind(consumed.user_id).first<{ github_id: number; deleted_at: number | null }>();
+  if (!user || user.deleted_at !== null || !(await isAllowed(rc, user.github_id))) return json({ error: 'access_denied' }, 400);
+  const minted = await mintDevice(rc, consumed.user_id, consumed.platform, consumed.environment_id);
   return json({ access_token: minted.token, token_type: 'Bearer', device_id: minted.deviceId, label: minted.label });
 }

@@ -20,7 +20,7 @@ Both flows share the **GitHub leg**: `startGitHubLeg()` writes an `auth_requests
 
 **PKCE loopback flow** (local dashboard; client in PAN-4330). `GET /auth/start?redirect_uri&state&code_challenge&code_challenge_method=S256&platform&environment_id`. `redirect_uri` must be `http:` with host exactly `127.0.0.1`, `localhost` or `[::1]`, any port, no userinfo, no fragment; anything else is a 400 page with no redirect. After the GitHub leg the browser is sent back to `redirect_uri` with `code=odc_…&state=…`, or with `error=access_denied&error_description=invite_only|account_deleting|github_denied&state=…`. The client posts `grant_type=authorization_code&code&code_verifier&redirect_uri` to `/oauth/token`. Codes are single use (consumed before any check), expire after 5 minutes, and require the identical `redirect_uri` and a matching S256 verifier; the allowlist is re-checked before minting.
 
-**Device flow** (CLI, SSH, headless; RFC 8628). `POST /oauth/device/code` with `platform` and `environment_id` returns `device_code` (`oddc_…`), `user_code` (`BCDF-GHJK`, 8 letters from `BCDFGHJKLMNPQRSTVWXZ`), `verification_uri` (`<base>/activate`), `verification_uri_complete`, `expires_in` 900 and `interval` 5. The person opens `/activate`, types the code (case, dashes and spaces are ignored), confirms the device type, and completes the GitHub leg. The CLI polls `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code`:
+**Device flow** (CLI, SSH, headless; RFC 8628). `POST /oauth/device/code` with `platform` and `environment_id` returns `device_code` (`oddc_…`), `user_code` (`BCDF-GHJK`, 8 letters from `BCDFGHJKLMNPQRSTVWXZ`), `verification_uri` (`<base>/activate`), `verification_uri_complete`, `expires_in` 900 and `interval` 5. The person opens `/activate`, types the code (case, dashes and spaces are ignored), confirms the device type, and completes the GitHub leg. Both `POST /activate` and `POST /activate/confirm` require an `Origin` header equal to `PUBLIC_BASE_URL`, so a cross-site form post cannot walk a signed-in browser through the confirm step and approve someone else's device code. The CLI polls `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code`:
 
 | Poll result | Meaning |
 | --- | --- |
@@ -68,8 +68,8 @@ Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: no
 | POST | `/oauth/token` | — | form `grant_type=…` → token response or 400 `{"error":…}` (`invalid_request`, `invalid_grant`, `access_denied`, `unsupported_grant_type`, RFC 8628 codes) |
 | POST | `/oauth/device/code` | — | form `platform`, `environment_id` → device code response |
 | GET | `/activate` | — | HTML form; `?user_code=` prefills |
-| POST | `/activate` | — | form `user_code` → confirm page, or the form with an error |
-| POST | `/activate/confirm` | — | form `user_code` → 302 to GitHub |
+| POST | `/activate` | same-origin `Origin` | form `user_code` → confirm page, or the form with an error; 403 page cross-site |
+| POST | `/activate/confirm` | same-origin `Origin` | form `user_code` → 302 to GitHub; 403 page cross-site |
 | GET | `/v1/me` | Bearer (expired grant allowed) | → `{ userId, githubId, githubLogin, deviceId, entitlement, access: { status: "active" \| "grant_expired", expiresAt } }` |
 | GET | `/v1/devices` | Bearer | → `{ devices: [{ deviceId, label, platform, environmentId, createdAt, lastUsedAt, current }] }` (the caller's active devices, oldest first) |
 | PATCH | `/v1/devices/:id` | Bearer | JSON `{"label"}` → the device, 400 `invalid_label`, or 404 `not_found` |

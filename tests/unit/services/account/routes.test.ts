@@ -39,6 +39,13 @@ describe('account service route table (PAN-4293 account-scaffold)', () => {
     expect(multi.headers.get('Allow')).toBe('PATCH, DELETE');
   });
 
+  it('a malformed percent-encoded path parameter is 404, not a thrown URIError', async () => {
+    for (const path of ['/v1/devices/%E0', '/admin/grants/%E0/revoke', '/admin/pending/%E0/allow']) {
+      const res = await track(call('DELETE', path));
+      expect(res.status, path).toBe(404);
+    }
+  });
+
   it('OPTIONS returns 405 on known and unknown paths', async () => {
     const known = await track(call('OPTIONS', '/v1/me'));
     expect(known.status).toBe(405);
