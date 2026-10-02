@@ -4,15 +4,17 @@
  * verifyDeviceToken() for the AccountRpc service binding consumed by the hosted vault (PAN-4297).
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import type { VerifyResult } from './contract.ts';
+import { verifyDeviceToken } from './devices.ts';
 import type { Env } from './env.ts';
-import { productionDeps } from './env.ts';
+import { productionDeps, rpcContext } from './env.ts';
 import { handle } from './routes.ts';
 import { runMaintenance } from './maintenance.ts';
 
+/** Service binding consumed by the hosted vault (PAN-4297): `env.ACCOUNT.verifyDevice(token)` (FR-6). */
 export class AccountRpc extends WorkerEntrypoint<Env> {
-  /** Scaffold stub; account-device-credentials replaces it with verifyDeviceToken(makeRc(this.env, this.ctx), token). */
-  async verifyDevice(_token: string): Promise<{ ok: false; error: 'invalid_token' }> {
-    return { ok: false, error: 'invalid_token' };
+  async verifyDevice(token: string): Promise<VerifyResult> {
+    return verifyDeviceToken(rpcContext(this.env, this.ctx, productionDeps), token);
   }
 }
 

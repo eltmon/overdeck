@@ -79,3 +79,13 @@ export interface RequestContext {
 }
 
 export type Handler = (req: Request, rc: RequestContext) => Promise<Response>;
+
+/**
+ * Context for a service-binding (RPC) call, which has no HTTP request. Throws when the Worker is not
+ * configured so the caller sees the misconfiguration instead of a silent `invalid_token`.
+ */
+export function rpcContext(env: Env, ctx: ExecutionContext, deps: Deps): RequestContext {
+  const parsed = parseConfig(env);
+  if (!parsed.ok) throw new Error(`account service not configured: missing ${parsed.missing.join(', ')}`);
+  return { env, config: parsed.config, ctx, deps, params: {}, clientIp: 'rpc' };
+}
