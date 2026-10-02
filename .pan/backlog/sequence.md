@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-02T11:55:24.241272Z · model: claude-opus-5-5 · open: 823_
+_Last sequenced: 2026-10-02T12:31:41.568369Z · model: claude-opus-5-5 · open: 824_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,6 +13,7 @@ _Last sequenced: 2026-10-02T11:55:24.241272Z · model: claude-opus-5-5 · open: 
 | 6 | PAN-4464 | S | medium | ok |  |  | In-pipeline: Linear MCP auth banner becomes one click; expired links refresh, blocked agents become clickable |
 | 7 | PAN-4455 | M | medium | ok |  |  | In-pipeline: 'Continue on another device' action from the conversation itself (Session Vault hand-off) |
 | 8 | PAN-4465 | XS | low | ok |  |  | In-pipeline: pan tell accepts conversation numbers and /conv/<n> URLs; error lists accepted target forms |
+| 9 | PAN-4485 | M | high | ok |  |  | In-pipeline: post-/clear parent+sibling share one session; list revives parent, stop/resume/restart-all hit both rows |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -325,7 +326,6 @@ _Last sequenced: 2026-10-02T11:55:24.241272Z · model: claude-opus-5-5 · open: 
 | 359 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 362 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
 | 363 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
 | 364 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
 | 365 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
@@ -645,6 +645,7 @@ _Last sequenced: 2026-10-02T11:55:24.241272Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 682 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
 | 684 | PAN-2356 | M | low | needs-refinement |  | PAN-4293, PAN-4297 | Overdeck Anywhere P3: relay service |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
@@ -862,6 +863,10 @@ Already in the pipeline, pinned at a freed top slot. Its stated dependencies PAN
 ### PAN-4465 (rank 8)
 
 Already in the pipeline, pinned at a freed top slot. It is a small CLI ergonomics fix, so it is low importance.
+
+### PAN-4485 (rank 9)
+
+Already in the pipeline, so it is pinned at the first free slot after the other in-pipeline pins. A superseded parent that keeps reviving and shares stop/resume with its sibling can kill or overwrite a live conversation, so it is high importance despite its P3 label.
 
 ### PAN-4217 (rank 23)
 
@@ -1147,10 +1152,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
 
 Triage: verify the no-kickoff zombie gap against the current liveness definition (stale work activity, not a mirror label). Rank held.
 
-### PAN-2169 (rank 102)
-
-Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation heuristic gap against that routine. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1158,10 +1159,10 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-02T11:55:24.241272Z",
+  "generatedAt": "2026-10-02T12:31:41.568369Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 823,
+  "openCount": 824,
   "nodes": [
     {
       "issue": "PAN-4433",
@@ -1264,6 +1265,19 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "dependsOn": [],
       "why": "In-pipeline: pan tell accepts conversation numbers and /conv/<n> URLs; error lists accepted target forms",
       "rationale": "Already in the pipeline, pinned at a freed top slot. It is a small CLI ergonomics fix, so it is low importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4485",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: post-/clear parent+sibling share one session; list revives parent, stop/resume/restart-all hit both rows",
+      "rationale": "Already in the pipeline, so it is pinned at the first free slot after the other in-pipeline pins. A superseded parent that keeps reviving and shares stop/resume with its sibling can kill or overwrite a live conversation, so it is high importance despite its P3 label.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5207,18 +5221,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "planning": "skip"
     },
     {
-      "issue": "PAN-2672",
-      "rank": 362,
-      "size": "S",
-      "importance": "medium",
-      "score": 61,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id)",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2670",
       "rank": 363,
       "size": "S",
@@ -9158,6 +9160,19 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "planning": "skip"
     },
     {
+      "issue": "PAN-2672",
+      "rank": 682,
+      "size": "S",
+      "importance": "low",
+      "score": 25,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close.",
+      "rationale": "Demoted from 362: the 2026-10-02 comment moves the remaining scope to PAN-4485 and PAN-4485 reports the transcript half fixed, so only a verify-and-close remains.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-1958",
       "rank": 683,
       "size": "M",
@@ -12747,6 +12762,13 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2672",
+      "to": "PAN-4485",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
