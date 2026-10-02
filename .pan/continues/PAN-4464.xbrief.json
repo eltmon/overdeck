@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:32:18.373Z",
+  "updated": "2026-10-02T02:32:19.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4464",
       "claimedAt": "2026-10-02T02:31:34.921Z",
       "doneAt": "2026-10-02T02:32:18.372Z"
+    },
+    "wi7-loopback-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:32:19.545Z"
     }
   }
 }
