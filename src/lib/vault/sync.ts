@@ -159,6 +159,9 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
         ownerIsHere: value.owner.environmentId === me.environmentId,
         updatedAt: value.updatedAt,
         tombstone: false,
+        ...(value.parent
+          ? { parentVaultId: value.parent.vaultId, forkKind: value.segments[0]?.prefix === null ? 'settlement' : 'version' }
+          : {}),
       });
     }
     rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));

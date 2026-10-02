@@ -28,6 +28,7 @@ import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
+import { VaultContinuityNotice } from './VaultContinuityNotice';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentRoutingNotice } from '../../lib/subagentRouting';
@@ -938,5 +939,14 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
 
 export function ComposerFooter(props: ComposerFooterProps) {
   if (props.conversation.origin === 'vault') return <VaultReadOnlyNotice conversation={props.conversation} />;
+  const continuity = props.conversation.vaultContinuity;
+  if (continuity) {
+    return (
+      <>
+        <VaultContinuityNotice continuity={continuity} onOpenCopy={openConversationRoute} />
+        <ComposerFooterInput {...props} />
+      </>
+    );
+  }
   return <ComposerFooterInput {...props} />;
 }

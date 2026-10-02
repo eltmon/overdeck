@@ -30,6 +30,10 @@ export interface ListCacheRow {
   ownerIsHere: boolean;
   updatedAt: string;
   tombstone: boolean;
+  /** The vaultId this row forked from, when it has a parent (PAN-4447). */
+  parentVaultId?: string;
+  /** How this row relates to its parent: a P-6 ownership-change fork or a P-7 version fork. */
+  forkKind?: 'settlement' | 'version';
 }
 
 export interface LocalIndex {
