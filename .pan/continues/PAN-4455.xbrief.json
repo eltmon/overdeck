@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T03:48:51.605Z",
+  "updated": "2026-10-02T03:48:53.117Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4455",
       "claimedAt": "2026-10-02T03:42:34.920Z",
       "doneAt": "2026-10-02T03:48:51.604Z"
+    },
+    "handoff-tab": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:48:53.116Z"
     }
   }
 }
