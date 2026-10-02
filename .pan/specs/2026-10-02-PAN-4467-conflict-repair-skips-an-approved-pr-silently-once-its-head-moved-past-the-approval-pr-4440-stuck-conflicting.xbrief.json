@@ -4,17 +4,17 @@
     "created": "2026-10-02T02:58:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4467: Conflict repair skips an approved PR silently once its head moved past the approval (PR #4440 stuck CONFLICTING)",
-    "updated": "2026-10-02T03:01:34.503Z"
+    "updated": "2026-10-02T03:04:11.162Z"
   },
   "plan": {
     "id": "pan-4467",
     "title": "Conflict repair skips an approved PR silently once its head moved past the approval (PR #4440 stuck CONFLICTING)",
-    "status": "proposed",
+    "status": "running",
     "uid": "e8bae45c-a6d0-4aab-8917-d3ae74fa571b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T02:58:55Z",
-    "updated": "2026-10-02T03:01:34.503Z",
+    "updated": "2026-10-02T03:04:11.162Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4467",
@@ -340,5 +340,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
