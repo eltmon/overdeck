@@ -68,6 +68,8 @@ const inFlight = new Set<string>();
 const lastBackstopAt = new Map<string, number>();
 /** `<issue>:<head>` pairs whose backstop refusal already raised Needs-you. */
 const refusalsSurfaced = new Set<string>();
+/** `<issue>:<head>` pairs whose declined conflicting head was already logged. */
+const declinesLogged = new Set<string>();
 /** Guarded-door answers that need the operator: the review will not start on its own. */
 const OPERATOR_REFUSALS = new Set<GuardedReviewRequestOutcome['kind']>(['circuit-breaker', 'no-project', 'dirty-workspace']);
 
@@ -75,6 +77,7 @@ export function __resetConflictRepairStateForTests(): void {
   inFlight.clear();
   lastBackstopAt.clear();
   refusalsSurfaced.clear();
+  declinesLogged.clear();
 }
 
 /**
@@ -184,6 +187,20 @@ function entriesForHead(entries: readonly PipelineJournalEntry[], head: string) 
   const forHead = (type: PipelineJournalEntry['type']) =>
     entries.filter((entry) => entry.type === type && entry.data?.head === head);
   return { repairs: forHead('conflict.repair-requested'), escalations: forHead('conflict.repair-escalated') };
+}
+
+/**
+ * PAN-4467: a candidate whose open PR conflicts but that the gate declines
+ * leaves one log line per head, so a skip is never silent.
+ */
+function logDeclinedConflict(d: Resolved, issueId: string, gate: ConflictRepairGateResult): void {
+  const { facts } = gate;
+  if (!facts.open || facts.mergeable !== false || !facts.headSha) return;
+  const head = facts.headSha.slice(0, 8);
+  const key = `${issueId}:${head}`;
+  if (declinesLogged.has(key)) return;
+  declinesLogged.add(key);
+  d.log(`[conflict-repair] ${issueId}: conflicting head ${head} not repaired: ${gate.reason ?? 'no reason given'}`);
 }
 
 /**
@@ -311,7 +328,10 @@ async function tickIssue(d: Resolved, issueId: string, workspacePath: string): P
   if (d.getIssuePause(issueId).status !== 'unpaused') return null;
 
   const gate = await d.evaluateGate(issueId);
-  if (!gate.conflicting) return reviewBackstop(d, issueId, entries, gate);
+  if (!gate.conflicting) {
+    logDeclinedConflict(d, issueId, gate);
+    return reviewBackstop(d, issueId, entries, gate);
+  }
   if (!gate.facts.headSha) return null;
 
   const head = gate.facts.headSha.slice(0, 8);
