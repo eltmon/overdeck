@@ -73,17 +73,18 @@ describe('account service route table (PAN-4293 account-scaffold)', () => {
       expect(login.status).toBe(503);
 
       const me = await track(call('GET', '/v1/me', { env }));
-      expect(me.status).toBe(501);
+      expect(me.status).toBe(401);
     }
   });
 
-  it('configured routes reach their handler stubs, which answer 501 not_implemented', async () => {
+  it('configured routes reach their handlers', async () => {
     const res = await track(call('GET', '/v1/me'));
-    expect(res.status).toBe(501);
-    expect(await res.json()).toEqual({ error: 'not_implemented' });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'invalid_token' });
 
     const withParam = await track(call('POST', '/admin/grants/583231/revoke'));
-    expect(withParam.status).toBe(501);
+    expect(withParam.status).toBe(200);
+    expect(await withParam.text()).toContain('Sign in with GitHub');
   });
 
   it('POST /oauth/token with an unsupported grant_type returns 400 unsupported_grant_type', async () => {
@@ -103,13 +104,15 @@ describe('account service route table (PAN-4293 account-scaffold)', () => {
     expect((await res.json()).error).toBe('invalid_request');
   });
 
-  it('POST /oauth/token dispatches the two supported grant types to their (stub) exchangers', async () => {
+  it('POST /oauth/token dispatches the two supported grant types to their exchangers', async () => {
     const code = await track(call('POST', '/oauth/token', form({ grant_type: 'authorization_code' })));
-    expect(code.status).toBe(501);
+    expect(code.status).toBe(400);
+    expect(await code.json()).toEqual({ error: 'invalid_request' });
     const device = await track(
       call('POST', '/oauth/token', form({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code' })),
     );
-    expect(device.status).toBe(501);
+    expect(device.status).toBe(400);
+    expect(await device.json()).toEqual({ error: 'invalid_request' });
   });
 
   it('a 17 KiB request body returns 413 before any handler runs', async () => {

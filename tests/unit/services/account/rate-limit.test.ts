@@ -61,13 +61,14 @@ describe('rate limiting (PAN-4293 account-rate-limit, D-12)', () => {
   it('through handle(): the 21st GET /auth/start from one IP is a 429 HTML page with Retry-After', async () => {
     const { env, deps } = setup();
     const ip = '192.0.2.10';
-    for (let i = 0; i < 20; i++) expect((await call('GET', '/auth/start', { env, deps, ip })).status).toBe(501);
+    // Without parameters /auth/start is a 400 page; the bucket counts the request either way.
+    for (let i = 0; i < 20; i++) expect((await call('GET', '/auth/start', { env, deps, ip })).status).toBe(400);
     const res = await call('GET', '/auth/start', { env, deps, ip });
     expect(res.status).toBe(429);
     expect(res.headers.get('Retry-After')).toBe('600');
     expect(res.headers.get('Content-Type')).toContain('text/html');
     expect(await res.text()).toContain('Too many requests');
-    expect((await call('GET', '/auth/start', { env, deps, ip: '192.0.2.11' })).status).toBe(501);
+    expect((await call('GET', '/auth/start', { env, deps, ip: '192.0.2.11' })).status).toBe(400);
   });
 
   it('through handle(): the 121st POST /oauth/token is 429 JSON rate_limited', async () => {
