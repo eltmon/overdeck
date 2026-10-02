@@ -4,17 +4,17 @@
     "created": "2026-10-02T03:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4455: Overdeck Anywhere: \"Continue on another device\" from the conversation itself",
-    "updated": "2026-10-02T03:13:10.853Z"
+    "updated": "2026-10-02T03:14:04.270Z"
   },
   "plan": {
     "id": "pan-4455",
     "title": "Overdeck Anywhere: \"Continue on another device\" from the conversation itself",
-    "status": "proposed",
+    "status": "running",
     "uid": "a0c16dca-435c-4633-8541-d6b4003b8d32",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T03:30:00Z",
-    "updated": "2026-10-02T03:13:10.853Z",
+    "updated": "2026-10-02T03:14:04.270Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4455",
@@ -1288,5 +1288,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
