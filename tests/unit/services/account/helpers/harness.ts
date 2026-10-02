@@ -3,19 +3,31 @@
  *
  * Tests drive handle() directly with an Env, a fake ExecutionContext and injected Deps.
  * Nothing here imports services/account/src/index.ts (the cloudflare:workers importer).
- * account-schema adds the node:sqlite D1 shim behind env.DB.
+ * env.DB is the node:sqlite D1 shim from ./d1.ts with the migrations applied.
  */
 import type { Deps, Env } from '../../../../../services/account/src/env.ts';
 import { handle } from '../../../../../services/account/src/routes.ts';
+import { applyMigrations, createTestD1, type D1Shim } from './d1.ts';
 
 export const TEST_BASE_URL = 'https://account.test';
 export const TEST_OWNER_GITHUB_ID = 1;
 
-/** Fully configured Env. Pass `undefined` for a key to simulate an unset secret. */
+/** A fresh in-memory D1 with every migration applied. */
+export function makeDb(): D1Shim {
+  const db = createTestD1();
+  applyMigrations(db);
+  return db;
+}
+
+/** The shim behind env.DB, for direct SQL in tests. */
+export function dbOf(env: Env): D1Shim {
+  return env.DB as unknown as D1Shim;
+}
+
+/** Fully configured Env with a fresh migrated database. Pass `undefined` for a key to simulate an unset secret. */
 export function makeEnv(overrides: Partial<Env> = {}): Env {
   return {
-    // Replaced by the D1 shim in account-schema; the scaffold routes never touch it.
-    DB: undefined as unknown as D1Database,
+    DB: makeDb() as unknown as D1Database,
     PUBLIC_BASE_URL: TEST_BASE_URL,
     GITHUB_CLIENT_ID: 'test-client-id',
     GITHUB_CLIENT_SECRET: 'test-client-secret',
