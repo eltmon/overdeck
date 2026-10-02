@@ -53,21 +53,21 @@ let events: TestEvent[] = [];
 let overdeckHome: string;
 let previousHome: string | undefined;
 
-function required(sequence: number, agentId: string, issueId: string): TestEvent {
+function required(sequence: number, agentId: string, issueId: string | null, authUrl: string | null = null): TestEvent {
   return {
     sequence,
     type: 'linear_mcp_auth.required',
     timestamp: `2026-07-21T12:00:0${sequence}.000Z`,
-    payload: { agentId, issueId, authUrl: null, expiresAt: null },
+    payload: { agentId, issueId, authUrl, expiresAt: null },
   };
 }
 
-function healthy(sequence: number): TestEvent {
+function healthy(sequence: number, agentId = 'operator', source: 'hook' | 'operator' = 'operator'): TestEvent {
   return {
     sequence,
     type: 'linear_mcp_auth.healthy',
     timestamp: `2026-07-21T12:00:0${sequence}.000Z`,
-    payload: { agentId: 'operator', issueId: null, source: 'operator' },
+    payload: { agentId, issueId: null, source },
   };
 }
 
@@ -194,6 +194,25 @@ describe('Linear MCP auth wake processor', () => {
       'delivered',
     ]);
     expect(notifiedEvents().every(event => event.payload['lifecycleId'] === 'seq-1')).toBe(true);
+  });
+
+  it('wakes a URL-less conversation when the refreshed owner reports healthy (PAN-4464)', async () => {
+    events.push(
+      required(1, 'conv-20261001-eba1', null),
+      required(2, 'agent-pan-2997', 'PAN-2997', 'https://linear.app/oauth/authorize?state=fresh'),
+      healthy(3, 'agent-pan-2997', 'hook'),
+    );
+
+    await processLinearMcpAuthWake();
+
+    expect(mocks.messageAgent.mock.calls.map(call => call[0])).toEqual([
+      'conv-20261001-eba1',
+      'agent-pan-2997',
+    ]);
+    expect(notifiedEvents().map(event => event.payload['agentId'])).toEqual([
+      'conv-20261001-eba1',
+      'agent-pan-2997',
+    ]);
   });
 
   it('records queued when messageAgent routes a stopped or gated agent to mail', async () => {
