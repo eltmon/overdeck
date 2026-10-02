@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:32:53.187Z",
+  "updated": "2026-10-02T02:46:36.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4464",
       "claimedAt": "2026-10-02T02:32:19.545Z",
       "doneAt": "2026-10-02T02:32:53.186Z"
+    },
+    "wi8-connect-flow-hook": {
+      "status": "completed",
+      "doneAt": "2026-10-02T02:46:36.745Z"
     }
   }
 }
