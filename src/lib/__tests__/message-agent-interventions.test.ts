@@ -176,6 +176,17 @@ describe('messageAgent operator interventions', () => {
     expect(interventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(debugSpy).toHaveBeenCalledWith('[agents] Skipping tell intervention for agent-pan-1487; state.json has no issueId');
   });
+
+  it('stays silent for conversation targets (PAN-4465)', async () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    writeAgentState('conv-20260928-7563', { issueId: undefined as unknown as string });
+
+    await messageAgent('conv-20260928-7563', 'hi', 'pan-tell');
+
+    expect(sendKeys).toHaveBeenCalledWith('conv-20260928-7563', 'hi');
+    expect(interventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
+    expect(debugSpy).not.toHaveBeenCalledWith(expect.stringContaining('Skipping tell intervention'));
+  });
 });
 
 describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () => {

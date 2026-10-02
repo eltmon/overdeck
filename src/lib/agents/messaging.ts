@@ -164,6 +164,8 @@ function claimCodexIdleTurn(agentId: string): boolean {
 
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
+  // Conversations never carry an issueId; interventions are per issue (PAN-4465).
+  if (normalizedId.startsWith('conv-')) return;
 
   const agentState = getAgentState(normalizedId);
   if (!agentState?.issueId) {
