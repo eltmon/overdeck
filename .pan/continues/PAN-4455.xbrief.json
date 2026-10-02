@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:49:51.849Z",
+  "updated": "2026-10-02T04:50:04.977Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "handoff-two-machine.ac2": {
       "status": "completed",
       "doneAt": "2026-10-02T04:49:51.849Z"
+    },
+    "handoff-two-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:50:04.977Z"
     }
   }
 }
