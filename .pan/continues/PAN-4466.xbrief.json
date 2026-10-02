@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4466",
   "created": "2026-10-02T02:46:23.902Z",
-  "updated": "2026-10-02T03:24:43.589Z",
+  "updated": "2026-10-02T03:24:48.964Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4466",
       "claimedAt": "2026-10-02T03:13:54.344Z",
       "doneAt": "2026-10-02T03:24:43.589Z"
+    },
+    "deck-terminal-deeplink": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:24:48.964Z"
     }
   }
 }
