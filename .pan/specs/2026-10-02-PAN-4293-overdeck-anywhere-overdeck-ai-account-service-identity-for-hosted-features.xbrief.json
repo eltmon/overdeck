@@ -4,17 +4,17 @@
     "created": "2026-10-02T02:59:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4293: Overdeck Anywhere: overdeck.ai account service (identity for hosted features)",
-    "updated": "2026-10-02T03:02:05.186Z"
+    "updated": "2026-10-02T03:04:36.005Z"
   },
   "plan": {
     "id": "pan-4293",
     "title": "Overdeck Anywhere: overdeck.ai account service (identity for hosted features)",
-    "status": "proposed",
+    "status": "running",
     "uid": "f3517f53-0ee6-4955-b715-adc7a0e30ea7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T02:59:58Z",
-    "updated": "2026-10-02T03:02:05.186Z",
+    "updated": "2026-10-02T03:04:36.005Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4293",
@@ -1489,5 +1489,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
