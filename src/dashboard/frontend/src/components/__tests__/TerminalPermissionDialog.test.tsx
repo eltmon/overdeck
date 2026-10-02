@@ -84,11 +84,34 @@ describe('TerminalPermissionDialog', () => {
 
   it('non-answerable shows only Open terminal', () => {
     const handlers = renderDialog({ ...DANGEROUS_RM, answerable: false, signature: null, options: [] });
-    expect(screen.getByText(/not visible on the agent's screen/)).toBeInTheDocument();
+    expect(screen.getByText(/open the terminal and answer it there/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Deny' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Open terminal' }));
     expect(handlers.onOpenTerminal).toHaveBeenCalled();
+  });
+
+  it('shows the start of a clipped command and the visible part', () => {
+    renderDialog({
+      ...DANGEROUS_RM,
+      clipped: true,
+      inputPreview: 'S=/tmp/x; node shoot2.cjs',
+      detailLines: ['sleep 20'],
+    });
+    expect(screen.getByText('Command (start)')).toBeInTheDocument();
+    expect(screen.getByText('On screen')).toBeInTheDocument();
+    expect(screen.getByText('S=/tmp/x; node shoot2.cjs')).toBeInTheDocument();
+    expect(screen.getByText('sleep 20')).toBeInTheDocument();
+    expect(screen.getByText(/scrolled off the agent's screen/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+  });
+
+  it('non-answerable prompt says to answer in the terminal and makes Open terminal primary', () => {
+    renderDialog({ ...DANGEROUS_RM, answerable: false, signature: null, options: [] });
+    expect(screen.getByText(/open the terminal and answer it there/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open terminal' })).toHaveClass('bg-warning');
+    expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
   });
 
   it('disables the answers while confirming', () => {
