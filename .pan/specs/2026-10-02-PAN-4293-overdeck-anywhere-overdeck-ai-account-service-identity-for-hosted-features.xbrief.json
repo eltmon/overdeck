@@ -1,0 +1,1493 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T02:59:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4293: Overdeck Anywhere: overdeck.ai account service (identity for hosted features)",
+    "updated": "2026-10-02T03:02:05.186Z"
+  },
+  "plan": {
+    "id": "pan-4293",
+    "title": "Overdeck Anywhere: overdeck.ai account service (identity for hosted features)",
+    "status": "proposed",
+    "uid": "f3517f53-0ee6-4955-b715-adc7a0e30ea7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-02T02:59:58Z",
+    "updated": "2026-10-02T03:02:05.186Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4293",
+        "label": "PAN-4293",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4293.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/anywhere-accounts.md",
+        "label": "Accounts design",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "accounts",
+      "cloudflare-workers",
+      "d1",
+      "oauth",
+      "security",
+      "admin"
+    ],
+    "metadata": {
+      "sizeJustification": "One greenfield Cloudflare Worker in a single new directory (services/account/) plus its tests and docs. The file count comes from one-module-per-flow layout and one test file per module, and the subsystem count is inflated by root package.json, bun.lock and doc paths rather than by coupling to existing code (no file under src/ changes). The operator requires the allowlist, admin screen, rate limiting and storage cap together; an account service shipped without the admin screen or without token verification is unusable to the testers the operator named, so the slices are not independently shippable as separate issues.",
+      "canonicalFilename": "2026-10-02-PAN-4293-overdeck-anywhere-overdeck-ai-account-service-identity-for-hosted-features.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-2356 relay, PAN-658 shared sessions and PAN-4297 hosted vault all assume an overdeck.ai identity service, and none builds it. The operator also requires that, until billing (PAN-4294) exists, tester access is granted manually through an admin UI, with a server-enforced allowlist, per-tester storage cap, and rate-limited sign-in.",
+      "Proposal": "A Cloudflare Worker at https://account.overdeck.ai (services/account/, D1 database) implementing GitHub sign-in (read:user, token discarded), a loopback PKCE flow for the dashboard and an RFC 8628 device flow for CLIs, 256-bit hash-at-rest device tokens with instant revocation, a /v1 device API, an AccountRpc.verifyDevice service-binding contract and a hosted-vault contract (quotaDecision storage cap, Durable Object CAS, R2 chunks, deleteAccountData), account deletion with fan-out, an hourly maintenance cron, D1 fixed-window rate limits on public sign-in endpoints, a tester entitlement stub with a 5 GB default cap, and an owner-only server-rendered admin screen. Tested with Node unit tests on a node:sqlite D1 shim and one Miniflare integration test on real workerd. Deployment is an operator checkpoint with a written runbook.",
+      "NonGoals": "- Any client code: pan account verbs, src/lib/account/, dashboard /api/account/* routes, Settings -> Anywhere, first-run card, wrapper skills (PAN-4330).\n- The hosted vault Worker, R2 bucket, per-vault Durable Object, keywrap serving, GET /v1/vault discovery and byte accounting (PAN-4297); only the contract is defined here.\n- Billing, Creem or paid plans (PAN-4294).\n- Relay, push notifications, shared sessions (PAN-2356, PAN-2354, PAN-658).\n- Kubernetes, Postgres or any non-Cloudflare hosting.\n- Email/password sign-in, email storage, or any identity provider other than GitHub.\n- Any GitHub OAuth scope beyond read:user, or any repository access.\n- Key rotation, approve-from-another-device, or a web transcript viewer.\n- Any route on the apex overdeck.ai domain.\n- Any Access-Control-* (CORS) response header.\n- Persisting the GitHub access token.\n- Receiving, storing or logging the vault key, a vault passphrase or plaintext user content.\n- Any agent running wrangler deploy (without --dry-run), wrangler login, d1 create, d1 migrations apply --remote, secret put, rollback, DNS edits or OAuth App creation.\n- Any change under src/ (the local Overdeck product)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Allowlist is a D1 grants table managed through the admin screen; only OWNER_GITHUB_ID is configuration.",
+        "rationale": "The operator's 2026-10-01 comment (grants through a UI, not config) refines the 2026-09-29 comment (ids in a Worker secret)."
+      },
+      {
+        "summary": "Hosting is Cloudflare Workers + D1 (account) with R2 + Durable Objects for the vault contract.",
+        "rationale": "Operator decision 2026-10-02 supersedes the 2026-10-01 Kubernetes direction; the K8s survey is kept as PRD Appendix A."
+      },
+      {
+        "summary": "Code lives in services/account/ as a Bun workspace with its own typecheck lane.",
+        "rationale": "Follows PAN-658 services/signaling-service and PAN-2356 D-R4; the root tsconfig only includes src/."
+      },
+      {
+        "summary": "Host is account.overdeck.ai; the device flow returns verification_uri.",
+        "rationale": "The apex is a Vercel site and the zone is on Cloudflare DNS; clients must not hardcode the path."
+      },
+      {
+        "summary": "Admin screen is server-rendered HTML in the Worker with its own owner-only GitHub session.",
+        "rationale": "Works from any browser and does not depend on the unbuilt PAN-4330 client."
+      },
+      {
+        "summary": "Device tokens carry 256 bits of entropy and are stored only as SHA-256 hashes.",
+        "rationale": "Matches epic D-6 and PAN-2356 FR-R1; a fast hash is correct for high-entropy secrets."
+      },
+      {
+        "summary": "Storage cap defaults to 5 GB per grant, editable per tester; the account service publishes it and the vault enforces it on every write via quotaDecision.",
+        "rationale": "Operator requirement 3; the account service holds no user data, so enforcement belongs at the storage write path (PAN-4297)."
+      },
+      {
+        "summary": "Rate limiting is D1 fixed windows per hashed client IP on every public sign-in endpoint, with a separate wrong-code counter on /activate.",
+        "rationale": "Operator requirement 4; deterministic and testable with the injected clock, no extra binding."
+      },
+      {
+        "summary": "Testing uses Node unit tests on a node:sqlite D1 shim plus one Miniflare integration test on real workerd, with wrangler and miniflare pinned as devDependencies.",
+        "rationale": "Operator asked to build and test locally with wrangler/Miniflare; the shim keeps unit tests fast in the root suite."
+      },
+      {
+        "summary": "One issue with sizeJustification rather than sibling issues.",
+        "rationale": "Greenfield deployable in one directory; the operator requires allowlist, admin, rate limits and cap together for the tester phase."
+      }
+    ],
+    "items": [
+      {
+        "id": "account-scaffold",
+        "title": "Scaffold services/account Worker: workspace wiring, config, route table and handler stubs",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4293",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "bun.lock",
+            "services/account/package.json",
+            "services/account/tsconfig.json",
+            "services/account/wrangler.jsonc",
+            "services/account/.gitignore",
+            "services/account/.dev.vars.example",
+            "services/account/src/index.ts",
+            "services/account/src/env.ts",
+            "services/account/src/http.ts",
+            "services/account/src/pages.ts",
+            "services/account/src/routes.ts",
+            "services/account/src/token-endpoint.ts",
+            "services/account/src/rate-limit.ts",
+            "services/account/src/pkce.ts",
+            "services/account/src/device-flow.ts",
+            "services/account/src/api.ts",
+            "services/account/src/deletion.ts",
+            "services/account/src/maintenance.ts",
+            "services/account/src/devices.ts",
+            "services/account/src/github-callback.ts",
+            "services/account/src/admin/session.ts",
+            "services/account/src/admin/screen.ts",
+            "services/account/src/admin/pending.ts",
+            "tests/unit/services/account/helpers/harness.ts",
+            "tests/unit/services/account/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-4",
+            "NFR-6",
+            "NFR-7"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "routes.test.ts passes",
+            "bun.lock contains wrangler, miniflare and @cloudflare/workers-types entries"
+          ],
+          "foundationFor": [
+            "account-schema",
+            "account-rate-limit",
+            "account-grants",
+            "account-device-credentials",
+            "account-github-leg",
+            "account-pkce-flow",
+            "account-device-flow",
+            "account-device-api",
+            "account-deletion",
+            "account-maintenance",
+            "account-admin-session",
+            "account-admin-grants-screen",
+            "account-admin-pending-screen",
+            "account-miniflare-integration"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-1 of PRD .pan/drafts/PAN-4293.md (sections 7.1, 7.2, 7.4, 7.14; decisions D-2, D-23, D-24, D-28, D-29). Add services/account as a Bun workspace and a typecheck:account lane appended to the root typecheck chain; pin @cloudflare/workers-types, wrangler and the miniflare version wrangler depends on exactly as devDependencies; regenerate and commit bun.lock. Create env.ts (Env, Deps, productionDeps, parseConfig), http.ts (security headers, 16 KiB guard), pages.ts (escapeHtml, invite-only, error, rate-limited pages), routes.ts with the full 7.2 route table including the rate-limit bucket column, token-endpoint.ts grant_type dispatch, index.ts as the only cloudflare:workers importer with a stub AccountRpc, and every handler module as a 501 stub so later items never edit routes.ts. tests/unit/services/account/helpers/harness.ts provides makeEnv, fakeCtx (drain), makeDeps and call()."
+        },
+        "items": [
+          {
+            "id": "account-scaffold.ac1",
+            "title": "Given the scaffold, when `npm run typecheck:account` runs, then it exits 0 and the root `npm run typecheck` chain includes the typecheck:account lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-scaffold.ac2",
+            "title": "routes.test.ts passes: GET /healthz returns 200 with a configured boolean, an unknown path returns 404, a wrong method returns 405 with an Allow header, and OPTIONS returns 405",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-scaffold.ac3",
+            "title": "Given GITHUB_CLIENT_SECRET is unset, when GET /v1/me is called, then it returns 503 listing GITHUB_CLIENT_SECRET while GET /healthz still returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-scaffold.ac4",
+            "title": "No tested response contains an Access-Control-Allow-Origin header, HTML responses carry the D-28 Content-Security-Policy, and a 17 KiB request body returns 413",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-scaffold.ac5",
+            "title": "POST /oauth/token with an unsupported grant_type returns 400 with error unsupported_grant_type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-schema",
+        "title": "Write the D1 schema migration and the node:sqlite D1 test shim",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/account/migrations/0001_init.sql",
+            "tests/unit/services/account/helpers/d1.ts",
+            "tests/unit/services/account/helpers/harness.ts",
+            "tests/unit/services/account/schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-9",
+            "NFR-3"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/schema.test.ts"
+          ],
+          "expected_outputs": [
+            "schema.test.ts passes"
+          ],
+          "foundationFor": [
+            "account-rate-limit",
+            "account-grants",
+            "account-device-credentials",
+            "account-github-leg",
+            "account-pkce-flow",
+            "account-device-flow",
+            "account-device-api",
+            "account-deletion",
+            "account-maintenance",
+            "account-admin-session",
+            "account-admin-grants-screen",
+            "account-admin-pending-screen",
+            "account-miniflare-integration"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-2 of PRD .pan/drafts/PAN-4293.md (section 7.3 verbatim). Write migrations/0001_init.sql with the ten tables (users, grants with storage_cap_bytes, pending_attempts, devices with the partial unique index on active (user_id, environment_id), auth_requests, auth_codes, device_grants, admin_sessions, deletion_jobs, rate_limits keyed by (bucket, client_hash)). helpers/d1.ts implements prepare/bind/first/all/run/batch over node:sqlite DatabaseSync(':memory:') with batch inside BEGIN/COMMIT and ROLLBACK on error; applyMigrations reads migrations/*.sql (never a .ts file). harness.ts gains env.DB."
+        },
+        "items": [
+          {
+            "id": "account-schema.ac1",
+            "title": "schema.test.ts passes: given an empty database, when applyMigrations runs, then all ten tables exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-schema.ac2",
+            "title": "Given an active device for (user, environment), when a second active device with the same pair is inserted, then the insert fails, while one revoked plus one active device for the pair are accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-schema.ac3",
+            "title": "grants.granted_via rejects a value outside admin-add and admin-allow-pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-schema.ac4",
+            "title": "Given a batch whose last statement fails, then the shim rolls back the earlier statements in that batch and RETURNING rows come back from run/first/all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-rate-limit",
+        "title": "Rate-limit public sign-in endpoints with D1 fixed windows per hashed client IP",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/rate-limit.ts",
+            "tests/unit/services/account/rate-limit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3",
+            "NFR-8"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/rate-limit.test.ts"
+          ],
+          "expected_outputs": [
+            "rate-limit.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-3 of PRD .pan/drafts/PAN-4293.md (section 7.11, decision D-12). Implement LIMITS (auth-start 20/10min, github-callback 30/10min, device-code 10/10min, token 120/10min, activate 30/15min, activate-fail 10/15min, admin-login 10/10min) and hit(rc, bucket) with the single-statement upsert in 7.11; client key = sha256Hex(CF-Connecting-IP or 'unknown'). routes.ts already calls hit() per route bucket and renders 429 with Retry-After (JSON rate_limited on /oauth/*, HTML elsewhere)."
+        },
+        "items": [
+          {
+            "id": "account-rate-limit.ac1",
+            "title": "rate-limit.test.ts passes: for every bucket, request number `limit` is accepted and request `limit + 1` returns ok false with retryAfterS equal to the seconds left in the window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-rate-limit.ac2",
+            "title": "Given the window has elapsed on the injected clock, when the same IP calls again, then the count resets and the request is accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-rate-limit.ac3",
+            "title": "Given two different client IPs, then each is counted in its own row and the stored client_hash contains a SHA-256 hex value, never the raw IP string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-rate-limit.ac4",
+            "title": "Through handle(), the 21st GET /auth/start from one CF-Connecting-IP returns 429 with a Retry-After header, and the 121st POST /oauth/token returns 429 JSON {\"error\":\"rate_limited\"}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-grants",
+        "title": "Implement the allowlist, pending attempts, tester entitlement and per-grant storage cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/grants.ts",
+            "services/account/src/entitlement.ts",
+            "tests/unit/services/account/grants.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9",
+            "FR-11"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/grants.test.ts"
+          ],
+          "expected_outputs": [
+            "grants.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-4 of PRD .pan/drafts/PAN-4293.md (sections 7.12, 7.13; decisions D-1, D-10, D-15, D-22, D-26, D-27). grants.ts: isAllowed (owner or unexpired grant), getActiveGrant, addGrant upsert with note/expiry/storageCapBytes, revokeGrant (one batch deleting the grant and revoking that user's active devices with revoked_by operator), recordPendingAttempt upsert, listGrantsWithDeviceStats, listPendingAttempts. entitlement.ts: Entitlement type, DEFAULT_STORAGE_CAP_BYTES = 5 * 1024 ** 3, entitlementFor(grant) and quotaDecision exactly as in 7.13."
+        },
+        "items": [
+          {
+            "id": "account-grants.ac1",
+            "title": "grants.test.ts passes: the owner id is allowed with no grant row, an unexpired grant is allowed, and an expired grant or unknown id is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-grants.ac2",
+            "title": "Given two sign-in attempts from one non-allowlisted id, then pending_attempts stores one row with attempts = 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-grants.ac3",
+            "title": "revokeGrant deletes the grant and marks only that user's active devices revoked_by operator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-grants.ac4",
+            "title": "entitlementFor(null) returns storageBytesCap 5368709120 and plan tester, a grant with storage_cap_bytes 2147483648 returns that cap, and quotaDecision accepts usage exactly at the cap and rejects one byte over with reason quota_exceeded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-device-credentials",
+        "title": "Mint and verify hash-at-rest device tokens and expose AccountRpc.verifyDevice",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/account/src/crypto.ts",
+            "services/account/src/devices.ts",
+            "services/account/src/contract.ts",
+            "services/account/src/index.ts",
+            "tests/unit/services/account/devices.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/devices.test.ts"
+          ],
+          "expected_outputs": [
+            "devices.test.ts passes",
+            "typecheck:account exits 0"
+          ],
+          "foundationFor": [
+            "account-pkce-flow",
+            "account-device-flow",
+            "account-device-api",
+            "account-deletion"
+          ],
+          "readinessReason": "Owns crypto.ts, devices.ts, contract.ts and the AccountRpc class in index.ts only; runs after scaffold, schema and grants land."
+        },
+        "narrative": {
+          "Action": "WI-5 of PRD .pan/drafts/PAN-4293.md (section 7.8; decisions D-5, D-6, D-17, D-18). crypto.ts: randomHex, sha256Hex, s256Challenge (base64url SHA-256), userCode (uniform rejection sampling over BCDFGHJKLMNPQRSTVWXZ). devices.ts: mintDevice (odd_ + 64 hex, rotate token hash in place for the same active (user, environmentId)), verifyDeviceToken (invalid_token / account_deleted / device_revoked / grant_expired / ok with entitlementFor), the 5-minute last_used_at throttle, authenticateRequest with allowExpiredGrant, list/rename/revoke helpers, revokeAllForUser. contract.ts: VerifyResult, AccountDataHolder, re-exports of Entitlement, quotaDecision and DEFAULT_STORAGE_CAP_BYTES (the contract PAN-4297 consumes). Replace the scaffold AccountRpc stub in index.ts with delegation to verifyDeviceToken."
+        },
+        "items": [
+          {
+            "id": "account-device-credentials.ac1",
+            "title": "devices.test.ts passes: a minted token matches ^odd_[0-9a-f]{64}$ and the devices table stores only its SHA-256 hash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-credentials.ac2",
+            "title": "Given an active device for (user, environmentId), when mintDevice runs again for the same pair, then deviceId and label are preserved and the old token returns invalid_token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-credentials.ac3",
+            "title": "verifyDeviceToken returns each of invalid_token, device_revoked, grant_expired and account_deleted from its scenario, and ok results carry the grant's storageBytesCap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-credentials.ac4",
+            "title": "Given the injected clock, last_used_at is written on the first verify, unchanged 4 minutes later, and rewritten 6 minutes later",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-credentials.ac5",
+            "title": "mintDevice rejects a platform outside ^(linux|darwin|win32)-(x64|arm64)$ and a non-UUID environmentId, and returns the default label Linux device, macOS device or Windows device by OS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-github-leg",
+        "title": "Run the GitHub OAuth leg with browser-bound state and the allowlist gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/github.ts",
+            "services/account/src/github-callback.ts",
+            "tests/unit/services/account/github-callback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/github-callback.test.ts"
+          ],
+          "expected_outputs": [
+            "github-callback.test.ts passes"
+          ],
+          "readinessReason": "Owns github.ts and github-callback.ts only; consumes grants.ts read-only."
+        },
+        "narrative": {
+          "Action": "WI-6 of PRD .pan/drafts/PAN-4293.md (section 7.5; decisions D-8, D-9, D-11, D-21). github.ts: authorizeUrl (scope read:user), exchangeCode, fetchUser (token discarded after use), lookupUserByLogin. github-callback.ts: startGitHubLeg (auth_requests row keyed by sha256(state), __Host-od_state cookie), the /auth/github/callback dispatcher (cookie must equal state, single-use DELETE ... RETURNING, GitHub error branch, 502 on exchange failure) that calls onGitHubIdentity / onGitHubDenied exported by pkce.ts, device-flow.ts and admin/session.ts, and resolveSignIn (isAllowed gate, pending attempt, users upsert, account_deleting)."
+        },
+        "items": [
+          {
+            "id": "account-github-leg.ac1",
+            "title": "github-callback.test.ts passes: the authorize redirect contains scope=read:user and a state equal to the __Host-od_state cookie value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-github-leg.ac2",
+            "title": "Given a callback with a missing cookie, a mismatched cookie, an expired auth_requests row, or a replayed state, then it returns the 400 page and no purpose handler runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-github-leg.ac3",
+            "title": "Given a successful callback with GitHub mocked, then the purpose handler receives {githubId, login} and a dump of every table contains neither the mocked access token nor gho_",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-github-leg.ac4",
+            "title": "Given a non-allowlisted identity, resolveSignIn records a pending_attempts row and creates no users row; a GitHub token-exchange failure returns the 502 page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-pkce-flow",
+        "title": "Issue device tokens through the loopback PKCE authorization-code flow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/pkce.ts",
+            "tests/unit/services/account/pkce.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/pkce.test.ts"
+          ],
+          "expected_outputs": [
+            "pkce.test.ts passes"
+          ],
+          "readinessReason": "Owns pkce.ts only; reuses github-callback and devices helpers read-only."
+        },
+        "narrative": {
+          "Action": "WI-7 of PRD .pan/drafts/PAN-4293.md (section 7.6; decisions D-7, D-11, D-13). GET /auth/start validates redirect_uri (http, host exactly 127.0.0.1 / localhost / [::1], no userinfo or fragment), S256 only, code_challenge shape, state length, platform and environment_id, then starts the GitHub leg; invalid input returns a 400 HTML page with no redirect. onGitHubIdentity('pkce') redirects with code+state or error=access_denied&error_description=invite_only. exchangeAuthorizationCode deletes the code with RETURNING (single use), checks expiry, identical redirect_uri and S256(verifier), re-checks isAllowed, then mints a device token."
+        },
+        "items": [
+          {
+            "id": "account-pkce-flow.ac1",
+            "title": "pkce.test.ts passes: the full flow from GET /auth/start through POST /oauth/token returns access_token, token_type Bearer, device_id and label, and creates a devices row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-pkce-flow.ac2",
+            "title": "Given a redirect_uri using https, a non-loopback host, 127.0.0.2, userinfo or a fragment, or code_challenge_method plain, then /auth/start returns 400 and the response has no Location header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-pkce-flow.ac3",
+            "title": "A wrong code_verifier, a reused code, a code older than 300 seconds, or a different redirect_uri at exchange returns invalid_grant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-pkce-flow.ac4",
+            "title": "Given a non-allowlisted identity, the callback redirects with error=access_denied&error_description=invite_only and the client state, records a pending attempt, and creates no auth_codes row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-pkce-flow.ac5",
+            "title": "Given a grant revoked between callback and exchange, the token endpoint returns access_denied and creates no devices row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-device-flow",
+        "title": "Issue device tokens through the RFC 8628 device authorization flow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/device-flow.ts",
+            "tests/unit/services/account/device-flow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-12"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/device-flow.test.ts"
+          ],
+          "expected_outputs": [
+            "device-flow.test.ts passes"
+          ],
+          "readinessReason": "Owns device-flow.ts only; reuses rate-limit, github-callback and devices helpers read-only."
+        },
+        "narrative": {
+          "Action": "WI-8 of PRD .pan/drafts/PAN-4293.md (section 7.7; decisions D-11, D-12, D-13). POST /oauth/device/code (oddc_ device code, XXXX-XXXX user code, verification_uri, 900 s expiry, 5 s interval); GET /activate form; POST /activate with the activate-fail counter (10 wrong codes per 15 min per IP, then 429); confirm page and POST /activate/confirm starting the GitHub leg; onGitHubIdentity('device') approving, denying (invite-only page) or reporting expiry; exchangeDeviceCode with authorization_pending, slow_down (+5 s), access_denied, expired_token and an isAllowed re-check before minting."
+        },
+        "items": [
+          {
+            "id": "account-device-flow.ac1",
+            "title": "device-flow.test.ts passes: POST /oauth/device/code returns device_code, a user_code formatted XXXX-XXXX, verification_uri ending /activate, expires_in 900 and interval 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-flow.ac2",
+            "title": "Polls return authorization_pending before approval, slow_down with interval 10 when polled sooner than the interval, and a token after approval through /activate, /activate/confirm and the GitHub callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-flow.ac3",
+            "title": "Given a non-allowlisted identity, the browser renders the invite-only page and the next poll returns access_denied; a grant older than 15 minutes returns expired_token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-flow.ac4",
+            "title": "The 11th wrong user code from one IP within 15 minutes returns 429, a new window accepts again, and lowercase or dashed codes are accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-device-api",
+        "title": "Serve the /v1 device API for the signed-in user",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/api.ts",
+            "tests/unit/services/account/api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/api.test.ts"
+          ],
+          "expected_outputs": [
+            "api.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-9 of PRD .pan/drafts/PAN-4293.md (section 7.9; decision D-15). GET /v1/me (expired grants allowed), GET /v1/devices (caller's active devices with current flag), PATCH /v1/devices/:id label (1-64 chars, no control characters), DELETE /v1/devices/:id (expired grants allowed; revoked_by user; 204). Another user's or a revoked device returns 404."
+        },
+        "items": [
+          {
+            "id": "account-device-api.ac1",
+            "title": "api.test.ts passes: GET /v1/me returns userId, githubId, githubLogin, deviceId, entitlement with storageBytesCap, and access status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-api.ac2",
+            "title": "GET /v1/devices returns only the caller's active devices and marks the calling device current",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-api.ac3",
+            "title": "PATCH rejects an empty, 65-character or control-character label with invalid_label, and PATCH or DELETE on another user's device returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-device-api.ac4",
+            "title": "After DELETE /v1/devices/:id, the same token returns 401 device_revoked on the next request; given an expired grant, GET /v1/devices returns 403 grant_expired while GET /v1/me returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-deletion",
+        "title": "Delete an account and fan the deletion out to bound data holders",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/deletion.ts",
+            "tests/unit/services/account/deletion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/deletion.test.ts"
+          ],
+          "expected_outputs": [
+            "deletion.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-10 of PRD .pan/drafts/PAN-4293.md (section 7.10; decisions D-15, D-16). DELETE /v1/account runs one batch (users.deleted_at, revoke devices as account-deletion, delete grant and pending row, INSERT OR IGNORE deletion_jobs with holders_pending from the optional VAULT binding), then ctx.waitUntil(runDeletionJob). runDeletionJob calls deleteAccountData(userId) on each bound holder, records attempts and last_error on failure, and deletes device and user rows and sets completed_at when all holders acked."
+        },
+        "items": [
+          {
+            "id": "account-deletion.ac1",
+            "title": "deletion.test.ts passes: with no VAULT binding, DELETE /v1/account returns 202 and after draining waitUntil the user and device rows are deleted and completed_at is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion.ac2",
+            "title": "Given a fake VAULT that succeeds, the job completes and the fake receives the userId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion.ac3",
+            "title": "Given a fake VAULT that throws, devices are revoked, the user row persists, and the job records attempts 1 with last_error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion.ac4",
+            "title": "The deleted user's token returns 401 on GET /v1/me and a repeated DELETE /v1/account returns the original deletionRequestedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-maintenance",
+        "title": "Retry deletion jobs and purge expired rows in the hourly cron",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/maintenance.ts",
+            "tests/unit/services/account/maintenance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-8"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/maintenance.test.ts"
+          ],
+          "expected_outputs": [
+            "maintenance.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-11 of PRD .pan/drafts/PAN-4293.md (section 7.10). runMaintenance(env, deps): runDeletionJob for every incomplete job, then purge auth_requests, auth_codes and admin_sessions past expires_at, device_grants 1 h past expiry, pending_attempts unseen for 30 days, devices revoked over 90 days ago, rate_limits windows older than 1 h, and completed deletion_jobs older than 30 days. index.ts scheduled already delegates here."
+        },
+        "items": [
+          {
+            "id": "account-maintenance.ac1",
+            "title": "maintenance.test.ts passes: given a pending deletion job whose holder now succeeds, runMaintenance completes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-maintenance.ac2",
+            "title": "For each table in section 7.10, a row outside the retention boundary is deleted and a row inside it survives, using the injected clock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-admin-session",
+        "title": "Sign the operator into the admin screen with an owner-only GitHub session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/admin/session.ts",
+            "tests/unit/services/account/admin-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/admin-session.test.ts"
+          ],
+          "expected_outputs": [
+            "admin-session.test.ts passes"
+          ],
+          "readinessReason": "Owns admin/session.ts only."
+        },
+        "narrative": {
+          "Action": "WI-12 of PRD .pan/drafts/PAN-4293.md (section 7.12 first four bullets; decisions D-19, D-20). POST /admin/login starts the GitHub leg with purpose admin; onGitHubIdentity('admin') creates a 12-hour session (__Host-od_admin cookie, HttpOnly, Secure, SameSite=Lax, Path=/, Max-Age=43200, hashed at rest, random csrf token) only for OWNER_GITHUB_ID and returns a 403 page otherwise; requireOwnerSession checks the session and, for POST, the csrf form field and Origin header; POST /admin/logout deletes the session."
+        },
+        "items": [
+          {
+            "id": "account-admin-session.ac1",
+            "title": "admin-session.test.ts passes: with OWNER_GITHUB_ID unset, GET /admin returns 503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-session.ac2",
+            "title": "Given the owner identity, the callback sets __Host-od_admin with HttpOnly, Secure, SameSite=Lax, Path=/ and Max-Age=43200, and redirects to /admin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-session.ac3",
+            "title": "Given a non-owner identity, the callback returns the 403 page and writes no admin_sessions or pending_attempts row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-session.ac4",
+            "title": "A POST with a wrong csrf value or a foreign Origin returns 403 while the correct pair is accepted, and logout deletes the session row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-admin-grants-screen",
+        "title": "Render the admin accounts table with add-by-username, storage cap and revoke",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/admin/screen.ts",
+            "tests/unit/services/account/admin-grants.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/admin-grants.test.ts"
+          ],
+          "expected_outputs": [
+            "admin-grants.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-13 of PRD .pan/drafts/PAN-4293.md (section 7.12 page parts 1-4; decisions D-9, D-14, D-26). GET /admin renders the header, the owner line, the allowlisted accounts table (login, GitHub id, granted date, entitlement, storage cap, note, expiry, active devices, last seen, Revoke) and the add form (username, note, expiry date, storage cap in GB 1-1000, default 5). POST /admin/grants resolves the username via lookupUserByLogin and upserts the grant; POST /admin/grants/:githubId/revoke revokes the grant and the user's devices. All values go through escapeHtml."
+        },
+        "items": [
+          {
+            "id": "account-admin-grants-screen.ac1",
+            "title": "admin-grants.test.ts passes: GET /admin renders the owner line and one row per grant including a 5 GB storage cap for a grant without an override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-grants-screen.ac2",
+            "title": "Given the lookup mocked to {id: 583231, login: octocat}, adding octocat with note beta, expiry 2026-12-31 and cap 2 creates grant 583231 with storage_cap_bytes 2147483648 and deletes any pending row for that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-grants-screen.ac3",
+            "title": "A lookup 404 renders GitHub user not found and creates no grant, a lookup 403 renders the rate-limit message, and a cap of 0 or 1001 is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-grants-screen.ac4",
+            "title": "Revoke deletes the grant and that user's tokens return device_revoked, and a note containing <script> renders escaped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-admin-pending-screen",
+        "title": "Show pending sign-ins with one-click Allow and flag overdue deletions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/admin/pending.ts",
+            "services/account/src/admin/screen.ts",
+            "tests/unit/services/account/admin-pending.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/admin-pending.test.ts"
+          ],
+          "expected_outputs": [
+            "admin-pending.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-14 of PRD .pan/drafts/PAN-4293.md (section 7.12 page parts 5-6; decisions D-14, D-16). admin/pending.ts renders the pending sign-in attempts table (login, GitHub id, first seen, last seen, attempts, flow, Allow) with the sentence 'Allowing an account lets it sign in. Ask the person to sign in again.' and the account deletions in progress table (user id, requested at, age in hours, holders pending, attempts, last error; 'overdue' past 24 hours). POST /admin/pending/:githubId/allow creates a tester grant with the default cap. admin/screen.ts includes both sections."
+        },
+        "items": [
+          {
+            "id": "account-admin-pending-screen.ac1",
+            "title": "admin-pending.test.ts passes: the pending table renders login, first and last seen, attempts and flow plus the Allow sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-pending-screen.ac2",
+            "title": "Given a pending row, Allow creates a grant with granted_via admin-allow-pending and the default cap, deletes the pending row, and the account's next PKCE sign-in returns a token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-pending-screen.ac3",
+            "title": "Allow on a missing pending row returns the 404 page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-admin-pending-screen.ac4",
+            "title": "A deletion job requested 25 hours ago renders overdue and one requested 2 hours ago does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-miniflare-integration",
+        "title": "Verify the bundled Worker end to end on local workerd with wrangler and Miniflare",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/package.json",
+            "tests/integration/services/account/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-12",
+            "NFR-2",
+            "NFR-9"
+          ],
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/integration/services/account/miniflare.test.ts",
+            "npm --prefix services/account run build:dry"
+          ],
+          "expected_outputs": [
+            "miniflare.test.ts passes against workerd",
+            "build:dry exits 0 and writes dist/index.js"
+          ],
+          "readinessReason": "Owns the integration test and the services/account package.json scripts block only."
+        },
+        "narrative": {
+          "Action": "WI-15 of PRD .pan/drafts/PAN-4293.md (sections 7.14 scripts, 7.15; decisions D-24, D-25, D-29). Add scripts dev (wrangler dev --local), migrate:local (wrangler d1 migrations apply overdeck-account --local) and build:dry (wrangler deploy --dry-run --outdir dist). The integration test bundles with wrangler deploy --dry-run via async execFile (esbuild fallback per 7.15 if the dry run needs credentials), loads the bundle into Miniflare with a local D1 and the migration applied, stubs GitHub with outboundService, and drives the flows through dispatchFetch. Never run any wrangler command that contacts Cloudflare."
+        },
+        "items": [
+          {
+            "id": "account-miniflare-integration.ac1",
+            "title": "Given the bundled Worker in Miniflare, when the owner completes the PKCE flow, then the returned token is accepted by GET /v1/me",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-miniflare-integration.ac2",
+            "title": "In Miniflare, a non-allowlisted identity is redirected with error=access_denied&error_description=invite_only, and the device flow approves and returns a token on the next poll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-miniflare-integration.ac3",
+            "title": "In Miniflare, the 21st GET /auth/start from one CF-Connecting-IP returns 429 with Retry-After",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-miniflare-integration.ac4",
+            "title": "After the flows, a SELECT over every D1 table contains no gho_stubbed value, and npm --prefix services/account run build:dry exits 0 without Cloudflare credentials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-docs",
+        "title": "Document the account service, its contracts and the admin screen",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md",
+            "anywhere.mdx",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/architecture.md",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11",
+            "FR-12"
+          ],
+          "verify_commands": [
+            "grep -c '^## ' docs/ACCOUNT-SERVICE.md",
+            "grep -n 'ACCOUNT-SERVICE.md' CLAUDE.md",
+            "grep -n 'services/account' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "at least 12 second-level headings",
+            "CLAUDE.md match printed",
+            "architecture.md match printed"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-16 of PRD .pan/drafts/PAN-4293.md. Create docs/ACCOUNT-SERVICE.md with the twelve sections named in WI-16 (What it is, Sign-in flows, Device tokens, Rate limits, API, RPC contract, Hosted vault contract, Account deletion, Admin screen, Configuration, Local development, Deploy). Add one sentence to anywhere.mdx order-table row 5 (account service built, invite-only, operator adds testers, 5 GB tester vault cap). Add a CLAUDE.md Topic Index row pointing at docs/ACCOUNT-SERVICE.md. Add a services/account/ row to .overdeck/context/codebase/architecture.md and a Hosted services bullet to stack.md, updating both last-verified dates."
+        },
+        "items": [
+          {
+            "id": "account-docs.ac1",
+            "title": "docs/ACCOUNT-SERVICE.md contains the twelve WI-16 section headings and its Rate limits section lists all seven buckets with their limits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac2",
+            "title": "The Hosted vault contract section states that the vault calls verifyDevice, refuses writes with 507 quota_exceeded when quotaDecision rejects, uses Durable Object CAS returning 412 on mismatch, and implements deleteAccountData",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac3",
+            "title": "`grep -n \"ACCOUNT-SERVICE.md\" CLAUDE.md` prints a match and anywhere.mdx row 5 states the account service is invite-only with a 5 GB tester cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac4",
+            "title": ".overdeck/context/codebase/architecture.md contains a services/account/ row and stack.md contains a Hosted services bullet naming Cloudflare Workers + D1 with a fresh last-verified date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-deploy-checkpoint",
+        "title": "Write the Cloudflare deploy runbook and stop at the operator checkpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:59:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md",
+            "services/account/wrangler.jsonc"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "traces": [
+            "NFR-9"
+          ],
+          "verify_commands": [
+            "npm --prefix services/account run build:dry",
+            "git grep -n -E 'wrangler (deploy|secret|d1 create|login|rollback)' -- ':!docs/ACCOUNT-SERVICE.md' ':!.pan/' ':!.overdeck/'"
+          ],
+          "expected_outputs": [
+            "build:dry exits 0",
+            "only the build:dry --dry-run line matches"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-17 of PRD .pan/drafts/PAN-4293.md (decision D-25). Write the eight numbered operator steps in the Deploy section of docs/ACCOUNT-SERVICE.md (GitHub OAuth App with callback https://account.overdeck.ai/auth/github/callback; wrangler login; d1 create and paste database_id; d1 migrations apply --remote; secret put for GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID; deploy; smoke via /healthz and /admin; rollback). Run npm --prefix services/account run build:dry. Then notify the operator with pan tell flywheel-orchestrator (fall back to an issue comment, then to the PR description) and stop. Never run a wrangler command that contacts Cloudflare."
+        },
+        "items": [
+          {
+            "id": "account-deploy-checkpoint.ac1",
+            "title": "The Deploy section of docs/ACCOUNT-SERVICE.md contains eight numbered operator steps and the last step contains the rollback command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deploy-checkpoint.ac2",
+            "title": "`npm --prefix services/account run build:dry` exits 0 and writes a bundle without Cloudflare credentials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deploy-checkpoint.ac3",
+            "title": "`git grep -n -E \"wrangler (deploy|secret|d1 create|login|rollback)\" -- ':!docs/ACCOUNT-SERVICE.md' ':!.pan/' ':!.overdeck/'` returns only the build:dry script line carrying --dry-run, and the operator notification is recorded in the tell output, an issue comment or the PR description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "account-scaffold",
+        "to": "account-schema",
+        "type": "blocks"
+      },
+      {
+        "from": "account-schema",
+        "to": "account-rate-limit",
+        "type": "blocks"
+      },
+      {
+        "from": "account-schema",
+        "to": "account-grants",
+        "type": "blocks"
+      },
+      {
+        "from": "account-schema",
+        "to": "account-admin-session",
+        "type": "blocks"
+      },
+      {
+        "from": "account-grants",
+        "to": "account-device-credentials",
+        "type": "blocks"
+      },
+      {
+        "from": "account-grants",
+        "to": "account-github-leg",
+        "type": "blocks"
+      },
+      {
+        "from": "account-grants",
+        "to": "account-admin-grants-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "account-grants",
+        "to": "account-deletion",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-credentials",
+        "to": "account-pkce-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-credentials",
+        "to": "account-device-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-credentials",
+        "to": "account-device-api",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-credentials",
+        "to": "account-deletion",
+        "type": "blocks"
+      },
+      {
+        "from": "account-github-leg",
+        "to": "account-pkce-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "account-github-leg",
+        "to": "account-device-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "account-github-leg",
+        "to": "account-admin-session",
+        "type": "blocks"
+      },
+      {
+        "from": "account-github-leg",
+        "to": "account-admin-grants-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "account-rate-limit",
+        "to": "account-device-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "account-deletion",
+        "to": "account-maintenance",
+        "type": "blocks"
+      },
+      {
+        "from": "account-admin-session",
+        "to": "account-admin-grants-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "account-admin-grants-screen",
+        "to": "account-admin-pending-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "account-pkce-flow",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-flow",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-device-api",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-maintenance",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-admin-pending-screen",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-rate-limit",
+        "to": "account-miniflare-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "account-miniflare-integration",
+        "to": "account-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "account-docs",
+        "to": "account-deploy-checkpoint",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
