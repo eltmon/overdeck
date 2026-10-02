@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-658",
   "created": "2026-10-02T05:23:15.999Z",
-  "updated": "2026-10-02T05:28:24.109Z",
+  "updated": "2026-10-02T05:35:29.943Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -18,6 +18,10 @@
     "share-protocol": {
       "status": "completed",
       "doneAt": "2026-10-02T05:28:24.109Z"
+    },
+    "share-room-state": {
+      "status": "completed",
+      "doneAt": "2026-10-02T05:35:29.942Z"
     }
   }
 }
