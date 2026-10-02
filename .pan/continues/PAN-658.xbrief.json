@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-658",
   "created": "2026-10-02T05:23:15.999Z",
-  "updated": "2026-10-02T06:01:38.487Z",
+  "updated": "2026-10-02T06:01:52.482Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "share-protocol.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T06:01:38.487Z"
+    },
+    "share-room-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T06:01:52.482Z"
     }
   }
 }
