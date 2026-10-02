@@ -55,4 +55,10 @@
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-10-01 -->
+- **Hosted services:** `services/account/` is a Cloudflare Worker on D1 (Web APIs
+  only, no `node:` imports; `cloudflare:workers` imported only in its `index.ts`).
+  wrangler and Miniflare are dev-only devDependencies of that workspace (local
+  `wrangler dev --local`, `--dry-run` bundles, real-workerd tests); deploying is
+  operator-only. See `docs/ACCOUNT-SERVICE.md`.
+
+<!-- last-verified: 2026-10-02 -->

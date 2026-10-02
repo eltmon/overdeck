@@ -62,6 +62,7 @@
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
 | Gauntlet lanes (`pan lane`) | [reference/lanes.mdx](reference/lanes.mdx) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
+| overdeck.ai account service (Cloudflare Worker, D1, invite-only admin) | [docs/ACCOUNT-SERVICE.md](docs/ACCOUNT-SERVICE.md) |
 
 ## Small But Sharp
 
