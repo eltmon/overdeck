@@ -48,6 +48,8 @@ export interface IsolatedDashboardOptions {
   port?: number;
   /** Reuse a home from a server stopped with `keepHome` (PAN-4279). */
   home?: string;
+  /** Extra environment, merged last (PAN-4437: a fake `HOME`, a stub on `PATH`). */
+  env?: Record<string, string>;
 }
 
 // ESM: no __dirname here.
@@ -110,6 +112,7 @@ export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}
       OVERDECK_DISABLE_AUTO_MERGE: '1',
       // fix10: never let a UAT host reach a Herdr session.
       OVERDECK_TERMINAL_BACKEND: 'tmux',
+      ...opts.env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

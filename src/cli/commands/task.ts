@@ -32,6 +32,9 @@ import {
 } from '../../lib/xbrief/claim-check.js';
 import { taskStateLockPath, withTaskStateLock } from '../../lib/xbrief/task-state-lock.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+import { formatBlockerRef, parseBlockerRefs } from '../../lib/cloister/blocker-refs.js';
+import { appendPipelineEntry } from '../../lib/cloister/pipeline-journal.js';
+import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 
 interface TaskOptions {
   json?: boolean;
@@ -204,6 +207,43 @@ export async function runTaskStatus(
   print({ itemId, status }, options.json);
 }
 
+export interface TaskBlockOptions extends TaskOptions {
+  on?: string[];
+}
+
+/**
+ * PAN-4451: `pan task block`. With `--on`, the refs are validated before
+ * anything is written, and the declaration is journaled as
+ * `blocked.declared` so the blocker-wake patrol can wake the agent once every
+ * blocker has merged. Without `--on` it is the plain status write.
+ */
+export async function runTaskBlock(issue: string, itemId: string, options: TaskBlockOptions): Promise<void> {
+  if (!options.on) return runTaskStatus('blocked', issue, itemId, options);
+  const { issueId, planHome, workspacePath } = resolveTaskContext(issue);
+  const refs = parseBlockerRefs(options.on, {
+    blockedIssueId: issueId,
+    isKnownIssue: (id) => resolveProjectFromIssueSync(id) !== null,
+    blockedIssueRepo: () => {
+      const resolved = resolveGitHubIssue(issueId);
+      return resolved.isGitHub ? `${resolved.owner}/${resolved.repo}` : null;
+    },
+  });
+  const lockPath = await taskStateLockPath(planHome);
+  await withTaskStateLock(lockPath, async () => {
+    setItemStatus(planHome, issueId, itemId, 'blocked');
+    await commitContinue(planHome, issueId);
+  });
+  const blockers = refs.map(formatBlockerRef);
+  appendPipelineEntry(workspacePath, {
+    type: 'blocked.declared',
+    issueId,
+    source: 'pan-task-block',
+    data: { item: itemId, blockers },
+  });
+  if (options.json) print({ itemId, status: 'blocked', blockers }, true);
+  else console.log(`${itemId}\tblocked\twaits on ${blockers.join(', ')}`);
+}
+
 export function registerTaskCommands(program: Command): void {
   const task = program.command('task').description('Read and update xBRIEF item state for one issue');
   task.command('next <issue>').option('--json', 'Print JSON')
@@ -217,7 +257,8 @@ export function registerTaskCommands(program: Command): void {
     .description('Record an item as done. Requires a commit carrying "Item: <item>" on a pushed branch.')
     .action(async (issue, item, options) => taskAction(() => runTaskDone(issue, item, options)));
   task.command('block <issue> <item>').option('--json', 'Print JSON')
-    .action(async (issue, item, options) => taskAction(() => runTaskStatus('blocked', issue, item, options)));
+    .option('--on <refs...>', 'Issues or PRs this item waits on (PAN-123, #45, owner/repo#45, PR URL); Overdeck wakes the agent when all have merged')
+    .action(async (issue, item, options) => taskAction(() => runTaskBlock(issue, item, options)));
   task.command('unblock <issue> <item>').option('--json', 'Print JSON')
     .action(async (issue, item, options) => taskAction(() => runTaskStatus('pending', issue, item, options)));
   task.command('reopen <issue> <item>').option('--json', 'Print JSON')

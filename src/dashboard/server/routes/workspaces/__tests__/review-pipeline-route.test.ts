@@ -27,6 +27,7 @@ const routeMocks = vi.hoisted(() => ({
   runVerificationForIssue: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   spawnReviewRoleForIssue: vi.fn(),
+  refreshIssuePullRequestStateNow: vi.fn(),
 }));
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
@@ -75,6 +76,10 @@ vi.mock('../../../../../lib/review-artifacts.js', () => ({
   createReviewArtifactsForIssue: vi.fn(async () => ({ mergeSet: { repos: [] } })),
 }));
 
+vi.mock('../../../services/issue-pr-refresh.js', () => ({
+  refreshIssuePullRequestStateNow: routeMocks.refreshIssuePullRequestStateNow,
+}));
+
 
 // W1 deleted src/lib/state-read-home.ts and src/lib/state-home.ts; W3 deletes
 // the record plane and the mirror syncs that import them. They are still on
@@ -89,6 +94,7 @@ vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnA
 
 import { EventStoreService } from '../../../services/domain-services.js';
 import { reviewPipelineRouteLayer, _resetAutoRequeueCountsForTests } from '../review-pipeline.js';
+import { requestReviewPipeline } from '../../../../../lib/cloister/request-review-pipeline.js';
 
 function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
   return { issueId: 'PAN-3340', state: 'working', ...overrides };
@@ -372,5 +378,52 @@ describe('POST /api/review/:issueId/trigger — conflict gate', () => {
 
     expect(result.status).toBe(409);
     expect(result.body).toMatchObject({ success: false, gated: true, pipeline: 'deferred' });
+  });
+});
+
+// PAN-4457: the issue row's PR badge appears within seconds of `pan done`
+// opening the PR, not only on the next tracker poll. The `/request` route is
+// the door onto `requestReviewGuarded` → `startRequestReviewPipeline`, where
+// the refresh call lives (the `/trigger` route above has its own separate
+// dispatch and never reaches it).
+describe('POST /api/review/:issueId/request — PR state refresh (PAN-4457)', () => {
+  it('calls refreshIssuePullRequestStateNow once with the canonical issue id when a request starts', async () => {
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result.status).toBe(202);
+    expect(routeMocks.refreshIssuePullRequestStateNow).toHaveBeenCalledTimes(1);
+    expect(routeMocks.refreshIssuePullRequestStateNow).toHaveBeenCalledWith('PAN-3340');
+  });
+
+  it('does not call refreshIssuePullRequestStateNow when the workspace does not exist', async () => {
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: false, isRemote: false, localPath: '' });
+
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result.body).toMatchObject({ success: false, error: 'Workspace does not exist' });
+    expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
+  });
+
+  it('does not call refreshIssuePullRequestStateNow when the pipeline is already running for the issue', async () => {
+    const isInFlightSpy = vi.spyOn(requestReviewPipeline, 'isInFlight').mockReturnValue(true);
+
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result.body).toMatchObject({ success: true, alreadyRunning: true });
+    expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
+
+    isInFlightSpy.mockRestore();
   });
 });

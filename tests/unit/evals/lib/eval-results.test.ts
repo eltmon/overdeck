@@ -22,6 +22,7 @@ function run(overrides: Partial<PromptScenarioRun> = {}): PromptScenarioRun {
     temperature: null,
     maxTokens: 32000,
     openaiVia: null,
+    anthropicVia: 'api',
     usage: { inputTokens: 100, outputTokens: 50, cacheReadTokens: 10, cacheWriteTokens: 5, reasoningTokens: null },
     costUsd: 0.01,
     costBasis: 'api',
@@ -54,12 +55,18 @@ describe('evals/lib/eval-results', () => {
       model: 'claude-sonnet-5-5',
       provider: 'anthropic',
       effort: 'high',
+      anthropicVia: 'api',
       score: 0.5,
       metrics: { lintPass: 1 },
       costUsd: 0.01,
       costBasis: 'api',
       recordedAt: '2026-09-29T10:00:00.000Z',
     });
+  });
+
+  it('recordFromRun copies a claude-cli route and its api-equivalent cost basis', () => {
+    const r = recordFromRun('feedback-acceptance', 'c1', run({ anthropicVia: 'claude-cli', costBasis: 'api-equivalent' }), 1, {});
+    expect(r).toMatchObject({ anthropicVia: 'claude-cli', costBasis: 'api-equivalent' });
   });
 
   it('parseEvalRecords returns the records written by appendEvalRecord', () => {
@@ -122,5 +129,27 @@ describe('evals/lib/eval-results', () => {
     expect(rows[0]).toContain('| 0.2500 |');
     expect(rows[1]).toContain('| review-recall | claude-opus-5-5 |');
     expect(rows[2]).toContain('| review-recall | gpt-6-luna |');
+  });
+
+  it('renderPlacementTable reports recall, blocking recall and blocking severity per model, skipping legacy records', () => {
+    const split = (recall: 0 | 1, blockingRecall: 0 | 1, excerptSufficient: 0 | 1 = 1) => ({
+      recall,
+      blockingRecall,
+      blockingSeverity: recall ? blockingRecall : null,
+      excerptSufficient,
+    });
+    const table = renderPlacementTable([
+      record({ caseId: 'c1', model: 'claude-opus-5-5', metrics: split(1, 1) }),
+      record({ caseId: 'c2', model: 'claude-opus-5-5', metrics: split(1, 0, 0) }),
+      record({ caseId: 'c3', model: 'claude-opus-5-5', metrics: split(0, 0) }),
+      record({ caseId: 'c1', model: 'claude-sonnet-5-5', effort: null, metrics: split(1, 0) }),
+      // Legacy record: written before the split, so its `recall` meant blocking recall.
+      record({ caseId: 'c2', model: 'claude-sonnet-5-5', effort: null, metrics: { recall: 1 } }),
+    ]);
+    const section = table.slice(table.indexOf('### Review recall: found vs rated blocking'));
+    expect(section.split('\n').filter((l) => l.startsWith('- '))).toEqual([
+      '- claude-opus-5-5 (high): recall 2/3; blocking recall 1/3; rated blocking when found 1/2; excerpt-sufficient recall 1/2',
+      '- claude-sonnet-5-5 (n/a): recall 1/1; blocking recall 0/1; rated blocking when found 0/1; excerpt-sufficient recall 1/1',
+    ]);
   });
 });

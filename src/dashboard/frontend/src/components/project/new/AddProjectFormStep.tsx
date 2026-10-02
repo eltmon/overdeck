@@ -10,6 +10,8 @@ import type { CreatedProject, ProjectCreateMode } from './projectCreateTypes.js'
 
 interface AddProjectFormStepProps {
   mode: ProjectCreateMode;
+  /** Prefills the Repository URL (clone mode). */
+  initialUrl?: string;
   titleId?: string;
   onCreated: (project: CreatedProject) => void;
   /** "Change": back to the start step. */
@@ -19,8 +21,8 @@ interface AddProjectFormStepProps {
   onBusyChange?: (busy: boolean) => void;
 }
 
-export function AddProjectFormStep({ mode, titleId, onCreated, onChange, onCancel, onBusyChange }: AddProjectFormStepProps) {
-  const create = useProjectCreateIntent({ initialMode: mode, onCreated });
+export function AddProjectFormStep({ mode, initialUrl, titleId, onCreated, onChange, onCancel, onBusyChange }: AddProjectFormStepProps) {
+  const create = useProjectCreateIntent({ initialMode: mode, onCreated, initialUrl });
   useEffect(() => {
     onBusyChange?.(create.frozen);
     return () => onBusyChange?.(false);

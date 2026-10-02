@@ -1,0 +1,635 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-01T21:12:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4447: Session Vault: dashboard continued-on states (\"Continued on <machine>\", \"Local turns saved as a fork\")",
+    "updated": "2026-10-01T21:14:53.276Z"
+  },
+  "plan": {
+    "id": "pan-4447",
+    "title": "Session Vault: dashboard continued-on states (\"Continued on <machine>\", \"Local turns saved as a fork\")",
+    "status": "running",
+    "uid": "23da25b4-7d1a-495f-aa07-a0b154ca4b3b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-01T21:12:22Z",
+    "updated": "2026-10-01T21:14:53.276Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4447",
+        "label": "PAN-4447",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4447.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "dashboard",
+      "conversations",
+      "pan-2350"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4447.md",
+      "canonicalFilename": "2026-10-01-PAN-4447-session-vault-dashboard-continued-on-states-continued-on-machine-local-turns-saved-as-a-fork.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "When machine B continues a conversation machine A started (pan vault resume or Continue here), A's dashboard shows nothing: the row and composer look unchanged. If the operator keeps typing on A, settle() saves those turns as a settlement fork (PAN-2609 P-6) silently. The operator cannot see that the conversation moved or that local turns were split off.",
+      "Proposal": "List-cache rows gain parentVaultId and forkKind ('settlement' for P-6 forks, detected by segments[0].prefix === null; 'version' for @<n> forks). A pure engine function roundTripStates(index) in src/lib/vault/round-trip.ts maps each owned native path to continued-elsewhere or forked-locally. src/lib/overdeck/conversation-vault-continuity.ts matches conversation rows to owned paths (Claude by <claudeSessionId>.jsonl basename, Codex by ${OVERDECK_HOME}/agents/<tmuxSession>/ prefix, greatest path wins) and getConversationListWithVaultCopies attaches vaultContinuity to every local row with one local-index read per call. The frontend shows a 'continued on <label>' chip on the row and a VaultContinuityNotice above the still-enabled composer with a 'View its copy' link to vault-<vaultId>, plus the fork line for forked-locally. Docs describe both states.",
+      "NonGoals": "- A 'Save local turns as a fork' button; the engine already saves them.\n- Making the composer read-only for a continued-elsewhere conversation.\n- vaultContinuity on GET /api/conversations/<id> (StandaloneRoutes.tsx), the Agents Directory (getEnrichedConversationList) or lanes.\n- A CLI display of these states in pan vault list or show.\n- States for version forks (@<n>), harnesses other than claude-code and codex, or agent (non-conversation) transcripts.\n- A new WebSocket or push event for state changes; the 10 s conversation-list poll carries it.\n- Any edit to ConversationPanel.tsx, src/lib/overdeck/conversations.ts or the PAN-4437 continue flow.\n- Writing, moving or deleting any native transcript."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Distinguish settlement forks from version forks with a forkKind field on ListCacheRow, derived from segments[0]?.prefix === null.",
+        "rationale": "Version forks (forkRecordAtVersion) also set record.parent, so parentVaultId alone would mislabel a pan vault resume <id>@<n> fork as 'local turns saved as a fork'. Only settle() writes a first segment with a null prefix; claimAndMaterialize always writes a non-null prefix. Keeping parentVaultId = record.parent?.vaultId matches the issue text."
+      },
+      {
+        "summary": "Name the engine function roundTripStates / type RoundTripState in src/lib/vault/round-trip.ts, keep the wire field vaultContinuity.",
+        "rationale": "continuity.ts already exports checkContinuity/ContinuityResult for line-hash tails; reusing the word in the engine would confuse executors. The issue fixes the file name round-trip.ts and the wire field vaultContinuity."
+      },
+      {
+        "summary": "When several owned paths match one conversation, the lexicographically greatest path wins.",
+        "rationale": "A Codex agent dir can hold several rollout files whose names embed their start time, so the greatest is the newest; the rule is deterministic and needs no file I/O."
+      },
+      {
+        "summary": "Attach vaultContinuity to local rows on every page, not only the first, and give browse rows null.",
+        "rationale": "Continuity is a per-row fact; the existing first-page-only early return exists for browse copies, not for per-row fields. One local-index read per call is cheap."
+      },
+      {
+        "summary": "An unreadable or corrupt local index yields null for every row with a warn-once log, never a list error.",
+        "rationale": "The conversation list is core UI; a broken vault index must not take it down."
+      },
+      {
+        "summary": "Keep the composer enabled in both states; ship 'Save local turns as a fork' as displayed state, not a button.",
+        "rationale": "The issue states the engine already saves local turns as a fork (P-6); typing on the first machine is what produces the fork."
+      },
+      {
+        "summary": "'View its copy' opens vault-<vaultId> for continued-elsewhere and vault-<parentVaultId> for forked-locally through ComposerFooter's existing openConversationRoute.",
+        "rationale": "PAN-4436 creates a browse row for every non-tombstone record owned elsewhere, so the row the other machine owns exists on this machine after the same sync; reusing the existing client-side route helper adds no new navigation path."
+      },
+      {
+        "summary": "Put the frontend VaultContinuity type in ConversationList.tsx and the notice in a new VaultContinuityNotice.tsx file.",
+        "rationale": "Matches the PAN-4436 pattern (origin, vaultOwnerLabel live on the frontend Conversation type) and keeps ComposerFooter.tsx (942/1000 lines) within the file-size ceiling."
+      },
+      {
+        "summary": "No new push event; rely on the conversation list's 10 s refetch.",
+        "rationale": "CommandDeck/index.tsx already polls ['conversations'] every 10 s, and PAN-4436's browse refresh emits conversation.created when the browse row appears."
+      }
+    ],
+    "items": [
+      {
+        "id": "list-cache-parent",
+        "title": "List-cache rows carry parentVaultId and forkKind from syncOnce",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/local-index.ts",
+            "src/lib/vault/sync.ts",
+            "tests/unit/lib/vault/sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/sync.test.ts tests/unit/lib/vault/local-index.test.ts tests/unit/lib/vault/browse.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync.test.ts, local-index.test.ts and browse.test.ts pass including the two new fork-parent cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Add optional parentVaultId?: string and forkKind?: 'settlement' | 'version' to ListCacheRow in src/lib/vault/local-index.ts. In syncOnce step 4 (src/lib/vault/sync.ts, the non-tombstone rows.push), spread { parentVaultId: value.parent.vaultId, forkKind: value.segments[0]?.prefix === null ? 'settlement' : 'version' } only when value.parent is non-null, so rows without a parent and tombstone rows carry neither key. Add two cases to tests/unit/lib/vault/sync.test.ts: a P-6 fork row (A settles, B takes ownership, A appends and syncs) and a forkRecordAtVersion row."
+        },
+        "items": [
+          {
+            "id": "list-cache-parent.ac1",
+            "title": "Given B owns A's record, when A appends a line and runs syncOnce, then the fork's list-cache row stores parentVaultId equal to the original vaultId and forkKind 'settlement'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-cache-parent.ac2",
+            "title": "When syncOnce pulls a record created by forkRecordAtVersion, its list-cache row stores forkKind 'version'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-cache-parent.ac3",
+            "title": "When syncOnce pulls a record whose parent is null, its list-cache row contains neither a parentVaultId nor a forkKind key, and existing sync/browse tests pass unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "round-trip-states",
+        "title": "roundTripStates returns continued-elsewhere and forked-locally per owned path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4447",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "round-trip-two-machine",
+            "conversation-continuity-map",
+            "conversation-list-continuity"
+          ],
+          "files_scope": [
+            "src/lib/vault/round-trip.ts",
+            "tests/unit/lib/vault/round-trip.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/round-trip.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "round-trip.test.ts passes every rule case; import-graph.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Create src/lib/vault/round-trip.ts exporting type RoundTripState and the pure function roundTripStates(index: Pick<LocalIndex, 'owned' | 'listCache'>): Map<string, RoundTripState>, importing only types from ./local-index.js. Apply FR-2's rules in order: no row or tombstone row means no entry; row owned elsewhere means continued-elsewhere with the row's ownerLabel; row owned here with forkKind 'settlement', a parentVaultId, and a non-tombstone parent row owned elsewhere means forked-locally with forkVaultId, parentVaultId and parentOwnerLabel. Write tests/unit/lib/vault/round-trip.test.ts with literal LocalIndex fixtures, one case per rule."
+        },
+        "items": [
+          {
+            "id": "round-trip-states.ac1",
+            "title": "Given an owned entry whose list-cache row has ownerIsHere false, roundTripStates returns { kind: 'continued-elsewhere', vaultId, ownerLabel } for that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "round-trip-states.ac2",
+            "title": "Given an owned settlement-fork row whose parent row is owned elsewhere, roundTripStates returns { kind: 'forked-locally', forkVaultId, parentVaultId, parentOwnerLabel }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "round-trip-states.ac3",
+            "title": "roundTripStates returns no entry for owned-here rows, tombstone rows, missing rows, version forks, and settlement forks whose parent is owned here, tombstoned or missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "round-trip-states.ac4",
+            "title": "When import-graph.test.ts runs, it passes with round-trip.ts reachable from the vault modules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "round-trip-two-machine",
+        "title": "Two-machine engine test proves byte-identical origin file and both states",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/vault/round-trip.e2e.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/round-trip.e2e.test.ts"
+          ],
+          "expected_outputs": [
+            "round-trip.e2e.test.ts passes both steps (continued-elsewhere, forked-locally)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Create tests/unit/lib/vault/round-trip.e2e.test.ts reusing the sync.test.ts harness (DirVaultStore in a temp root, homeA/homeB, useHome switching OVERDECK_HOME, afterEach restore). A settles and syncs; B syncs and calls adoptRecord with projectsRoot under the temp root (never the default); A reads its native file bytes, runs syncOnce, compares bytes with Buffer.compare, and asserts roundTripStates(await readLocalIndex()) maps A's path to continued-elsewhere with B's label; A appends a user line, runs syncOnce, asserts the settled result's forkedFrom.vaultId and that the path maps to forked-locally with the fork id and B's label."
+        },
+        "items": [
+          {
+            "id": "round-trip-two-machine.ac1",
+            "title": "Given B adopted A's record, when A runs syncOnce, then A's native file bytes are preserved (Buffer.compare returns 0) and roundTripStates returns continued-elsewhere with B's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "round-trip-two-machine.ac2",
+            "title": "When A then appends a local line and runs syncOnce, roundTripStates returns forked-locally whose forkVaultId equals the settled result's vaultId and whose parentOwnerLabel is B's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-continuity-map",
+        "title": "Conversation rows resolve to round-trip states by Claude basename and Codex agent-dir prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-vault-continuity.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-continuity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-continuity.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-continuity.test.ts passes every match case",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Create src/lib/overdeck/conversation-vault-continuity.ts exporting buildVaultContinuityLookup(index, overdeckHome), async loadVaultContinuityLookup(overdeckHome = getOverdeckHome()) and vaultContinuityFor(conv, lookup). Build a Map<basename, path[]> for claude-code entries and a Map<tmuxSession, path[]> for codex entries under <overdeckHome>/agents/ in one pass, sorted ascending. vaultContinuityFor returns null for origin 'vault' rows and other harnesses, matches Claude rows (harness claude-code/null/undefined) by <claudeSessionId>.jsonl and Codex rows by tmuxSession, takes the last (greatest) candidate and returns its state or null. loadVaultContinuityLookup catches readLocalIndex errors, warns once per message with a module-level Set, and falls back to an empty index."
+        },
+        "items": [
+          {
+            "id": "conversation-continuity-map.ac1",
+            "title": "vaultContinuityFor returns the state of the owned claude-code path whose basename is <claudeSessionId>.jsonl, and null for a Claude row without claudeSessionId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-continuity-map.ac2",
+            "title": "vaultContinuityFor returns the state of a codex path under <home>/agents/<tmuxSession>/, rejects a path under <home>/agents/<tmuxSession>xy/, and with two candidates the greater path wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-continuity-map.ac3",
+            "title": "vaultContinuityFor returns null for an origin 'vault' row and for a pi-harness row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-continuity-map.ac4",
+            "title": "Given vault/index.json contains invalid JSON, loadVaultContinuityLookup resolves without throwing and every row returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-list-continuity",
+        "title": "GET /api/conversations returns vaultContinuity on every local row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/__tests__/conversation-vault-browse.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-vault-browse.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-vault-browse.test.ts passes including the new PAN-4447 describe block",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In getConversationListWithVaultCopies (src/lib/overdeck/conversation-list.ts) run getEnrichedConversationList and loadVaultContinuityLookup in parallel, map every enriched row to a new object { ...row, vaultContinuity: vaultContinuityFor(row, lookup) } before the offset !== 0 early return (never mutate the cached rows), and give browse copies vaultContinuity: null. Update the function's doc comment. Add a describe('vault continuity on list rows (PAN-4447)') block to src/lib/overdeck/__tests__/conversation-vault-browse.test.ts that writes an owned entry and list-cache row with setOwnedTail and replaceListCache under TEST_HOME, invalidates the enrichment cache, and checks the first and second pages."
+        },
+        "items": [
+          {
+            "id": "conversation-list-continuity.ac1",
+            "title": "Given an owned entry for <claudeSessionId>.jsonl whose record is owned by 'laptop', getConversationListWithVaultCopies(50, 0) returns that local row with vaultContinuity { kind: 'continued-elsewhere', vaultId, ownerLabel: 'laptop' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-continuity.ac2",
+            "title": "getConversationListWithVaultCopies returns browse rows with vaultContinuity null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-continuity.ac3",
+            "title": "getConversationListWithVaultCopies(50, 1) returns rows that each contain a vaultContinuity key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-row-chip",
+        "title": "Conversation row renders 'continued on <label>' for both states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes the three new continuity cases; VaultBrowseCopy.test.tsx passes unchanged",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Add the optional vaultContinuity union to interface Conversation in CommandDeck/ConversationList.tsx after vaultOwnerLabel, and export type VaultContinuity = NonNullable<Conversation['vaultContinuity']>. In ConversationRow.tsx build continuityBadge (conversationBranchChip span, MonitorSmartphone icon, text 'continued on <label>', data-testid vault-continuity-badge, title naming the fork id8 for forked-locally) and make ownerBadge fall back to it for non-vault rows, so both row variants render it without other line changes. Add three cases to ConversationRow.test.tsx."
+        },
+        "items": [
+          {
+            "id": "conversation-row-chip.ac1",
+            "title": "Given a local row with continued-elsewhere ownerLabel 'laptop', ConversationRow renders the text 'continued on laptop'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-row-chip.ac2",
+            "title": "Given a forked-locally row with parentOwnerLabel 'laptop', ConversationRow renders 'continued on laptop' and the chip title contains 'saved as a fork (<forkVaultId first 8>)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-row-chip.ac3",
+            "title": "Given vaultContinuity null, ConversationRow renders no vault-continuity-badge, and a browse row still renders its 'from <label>' owner badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-continuity-notice",
+        "title": "Composer notice renders both states and routes 'View its copy' to the browse row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/VaultContinuityNotice.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultContinuityNotice.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/VaultContinuityNotice.test.tsx src/dashboard/frontend/src/components/chat/__tests__/VaultBrowseCopy.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "VaultContinuityNotice.test.tsx passes; VaultBrowseCopy.test.tsx passes unchanged",
+            "typecheck, lint and the file-size guard complete without errors (ComposerFooter.tsx stays at or under 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Create chat/VaultContinuityNotice.tsx exporting VaultContinuityNotice({ continuity, onOpenCopy }) with role status and data-testid vault-continuity-notice: line 1 'Continued on <label>.' plus a 'View its copy' button calling onOpenCopy('vault-<vaultId or parentVaultId>'); line 2 only for forked-locally 'Local turns since then were saved as a fork (<id8>).'. In ComposerFooter.tsx change only the exported ComposerFooter function (and one import) so a local conversation with vaultContinuity renders the notice followed by ComposerFooterInput, passing the existing openConversationRoute as onOpenCopy. Write chat/__tests__/VaultContinuityNotice.test.tsx, copying VaultBrowseCopy.test.tsx's mocks for the ComposerFooter cases."
+        },
+        "items": [
+          {
+            "id": "composer-continuity-notice.ac1",
+            "title": "Given continued-elsewhere on 'laptop', VaultContinuityNotice renders 'Continued on laptop.' and no fork line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-continuity-notice.ac2",
+            "title": "Given forked-locally, VaultContinuityNotice renders 'Local turns since then were saved as a fork (<id8>).'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-continuity-notice.ac3",
+            "title": "When 'View its copy' is clicked, onOpenCopy receives 'vault-<vaultId>' for continued-elsewhere and 'vault-<parentVaultId>' for forked-locally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-continuity-notice.ac4",
+            "title": "Given a local conversation with continued-elsewhere, ComposerFooter renders the notice and the composer editor, and clicking 'View its copy' routes window.location.pathname to '/conv/vault-<vaultId>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-continuity-notice.ac5",
+            "title": "Given vaultContinuity null, ComposerFooter renders no vault-continuity-notice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-continued-on-states",
+        "title": "Session Vault docs describe the continued-on and forked-locally states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-01T21:12:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SESSION-VAULT.md",
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Local turns since then were saved as a fork' docs/SESSION-VAULT.md",
+            "grep -n 'round-trip.ts' docs/SESSION-VAULT.md",
+            "grep -n 'forkKind' docs/SESSION-VAULT.md",
+            "grep -n -i 'continued on' configuration/session-vault.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. In docs/SESSION-VAULT.md section 'Dashboard (Overdeck mode)' add a 'Continued-on states (PAN-4447)' bullet with both notice texts, the 'View its copy' link to vault-<vaultId>, the enabled composer, the source (round-trip.ts over the local index, list-cache parentVaultId/forkKind), and that version forks show no state; add the round-trip.ts line to the Module map after continue-inspect.ts. In configuration/session-vault.mdx section 'Continue on another machine', after the paragraph ending 'changes nothing.', add a paragraph saying the first machine then marks the conversation 'continued on <machine>', links to the other machine's copy, and keeps anything typed there afterwards as a separate saved fork whose id the panel shows."
+        },
+        "items": [
+          {
+            "id": "docs-continued-on-states.ac1",
+            "title": "docs/SESSION-VAULT.md contains the texts 'Continued on <machine>.' and 'Local turns since then were saved as a fork', names round-trip.ts and forkKind, and states that version forks show no state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-continued-on-states.ac2",
+            "title": "configuration/session-vault.mdx 'Continue on another machine' contains a paragraph saying the first machine shows 'continued on <machine>' and saves later local turns as a fork",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "list-cache-parent",
+        "to": "round-trip-states",
+        "type": "blocks"
+      },
+      {
+        "from": "list-cache-parent",
+        "to": "round-trip-two-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "round-trip-states",
+        "to": "round-trip-two-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "round-trip-states",
+        "to": "conversation-continuity-map",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-continuity-map",
+        "to": "conversation-list-continuity",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-row-chip",
+        "to": "composer-continuity-notice",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

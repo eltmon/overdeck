@@ -49,6 +49,16 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
 - Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
   unready clients are closed with `terminal-ready-timeout`
+- App-level heartbeat (PAN-4434): a client that opts in with `?heartbeat=1` on the upgrade URL
+  receives a `\u0000{"type":"ping"}` control frame every 20s from connection onward (across the
+  attach/respawn wait) and must answer `{"type":"pong"}`; any inbound message resets the missed-interval
+  counter, and two consecutive silent intervals end in `ws.terminate()`. Ping/pong client messages are
+  dropped at the single `ws.on('message')` entry point before they can reach the PTY, the Herdr bridge,
+  or any pending-input buffer. A connection without `?heartbeat=1` gets no heartbeat and is never
+  terminated by it; `XTerminal.tsx` always opts in. A data frame is used instead of a protocol-level
+  `ws.ping()` because proxies such as Cloudflare close an idle WebSocket after ~100s and treat a data
+  frame as traffic more reliably than a ping frame. See `ws-terminal-heartbeat.ts` and
+  `components/terminal/terminalControlFrames.ts`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
@@ -310,8 +320,11 @@ door that does not exist; a real record read door would be a separate change.
   tombstone, and a `snapshot_json`. The pull-request sync sweep
   (`services/pull-request-sync-service.ts`, primary dashboard only, boot +30 s then
   every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
-  whose head branch equals a conversation's branch (`resolveConversationBranch`; never
-  the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
+  whose head branch equals a conversation's branch (`resolveConversationBranch`: a
+  linked worktree's, an agent's, or — PAN-4457 — a live operator conversation's branch
+  in the primary checkout, via the backend-agnostic pane inventory, `getBackendPanes`;
+  liveness unknown or the inventory degraded skips primary-checkout matching that
+  sweep; never the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
   by due rule: unsynced and open every sweep, closed every 15 min, merged never. A
   due GitHub link no listing covered gets one `gh pr view` (the fallback), and 3
   consecutive failed reads skip that repository for 15 min. The last-read times
@@ -330,7 +343,18 @@ door that does not exist; a real record read door would be a separate change.
   `manual`/`agent` relink clears it; a `created` link does not. `created` links
   come from `linkCreatedPullRequestToIssueConversations`, called after
   `createReviewArtifact` in `review-artifacts.ts` and `pan done`: every
-  non-archived agent conversation with that `issue_id` gets the PR. Other reads,
+  non-archived agent conversation with that `issue_id` gets the PR, and so
+  (PAN-4457) does every non-archived, non-vault operator conversation whose
+  `cwd` is at or under the issue's `workspacePath` (matched with SQLite
+  `instr()`, never `LIKE`, so a path containing `_` or `%` isn't a wildcard).
+  Issue and workspace row badges (`FeatureItem.tsx`, `Sidebar.tsx`) read
+  `DerivedIssueState.pr` through `issuePullRequestBadgeLink`, never a
+  conversation link. `startRequestReviewPipeline`
+  (`routes/workspaces/review-pipeline.ts`) calls
+  `refreshIssuePullRequestStateNow` (`services/issue-pr-refresh.ts`) right
+  after journalling an accepted review request, which invalidates the repo's
+  cached PR listing and schedules a derived-state refresh for the issue, so
+  the badge appears within seconds of `pan done` opening the PR. Other reads,
   all in `routes/conversation-pull-requests.ts`: `POST …/pull-requests/sync`
   (forced `gh pr view` refresh of every live, unmerged link), `GET
   /api/pull-requests?state=&project=` (every live link, with its conversation and

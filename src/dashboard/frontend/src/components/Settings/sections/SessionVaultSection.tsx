@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { SettingsSection } from '../primitives';
+import { SessionVaultJoinForm } from './SessionVaultJoinForm';
+import { RecoveryDialog, SessionVaultSetupForm, type ShownOnce } from './SessionVaultSetupForm';
+import { BUTTON_CLASS, postVault } from './sessionVaultShared';
 
 type VaultState = 'off' | 'rotation-pending' | 'key-missing' | 'key-mismatch' | 'ready';
 
@@ -63,6 +66,7 @@ interface ConfirmRefused {
 }
 
 const STATUS_QUERY_KEY = ['vault-status'];
+const AUTO_SYNC_DOCS = 'https://overdeck.ai/configuration/session-vault#save-and-sync';
 const BATCH_QUERY_KEY = ['vault-eviction-batch'];
 
 function formatBytes(bytes: number): string {
@@ -84,33 +88,50 @@ async function fetchVaultEvictionBatch(): Promise<EvictionBatchResponse> {
   return res.json();
 }
 
-async function postVault(path: string, body?: Record<string, unknown>): Promise<{ status: number; body: unknown }> {
-  await ensureDashboardSession();
-  const res = await fetch(`/api/vault/${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: await dashboardMutationJsonHeaders(),
-    body: JSON.stringify(body ?? {}),
-  });
-  const parsed = await res.json().catch(() => null);
-  return { status: res.status, body: parsed };
+/** FR-11: one sync now, through the primary dashboard's vault queue; the response is the fresh status. */
+function SyncNowButton() {
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { status, body } = await postVault('sync');
+      if (status === 200 && body) queryClient.setQueryData(STATUS_QUERY_KEY, body);
+      else toast.error((body as { error?: string } | null)?.error ?? `Sync failed (${status}).`);
+    } catch (error) {
+      toast.error(`Sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+  return (
+    <button type="button" disabled={syncing} onClick={() => void handleSync()} className={BUTTON_CLASS}>
+      {syncing ? 'Syncing…' : 'Sync now'}
+    </button>
+  );
 }
 
-function VaultStatusBlock({ status }: { status: VaultStatusResponse }) {
+function VaultStatusBlock({ status, onChanged, onCreated }: {
+  status: VaultStatusResponse;
+  onChanged: (message?: string) => void;
+  onCreated: (secrets: ShownOnce) => void;
+}) {
   if (status.state === 'off') {
-    return <p className="text-xs text-muted-foreground">Session Vault is off. Run: pan vault setup &lt;git-url&gt;</p>;
+    return (
+      <div className="space-y-6">
+        <SessionVaultSetupForm onDone={onChanged} onCreated={onCreated} />
+        <SessionVaultJoinForm mode="join" backend={null} onDone={onChanged} />
+      </div>
+    );
+  }
+  if (status.state === 'key-missing' || status.state === 'key-mismatch') {
+    return <SessionVaultJoinForm mode="unlock" backend={status.backend} onDone={onChanged} />;
   }
 
   return (
     <div className="space-y-1 text-xs">
       {status.state === 'rotation-pending' && (
         <p className="text-muted-foreground">A key rotation is unfinished on this machine. Run: pan vault rotate-key</p>
-      )}
-      {status.state === 'key-missing' && (
-        <p className="text-muted-foreground">The vault key is missing for backend {status.backend}. Run: pan vault join {status.backend}</p>
-      )}
-      {status.state === 'key-mismatch' && (
-        <p className="text-muted-foreground">This machine&apos;s vault key does not open {status.backend}. Run: pan vault join {status.backend}</p>
       )}
       {status.state === 'ready' && (
         <>
@@ -119,7 +140,7 @@ function VaultStatusBlock({ status }: { status: VaultStatusResponse }) {
             {status.lastSync && (
               <>
                 {' · '}Last sync:{' '}
-                <span className="text-foreground" title={status.lastSync.at}>{formatRelativeTime(status.lastSync.at)}</span>
+                <span data-testid="vault-last-sync" className="text-foreground" title={status.lastSync.at}>{formatRelativeTime(status.lastSync.at)}</span>
                 {status.lastSync.offline && <span className="text-muted-foreground"> · Offline</span>}
               </>
             )}
@@ -134,6 +155,15 @@ function VaultStatusBlock({ status }: { status: VaultStatusResponse }) {
               </p>
             )),
           )}
+          {status.running && (
+            <div className="pt-1">
+              <SyncNowButton />
+            </div>
+          )}
+          <p className="text-muted-foreground">
+            Sync runs automatically every few minutes in the primary dashboard. Change the interval in the docs:{' '}
+            <a href={AUTO_SYNC_DOCS} target="_blank" rel="noreferrer" className="underline hover:text-foreground">Session Vault configuration</a>.
+          </p>
         </>
       )}
       {!status.running && (
@@ -176,6 +206,33 @@ export function SessionVaultSection() {
   });
 
   const refetchBatch = () => void queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEY });
+  /** The line a setup or join reported; `shownIn` is the state it landed in, so the next state change clears it. */
+  const [vaultNotice, setVaultNotice] = useState<{ message: string; shownIn: VaultState | null } | null>(null);
+  /**
+   * FR-9, D-11: the shown-once recovery phrase and generated passphrase. Held here, not in the
+   * setup form: the next status refetch reports `ready` and unmounts the form, and the dialog
+   * must stay until the operator checks "I wrote it down" and clicks Done.
+   */
+  const [shownOnce, setShownOnce] = useState<ShownOnce | null>(null);
+  /** A setup or join changed the vault: show its line (if any) and re-read the status. */
+  const handleVaultChanged = (message?: string) => {
+    setVaultNotice(message ? { message, shownIn: null } : null);
+    void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY });
+  };
+  const handleRecoveryDone = () => {
+    setShownOnce(null);
+    handleVaultChanged();
+  };
+
+  const currentState = status?.state;
+  useEffect(() => {
+    if (!currentState) return;
+    setVaultNotice((notice) => {
+      if (!notice) return notice;
+      if (notice.shownIn === null) return { ...notice, shownIn: currentState };
+      return notice.shownIn === currentState ? notice : null;
+    });
+  }, [currentState]);
 
   /** Runs a batch-mutating POST, reporting a toast on rejection instead of an unhandled promise. */
   async function postVaultBatch(path: string, body: Record<string, unknown> | undefined, failureMessage: string): Promise<{ status: number; body: unknown } | null> {
@@ -251,8 +308,10 @@ export function SessionVaultSection() {
           Failed to load vault status: {statusError instanceof Error ? statusError.message : String(statusError)}
         </div>
       ) : (
-        status && <VaultStatusBlock status={status} />
+        status && <VaultStatusBlock status={status} onChanged={handleVaultChanged} onCreated={setShownOnce} />
       )}
+      {vaultNotice && <p data-testid="vault-notice" className="mt-2 text-xs text-muted-foreground">{vaultNotice.message}</p>}
+      {shownOnce && <RecoveryDialog secrets={shownOnce} onDone={handleRecoveryDone} />}
 
       {status && status.state !== 'off' && (
         <div className="mt-6 space-y-6">

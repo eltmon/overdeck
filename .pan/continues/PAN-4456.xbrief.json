@@ -1,0 +1,294 @@
+{
+  "version": "1",
+  "issueId": "PAN-4456",
+  "created": "2026-10-01T21:16:10.329Z",
+  "updated": "2026-10-01T22:37:24.895Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T22:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-01T22:37:24.895Z"
+    }
+  ],
+  "items": {
+    "anywhere-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:16:10.329Z",
+      "doneAt": "2026-10-01T21:17:56.102Z"
+    },
+    "remote-access-vault-unlock": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:18:06.748Z",
+      "doneAt": "2026-10-01T21:19:04.210Z"
+    },
+    "session-vault-version-notes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:19:08.707Z",
+      "doneAt": "2026-10-01T21:20:10.937Z"
+    },
+    "changelog-mdx-anywhere": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:20:15.449Z",
+      "doneAt": "2026-10-01T21:21:04.597Z"
+    },
+    "changelog-md-anywhere": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:21:08.894Z",
+      "doneAt": "2026-10-01T21:21:46.446Z"
+    },
+    "cli-vault-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:21:51.153Z",
+      "doneAt": "2026-10-01T21:23:00.540Z"
+    },
+    "cli-pair-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:23:04.511Z",
+      "doneAt": "2026-10-01T21:23:44.950Z"
+    },
+    "cli-devices-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:23:46.339Z",
+      "doneAt": "2026-10-01T21:24:18.035Z"
+    },
+    "cli-token-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:24:19.389Z",
+      "doneAt": "2026-10-01T21:25:03.088Z"
+    },
+    "cli-overview-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:25:14.179Z",
+      "doneAt": "2026-10-01T21:25:48.151Z"
+    },
+    "docs-json-anywhere-nav": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:25:49.463Z",
+      "doneAt": "2026-10-01T21:27:45.635Z"
+    },
+    "conversations-browse-continue": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:27:49.564Z",
+      "doneAt": "2026-10-01T21:29:21.221Z"
+    },
+    "pan-vault-skill-dashboard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4456",
+      "claimedAt": "2026-10-01T21:29:25.584Z",
+      "doneAt": "2026-10-01T21:30:08.994Z"
+    },
+    "anywhere-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:40:56.178Z"
+    },
+    "anywhere-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:41:27.263Z"
+    },
+    "anywhere-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:42:08.015Z"
+    },
+    "anywhere-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:42:44.108Z"
+    },
+    "anywhere-status.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:43:33.324Z"
+    },
+    "remote-access-vault-unlock.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:44:15.223Z"
+    },
+    "remote-access-vault-unlock.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:44:53.253Z"
+    },
+    "remote-access-vault-unlock.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:45:36.322Z"
+    },
+    "remote-access-vault-unlock.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:46:22.012Z"
+    },
+    "session-vault-version-notes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:47:00.420Z"
+    },
+    "session-vault-version-notes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:47:36.347Z"
+    },
+    "session-vault-version-notes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:48:13.547Z"
+    },
+    "session-vault-version-notes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:48:47.257Z"
+    },
+    "changelog-mdx-anywhere.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:49:21.997Z"
+    },
+    "changelog-mdx-anywhere.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:50:03.458Z"
+    },
+    "changelog-mdx-anywhere.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:50:57.661Z"
+    },
+    "changelog-mdx-anywhere.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:51:44.255Z"
+    },
+    "changelog-md-anywhere.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:52:29.766Z"
+    },
+    "changelog-md-anywhere.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:53:20.422Z"
+    },
+    "changelog-md-anywhere.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:54:01.612Z"
+    },
+    "cli-vault-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:54:46.611Z"
+    },
+    "cli-vault-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:55:43.104Z"
+    },
+    "cli-vault-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:56:36.771Z"
+    },
+    "cli-vault-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:57:27.755Z"
+    },
+    "cli-pair-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:58:11.156Z"
+    },
+    "cli-pair-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:58:54.746Z"
+    },
+    "cli-pair-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T21:59:45.951Z"
+    },
+    "cli-pair-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:00:37.721Z"
+    },
+    "cli-devices-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:01:19.120Z"
+    },
+    "cli-devices-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:02:11.927Z"
+    },
+    "cli-devices-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:02:59.319Z"
+    },
+    "cli-token-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:04:00.057Z"
+    },
+    "cli-token-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:04:48.462Z"
+    },
+    "cli-token-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:06:01.970Z"
+    },
+    "cli-token-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:07:05.795Z"
+    },
+    "cli-overview-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:07:58.788Z"
+    },
+    "cli-overview-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:08:44.875Z"
+    },
+    "docs-json-anywhere-nav.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:09:48.840Z"
+    },
+    "docs-json-anywhere-nav.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:11:03.560Z"
+    },
+    "docs-json-anywhere-nav.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:12:18.926Z"
+    },
+    "conversations-browse-continue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:13:40.798Z"
+    },
+    "conversations-browse-continue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:14:38.474Z"
+    },
+    "conversations-browse-continue.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:15:45.486Z"
+    },
+    "conversations-browse-continue.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:16:38.989Z"
+    },
+    "pan-vault-skill-dashboard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:17:32.305Z"
+    },
+    "pan-vault-skill-dashboard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:18:32.735Z"
+    },
+    "pan-vault-skill-dashboard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T22:19:23.276Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-01T22:37:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4456\n\n# Review — PAN-4456\n## Verdict: CHANGES REQUESTED — features/conversations.mdx no longer compiles as MDX (raw `<title>` in prose, line 490)\n\n## Context\n- Run ID: agent-pan-4456-review-406845a0\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4456/.pan/review/agent-pan-4456-review-406845a0/context.json\n- Branch / workspace: feature/pan-4456 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4456\n- HEAD reviewed: 406845a0d6e042d441fb38c3fbc90aa486b399bc\n- Base: origin/main merge-base 8a82dad552bcd1b72b4f5279ae34826493adc85a (matches the PRD audit baseline); no prior review cycle\n- PR: not resolvable (`gh` unauthenticated: HTTP 401)\n\n## Blocking Findings\n\n### [correctness] New \"Conversations from your other machines\" section breaks the MDX parse of the whole page — `features/conversations.mdx:490`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope (WI-12, NFR-3 \"the docs build stays valid\")\n- Trigger and changed-code connection: the added line 490 reads `**Continue here** opens a dialog titled \"Continue “<title>”\" that says \"Saved on`. The `<title>` sits in plain prose, outside a code span. MDX parses `<title>` as a JSX element and finds no closing tag. The PRD's WI-12 draft carried the same raw `<title>`, and the implementation copied it.\n- Expected / observed / impact: expected the page to compile as before. Observed: `@mdx-js/mdx@3` + `remark-gfm@4` compile fails with `Expected a closing tag for <title> (490:52-490:59) before the end of paragraph`. The `origin/main` version of the same file compiles cleanly. Mintlify compiles pages with MDX, so the Conversations feature page (a long, existing page) fails to build or render on the next docs deploy from `main`. That is user-visible breakage of existing docs, not only of the new section.\n- Evidence: isolated probe in the session scratchpad (`@mdx-js/mdx@3`, `remark-gfm@4`, front matter stripped) compiled every changed `.mdx` file at HEAD and at `origin/main`. All other changed pages compile at HEAD (`anywhere.mdx`, `configuration/remote-access.mdx`, `configuration/session-vault.mdx`, `changelog.mdx`, `cli/vault.mdx`, `cli/pair.mdx`, `cli/devices.mdx`, `cli/token.mdx`, `cli/overview.mdx`). Only `features/conversations.mdx` fails, and only at HEAD. Limitation: I did not run Mintlify itself. The author's commit `4d0c9b4abbf` body records that `npx mint broken-links` ran but failed to parse the pre-existing `configuration/harnesses.mdx` (\"an unescaped `<0.9.0` parsed as JSX\"). Mintlify's parser therefore rejects raw `<…>` in prose exactly as my probe does: my probe also fails on that same file, on `origin/main` too. Because mint stopped at that pre-existing error, it never reached this new one. The AC-11 `node -e` fallback checks only `docs.json` paths, never MDX syntax.\n- Fix: put the title placeholder in a code span, matching the `<machine>` placeholders around it, for example ``opens a dialog titled `Continue “<title>”` that says \"Saved on `<machine>`.\"``. Escaping as `\\<title>` also works. Re-run an MDX compile (or `npx -y mint@latest broken-links`) on the page. Spec correction: the WI-12 draft text in `.pan/drafts/pan-4456.md` (line 298) has the same raw `<title>`; fix it there too, so a re-run of the plan does not reintroduce it.\n\n## Non-blocking Findings\n\n### [correctness] Backslash-escaped backticks inside code spans render garbled — `cli/token.mdx:48`, `cli/devices.mdx:24`, `cli/pair.mdx:43`, `cli/pair.mdx:46-48`\n- Severity: ~ (SHOULD)\n- Classification: implementation defect (inherited from the PRD's WI-8/WI-9 drafts); in_pr_scope\n- Trigger: lines such as `` `No access tokens. Create one with \\`pan token create\\`.` ``. CommonMark does not honor backslash escapes inside code spans, so the first `\\`` closes the span.\n- Observed: micromark (the parser under remark/MDX) renders `<code>No access tokens. Create one with \\</code>pan token create`.``. The page shows a stray backslash and a stray backtick, and the quoted CLI message does not match the real output. The pages still compile.\n- Fix: use a double-backtick code span, for example ``` `` No access tokens. Create one with `pan token create`. `` ```, or a fenced block as the pages already do for the revoke messages.\n\n### [pre-existing] `configuration/harnesses.mdx` already fails MDX compile on `origin/main` (line 589, `<0.9.0` parsed as JSX)\n- Severity: ? (MAY); pre_existing, not this author's blocker.\n- It masks every later parse error in `mint broken-links`, which is how the blocker above slipped through. A separate issue should escape it (for example `&lt;0.9.0` or a code span). After that, `mint broken-links` becomes a usable NFR-3 gate. Until then, compile the changed pages with MDX directly.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status | Notes |\n| --- | --- | --- |\n| `cli/token.mdx` | reviewed | Every verb, flag, output string and the 5-second acceptance note match `src/cli/commands/token.ts`. Not in the v0.64.0 tag (verified with `git cat-file`), so \"next release\" is correct. Escaped-backtick advisory. |\n| `configuration/remote-access.mdx` | reviewed | Locked-vault row and **Set up** text match `SessionVaultSection.tsx` lines 101-113 (`Run: pan vault join {backend}`, `Run: pan vault setup <git-url>`) and the `AnywhereStatusCard.tsx` buttons. `--label` text matches `pair.ts`. Version note is correct. |\n| `configuration/session-vault.mdx` | reviewed | `dir:` backend matches `DIR_BACKEND_PREFIX` in `src/lib/vault/open.ts`. 30 s / 5 min match `VAULT_CONFIG_DEFAULTS` (`debounceSec: 30`, `syncIntervalSec: 300`). Anchors `#conversations-from-your-other-machines` and `#continue-on-another-machine` resolve. |\n| `anywhere.mdx` | reviewed | Warning replaced, shipped table, Status column, row 2 rewrite, migrate lines all marked planned (lines 68, 214). Pricing sections otherwise untouched. |\n| `changelog.mdx` | reviewed | Insert-only (+9/-0) inside the v0.65.0 block; the v0.64.0 block is untouched. All six `pull/<n>` links are present. No heartbeat claim in the new text (the only \"heartbeat\" hit, line 112, is the pre-existing telemetry entry). Spot-checked claims: `insufficient_scope` (`remote-request-gate.ts`), root-only create/revoke (`routes/access-tokens.ts` header), `trusted-origins.json`, the \"Require a token to sign in\" row, and the status card on `HealthDashboard.tsx`. |\n| `CHANGELOG.md` | reviewed | One `### Added: Overdeck Anywhere` subsection under `## Unreleased`; insert-only (+11/-0). |\n| `cli/devices.mdx` | reviewed | Matches `runDevicesList` / `runDevicesRevoke` in `pair.ts`, including the registry fallback and the error strings. Escaped-backtick advisory. |\n| `cli/overview.mdx` | reviewed | Four links appended; em dash count stays 1. |\n| `cli/pair.mdx` | reviewed | Matches `runPair`, `NOT_RUNNING`, `NEEDS_PAN_UP`, the loopback set (`loopback.ts`: localhost, `*.localhost`, 127.0.0.1, ::1), `odp_` prefix and 10-minute TTL (`pairing-credentials.ts`). The `LOOPBACK_WARNING` string is described neutrally, not quoted (D-9). Escaped-backtick advisory. |\n| `cli/vault.mdx` | reviewed | All 15 verbs and every flag match `src/cli/commands/vault/index.ts`. `VAULT_OFF_MESSAGE` matches `config.ts:18`; the `evict` config key matches `VaultConfig.evict`; `<id>@<version>` forking matches `resume.ts:210`. No `migrate` or `stats`. |\n| `features/conversations.mdx` | reviewed | Strings match `ConversationRow.tsx:320-329`, `ComposerFooter.tsx:920-928`, `VaultContinueDialog.tsx:102-193` and `BROWSE_HARNESSES` in `browse.ts:25`. **Blocking MDX parse error at line 490.** The em dash count stays 39. |\n| `docs.json` | reviewed | The Anywhere group is exactly the seven pages; the two configuration pages moved, not duplicated; AC-11 prints `ok`. The existing nav test (`tests/unit/telemetry-docs.test.ts:111`) asserts only telemetry and posthog pages, so it is unaffected. |\n| `sync-sources/skills/pan-vault/SKILL.md` | reviewed | `## In the dashboard` was added; status labels match the remote-access card text. |\n| `.pan/drafts/pan-4456.md` | reviewed | Plan artifact. Its WI-12 text holds the raw `<title>` that caused the blocker (spec defect noted above). |\n| `.pan/continues/PAN-4456.xbrief.json`, `.pan/specs/…PAN-4456….xbrief.json` | not applicable | Plan state artifacts, not shipped docs. |\n\n### Dimensions\n- **Correctness:** one blocker (MDX parse failure) and one rendering advisory. Every factual claim I checked in the new docs matches source on HEAD. The version attribution was verified against the `v0.64.0` tag: `pair.ts` and `vault/index.ts` are in the tag; `token.ts` and `SessionVaultSection.tsx` are not; none of the six PR commits is contained in any tag.\n- **Security:** docs only. The docs keep the credential-in-fragment and root-only token-mint statements accurate. No secrets and no destructive \"acceptance test\" instructions were added. No issues.\n- **Performance:** not applicable (no code paths changed).\n- **Requirements/UX:** see the AC matrix. The non-goals hold: no `src/` file is in the diff, the v0.64.0 block is untouched, the CHANGELOG.md edit is insert-only, there are no new tests, and there is no heartbeat claim.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | met | No \"planned and not yet available\"; shipped table with v0.64.0/v0.65.0; Status column; both `pan vault migrate` lines contain \"planned\"; the `pan vault stats` mention (line 239-240) reads \"we plan\" (FR-2 holds); em dashes 0. |\n| AC-2 | met | `pan vault join <backend>` in the locked row; `4446` count 2; \"where you unlock it\" is gone; em dashes 0. |\n| AC-3 | met | `dir:` 1, `4446` 1, three \"next release (v0.65.0)\" notes; em dashes 0. |\n| AC-4 | met | All six `pull/<n>` present; v0.64.0 block untouched (+9/-0 inside the v0.65.0 block); em dashes 0. |\n| AC-5 | met | Exactly one subsection; insert-only. |\n| AC-6 | met | Flag cross-check prints nothing; `migrate\\|vault stats` count 0. |\n| AC-7 | met | Cross-checks for pair.ts (pair+devices) and token.ts print nothing; em dashes 0. |\n| AC-8 | met | Four links; em dash count 1. |\n| AC-9 | met (content) / **unmet via NFR-3** | The section contains the required strings and the em dash count is 39, but the page no longer compiles as MDX. |\n| AC-10 | met | `## In the dashboard` names Settings → Session Vault, Continue here and PAN-4446. |\n| AC-11 | met | The `node -e` check prints `ok`. |\n| AC-12 | partially verified | No `src/` file is in the diff (verified). `npm run lint` / `npm run typecheck` were not re-run, and the CI status could not be read (`gh` 401). The change is docs-only, so neither gate reads the changed files. |\n| NFR-3 | **unmet** | MDX compile failure in `features/conversations.mdx`. |\n\n## Verification\n- AC shell checks from the PRD (em dash counts, greps, flag cross-checks, AC-11 node script): run at HEAD, all pass as listed above.\n- MDX compile probe: `@mdx-js/mdx@3` + `remark-gfm@4` installed into the session scratchpad (not the repo). Every changed `.mdx` was compiled at HEAD and at `origin/main`. Only `features/conversations.mdx` at HEAD fails, at 490:52.\n- micromark@4.0.2 (already in `node_modules`) render of the escaped-backtick line confirmed the garbled output.\n- Version attribution: `git cat-file -e v0.64.0:<path>` and `git tag --contains <sha>` for the six PR commits.\n- Not run: `npx mint broken-links` (an MDX compile already demonstrates the failure); `npm run lint` / `npm run typecheck` (docs-only diff; the gate owns them); `npm run lint:effect-diagnostics` (not applicable: no TypeScript or Effect changes); CI checks (`gh pr checks` unavailable: unauthenticated).\n- Note: the workspace has an uncommitted change to `.pan/continues/PAN-4456.xbrief.json`; it is not part of the reviewed HEAD.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4456/.pan/review/agent-pan-4456-review-406845a0/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4456 -m \"Fixed review issues\"`"
+    }
+  ]
+}

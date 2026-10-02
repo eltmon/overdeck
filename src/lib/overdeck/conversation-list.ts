@@ -23,6 +23,7 @@ import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
 import { readConversationProviderError } from './conversation-provider-error.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
+import { loadVaultContinuityLookup, vaultContinuityFor, type ConversationContinuityInput } from './conversation-vault-continuity.js';
 import {
   type LegacyConversation,
   listConversations,
@@ -159,9 +160,21 @@ export function getEnrichedConversationList(limit: number, offset: number): Prom
  * PAN-4436: GET /api/conversations — local rows, then Session Vault browse copies on the
  * first page. The Agents Directory and lanes keep getEnrichedConversationList, so they never
  * see browse copies.
+ *
+ * PAN-4447: every local row also carries `vaultContinuity` (continued-elsewhere, forked-locally,
+ * or null), resolved against the machine-local vault index (conversation-vault-continuity.js).
+ * Browse copies always get `vaultContinuity: null` — a browse copy is already the other
+ * machine's side of the conversation.
  */
 export async function getConversationListWithVaultCopies(limit: number, offset: number): Promise<readonly unknown[]> {
-  const enriched = await getEnrichedConversationList(limit, offset);
+  const [enrichedRows, lookup] = await Promise.all([
+    getEnrichedConversationList(limit, offset),
+    loadVaultContinuityLookup(),
+  ]);
+  const enriched = (enrichedRows as ReadonlyArray<Record<string, unknown> & ConversationContinuityInput>).map((row) => ({
+    ...row,
+    vaultContinuity: vaultContinuityFor(row, lookup),
+  }));
   if (offset !== 0) return enriched;
   const favorites = getCachedFavoritedIds();
   const copies = listVaultBrowseConversations().map((conv) => ({
@@ -170,7 +183,7 @@ export async function getConversationListWithVaultCopies(limit: number, offset: 
     isFavorited: favorites.has(conv.name), compacting: false, contextUsage: null,
     lastActivityAt: conv.endedAt, branch: null, isWorktree: false,
     pullRequest: null, pullRequestCount: 0, pendingInputCount: 0, pendingInputKinds: [],
-    transcriptMissing: false, needsTerminal: false, providerError: null,
+    transcriptMissing: false, needsTerminal: false, providerError: null, vaultContinuity: null,
   }));
   return [...enriched, ...copies];
 }

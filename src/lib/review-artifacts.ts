@@ -137,7 +137,7 @@ export async function createReviewArtifactsForIssue(
 
     if (artifact.url) {
       mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifact.url, artifact.id);
-      linkCreatedPullRequestToIssueConversations(issueId, artifact.url);
+      linkCreatedPullRequestToIssueConversations(issueId, artifact.url, workspacePath);
     }
     mergeSet = withRepoState(mergeSet, repo.repoKey, {
       artifactId: artifact.id,

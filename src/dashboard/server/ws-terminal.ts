@@ -14,6 +14,11 @@
  * are handled via a shared PTY hub — one PTY process, many WebSocket clients.
  * Output is broadcast to all clients; any client can send input. PTY stays alive
  * until the last client disconnects.
+ *
+ * PAN-4434: A connection whose URL carries `?heartbeat=1` gets an app-level
+ * ping/pong heartbeat (see ws-terminal-heartbeat.ts) so idle terminals survive
+ * reverse proxies that close silent WebSockets; connections without it are
+ * unaffected.
  */
 
 import http from 'node:http';
@@ -29,6 +34,7 @@ import { authorizeDashboardUpgrade, rejectUpgrade, trackDeviceSocket } from './w
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 import { HerdrTerminalProcess, resolveHerdrTerminalId, resolveTerminalAttachTarget } from './services/terminal-service.js';
+import { startTerminalHeartbeat, wantsTerminalHeartbeat } from './ws-terminal-heartbeat.js';
 
 // Worst-case respawn window for switch-model / resume / restart-all: on Herdr
 // the launch itself waits up to 60s for detection, then readiness runs (up to
@@ -38,7 +44,9 @@ const RESPAWN_WAIT_MS = 95_000;
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
   | { type: 'ready' }
-  | { type: 'resize'; cols: number; rows: number };
+  | { type: 'resize'; cols: number; rows: number }
+  | { type: 'ping' }
+  | { type: 'pong' };
 
 const ATTACH_TIMEOUT_MS = 5000;
 const READY_TIMEOUT_MS = 10_000;
@@ -79,7 +87,7 @@ function parseControlMessage(message: string): ClientControlMessage | null {
   if (!message.startsWith('{')) return null;
   try {
     const parsed = JSON.parse(message) as ClientControlMessage;
-    if (parsed.type === 'ready') return parsed;
+    if (parsed.type === 'ready' || parsed.type === 'ping' || parsed.type === 'pong') return parsed;
     if ((parsed.type === 'attach' || parsed.type === 'resize') && parsed.cols > 0 && parsed.rows > 0) {
       return parsed;
     }
@@ -289,6 +297,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
     console.log(`[ws-terminal] WebSocket connected for session: ${sessionName}`);
 
+    if (wantsTerminalHeartbeat(url)) startTerminalHeartbeat(ws, () => sendControl(ws, { type: 'ping' }));
+
     // Buffer messages immediately to avoid losing them during async setup.
     // The client sends resize dimensions immediately on connect, but we have async
     // operations (tmux checks) that take time. Without buffering, messages are lost.
@@ -309,6 +319,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
     ws.on('message', (data) => {
       const message = data.toString();
+      const control = parseControlMessage(message);
+      if (control?.type === 'ping' || control?.type === 'pong') return; // heartbeat traffic is never input (PAN-4434)
       if (messageHandler) {
         messageHandler(message);
       } else if (bufferPreAttachMessage(message)) {

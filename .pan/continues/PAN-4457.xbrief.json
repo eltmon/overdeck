@@ -1,0 +1,208 @@
+{
+  "version": "1",
+  "issueId": "PAN-4457",
+  "created": "2026-10-01T21:43:35.334Z",
+  "updated": "2026-10-01T23:48:44.201Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T23:46Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-01T23:46:36.793Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T23:48Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-01T23:48:44.200Z"
+    }
+  ],
+  "items": {
+    "badge-adapter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T21:43:35.334Z",
+      "doneAt": "2026-10-01T21:53:57.248Z"
+    },
+    "issue-row-badge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T21:54:07.296Z",
+      "doneAt": "2026-10-01T22:08:59.068Z"
+    },
+    "workspace-row-badge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T22:09:07.885Z",
+      "doneAt": "2026-10-01T22:19:52.717Z"
+    },
+    "issue-pr-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T22:19:57.665Z",
+      "doneAt": "2026-10-01T22:48:39.482Z"
+    },
+    "review-door-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T22:48:44.905Z",
+      "doneAt": "2026-10-01T22:50:31.264Z"
+    },
+    "primary-checkout-matching": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T22:50:53.106Z",
+      "doneAt": "2026-10-01T23:12:03.567Z"
+    },
+    "created-link-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T23:12:10.889Z",
+      "doneAt": "2026-10-01T23:21:48.840Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4457",
+      "claimedAt": "2026-10-01T23:21:53.874Z",
+      "doneAt": "2026-10-01T23:29:33.111Z"
+    },
+    "badge-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:30:57.189Z"
+    },
+    "badge-adapter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:31:39.794Z"
+    },
+    "badge-adapter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:31:55.303Z"
+    },
+    "badge-adapter.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:32:08.881Z"
+    },
+    "issue-row-badge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:32:24.365Z"
+    },
+    "issue-row-badge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:32:38.753Z"
+    },
+    "issue-row-badge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:32:51.916Z"
+    },
+    "issue-row-badge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:06.563Z"
+    },
+    "workspace-row-badge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:19.341Z"
+    },
+    "workspace-row-badge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:32.882Z"
+    },
+    "workspace-row-badge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:45.588Z"
+    },
+    "workspace-row-badge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:33:57.012Z"
+    },
+    "issue-pr-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:09.414Z"
+    },
+    "issue-pr-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:21.822Z"
+    },
+    "issue-pr-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:33.582Z"
+    },
+    "review-door-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:45.330Z"
+    },
+    "review-door-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:34:56.952Z"
+    },
+    "primary-checkout-matching.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:09.259Z"
+    },
+    "primary-checkout-matching.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:24.903Z"
+    },
+    "primary-checkout-matching.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:36.838Z"
+    },
+    "primary-checkout-matching.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:47.740Z"
+    },
+    "created-link-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:35:58.718Z"
+    },
+    "created-link-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:36:10.391Z"
+    },
+    "created-link-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:36:22.491Z"
+    },
+    "created-link-workspace.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:36:34.171Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:36:45.676Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:36:57.395Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:37:08.963Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:37:20.851Z"
+    },
+    "badge-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T23:37:49.144Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-01T23:46:36Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4457\n\nPull request: https://github.com/eltmon/overdeck/pull/4463 (head `009d04e2`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-01T23:48:44Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4457 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (0ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4457/.overdeck/verification/2026-10-01T23-41-33-524Z-009d04e2.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4457/.overdeck/verification/2026-10-01T23-41-33-524Z-009d04e2.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4457 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4457 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

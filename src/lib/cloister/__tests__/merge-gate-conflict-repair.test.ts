@@ -79,11 +79,21 @@ describe('evaluateConflictRepairGate', () => {
     expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(false);
   });
 
-  it.each(['red', 'pending', 'none'] as const)('is not conflicting when checks are %s', async (checks) => {
+  it.each(['pending', 'none'] as const)('is conflicting when checks are %s (no CI on a conflicting PR)', async (checks) => {
     const { deps } = gateDeps(conflictingFacts({ checks }));
+    expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(true);
+  });
+
+  it('is not conflicting when checks are red', async () => {
+    const { deps } = gateDeps(conflictingFacts({ checks: 'red' }));
     const result = await evaluateConflictRepairGate('PAN-1', deps);
     expect(result.conflicting).toBe(false);
-    expect(result.reason).toBe('PR is not otherwise merge-ready');
+    expect(result.reason).toContain('CI checks failing on PR HEAD');
+  });
+
+  it('is not conflicting for a draft', async () => {
+    const { deps } = gateDeps(conflictingFacts({ draft: true }));
+    expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(false);
   });
 
   it('is not conflicting when changes are requested', async () => {
@@ -99,11 +109,20 @@ describe('evaluateConflictRepairGate', () => {
     expect(readReviews).toHaveBeenCalled();
   });
 
-  it('applies the CI test-job policy of the merge gate', async () => {
+  it('waives the CI test job on a conflicting head', async () => {
     const { deps } = gateDeps(conflictingFacts({ testChecks: 'none', testJobSucceeded: false }));
-    const result = await evaluateConflictRepairGate('PAN-1', deps);
-    expect(result.conflicting).toBe(false);
-    expect(result.reason).toContain('no CI test job reported');
+    expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(true);
+  });
+
+  it('matches PR #4440', async () => {
+    const { deps } = gateDeps(conflictingFacts({
+      checks: 'green',
+      testChecks: 'none',
+      testJobSucceeded: false,
+      mergeable: false,
+      approvedAtHead: true,
+    }));
+    expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(true);
   });
 
   it('holds a failed UAT at the head when UAT is required', async () => {

@@ -344,6 +344,11 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
   return (await readRepoPullRequests(projectPath)) ?? [];
 }
 
+/** Drop the cached PR listing for one repo so the next read goes to the forge (PAN-4457). */
+export function invalidateRepoPullRequests(projectPath: string): void {
+  cachedRepoPullRequests.invalidate(projectPath);
+}
+
 /**
  * The repo's PR listing, or null when the read failed (rate limit, auth,
  * network), so a caller that backs off can tell "failed" from "no PRs".

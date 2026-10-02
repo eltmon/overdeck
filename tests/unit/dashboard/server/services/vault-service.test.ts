@@ -27,8 +27,10 @@ import {
   getVaultServiceSnapshot,
   onVaultSyncReport,
   reviewEvictionBatch,
+  setupVaultFromDashboard,
   startVaultService,
   stopVaultService,
+  syncVaultNow,
   type VaultServiceDeps,
 } from '../../../../../src/dashboard/server/services/vault-service.js';
 
@@ -353,5 +355,81 @@ describe('vault-service (PAN-4307 WI-4)', () => {
 
     expect(doorMocks.removeTranscriptFile).not.toHaveBeenCalled();
     expect(doorMocks.removeTranscriptTree).not.toHaveBeenCalled();
+  });
+
+  describe('PAN-4446 WI-5: setup, join and Sync now', () => {
+    const config = { ...VAULT_CONFIG_DEFAULTS, exclude: { paths: [], origins: [], sessions: [] } };
+
+    it('syncVaultNow on a service that is not started returns not-running and never calls syncOnce', async () => {
+      const syncOnce = vi.fn();
+      startVaultService({ readVaultConfig: vi.fn().mockResolvedValue(config), syncOnce, createVaultSettlePoller: noopPoller });
+      await stopVaultService();
+      expect(await syncVaultNow()).toEqual({ status: 'not-running' });
+      expect(syncOnce).not.toHaveBeenCalled();
+    });
+
+    it('a boot config read that settles after stopVaultService never creates a sync loop', async () => {
+      let resolveConfig!: (value: typeof config) => void;
+      const readVaultConfig = vi.fn(() => new Promise<typeof config>((resolve) => { resolveConfig = resolve; }));
+      const createSyncLoop = vi.fn(() => ({ start: () => undefined, stop: () => undefined }));
+      startVaultService({ readVaultConfig, createSyncLoop, createVaultSettlePoller: noopPoller });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(readVaultConfig).toHaveBeenCalledTimes(1);
+      await stopVaultService();
+      resolveConfig(config);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(createSyncLoop).not.toHaveBeenCalled();
+    });
+
+    it('syncVaultNow on a started service with an open vault calls syncOnce once and reports lastSync', async () => {
+      const readVaultConfig = vi.fn().mockResolvedValue({ ...config, backend: 'dir:x' });
+      const openVaultContext = vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult);
+      const syncOnce = vi.fn().mockResolvedValue(offReport());
+      startVaultService({ readVaultConfig, openVaultContext, syncOnce, createVaultSettlePoller: noopPoller });
+
+      const result = await syncVaultNow();
+      expect(syncOnce).toHaveBeenCalledTimes(1);
+      expect(result.status).toBe('synced');
+      if (result.status !== 'synced') return;
+      expect(result.snapshot.state).toBe('ready');
+      expect(result.snapshot.lastSync?.at).toEqual(expect.any(String));
+    });
+
+    it('setupVaultFromDashboard waits for an in-flight queued operation before calling setupVault', async () => {
+      const order: string[] = [];
+      const setupVault = vi.fn(async () => {
+        order.push('setup');
+        return { status: 'already-set-up' as const, backend: 'dir:x' };
+      });
+      startVaultService({ readVaultConfig: vi.fn().mockResolvedValue(config), setupVault, createVaultSettlePoller: noopPoller });
+
+      let release!: () => void;
+      const inFlight = enqueueVaultOperation('held', () => new Promise<void>((resolve) => {
+        release = () => {
+          order.push('held');
+          resolve();
+        };
+      }));
+      const setup = setupVaultFromDashboard({ url: 'dir:x', passphrase: { mode: 'none' } });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(setupVault).not.toHaveBeenCalled();
+
+      release();
+      await inFlight;
+      expect(await setup).toEqual({ status: 'already-set-up', backend: 'dir:x' });
+      expect(order).toEqual(['held', 'setup']);
+      expect(setupVault).toHaveBeenCalledWith({ url: 'dir:x', passphrase: { mode: 'none' } });
+    });
+
+    it('syncVaultNow inside the boot window never creates a second sync loop', async () => {
+      const readVaultConfig = vi.fn().mockResolvedValue({ ...config, syncIntervalSec: 60 });
+      const openVaultContext = vi.fn().mockResolvedValue({ status: 'off' } satisfies VaultOpenResult);
+      const createSyncLoop = vi.fn(() => ({ start: () => undefined, stop: () => undefined }));
+      startVaultService({ readVaultConfig, openVaultContext, createSyncLoop, createVaultSettlePoller: noopPoller });
+
+      expect((await syncVaultNow()).status).toBe('synced');
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(createSyncLoop).toHaveBeenCalledTimes(1);
+    });
   });
 });

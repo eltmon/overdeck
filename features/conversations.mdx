@@ -397,11 +397,15 @@ and every 60 seconds after that, Overdeck reads each GitHub project's pull
 requests once and links every PR whose head branch equals the branch a
 conversation's working directory is on. Agent conversations whose workspace
 cannot be read fall back to `feature/<issue>`. A conversation on the project's
-default branch is never linked by branch. The same sweep refreshes the stored
+default branch is never linked by branch. In the project's main checkout, which
+every conversation there shares, an operator conversation is linked by branch
+only while its terminal is running, so idle conversations never pick up the PR
+of whatever branch the checkout is on. A merged PR stays linked after the
+checkout goes back to the default branch. The same sweep refreshes the stored
 state of linked PRs, so the badge renders without a live GitHub call. Open PRs
 refresh on every sweep, closed PRs at most every 15 minutes, and merged PRs are
 final and never re-read. A linked PR the project listing doesn't include (older
-than its 200 most recent PRs, in another repository, or on a conversation
+than its 100 most recent PRs, in another repository, or on a conversation
 outside any GitHub project) is read on its own. After three failed reads in a
 row, Overdeck skips that repository for 15 minutes.
 
@@ -454,13 +458,23 @@ Rules:
   next sweep.
 
 When the pipeline opens the pull request for an issue (`pan done`, or the review
-pipeline), it links that PR to every agent conversation for the issue, with the
-source `created`. Those conversations show the PR at once, without waiting for a
-sweep. The pipeline never restores a PR you unlinked.
+pipeline), it links that PR to every agent conversation for the issue and every
+conversation working inside the issue's workspace, with the source `created`.
+Those conversations show the PR at once, without waiting for a sweep. The
+pipeline never restores a PR you unlinked.
 
 The other direction works too: an issue's **Code** card lists every conversation
 linked to the issue's PR, with why it's linked (opened by the pipeline, linked
 by hand, linked by an agent, or on the same branch). Click one to open it.
+
+### On issue and workspace rows
+
+The issue's row in Command Deck's project tree, and its row in the sidebar
+Workspaces rail, show the same badge as a conversation's — the PR's number,
+colored by state and review, with a `×` for failing checks — read from the
+issue's derived state rather than a conversation's link. It appears within
+seconds of `pan done` opening the PR. A PR that closed without merging is not
+shown there.
 
 Linking never archives or stops a conversation unless you turn on auto-archive:
 
@@ -479,6 +493,37 @@ them).
 Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
 GitLab merge request status, the Pull requests page, and search by PR number.
 
+## Conversations from your other machines
+
+Arrives in the next release (v0.65.0), and needs Session Vault set up on this machine
+([Session Vault](/configuration/session-vault)).
+
+Claude Code and Codex conversations that another machine saved to the vault appear in the
+conversation list with a "from `<machine>`" chip. Hovering it reads "Read-only copy from
+`<machine>`".
+
+Opening one shows the transcript. The composer is replaced by "Read-only copy from
+`<machine>`.", the command `pan vault resume <id>`, and a **Continue here** button.
+
+**Continue here** opens a dialog titled `Continue "<title>"` that says "Saved on
+`<machine>`." and where the conversation will continue. Cases, one sentence each:
+
+- Code snapshot: it says which snapshot it applies here, or that the checkout has
+  uncommitted changes so the snapshot goes into a new workspace.
+- Drift: when branch, commit or dirty state differs, it lists the differences and offers
+  **Continue**, **Continue with a note** and **Cancel**.
+- No project: "No registered project matches `<slug>`." with **Clone and register
+  `<slug>`**, which opens the Add project dialog.
+- Another machine continued it first: "Already continued on `<machine>`." and nothing
+  changes.
+- A harness without native resume: the dialog shows the `pan vault resume <id>` command
+  instead.
+
+After it continues, the conversation opens on this machine as a normal conversation.
+
+See [Session Vault: Continue on another machine](/configuration/session-vault#continue-on-another-machine)
+for the CLI path instead of repeating it.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
@@ -486,6 +531,7 @@ GitLab merge request status, the Pull requests page, and search by PR number.
 - [Harnesses](/configuration/harnesses) — `claude-code` vs `pi`, and the ToS rules that gate them
 - `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
 - `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff
+- [Session Vault](/configuration/session-vault): save conversations off-machine and continue them elsewhere
 
 ## Subagent activity and direct messages
 

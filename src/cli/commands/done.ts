@@ -241,8 +241,8 @@ export async function openOrUpdatePullRequests(issueId: string, workspacePath: s
       cwd: root.dir,
     });
     opened.push({ repoKey: root.repoKey, url: artifact.url, id: artifact.id, created: artifact.created });
-    // PAN-3822: the issue's agent conversations show this PR at once.
-    linkCreatedPullRequestToIssueConversations(issueId, artifact.url);
+    // PAN-3822/PAN-4457: the issue's agent conversations and operator conversations in its workspace show this PR at once.
+    linkCreatedPullRequestToIssueConversations(issueId, artifact.url, workspacePath);
 
     // "Review requested" is derived from the PR being open and not a draft —
     // there is no reviewer row to write. `gh pr ready` is a no-op on a PR that

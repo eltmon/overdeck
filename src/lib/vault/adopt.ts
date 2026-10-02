@@ -6,7 +6,10 @@
  * writes that with `casRef`, and only on `ok` writes the native file. A
  * `conflict` means another machine adopted first: the record is re-read and
  * `{ alreadyContinuedOn: <label> }` is returned with no native file written.
- * The origin machine's native file is never touched.
+ * The origin machine's native file is never touched. A caller that checked
+ * the owner earlier passes `expectedOwnerEnvironmentId`; it is compared with
+ * the same read the CAS starts from, so an adoption by another machine in
+ * between is refused rather than taken over (PAN-4437 D-6).
  *
  * `forkRecordAtVersion` creates a new record (new vaultId, owned here) whose
  * log is the parent's chunk ids through settlement `n` and whose parent is
@@ -35,6 +38,11 @@ export interface AdoptOptions {
   /** Defaults to `ensureEnvironmentIdentity()`. */
   identity?: EnvironmentIdentity;
   now?: () => Date;
+  /**
+   * The owner the caller saw. When the record's owner is now someone else,
+   * nothing is written and `{ adopted: false }` names the current owner.
+   */
+  expectedOwnerEnvironmentId?: string;
 }
 
 export type AdoptResult =
@@ -96,6 +104,9 @@ async function claimAndMaterialize(
 export async function adoptRecord(options: AdoptOptions): Promise<AdoptResult> {
   const identity = options.identity ?? (await ensureEnvironmentIdentity());
   const current = await readRecordOrThrow(options.store, options.vaultId, options.keys);
+  if (options.expectedOwnerEnvironmentId !== undefined && current.record.owner.environmentId !== options.expectedOwnerEnvironmentId) {
+    return { adopted: false, alreadyContinuedOn: current.record.owner.label };
+  }
   if (current.record.owner.environmentId === identity.environmentId) {
     throw new Error(`Vault record ${options.vaultId} is already owned by this machine (${identity.label}); nothing to adopt`);
   }

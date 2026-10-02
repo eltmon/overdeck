@@ -14,6 +14,7 @@ import {
 } from '../lib/terminalReconnectPolicy';
 import { ensureDashboardSession } from '../lib/wsTransport';
 import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
+import { parseTerminalControlFrame, TERMINAL_CONTROL_PREFIX, TERMINAL_PONG_MESSAGE } from './terminal/terminalControlFrames';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -98,19 +99,6 @@ type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
 
 const SERVER_RESTARTING_CLOSE_CODE = 4503;
 const SESSION_NOT_FOUND_RETRY_MS = 3_000; // the single retry of a 4404 (PAN-3921)
-
-interface TerminalSnapshotMessage {
-  type: 'snapshot';
-  cols: number;
-  rows: number;
-  data: string;
-}
-
-interface TerminalSizeMessage {
-  type: 'size';
-  cols: number;
-  rows: number;
-}
 
 // Context menu state
 interface ContextMenuState {
@@ -575,7 +563,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
+    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
     if (token) {
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
@@ -677,7 +665,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     let firstMessageLogged = false;
     let firstLiveByteLogged = false;
     ws.onmessage = (event) => {
-      sessionNotFoundRetried.current = false;
       if (!firstMessageLogged) {
         firstMessageLogged = true;
         profMark(sessionName, tProf, 'first ws message received');
@@ -691,6 +678,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         dataStr = event.data;
       }
 
+      const control = dataStr.startsWith(TERMINAL_CONTROL_PREFIX) ? parseTerminalControlFrame(dataStr) : null;
+      // A heartbeat ping is not real traffic from the session; resetting the
+      // one-shot 4404 retry latch on it would let a connection that pings
+      // during the respawn wait retry 4404 more than once (PAN-4434).
+      if (control?.type !== 'ping') sessionNotFoundRetried.current = false;
+
       // DEBUG: Log incoming data
       if (DEBUG_TERMINAL) {
         debugMsgCount++;
@@ -701,14 +694,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         }
       }
 
-      if (dataStr.startsWith('\u0000')) {
-        let control: TerminalSnapshotMessage | TerminalSizeMessage | null = null;
-        try {
-          control = JSON.parse(dataStr.slice(1)) as TerminalSnapshotMessage | TerminalSizeMessage;
-        } catch {
-          control = null;
-        }
-
+      if (dataStr.startsWith(TERMINAL_CONTROL_PREFIX)) {
         if (control?.type === 'snapshot') {
           profMark(sessionName, tProf, 'snapshot decoded', `cols=${control.cols} rows=${control.rows} bytes=${control.data.length}`);
           remoteSize.current = { cols: control.cols, rows: control.rows };
@@ -742,6 +728,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           }
           return;
         }
+
+        if (control?.type === 'ping') {
+          ws.send(TERMINAL_PONG_MESSAGE);
+          return;
+        }
+        if (control !== null) return; // unknown control frames never reach xterm (PAN-4434)
       }
 
       if (!firstLiveByteLogged) {

@@ -33,6 +33,7 @@
       "titlerefinement",
       "conversationabout",
       "transcript-summary.ts"
-    ]
+    ],
+    "evidence": "outside-excerpt"
   }
 }

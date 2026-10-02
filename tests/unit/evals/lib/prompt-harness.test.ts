@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { extractJsonArray, loadPromptFile, runPromptScenario } from '../../../../evals/lib/prompt-harness.js';
 
-const { streamMock, anthropicCtor } = vi.hoisted(() => {
+const { streamMock, anthropicCtor, callClaudeCliMock } = vi.hoisted(() => {
   const streamMock = vi.fn();
   const anthropicCtor = vi.fn(function AnthropicMock(this: { messages: { stream: typeof streamMock } }) {
     this.messages = { stream: streamMock };
   });
-  return { streamMock, anthropicCtor };
+  const callClaudeCliMock = vi.fn();
+  return { streamMock, anthropicCtor, callClaudeCliMock };
 });
 
 vi.mock('@anthropic-ai/sdk', () => ({ default: anthropicCtor }));
+vi.mock('../../../../evals/lib/claude-cli.js', () => ({ callClaudeCli: callClaudeCliMock }));
 
 function mockFinalMessage(overrides: {
   text?: string;
@@ -31,6 +33,7 @@ describe('evals/lib/prompt-harness', () => {
   beforeEach(() => {
     streamMock.mockReset();
     anthropicCtor.mockClear();
+    callClaudeCliMock.mockReset();
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
     mockFinalMessage();
@@ -143,6 +146,38 @@ describe('evals/lib/prompt-harness', () => {
       expect(run.provider).toBe('openai');
       expect(run.costBasis).toBe('api-equivalent');
       expect(typeof run.costUsd).toBe('number');
+    });
+
+    it('claude-sonnet-5-5 with OVERDECK_EVAL_ANTHROPIC_VIA=claude-cli calls the CLI route, not the SDK, at api-equivalent cost', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      vi.stubEnv('OVERDECK_EVAL_ANTHROPIC_VIA', 'claude-cli');
+      callClaudeCliMock.mockResolvedValue({
+        text: 'from cli',
+        usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 2 },
+        stopReason: 'end_turn',
+      });
+
+      const { text, run } = await runPromptScenario({ system: 'sys', user: 'usr' });
+
+      expect(callClaudeCliMock).toHaveBeenCalledTimes(1);
+      expect(callClaudeCliMock.mock.calls[0]![1]).toEqual({ system: 'sys', messages: [{ role: 'user', content: 'usr' }] });
+      expect(anthropicCtor).not.toHaveBeenCalled();
+      expect(text).toBe('from cli');
+      expect(run.anthropicVia).toBe('claude-cli');
+      expect(run.costBasis).toBe('api-equivalent');
+      expect(typeof run.costUsd).toBe('number');
+    });
+
+    it('claude-sonnet-5-5 without the route variable uses the SDK and stamps anthropicVia api', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'claude-sonnet-5-5');
+      vi.stubEnv('OVERDECK_EVAL_ANTHROPIC_VIA', '');
+
+      const { run } = await runPromptScenario({ system: 'sys', user: 'usr' });
+
+      expect(streamMock).toHaveBeenCalledTimes(1);
+      expect(callClaudeCliMock).not.toHaveBeenCalled();
+      expect(run.anthropicVia).toBe('api');
+      expect(run.costBasis).toBe('api');
     });
   });
 

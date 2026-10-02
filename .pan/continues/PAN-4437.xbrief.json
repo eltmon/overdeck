@@ -1,0 +1,220 @@
+{
+  "version": "1",
+  "issueId": "PAN-4437",
+  "created": "2026-09-30T19:30:30.547Z",
+  "updated": "2026-10-01T14:44:56.683Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T14:29Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-01T14:29:35.695Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T14:30Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-01T14:30:48.376Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-01T14:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-01T14:44:56.683Z"
+    }
+  ],
+  "items": {
+    "continue-inspect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-09-30T19:30:30.547Z",
+      "doneAt": "2026-09-30T19:33:03.742Z"
+    },
+    "project-origin-match": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-09-30T19:33:09.519Z",
+      "doneAt": "2026-09-30T19:34:01.558Z"
+    },
+    "conversation-vault-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-09-30T19:34:05.592Z",
+      "doneAt": "2026-09-30T19:36:47.355Z"
+    },
+    "add-project-prefill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-09-30T19:38:19.818Z",
+      "doneAt": "2026-09-30T19:40:13.181Z"
+    },
+    "docs-continue-here": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-09-30T19:40:35.978Z",
+      "doneAt": "2026-09-30T19:47:12.835Z"
+    },
+    "vault-continue-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-10-01T13:18:08.082Z",
+      "doneAt": "2026-10-01T13:22:32.775Z"
+    },
+    "vault-continue-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-10-01T13:22:37.308Z",
+      "doneAt": "2026-10-01T13:25:17.289Z"
+    },
+    "vault-continue-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-10-01T13:25:21.471Z",
+      "doneAt": "2026-10-01T13:41:09.740Z"
+    },
+    "uat-continue-here": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4437",
+      "claimedAt": "2026-10-01T13:41:14.533Z",
+      "doneAt": "2026-10-01T13:49:27.829Z"
+    },
+    "continue-inspect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:15:38.249Z"
+    },
+    "continue-inspect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:15:49.633Z"
+    },
+    "continue-inspect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:16:01.111Z"
+    },
+    "continue-inspect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:16:12.592Z"
+    },
+    "project-origin-match.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:16:23.937Z"
+    },
+    "project-origin-match.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:16:36.057Z"
+    },
+    "project-origin-match.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:16:49.787Z"
+    },
+    "conversation-vault-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:17:02.230Z"
+    },
+    "conversation-vault-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:17:14.553Z"
+    },
+    "conversation-vault-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:17:27.097Z"
+    },
+    "vault-continue-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:17:41.294Z"
+    },
+    "vault-continue-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:17:55.146Z"
+    },
+    "vault-continue-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:18:08.414Z"
+    },
+    "vault-continue-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:18:21.850Z"
+    },
+    "vault-continue-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:18:35.017Z"
+    },
+    "vault-continue-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:18:48.548Z"
+    },
+    "vault-continue-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:02.614Z"
+    },
+    "vault-continue-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:16.830Z"
+    },
+    "add-project-prefill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:29.861Z"
+    },
+    "add-project-prefill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:43.112Z"
+    },
+    "add-project-prefill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:19:57.439Z"
+    },
+    "vault-continue-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:20:11.160Z"
+    },
+    "vault-continue-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:20:26.831Z"
+    },
+    "vault-continue-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:20:40.288Z"
+    },
+    "vault-continue-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:20:52.722Z"
+    },
+    "uat-continue-here.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:21:07.732Z"
+    },
+    "uat-continue-here.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:21:20.509Z"
+    },
+    "uat-continue-here.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:21:33.198Z"
+    },
+    "uat-continue-here.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:21:46.064Z"
+    },
+    "docs-continue-here.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:21:58.807Z"
+    },
+    "docs-continue-here.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:22:12.476Z"
+    },
+    "docs-continue-here.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-01T14:22:26.646Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-01T14:44:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4437\n\n# Review — PAN-4437\n## Verdict: CHANGES REQUESTED — D-6 owner check is not anchored to adoptRecord's CAS, so a continue can silently take over a conversation another machine adopted during the WIP step\n\n## Context\n- Run ID: agent-pan-4437-review-fe687491\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4437/.pan/review/agent-pan-4437-review-fe687491/context.json\n- Branch / workspace: feature/pan-4437 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4437\n- PR: https://github.com/eltmon/overdeck/pull/4454\n- HEAD reviewed: fe687491e6b631e582cba581146c78be09b432da\n- Base / prior cycle SHA: merge-base c98f934d1c3d80602cbe90b83d66c8ee79cb4391; no prior review cycle\n\n## Blocking Findings\n\n### [correctness] Owner check and adoption CAS read different record versions — `src/dashboard/server/services/vault-continue.ts:290`\n- Severity: ! (MUST)\n- Classification / requirement scope: specification defect with an implementation consequence; in_pr_scope (FR-10, D-6, Goal \"exactly one adopts\").\n- Trigger and changed-code connection: `runContinue` reads the record (line 279) and compares `ownerToken(record.owner.environmentId)` with `body.expectedOwnerToken` (line 290). It then runs `placeCode` (line 297). `placeCode` calls `applyWipSnapshot`. On a dirty registered checkout it also calls `createScratchWorkspace` → `performWorkspaceCreate`, which runs `git fetch origin <parent>` and `git worktree add` (`src/lib/workspaces/create.ts` lines 440-447). Only after that does `deps.adoptRecord` run (line 309). `adoptRecord` does its own `readRecordOrThrow` (`src/lib/vault/adopt.ts` line 104) and CASes from **that** version (`claimAndMaterialize`, line 85). `AdoptOptions` (`adopt.ts` lines 25-38) has no expected version and no expected owner. So the CAS is never tied to the version that the D-6 check read.\n- Expected / observed / impact: D-6 says that when the owner changed after the dialog opened, the continue must return 409 `already-continued`, because \"taking it over silently would steal a live conversation\". FR-10 and the Goal say that when two machines race, exactly one adopts. What actually happens: machine A passes the token check and then spends seconds (the fetch can take much longer) in `placeCode`. During that time machine B adopts the record (from the dashboard button or `pan vault resume`) and starts using the conversation. A's `adoptRecord` then reads B's version, sees an owner that is not A, and CASes successfully. A takes over B's live conversation silently. This is the exact harm D-6 names, and both machines believe they adopted. It is reachable through the normal \"Continue here\" button. A probe is not needed.\n- Spec defect: D-6 states: \"The truly concurrent case (both read the same version) is decided by `adoptRecord`'s `casRef`: the loser gets `conflict` → FR-10.\" This holds only if `adoptRecord` CASes from the version that `continueHere` checked. It does not: `adoptRecord` re-reads. The plan put a long write step (D-4) between the check and the CAS without anchoring the two.\n- Evidence: static trace as above. The unit test `vault-continue.test.ts:189` (\"a stale owner token…\") covers only the read before `placeCode`. `adoptRecord` is mocked, so the CAS-from-a-newer-version path is never exercised. The UAT race (`pan-4437-continue-here.spec.ts:211`) adopts from machine C before the POST, so the token check catches it and the window is never tested. The CLI (`src/cli/commands/vault/resume.ts` lines 180/236: `applyCode` then `adoptRecord`) has the same shape. That is pre-existing there, but this PR is the one that commits to D-6. No runtime reproduction was run: a reproduction needs two vault-joined homes with a delay injected into `placeCode`.\n- Fix: add an optional `expectedOwnerEnvironmentId` (or `expectedVersion`) to `AdoptOptions`. Check it inside `adoptRecord` against the record that `readRecordOrThrow` returns. On a mismatch, return `{ adopted: false, alreadyContinuedOn: <current owner label> }` without writing. Pass the owner that `runContinue` verified, `record.owner.environmentId` from line 279. The check and the CAS then use one read, and every later change is caught by `casRef`. This stays inside the vault engine (NFR-3 holds). Add a unit test in `tests/unit/lib/vault/adopt*.test.ts`: when the owner changed between the caller's read and adopt, the result is `adopted: false` and no file is written. Add a `vault-continue.test.ts` case that asserts `continueHere` passes the expected owner. Correct D-6 in `.pan/drafts/pan-4437.md` so that it states the anchoring.\n\n## Non-blocking Findings\n\n1. **~ The preview promises a new workspace that the POST then refuses (dirty, unregistered checkout).** When the saved cwd exists, is dirty, and is under no registered project, `previewContinue` returns `codePlacement: 'new-workspace'` with `target.projectKey: null`. The dialog shows \"...the code snapshot ... goes into a new workspace\" (`VaultContinueDialog.tsx:145`). The POST then returns 409 `dirty-unregistered` (`vault-continue.ts:247-254`). The operator does see the error text, so this is not a breakage. FR-2 (\"explains why\") would be served better if the preview reported this case, for example with `codePlacement: 'none'` plus a reason, or with the dialog checking `target.projectKey === null && target.dirty`. Implementation defect, minor.\n2. **≉ Spec drift: the route paths.** The routes moved from `/api/vault/records/...` to `/api/vault/sessions/...` (commit `1596d812ccb`) because `lint:no-state-layer` rejects `/records/`. The change is consistent across the routes, `NO_LOSS_MATRIX`, the dialog fetches, the tests and `docs/SESSION-VAULT.md`. `.pan/drafts/pan-4437.md` (wire contract, FR-1, FR-7) and the xBRIEF spec still say `/records/`. Correct the spec text when the blocker is fixed.\n3. **? Abandoned artifacts on a lost race (accepted by the PRD).** On a lost CAS after `placeCode`, an applied in-place snapshot or a new `scratch/vault-<id8>` workspace stays in place. FR-10 (`codeAppliedAt`) and the non-goals accept this. Recorded only for awareness.\n4. **? A codex end-to-end launch was not exercised at runtime.** `vault-continue-codex-placement.test.ts` proves on the real filesystem that the adopted rollout is what `resolveCodexRolloutPath` returns. `spawnConversationSession` derives `resumeSessionId` the same way (`conversation-runtime.ts` lines 679-682), so the contract holds statically. The Playwright UAT covers Claude only.\n5. **Pre-existing:** the CLI `resumeCommand` has the same check-then-act shape. The fix in item 1 of \"Blocking Findings\" (an `AdoptOptions` field) lets the CLI adopt the same guard later. It is out of scope here (D-14).\n6. **Stub-UI manifest flag (`VaultContinueDialog.tsx:71`, `useState(false)` for `busy`): not a stub.** `setBusy(true)` and `setBusy(false)` are called at lines 85 and 108 around the POST, and `busy` disables the actions. Resolved as a false positive.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/server/services/vault-continue.ts | Reviewed in full (blocker, advisory 1) |\n| src/dashboard/server/routes/vault.ts | Reviewed: auth (GET `rejectUnauthorizedDashboardRequest`, POST `rejectUnsafeDashboardMutationRequest`), vaultId and owner-token validation, onDrift 400 |\n| src/dashboard/server/services/vault-service.ts | Reviewed: only `vaultUnavailableMessage` was exported |\n| src/lib/overdeck/conversation-vault-continue.ts | Reviewed against the plain-fork tail of `runForkPipeline` (conversation-forks.ts 437-452), `registerInFlightForkPipeline` and `handleForkPipelineFailure`. Never rejects. The pane role defaults to `conversation` (conversation-pane-role.ts) |\n| src/lib/vault/continue-inspect.ts | Reviewed: write-free (only `readCwdState`), imports only sibling vault modules (NFR-3) |\n| src/lib/projects/origin-match.ts | Reviewed: FR-6 rule, first match wins |\n| src/cli/commands/vault/resume.ts | Reviewed: the `driftNote` move and re-export. The text is identical |\n| src/dashboard/frontend/src/components/chat/VaultContinueDialog.tsx | Reviewed (advisories 1 and 6) |\n| src/dashboard/frontend/src/components/chat/ComposerFooter.tsx | Reviewed: the button and `/conv/<name>` popstate navigation. `CommandDeck/index.tsx:597` resolves by name |\n| src/dashboard/frontend/src/components/project/new/{AddProjectDialog,AddProjectFormStep,addProjectDialogStore,useProjectCreateIntent}.ts(x) | Reviewed: `initialUrl` and `onCreatedExtra` are threaded through and cleared on `hide()` |\n| src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts | Reviewed: `env` merged last |\n| src/dashboard/frontend/tests/pan-4437-continue-here.spec.ts | Reviewed: fake HOME, stub claude, three homes. The race path covers the token check only |\n| tests/unit/dashboard/server/services/vault-continue.test.ts | Reviewed (case list). `adoptRecord` is mocked |\n| tests/unit/dashboard/server/services/vault-continue-codex-placement.test.ts | Reviewed: real-filesystem D-9 contract in a temp HOME |\n| tests/unit/dashboard/server/routes/vault.test.ts | Reviewed |\n| tests/unit/lib/overdeck/conversation-vault-continue.test.ts | Reviewed |\n| tests/unit/lib/vault/continue-inspect.test.ts | Reviewed: includes the `count-objects` write-free check |\n| tests/unit/lib/projects/origin-match.test.ts | Reviewed |\n| tests/unit/lib/overdeck/no-loss-matrix.ts | Reviewed: two rows |\n| src/dashboard/frontend/src/components/chat/__tests__/{VaultContinueDialog,VaultBrowseCopy}.test.tsx, project/new/__tests__/AddProjectDialog.test.tsx | Reviewed |\n| package.json | Reviewed: `VaultContinueDialog.test.tsx` was added to `test:frontend-subset` (it runs in the normal test command) |\n| docs/SESSION-VAULT.md, configuration/session-vault.mdx | Reviewed: the target order, code placement, race message and clone offer are described |\n| .pan/drafts/pan-4437.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4437.xbrief.json | Read for requirements. Not applicable as code (advisory 2 records the spec drift) |\n\n### Dimensions\n- **Correctness:** blocker above. Other traces hold: the codex rollout is resolved through the `codex-home*` scan, and the `extractThreadIdFromRollout` resume works without the thread-id file. The Claude path check uses `sessionFilePath(targetCwd, id)`, which agrees with `projectsRoot: claudeProjectsRoot()`. `removeVaultBrowseRow` is synchronous (`conversation-vault-rows.ts:106`), so the surrounding try/catch is valid. The launch runs outside the queue and never rejects.\n- **Security:** the browser supplies no cwd (D-2). `vaultId` is checked with `/^[0-9a-f-]+$/` and the owner token with `/^[0-9a-f]{16}$/`. The GET uses the dashboard auth gate and the POST uses the CSRF/mutation gate. The owner token is an opaque sha256 prefix, so no environment id reaches the browser. Git work uses `execFile` argument vectors (create.ts). No issues found.\n- **Performance:** all I/O is async and there is no `execSync`. The preview calls `listProjectsAsync` and one `readCwdState`. The vault queue serializes continues. No concerns.\n- **Requirements/UX:** see the matrix below. The loading, error, non-resumable, clone, no-checkout, drift and race states are all rendered. Escape and backdrop clicks are disabled while busy.\n\n### AC → evidence\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | Met | continue-inspect.test.ts (in-place, new-workspace, none; count-objects unchanged); resume re-export; CI test shards green |\n| AC-2 | Met | origin-match.test.ts |\n| AC-3 | Met | conversation-vault-continue.test.ts |\n| AC-4 | Partially met | Order, queue, CAS-conflict and dirty-unregistered tests pass with mocks. The race guarantee that this AC is meant to prove fails in the window described in the blocker |\n| AC-5 | Met | vault.test.ts continue cases; no-loss rows; CI green |\n| AC-6 | Met | AddProjectDialog.test.tsx (three new cases) |\n| AC-7 | Met | VaultContinueDialog.test.tsx |\n| AC-8 | Unverified by this review | The spec exists and covers adopt, the token race and the clone offer. The screenshots were not re-run here (UAT role). The race case does not cover the blocker window |\n| AC-9 | Met | docs diffs |\n\n## Verification\n- CI on the exact HEAD: `gh run view 36877023084` → headSha `fe687491e6b…`, conclusion `success`. `gh pr checks` shows build, lint, lint-group (core/effect/skills/state), test-shard 1-4, test-e2e and test all passing. `overdeck/verification` passed.\n- `npm run lint:effect-diagnostics`: runs in CI `lint-group (effect)` (`scripts/run-lint-group.mjs:16`), which passed on this HEAD, so there are no NEW diagnostics. Not re-run locally.\n- No local tests were run: CI covers the touched tests. The blocker comes from a static trace. Its reproduction needs two vault homes plus an injected delay, which this review did not build.\n- CodeRabbit: pending (not a gate).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4437/.pan/review/agent-pan-4437-review-fe687491/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4437 -m \"Fixed review issues\"`"
+    }
+  ]
+}
