@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { Conversation } from '../../CommandDeck/ConversationList';
 
 /**
  * PAN-4455 D-1: the conversation the "Continue on another device" dialog is
@@ -32,7 +31,20 @@ export function openContinueOnDevice(target: ContinueTarget): void {
   useContinueOnDeviceStore.getState().open(target);
 }
 
-export function continueTargetOf(conversation: Conversation, viewMode: 'conversation' | 'terminal' = 'conversation'): ContinueTarget {
+/**
+ * The conversation fields a target needs. Structural, not `Conversation`, so this
+ * store does not import ConversationList (which renders ConversationRow, which
+ * imports this store).
+ */
+export interface ContinueSource {
+  name: string;
+  id: number;
+  title?: string | null;
+  harness?: string | null;
+  sessionAlive: boolean;
+}
+
+export function continueTargetOf(conversation: ContinueSource, viewMode: 'conversation' | 'terminal' = 'conversation'): ContinueTarget {
   return {
     name: conversation.name,
     id: conversation.id,
