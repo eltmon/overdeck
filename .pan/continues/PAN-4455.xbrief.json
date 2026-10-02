@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:54:30.474Z",
+  "updated": "2026-10-02T04:54:43.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,10 @@
     "panel-menu-entry.ac1": {
       "status": "completed",
       "doneAt": "2026-10-02T04:54:30.473Z"
+    },
+    "panel-menu-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:43.837Z"
     }
   }
 }
