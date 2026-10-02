@@ -29,6 +29,8 @@ import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
+import { HandoffNotice } from './HandoffNotice';
+import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentRoutingNotice } from '../../lib/subagentRouting';
@@ -948,5 +950,16 @@ export function ComposerFooter(props: ComposerFooterProps) {
       </>
     );
   }
-  return <ComposerFooterInput {...props} />;
+  return <ComposerFooterWithHandoff {...props} />;
+}
+
+/** PAN-4455 D-15/D-16: the hand-off notice, only when PAN-4447's continuity notice does not apply. */
+function ComposerFooterWithHandoff(props: ComposerFooterProps) {
+  const handoff = useHandoffNotice(props.conversation);
+  return (
+    <>
+      {handoff && <HandoffNotice conversation={props.conversation} at={handoff.at} />}
+      <ComposerFooterInput {...props} />
+    </>
+  );
 }

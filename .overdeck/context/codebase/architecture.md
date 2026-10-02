@@ -16,6 +16,7 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 | `sync-sources/skills/` | Bundled wrapper skills for `pan` verbs, one `<name>/SKILL.md` each (lint-enforced vs `--help` by `scripts/lint-skills.sh`). Exception: `okf/` is canonical in `eltmon/okf` (since 2026-09-29; the old subtree mirror was deleted in `abaeeab9647`) and is vendored here from a release tag — never edit it in place (PAN-4408). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
+| `services/account/` | The overdeck.ai account service: a Cloudflare Worker (D1) for GitHub sign-in, device tokens, the invite-only allowlist and its admin screen. Own Bun workspace and `typecheck:account` lane; Web APIs only; unit tests on a `node:sqlite` D1 shim, one Miniflare integration test. Deploy is operator-only. See `docs/ACCOUNT-SERVICE.md`. |
 
 ## Key src/lib modules
 
@@ -197,4 +198,4 @@ from `DerivedIssueState.pr`, not from links; the conversation list's badge
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-01 -->
+<!-- last-verified: 2026-10-02 -->

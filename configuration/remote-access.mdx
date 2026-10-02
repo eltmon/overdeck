@@ -87,6 +87,25 @@ works on this machine, and `pan pair` says so.
 machine's internal token. A paired device cannot create more pairing
 credentials.
 
+### Open one conversation on another screen
+
+To look at one conversation on your phone or another computer while this
+machine keeps running it, open the conversation's ⋮ menu (in its header or on
+its row) and choose **Continue on another device**. The **Open on another
+screen** tab shows a link to that conversation, a **Copy** button and a QR
+code.
+
+The tab offers only trusted addresses other devices can reach, never a loopback
+address. If there is none yet, type one and click **Add an address**.
+
+In a browser on this machine, **Also pair the device** is checked by default.
+Click **Create pairing link** to add a one-time pairing credential to the link
+(`…/conv/<id>#pair=odp_…`): an unpaired device that opens it pairs and lands on
+the conversation in one step. The credential follows the same rules as above:
+it works once, expires after 10 minutes, and travels only in the URL fragment.
+On a paired device the option is not shown, and the link works for devices
+that are already paired. This arrives in the next release (v0.65.0).
+
 ### Open the dashboard at a non-default address
 
 The dashboard only accepts browser requests from origins it trusts. To open it

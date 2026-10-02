@@ -146,6 +146,15 @@
       "name": "qwen-tts-linux-x64",
       "version": "0.1.0",
     },
+    "services/account": {
+      "name": "@overdeck/account-service",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261002.1",
+        "miniflare": "5.20261001.0-alpha",
+        "wrangler": "4.146.0",
+      },
+    },
     "services/share": {
       "name": "@overdeck/share-service",
       "version": "0.0.0",
@@ -805,6 +814,8 @@
     "@octokit/types": ["@octokit/types@18.0.0", "", { "dependencies": { "@octokit/openapi-types": "^29.0.1" } }, "sha512-l6bAF43PNxkJp6g+W4PjoUSSkxHomXw2nOum5CTftJz1NlV3vu93NImgOYtLf6CbBUb5j+fiuzW0PPQ5JTSvZA=="],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.1", "", {}, "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="],
+
+    "@overdeck/account-service": ["@overdeck/account-service@workspace:services/account"],
 
     "@overdeck/contracts": ["@overdeck/contracts@workspace:packages/contracts"],
 

@@ -20,7 +20,8 @@ const { _resetTrustedOriginsForTests } = await import('../routes/origin-validati
 const { anywhereRouteLayer } = await import('../routes/anywhere.js');
 
 const INTERNAL_TOKEN = 'anywhere-status-internal-token-0123';
-const ENV_KEYS = ['OVERDECK_HOME', 'OVERDECK_INTERNAL_TOKEN', 'OVERDECK_TRUSTED_ORIGINS', 'OVERDECK_TRAEFIK_ENABLED', 'OVERDECK_TRAEFIK_DOMAIN', 'TRAEFIK_DOMAIN', 'DASHBOARD_URL', 'API_PORT', 'PORT'] as const;
+const SESSION_TOKEN = 'anywhere-status-session-token-0123';
+const ENV_KEYS = ['OVERDECK_HOME', 'OVERDECK_INTERNAL_TOKEN', 'OVERDECK_DASHBOARD_SESSION_TOKEN', 'OVERDECK_TRUSTED_ORIGINS', 'OVERDECK_TRAEFIK_ENABLED', 'OVERDECK_TRAEFIK_DOMAIN', 'TRAEFIK_DOMAIN', 'DASHBOARD_URL', 'API_PORT', 'PORT'] as const;
 let savedEnv: Record<string, string | undefined>;
 let home: string;
 
@@ -44,6 +45,7 @@ beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4445-anywhere-status-'));
   process.env.OVERDECK_HOME = home;
   process.env.OVERDECK_INTERNAL_TOKEN = INTERNAL_TOKEN;
+  process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = SESSION_TOKEN;
   process.env.API_PORT = '3999';
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
@@ -94,5 +96,12 @@ describe('GET /api/anywhere/status (PAN-4445)', () => {
   it('answers 401 without a credential', async () => {
     const res = await get({});
     expect(res.status).toBe(401);
+  });
+
+  it('reports the caller\'s credential kind as viewer.kind (PAN-4455 D-3)', async () => {
+    expect((await get({ [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN })).json.viewer).toEqual({ kind: 'internal-token' });
+    expect((await get({ cookie: `overdeck_session=${SESSION_TOKEN}` })).json.viewer).toEqual({ kind: 'root-session' });
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect((await get({ cookie: `overdeck_device=${token}` })).json.viewer).toEqual({ kind: 'device' });
   });
 });
