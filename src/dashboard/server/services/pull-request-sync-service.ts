@@ -13,10 +13,11 @@
  *      During a GitHub quota pause of the user GraphQL bucket (PAN-4264) the
  *      sweep is skipped and no failure is counted.
  *   3. Branch detection: a PR whose head branch equals the conversation's branch
- *      (`resolveConversationBranch`: a linked worktree's or agent's branch,
- *      never the default branch or the primary checkout's) becomes a
- *      `branch` link. A dismissed row blocks re-insertion. A link whose PR drops
- *      out of the listing is never deleted (the listing is capped at 100).
+ *      (`resolveConversationBranch`: a linked worktree's, an agent's, or a live
+ *      operator conversation's branch in the primary checkout; never the
+ *      default branch) becomes a `branch` link. A dismissed row blocks
+ *      re-insertion. A link whose PR drops out of the listing is never
+ *      deleted (the listing is capped at 100).
  *   4. Snapshot refresh of every due linked PR: never synced or open → every
  *      sweep; closed → the 15-minute slow lane; merged → never (final).
  *      Dismissed links are not refreshed. A write (and a
@@ -32,9 +33,10 @@
  * Started only by a primary dashboard (a peer dashboard never writes).
  */
 
-import type { PullRequestKey, PullRequestLink, PullRequestSnapshot } from '@overdeck/contracts';
+import { paneAgentKey, type PullRequestKey, type PullRequestLink, type PullRequestSnapshot } from '@overdeck/contracts';
 
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { getBackendPanes, isBackendInventoryDegraded } from './backend-inventory.js';
 import { resolveConversationBranch } from '../../../lib/overdeck/conversation-branch.js';
 import {
   archiveConversation,
@@ -224,10 +226,14 @@ async function syncProject(
   project: ProjectConfig,
   conversations: readonly PullRequestSyncConversation[],
   ctx: SweepContext,
+  livePanes: ReadonlySet<string> | null,
 ): Promise<PullRequestSyncResult> {
   const defaultBranch = getRepoTargetBranch(undefined, project);
   const branches = await withConcurrencyLimit(
-    conversations.map((conversation) => () => resolveConversationBranch(conversation, defaultBranch)),
+    conversations.map((conversation) => () => resolveConversationBranch(
+      { ...conversation, live: livePanes ? livePanes.has(conversation.tmuxSession) : null },
+      defaultBranch,
+    )),
     BRANCH_READ_CONCURRENCY,
   );
   const links = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
@@ -398,17 +404,32 @@ async function listLiveConversationSessions(): Promise<readonly string[] | null>
   }
 }
 
+/** Agent ids of live panes, or null when the inventory cannot be trusted this sweep. */
+async function listLivePaneAgentIds(): Promise<ReadonlySet<string> | null> {
+  try {
+    const panes = await getBackendPanes();
+    if (isBackendInventoryDegraded()) return null;
+    return new Set(panes.filter((pane) => pane.state !== 'exited').map(paneAgentKey));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * One full sweep. Exported for tests; `readPullRequest` is the `gh pr view`
- * fallback and `listLiveSessions` the terminal sessions auto-archive checks.
+ * fallback, `listLiveSessions` the terminal sessions auto-archive checks, and
+ * `listLivePanes` the backend-agnostic pane inventory primary-checkout
+ * branch matching reads for liveness (PAN-4457).
  */
 export async function runPullRequestSyncOnce(
   now: number = Date.now(),
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
   listLiveSessions: () => Promise<readonly string[] | null> = listLiveConversationSessions,
+  listLivePanes: () => Promise<ReadonlySet<string> | null> = listLivePaneAgentIds,
 ): Promise<PullRequestSyncResult> {
   // PAN-4264: skip the whole sweep during a user GraphQL pause (non-essential poller).
   if (userGraphqlPaused()) return { inserted: 0, updated: 0 };
+  const livePanes = await listLivePanes();
   const conversations = listConversationsForPullRequestSync();
   const ctx: SweepContext = {
     now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),
@@ -427,7 +448,7 @@ export async function runPullRequestSyncOnce(
   let updated = 0;
   for (const { project, conversations: projectConversations } of groups.values()) {
     try {
-      const result = await syncProject(project, projectConversations, ctx);
+      const result = await syncProject(project, projectConversations, ctx, livePanes);
       inserted += result.inserted;
       updated += result.updated;
     } catch (error) {

@@ -397,11 +397,15 @@ and every 60 seconds after that, Overdeck reads each GitHub project's pull
 requests once and links every PR whose head branch equals the branch a
 conversation's working directory is on. Agent conversations whose workspace
 cannot be read fall back to `feature/<issue>`. A conversation on the project's
-default branch is never linked by branch. The same sweep refreshes the stored
+default branch is never linked by branch. In the project's main checkout, which
+every conversation there shares, an operator conversation is linked by branch
+only while its terminal is running, so idle conversations never pick up the PR
+of whatever branch the checkout is on. A merged PR stays linked after the
+checkout goes back to the default branch. The same sweep refreshes the stored
 state of linked PRs, so the badge renders without a live GitHub call. Open PRs
 refresh on every sweep, closed PRs at most every 15 minutes, and merged PRs are
 final and never re-read. A linked PR the project listing doesn't include (older
-than its 200 most recent PRs, in another repository, or on a conversation
+than its 100 most recent PRs, in another repository, or on a conversation
 outside any GitHub project) is read on its own. After three failed reads in a
 row, Overdeck skips that repository for 15 minutes.
 
@@ -454,13 +458,23 @@ Rules:
   next sweep.
 
 When the pipeline opens the pull request for an issue (`pan done`, or the review
-pipeline), it links that PR to every agent conversation for the issue, with the
-source `created`. Those conversations show the PR at once, without waiting for a
-sweep. The pipeline never restores a PR you unlinked.
+pipeline), it links that PR to every agent conversation for the issue and every
+conversation working inside the issue's workspace, with the source `created`.
+Those conversations show the PR at once, without waiting for a sweep. The
+pipeline never restores a PR you unlinked.
 
 The other direction works too: an issue's **Code** card lists every conversation
 linked to the issue's PR, with why it's linked (opened by the pipeline, linked
 by hand, linked by an agent, or on the same branch). Click one to open it.
+
+### On issue and workspace rows
+
+The issue's row in Command Deck's project tree, and its row in the sidebar
+Workspaces rail, show the same badge as a conversation's — the PR's number,
+colored by state and review, with a `×` for failing checks — read from the
+issue's derived state rather than a conversation's link. It appears within
+seconds of `pan done` opening the PR. A PR that closed without merging is not
+shown there.
 
 Linking never archives or stops a conversation unless you turn on auto-archive:
 

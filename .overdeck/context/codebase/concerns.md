@@ -359,4 +359,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-<!-- last-verified: 2026-09-30 -->
+- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
+  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
+  conversations launch through the terminal-backend door (Herdr default,
+  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
+  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
+<!-- last-verified: 2026-10-01 -->
