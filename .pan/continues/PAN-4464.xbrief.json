@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:49:59.037Z",
+  "updated": "2026-10-02T02:51:48.666Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -77,6 +77,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4464",
       "claimedAt": "2026-10-02T02:49:59.036Z"
+    },
+    "wi13-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:51:48.666Z"
     }
   }
 }
