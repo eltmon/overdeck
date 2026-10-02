@@ -5,7 +5,8 @@
  * Nothing here imports services/account/src/index.ts (the cloudflare:workers importer).
  * env.DB is the node:sqlite D1 shim from ./d1.ts with the migrations applied.
  */
-import type { Deps, Env } from '../../../../../services/account/src/env.ts';
+import type { Deps, Env, RequestContext } from '../../../../../services/account/src/env.ts';
+import { parseConfig } from '../../../../../services/account/src/env.ts';
 import { handle } from '../../../../../services/account/src/routes.ts';
 import { applyMigrations, createTestD1, type D1Shim } from './d1.ts';
 
@@ -121,6 +122,29 @@ export async function call(method: string, path: string, opts: CallOptions = {})
   if (opts.ip) headers.set('CF-Connecting-IP', opts.ip);
   const req = new Request(`${TEST_BASE_URL}${path}`, { method, headers, body: opts.body ?? null });
   return handle(req, opts.env ?? makeEnv(), opts.ctx ?? fakeCtx(), opts.deps ?? makeDeps());
+}
+
+export interface RcOptions {
+  env?: Env;
+  deps?: Deps;
+  ctx?: FakeCtx;
+  params?: Record<string, string>;
+  clientIp?: string;
+}
+
+/** A RequestContext for calling module functions directly, bypassing the route table. */
+export function makeRc(opts: RcOptions = {}): RequestContext {
+  const env = opts.env ?? makeEnv();
+  const parsed = parseConfig(env);
+  if (!parsed.ok) throw new Error(`makeRc: env is missing ${parsed.missing.join(', ')}`);
+  return {
+    env,
+    config: parsed.config,
+    ctx: opts.ctx ?? fakeCtx(),
+    deps: opts.deps ?? makeDeps(),
+    params: opts.params ?? {},
+    clientIp: opts.clientIp ?? '203.0.113.7',
+  };
 }
 
 /** Builds a form body for POST /oauth/token and the HTML forms. */
