@@ -4,17 +4,17 @@
     "created": "2026-10-02T02:41:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4466: Needs-you shows subagent permission prompts with no way to answer them (answerable:false, no options, no explanation)",
-    "updated": "2026-10-02T02:45:28.625Z"
+    "updated": "2026-10-02T02:46:08.098Z"
   },
   "plan": {
     "id": "pan-4466",
     "title": "Needs-you shows subagent permission prompts with no way to answer them (answerable:false, no options, no explanation)",
-    "status": "proposed",
+    "status": "running",
     "uid": "c0b21a21-9d9d-48f4-99f1-e030bc8b5b23",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T02:41:12Z",
-    "updated": "2026-10-02T02:45:28.625Z",
+    "updated": "2026-10-02T02:46:08.098Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4466",
@@ -608,5 +608,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
