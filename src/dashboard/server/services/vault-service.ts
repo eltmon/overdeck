@@ -28,12 +28,15 @@ import {
   type ConfirmResult,
   type EvictionBatch,
 } from '../../../lib/vault/evict.js';
+import { isTombstone, readSessionRecord, refName, type SessionRecord } from '../../../lib/vault/format.js';
+import type { VaultSubkeys } from '../../../lib/vault/identity.js';
 import { joinVault as joinVaultDefault, type JoinSecret, type JoinVaultResult } from '../../../lib/vault/join-core.js';
 import { VaultKeyRetiredError } from '../../../lib/vault/keyring.js';
 import { openVaultContext as openVaultContextDefault, type OpenVault, type VaultOpenResult } from '../../../lib/vault/open.js';
-import { settle as settleDefault } from '../../../lib/vault/settle.js';
+import { settle as settleDefault, type SettleResult } from '../../../lib/vault/settle.js';
 import { setupVault as setupVaultDefault, type SetupPassphrase, type SetupVaultResult } from '../../../lib/vault/setup-core.js';
 import { createSyncLoop as createSyncLoopDefault, syncOnce as syncOnceDefault, type SyncLoop, type SyncReport } from '../../../lib/vault/sync.js';
+import type { VaultStore } from '../../../lib/vault/store/types.js';
 import type { WipMode } from '../../../lib/vault/wip-capture.js';
 import { createVaultIsLive } from './vault-liveness.js';
 import { createVaultSettlePoller as createVaultSettlePollerDefault, type VaultSettlePoller } from './vault-settle-poller.js';
@@ -248,18 +251,43 @@ async function runSync(config: VaultConfig): Promise<{ offline: boolean }> {
 }
 
 /** Idempotent: a second call while already started does nothing. */
+export type QueuedSettleOutcome =
+  | { status: 'unavailable'; opened: Exclude<VaultOpenResult, { status: 'open' }> }
+  | { status: 'settled'; result: SettleResult; record: SessionRecord | null };
+
+/**
+ * The one dashboard settle path (PAN-4455 D-6): the poller and the hand-off route
+ * both call it. `readBack` reads the settled record inside the same queue slot.
+ * Throws whatever `settle()` throws; callers decide whether to log or report.
+ */
+export function settleOnQueue(path: string, harness: string, wip: WipMode, options: { readBack?: boolean } = {}): Promise<QueuedSettleOutcome> {
+  return enqueueVaultOperation('settle', async () => {
+    const opened = await deps.openVaultContext();
+    if (opened.status !== 'open') return { status: 'unavailable' as const, opened };
+    const config = await deps.readVaultConfig();
+    const { store, keys } = opened.vault;
+    const result = await deps.settle({ nativePath: path, harness, store, keys, config, wip });
+    const record = options.readBack && result.vaultId ? await readRecordOrNull(store, keys, result.vaultId) : null;
+    return { status: 'settled' as const, result, record };
+  });
+}
+
+/** The record for `vaultId` as the store holds it now, or null when missing or tombstoned. */
+async function readRecordOrNull(store: VaultStore, keys: VaultSubkeys, vaultId: string): Promise<SessionRecord | null> {
+  const name = refName('record', vaultId, keys.K_ref);
+  const ref = await store.readRef(name);
+  if (!ref) return null;
+  const value = await readSessionRecord(name, ref.value, keys);
+  return value && !isTombstone(value) ? value : null;
+}
+
 /** A failing settle logs once per distinct message and never throws out of the poller's timers (NFR-6). */
 async function queuedSettle(path: string, harness: string, wip: WipMode): Promise<void> {
-  return enqueueVaultOperation('settle', async () => {
-    try {
-      const opened = await deps.openVaultContext();
-      if (opened.status !== 'open') return;
-      const config = await deps.readVaultConfig();
-      await deps.settle({ nativePath: path, harness, store: opened.vault.store, keys: opened.vault.keys, config, wip });
-    } catch (error) {
-      console.warn(`[vault] settle failed for ${path}:`, error);
-    }
-  });
+  try {
+    await settleOnQueue(path, harness, wip);
+  } catch (error) {
+    console.warn(`[vault] settle failed for ${path}:`, error);
+  }
 }
 
 export function startVaultService(overrides: VaultServiceDeps = {}): void {
