@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T03:54:23.457Z",
+  "updated": "2026-10-02T04:03:05.976Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-02T03:54:22.080Z"
     },
     "panel-menu-entry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4455",
-      "claimedAt": "2026-10-02T03:54:23.457Z"
+      "claimedAt": "2026-10-02T03:54:23.457Z",
+      "doneAt": "2026-10-02T04:03:05.975Z"
     }
   }
 }
