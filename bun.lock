@@ -155,6 +155,15 @@
         "wrangler": "4.146.0",
       },
     },
+    "services/share": {
+      "name": "@overdeck/share-service",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261002.1",
+        "miniflare": "5.20261001.0-alpha",
+        "wrangler": "4.146.0",
+      },
+    },
     "src/dashboard/frontend": {
       "name": "@overdeck/frontend",
       "version": "0.1.0",
@@ -817,6 +826,8 @@
     "@overdeck/ohmypi-extension": ["@overdeck/ohmypi-extension@workspace:packages/ohmypi-extension"],
 
     "@overdeck/pi-extension": ["@overdeck/pi-extension@workspace:packages/pi-extension"],
+
+    "@overdeck/share-service": ["@overdeck/share-service@workspace:services/share"],
 
     "@oxc-project/types": ["@oxc-project/types@0.127.0", "", {}, "sha512-aIYXQBo4lCbO4z0R3FHeucQHpF46l2LbMdxRvqvuRuW2OxdnSkcng5B8+K12spgLDj93rtN3+J2Vac/TIO+ciQ=="],
 
