@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T03:34:15.997Z",
+  "updated": "2026-10-02T03:34:55.436Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "account-scaffold.ac5": {
       "status": "completed",
       "doneAt": "2026-10-02T03:34:15.997Z"
+    },
+    "account-schema": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4293",
+      "claimedAt": "2026-10-02T03:34:55.436Z"
     }
   }
 }
