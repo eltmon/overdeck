@@ -519,14 +519,14 @@ agent key (`agent_id ?? 'main'`), the tool, an input preview, the subagent's des
 agent's entry. Hooks alone cannot keep it current — a user Deny fires neither `PostToolUse` nor
 `Stop` — so the pane is the evidence: an entry whose prompt the pane showed and no longer shows
 is dropped on the next read, and a confirmed dashboard answer clears its entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
-reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two:
-`pendingPermission.answerable` is true only when the prompt is on screen. PAN-4466: a prompt
-taller than the pane loses its `───` rule and title off the top; it is still recognized as
-**clipped** when its question matches `Do you want to …`, its options and `Esc to cancel` footer
-are the last thing on screen, and no rule is in view. A clipped prompt is answerable, its agent
-comes from the hook registry (or reads `Unknown agent` when none matches), and `inputPreview`
-carries the start of the command — the pane shows only the tail. A registry entry without a
-prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
+reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two. A prompt on screen
+is `answerable`; so is one taller than the pane that has lost its `───` rule and title off the
+top, recognized as **clipped** (PAN-4466) when its question matches `Do you want to …`, its
+options and `Esc to cancel` footer are the last thing on screen, and no rule is in view. A
+clipped prompt's agent comes from the hook registry (or reads `Unknown agent` when none
+matches), and `inputPreview` carries the start of the command — the pane shows only the tail. A
+registry entry without a prompt on screen is `answerable: false`. The registry is lost on a
+dashboard restart;
 the dialog then labels the agent from the prompt's title. `GET /api/conversations/pending-input`
 carries `pendingPermission` (and skips the PAN-3113 pane-choice check while one is pending);
 `GET /api/conversations/:id` adds `permissionRequest` to `pendingInputKinds`.
