@@ -1,7 +1,8 @@
 import { Effect } from 'effect';
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { clearAgentPaused, getAgentState, resolveAgentTarget } from '../../lib/agents.js';
+import { printAgentTargetFailure, resolveCliSingleAgentId } from '../agent-target.js';
+import { clearAgentPaused, getAgentState } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { resumeAgent } from '../../lib/agents/resume.js';
@@ -20,16 +21,15 @@ async function requestReviewFromCli(issueId: string): Promise<ReviewRequestOutco
 }
 
 export async function unpauseCommand(id: string): Promise<void> {
-  // PAN-1760: resolve through normalizeAgentId so full agent IDs
-  // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue IDs.
-  const agentId = resolveAgentTarget(id);
-  if (!agentId) {
-    console.error(chalk.red(`Could not resolve agent target "${id}"`));
-    console.error(chalk.dim(
-      'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
-    ));
+  // PAN-1760: resolve through the shared resolver so full agent IDs
+  // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue
+  // IDs — and so conversation numbers/names/URLs work too (PAN-4465).
+  const target = await resolveCliSingleAgentId(id);
+  if (!target.ok) {
+    printAgentTargetFailure(target.failure, 'unpause');
     return exitCli(1);
   }
+  const agentId = target.agentId;
   const state = getAgentState(agentId);
 
   if (!state) {
