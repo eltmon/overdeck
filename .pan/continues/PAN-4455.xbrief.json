@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:56:45.667Z",
+  "updated": "2026-10-02T04:56:56.843Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,10 @@
     "handoff-notice.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T04:56:45.667Z"
+    },
+    "pairing-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:56.842Z"
     }
   }
 }
