@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-02T11:37:52.027542Z · model: claude-opus-5-5 · open: 823_
+_Last sequenced: 2026-10-02T11:55:24.241272Z · model: claude-opus-5-5 · open: 823_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -399,7 +399,7 @@ _Last sequenced: 2026-10-02T11:37:52.027542Z · model: claude-opus-5-5 · open: 
 | 433 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 434 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 435 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 436 | PAN-4480 | S | medium | ok |  | PAN-4475, PAN-4330 | Shared Sessions slice 9: pan share and pan join CLI verbs with wrapper skills |
+| 436 | PAN-4480 | M | medium | ok |  | PAN-4475, PAN-4330 | Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330 |
 | 437 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 438 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 439 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -1158,7 +1158,7 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-02T11:37:52.027542Z",
+  "generatedAt": "2026-10-02T11:55:24.241272Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 823,
@@ -6117,7 +6117,7 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
     {
       "issue": "PAN-4480",
       "rank": 436,
-      "size": "S",
+      "size": "M",
       "importance": "medium",
       "score": 52,
       "condition": "ok",
@@ -6125,7 +6125,8 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
         "PAN-4475",
         "PAN-4330"
       ],
-      "why": "Shared Sessions slice 9: pan share and pan join CLI verbs with wrapper skills",
+      "why": "Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330",
+      "rationale": "Body changed on 2026-10-02 to add an operator requirement for zero-install `npx @overdeck/core join`, so size grows from S to M; rank holds at 436 because its blockers PAN-4475 and PAN-4330 are still open and no new cross-references appeared.",
       "gate": "auto",
       "planning": "auto"
     },
