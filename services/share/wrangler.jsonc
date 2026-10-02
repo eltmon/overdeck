@@ -1,0 +1,11 @@
+{
+  "name": "overdeck-share",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "share.overdeck.ai", "custom_domain": true }],
+  // "durable_objects" + "migrations" (ShareRoom, new_sqlite_classes) are added with the ShareRoom export (share-room-do).
+  "services": [{ "binding": "ACCOUNT", "service": "overdeck-account", "entrypoint": "AccountRpc" }],
+  "ratelimits": [{ "name": "ROOM_CREATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  "vars": { "PUBLIC_BASE_URL": "https://share.overdeck.ai" }
+  // TURN_KEY_ID, TURN_KEY_API_TOKEN: Worker secrets set by the operator (docs/SHARED-SESSIONS.md "Deploy").
+}
