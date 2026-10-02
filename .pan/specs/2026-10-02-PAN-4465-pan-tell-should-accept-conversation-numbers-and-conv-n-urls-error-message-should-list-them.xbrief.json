@@ -4,17 +4,17 @@
     "created": "2026-10-02T02:33:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4465: pan tell should accept conversation numbers and /conv/<n> URLs; error message should list them",
-    "updated": "2026-10-02T02:34:45.098Z"
+    "updated": "2026-10-02T02:35:34.407Z"
   },
   "plan": {
     "id": "pan-4465",
     "title": "pan tell should accept conversation numbers and /conv/<n> URLs; error message should list them",
-    "status": "proposed",
+    "status": "running",
     "uid": "15420e9f-07c7-4fd8-be6f-b9710fdf21cd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T02:33:21Z",
-    "updated": "2026-10-02T02:34:45.098Z",
+    "updated": "2026-10-02T02:35:34.407Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4465",
@@ -665,5 +665,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
