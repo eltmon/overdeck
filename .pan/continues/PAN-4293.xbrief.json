@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:22:38.938Z",
+  "updated": "2026-10-02T04:22:50.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "account-pkce-flow.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T04:22:38.938Z"
+    },
+    "account-pkce-flow.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:22:50.897Z"
     }
   }
 }
