@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4467",
   "created": "2026-10-02T03:04:42.079Z",
-  "updated": "2026-10-02T03:53:58.975Z",
+  "updated": "2026-10-02T03:54:10.812Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "docs-stale-approval.ac2": {
       "status": "completed",
       "doneAt": "2026-10-02T03:53:58.975Z"
+    },
+    "docs-stale-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:10.811Z"
     }
   }
 }
