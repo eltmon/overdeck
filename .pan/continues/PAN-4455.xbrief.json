@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4455",
   "created": "2026-10-02T03:14:15.221Z",
-  "updated": "2026-10-02T04:53:27.243Z",
+  "updated": "2026-10-02T04:53:39.845Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "handoff-tab.ac4": {
       "status": "completed",
       "doneAt": "2026-10-02T04:53:27.243Z"
+    },
+    "dialog-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:39.845Z"
     }
   }
 }
