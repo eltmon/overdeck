@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4466",
   "created": "2026-10-02T02:46:23.902Z",
-  "updated": "2026-10-02T03:55:46.732Z",
+  "updated": "2026-10-02T03:55:58.765Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "deck-terminal-deeplink.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T03:55:46.732Z"
+    },
+    "needs-you-row-detail.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:58.765Z"
     }
   }
 }
