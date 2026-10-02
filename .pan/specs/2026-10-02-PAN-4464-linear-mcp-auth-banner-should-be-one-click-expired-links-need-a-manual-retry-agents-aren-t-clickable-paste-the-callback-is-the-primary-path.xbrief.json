@@ -1,0 +1,998 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T02:20:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4464: Linear MCP auth banner should be one click",
+    "updated": "2026-10-02T02:24:25.504Z"
+  },
+  "plan": {
+    "id": "pan-4464",
+    "title": "Linear MCP auth banner should be one click: expired links need a manual retry, agents aren't clickable, paste-the-callback is the primary path",
+    "status": "proposed",
+    "uid": "9baa2946-5440-460a-b2cd-1b641e13b248",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-02T02:20:31Z",
+    "updated": "2026-10-02T02:24:25.504Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4464",
+        "label": "PAN-4464",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "linear-mcp-auth",
+      "frontend",
+      "api",
+      "oauth"
+    ],
+    "narratives": {
+      "Problem": "The Linear MCP auth banner shows blocked conversations as unclickable session names (the server looks them up by DB name, but the agent id is the tmux session), offers no way to regenerate an expired link, and makes the remote-only paste-the-callback step the primary action. After a same-machine OAuth nothing closes the lifecycle, so the banner stays until someone pokes the agent.",
+      "Proposal": "One \"Connect Linear\" button. POST /api/linear-mcp-auth/connect returns the link when it is usable (active, owner alive) or messages a blocked agent to call mcp__linear__authenticate once and returns 202; the banner polls for the fresh authUrl and navigates a tab it opened synchronously. On returning to a loopback-hosted dashboard the banner POSTs /api/linear-mcp-auth/verify, which asks the owner for one Linear read so the hook emits healthy and the existing wake pass resumes every blocked agent. Rows show the conversation title and link to /conv/<rowid> or /issues/<id>. The paste field and Mark completed move into a disclosure, open by default only on a non-loopback host.",
+      "NonGoals": "- No new domain event type and no packages/contracts change.\n- No change to sync-sources/hooks/linear-mcp-auth-hook or its emitted kinds.\n- No reading of Claude Code credential stores (~/.claude/.credentials.json) to detect OAuth completion.\n- No change to processLinearMcpAuthWake or LINEAR_MCP_AUTH_WAKE_COPY.\n- No removal of POST /api/linear-mcp-auth/callback or /complete.\n- No support for non-Claude-Code harnesses.\n- No server-side long-poll for the fresh link; the connect route returns immediately.\n- No messageAgent( call added to src/dashboard/server (the delivery audit list stays unchanged)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a verify request (POST /verify) that asks the URL owner for one Linear read when the operator returns to the dashboard.",
+        "rationale": "The hook emits healthy only on a clean Linear call with the marker present; a same-machine OAuth callback fires no hook, so without this the banner never clears (finding F2)."
+      },
+      {
+        "summary": "The connect route returns immediately (200 open / 202 refreshing) and the banner polls GET every 1 s for the fresh link.",
+        "rationale": "Keeps the server stateless and the route shape consistent with the existing routes; the client already polls the projection."
+      },
+      {
+        "summary": "A link counts as usable only when status is active, authUrl is set, and the owner is not confirmed dead.",
+        "rationale": "Only the owner process holds the localhost callback listener; a dead owner means the link cannot complete."
+      },
+      {
+        "summary": "Refresh and verify are throttled in memory (60 s and 15 s per lifecycle).",
+        "rationale": "A second authenticate call can replace the callback listener and break the tab the operator is using; an in-memory rate limit is not stored state."
+      },
+      {
+        "summary": "Mark completed moves into the paste disclosure, relabelled \"Already authorized another way? Mark completed\".",
+        "rationale": "Both are fallback paths; the issue asks for one primary button."
+      },
+      {
+        "summary": "Auto-verify on focus only on loopback hosts; *.localhost counts as loopback.",
+        "rationale": "On a remote browser the callback cannot reach the agent, so the paste relay completes the flow; the dashboard is commonly served as overdeck.localhost."
+      },
+      {
+        "summary": "Scope item 4 (resume all blocked agents) gets a regression test, not new code.",
+        "rationale": "processLinearMcpAuthWake already wakes every agent of the completed lifecycle (finding F4)."
+      },
+      {
+        "summary": "Connect/verify logic lives in src/lib modules, keeping messageAgent calls out of src/dashboard/server.",
+        "rationale": "Matches the existing wake pass placement and keeps routes thin; the delivery audit list needs no edit."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-conv-lookup",
+        "title": "Resolve blocked conversations by tmux session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/linear-mcp-auth.ts",
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linear-mcp-auth route tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 and D15. In withConversationUrls (routes/linear-mcp-auth.ts line ~94) replace getConversationByName(agent.agentId) with getConversationByTmuxSession(agent.agentId) ?? getConversationByName(agent.agentId.slice('conv-'.length)). Root cause: the agent id conv-20261001-eba1 is the tmux session; the DB name is 20261001-eba1, so the name lookup always returned null. Add getConversationByTmuxSession to the conversations.js mock in the route test, update the existing conversation-URL test to the tmux mock, and add the fallback test."
+        },
+        "items": [
+          {
+            "id": "wi1-conv-lookup.ac1",
+            "title": "Given blocked agent conv-20261001-eba1 and getConversationByTmuxSession returning a row with id 3172, when GET /api/linear-mcp-auth runs, then the response returns conversationUrl \"/conv/3172\" for that agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-conv-lookup.ac2",
+            "title": "Given getConversationByTmuxSession returns null, when GET runs, then the route falls back to getConversationByName(\"20261001-eba1\") and returns its /conv/<id> URL.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-conv-lookup.ac3",
+            "title": "Given a non-conv agent id such as agent-min-852, when GET runs, then the response returns conversationUrl null for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-conv-title",
+        "title": "Project conversation titles onto blocked agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/linear-mcp-auth.ts",
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "src/lib/linear-mcp-auth.ts",
+            "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linear-mcp-auth route tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add optional conversationTitle?: string | null (projection-only doc comment, like conversationUrl) to LinearMcpAuthBlockedAgent in src/lib/linear-mcp-auth.ts and to the frontend interface in useLinearMcpAuthStatus.ts. In withConversationUrls set conversationTitle: conversation?.title ?? null; non-conv agents get null."
+        },
+        "items": [
+          {
+            "id": "wi2-conv-title.ac1",
+            "title": "Given the WI-1 fixture row with title \"Fernkite: hosted Emma assessment\", when GET /api/linear-mcp-auth runs, then the blocked agent returns conversationTitle \"Fernkite: hosted Emma assessment\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-conv-title.ac2",
+            "title": "Given a non-conv agent, when GET runs, then the response returns conversationTitle null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-connect-module",
+        "title": "Add the connect module that opens or refreshes the Linear link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi5-connect-route",
+            "wi8-connect-flow-hook"
+          ],
+          "files_scope": [
+            "src/lib/linear-mcp-auth-connect.ts",
+            "src/lib/__tests__/linear-mcp-auth-connect.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/linear-mcp-auth-connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linear-mcp-auth-connect tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 with decisions D2, D3, D4, D6. New src/lib/linear-mcp-auth-connect.ts exporting LINEAR_MCP_AUTH_REFRESH_COPY (exact D6 text), LINEAR_MCP_AUTH_REFRESH_THROTTLE_MS = 60_000, the LinearMcpAuthConnectResult union (open | refreshing | nothing-pending | unreachable), connectLinearMcpAuth(deps?) and _resetLinearMcpAuthConnectForTests(). Usable link = active + authUrl + owner not confirmed dead (isConfirmedDead(isAlive(owner)); thrown probe or runtime-indeterminate counts as alive). Refresh candidates: authUrlAgentId first, then blockedAgents by declaredAt descending; first messageAgent outcome with delivered === true wins. Throttle keyed by intervention.declaredAt, in memory. Tests use injected now or fake timers."
+        },
+        "items": [
+          {
+            "id": "wi3-connect-module.ac1",
+            "title": "Given an active intervention whose owner isAlive verdict is alive, when connectLinearMcpAuth runs, then it returns kind \"open\" with the authUrl and messageAgent is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-module.ac2",
+            "title": "Given an expired intervention, when connectLinearMcpAuth runs, then it messages the owner first with LINEAR_MCP_AUTH_REFRESH_COPY and returns kind \"refreshing\" with requestedFrom set to the owner and previousAuthUrl set to the old URL.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-module.ac3",
+            "title": "Given an active intervention whose owner verdict is { alive: false, reason: \"no-session\" }, when connectLinearMcpAuth runs, then it sends a refresh request instead of returning \"open\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-module.ac4",
+            "title": "Given the owner delivery returns delivered false, when connectLinearMcpAuth runs, then it falls back to the newest-declared other blocked agent, and returns kind \"unreachable\" with the D3 error when no candidate is delivered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-module.ac5",
+            "title": "Given a refresh was delivered less than 60 s earlier for the same declaredAt, when connectLinearMcpAuth runs again, then it returns the same requestedFrom and messageAgent is called only once in total.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-verify-module",
+        "title": "Add the verify module that asks the owner to re-check Linear",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/linear-mcp-auth-verify.ts",
+            "src/lib/__tests__/linear-mcp-auth-verify.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/linear-mcp-auth-verify.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linear-mcp-auth-verify tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 with decisions D5, D6. New src/lib/linear-mcp-auth-verify.ts exporting LINEAR_MCP_AUTH_VERIFY_COPY (exact D6 text; must forbid calling mcp__linear__authenticate), LINEAR_MCP_AUTH_VERIFY_THROTTLE_MS = 15_000, the LinearMcpAuthVerifyResult union (already-connected | requested | no-owner | unreachable), requestLinearMcpAuthVerify(deps?) and _resetLinearMcpAuthVerifyForTests(). Messages only authUrlAgentId via messageAgent with caller \"linear-mcp-auth-verify\"."
+        },
+        "items": [
+          {
+            "id": "wi4-verify-module.ac1",
+            "title": "Given status none, when requestLinearMcpAuthVerify runs, then it returns kind \"already-connected\" and sends no message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-verify-module.ac2",
+            "title": "Given an active intervention with owner agent-pan-2997, when requestLinearMcpAuthVerify runs, then it calls messageAgent(\"agent-pan-2997\", LINEAR_MCP_AUTH_VERIFY_COPY, \"linear-mcp-auth-verify\") and returns kind \"requested\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-verify-module.ac3",
+            "title": "Given LINEAR_MCP_AUTH_VERIFY_COPY, when the test reads it, then it contains the text \"do NOT call mcp__linear__authenticate\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-verify-module.ac4",
+            "title": "Given a verify was sent less than 15 s earlier for the same lifecycle, when it runs again, then it returns \"requested\" and messageAgent is called once in total; given delivered false, it returns \"unreachable\" carrying the outcome reason.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-connect-route",
+        "title": "Expose POST /api/linear-mcp-auth/connect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/linear-mcp-auth.ts",
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route, no-loss-matrix, route-scopes and remote-request-gate tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add postLinearMcpAuthConnectRoute (origin check first via rejectInvalidOrigin) calling connectLinearMcpAuth() and merge it into linearMcpAuthRouteLayer. Map open -> 200 { action: \"open\", authUrl, authUrlAgentId }; refreshing -> 202 { action: \"refreshing\", requestedFrom, previousAuthUrl }; nothing-pending -> 409 { success: false, error: \"No Linear authorization is pending\" }; unreachable -> 409 { success: false, error }. Add the no-loss-matrix row from the PRD. The route file must gain no messageAgent( line."
+        },
+        "items": [
+          {
+            "id": "wi5-connect-route.ac1",
+            "title": "Given connectLinearMcpAuth returns kind \"open\", when POST /api/linear-mcp-auth/connect runs with a trusted origin, then it returns 200 with action \"open\" and the authUrl.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-connect-route.ac2",
+            "title": "Given connectLinearMcpAuth returns kind \"refreshing\", when POST /connect runs, then it returns 202 with action \"refreshing\", requestedFrom and previousAuthUrl.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-connect-route.ac3",
+            "title": "Given kind \"nothing-pending\" or \"unreachable\", when POST /connect runs, then it returns 409 with success false and the error text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-connect-route.ac4",
+            "title": "Given a request with no origin header, when POST /connect runs, then it rejects it with 403, and no-loss-matrix.ts lists \"POST /api/linear-mcp-auth/connect\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-verify-route",
+        "title": "Expose POST /api/linear-mcp-auth/verify",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/linear-mcp-auth.ts",
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route, no-loss-matrix, route-scopes and remote-request-gate tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add postLinearMcpAuthVerifyRoute (origin check first) calling requestLinearMcpAuthVerify() and merge it into linearMcpAuthRouteLayer. Map already-connected -> 200 { alreadyConnected: true }; requested -> 202 { requestedFrom }; no-owner -> 409 { success: false, error: \"No blocked agent owns the active Linear authorization URL\" }; unreachable -> 409 { success: false, error }. Add the no-loss-matrix row from the PRD."
+        },
+        "items": [
+          {
+            "id": "wi6-verify-route.ac1",
+            "title": "Given requestLinearMcpAuthVerify returns kind \"requested\", when POST /api/linear-mcp-auth/verify runs with a trusted origin, then it returns 202 with requestedFrom.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-verify-route.ac2",
+            "title": "Given kind \"already-connected\", when POST /verify runs, then it returns 200 with alreadyConnected true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-verify-route.ac3",
+            "title": "Given kind \"no-owner\" or \"unreachable\", when POST /verify runs, then it returns 409 with success false and the error text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-verify-route.ac4",
+            "title": "Given a request with no origin header, when POST /verify runs, then it rejects it with 403, and no-loss-matrix.ts lists \"POST /api/linear-mcp-auth/verify\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-loopback-host",
+        "title": "Add the isLoopbackHost predicate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/loopbackHost.ts",
+            "src/dashboard/frontend/src/lib/__tests__/loopbackHost.test.ts"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/loopbackHost.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "loopbackHost tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/dashboard/frontend/src/lib/loopbackHost.ts with isLoopbackHost(hostname) exactly as in the PRD snippet: localhost, *.localhost (the Traefik dashboard is overdeck.localhost), ::1 / [::1], and 127.x.y.z are loopback."
+        },
+        "items": [
+          {
+            "id": "wi7-loopback-host.ac1",
+            "title": "Given hostnames localhost, overdeck.localhost, 127.0.0.1, 127.1.2.3 and [::1], when isLoopbackHost runs, then it returns true for each.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-loopback-host.ac2",
+            "title": "Given hostnames 192.168.1.20, overdeck.example.com and localhost.evil.com, when isLoopbackHost runs, then it returns false for each.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-connect-flow-hook",
+        "title": "Add the useLinearConnectFlow state machine with fast polling",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi11-banner-connect-ui",
+            "wi12-playwright"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useLinearConnectFlow.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useLinearConnectFlow.test.tsx",
+            "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/hooks/__tests__/useLinearConnectFlow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useLinearConnectFlow tests pass under fake timers",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ],
+          "acJustification": "Six observable transitions of one state machine; splitting the hook would split one module across items."
+        },
+        "narrative": {
+          "Action": "PRD WI-8 with decisions D8, D9, D10, D11, D14. useLinearMcpAuthStatus(options?: { fast?: boolean }) polls every 1000 ms when fast. New hook useLinearConnectFlow() owns the status query: it holds phase in state, calls useLinearMcpAuthStatus({ fast: phase !== \"idle\" }) itself, and returns { intervention, phase, fallbackUrl, notice, connect, checkNow } with phase idle | opening | refreshing | awaiting-approval | checking. connect() opens about:blank synchronously, POSTs /connect, navigates (opener = null first) on open, waits up to 90 s for a fresh authUrl (authUrl !== previousAuthUrl and status active) on refreshing. On a loopback host the first focus/visibilitychange-visible event >= 2 s after navigation calls checkNow() (POST /verify); checking times out after 60 s back to awaiting-approval with the D11 notice. status none during a flow -> toast.success(\"Linear connected — N agent(s) resumed\") using the last non-none blockedAgents.length. Tests use vi.useFakeTimers() and mocked fetch, window.open and sonner."
+        },
+        "items": [
+          {
+            "id": "wi8-connect-flow-hook.ac1",
+            "title": "Given POST /connect returns 200 open, when connect() runs, then the fake tab opener is set to null, its location.href becomes the authUrl, and phase becomes awaiting-approval.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-connect-flow-hook.ac2",
+            "title": "Given POST /connect returns 202 refreshing, when the intervention later returns a different active authUrl, then the tab navigates to the new URL; when 90 s pass without one, then the tab close() is called and an error toast is shown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-connect-flow-hook.ac3",
+            "title": "Given window.open returns null, when connect() resolves a URL, then the hook exposes it as fallbackUrl.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-connect-flow-hook.ac4",
+            "title": "Given phase awaiting-approval on hostname localhost, when a window focus event fires 3 s after navigation, then POST /api/linear-mcp-auth/verify is sent once; on hostname 192.168.1.20 no verify is sent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-connect-flow-hook.ac5",
+            "title": "Given a flow in progress with 2 blocked agents, when the intervention status becomes none, then toast.success is called with \"Linear connected — 2 agents resumed\" and phase returns to idle.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-connect-flow-hook.ac6",
+            "title": "Given the hook mounts idle, when it calls useLinearMcpAuthStatus, then it passes fast false; given connect() has started, then it passes fast true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-wake-all-regression",
+        "title": "Lock in waking every blocked agent after a refreshed owner connects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/__tests__/linear-mcp-auth-wake.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/linear-mcp-auth-wake.test.ts"
+          ],
+          "expected_outputs": [
+            "linear-mcp-auth-wake tests pass including the new regression test"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and finding F4: the wake pass already wakes every blocked agent; no production change. Widen the test helpers to required(sequence, agentId, issueId: string | null, authUrl: string | null = null) and healthy(sequence, agentId = \"operator\", source = \"operator\") without changing existing calls, then add a test: required(1, \"conv-20261001-eba1\", null), required(2, \"agent-pan-2997\", \"PAN-2997\", \"https://linear.app/oauth/authorize?state=fresh\"), healthy(3, \"agent-pan-2997\", \"hook\") -> processLinearMcpAuthWake() messages both agents."
+        },
+        "items": [
+          {
+            "id": "wi9-wake-all-regression.ac1",
+            "title": "Given a URL-less conversation and a refreshed owner in one lifecycle, when the owner emits a hook-sourced healthy event and processLinearMcpAuthWake runs, then messageAgent is called for both conv-20261001-eba1 and agent-pan-2997.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-wake-all-regression.ac2",
+            "title": "Given the widened helpers, when the existing wake tests run, then every existing test in the file still passes unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-agent-row-links",
+        "title": "Link each blocked agent row to its conversation or issue view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/LinearMcpAuthBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "LinearMcpAuthBanner tests pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and D12. Export blockedAgentLink(agent) from LinearMcpAuthBanner.tsx (label = conversationTitle ?? issueId ?? agentId; href = conversationUrl ?? (issueId ? `/issues/${issueId}` : null)). Render the label as a link with title={agent.agentId}, a plain span when href is null, then a trailing ExternalLink icon anchor with aria-label \"Open <issueId> in tracker\" when a tracker URL resolves. Keep the \"(woken, re-checking)\" suffix."
+        },
+        "items": [
+          {
+            "id": "wi10-agent-row-links.ac1",
+            "title": "Given a conversation agent with conversationTitle \"Fernkite: hosted Emma assessment\" and conversationUrl \"/conv/3172\", when the banner renders, then the row renders a link with that text, href \"/conv/3172\" and title \"conv-20261001-eba1\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-agent-row-links.ac2",
+            "title": "Given agent-min-852 with issueId MIN-852 and no conversationUrl, when the banner renders, then the row renders a link \"MIN-852\" with href \"/issues/MIN-852\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-agent-row-links.ac3",
+            "title": "Given an agent with no conversation and no issueId, when the banner renders, then the row renders its agentId as plain text with no link.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-banner-connect-ui",
+        "title": "Make Connect Linear the banner primary action with a fallback disclosure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/LinearMcpAuthBanner.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "LinearMcpAuthBanner tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 with decisions D1, D13. Remove the \"Open Linear authorization\" anchor and the expired/waiting paragraphs. Add the \"Connect Linear\" button (disabled while phase !== idle) wired to useLinearConnectFlow, the fallbackUrl anchor, and the per-phase status line copy from FR-5 plus the idle+expired line and D11 notice. Move the paste input, Submit callback URL button, the explanatory paragraph and Mark completed (relabelled \"Already authorized another way? Mark completed\") into <details open={!isLoopbackHost(window.location.hostname)}> with summary \"Signed in from a different device? Paste the callback URL\". Replace useLinearMcpAuthStatus() in the banner with const flow = useLinearConnectFlow(); intervention = flow.intervention. In the banner test replace the useLinearMcpAuthStatus mock with a useLinearConnectFlow mock, and control the host with vi.mock(\"../lib/loopbackHost\") rather than redefining window.location."
+        },
+        "items": [
+          {
+            "id": "wi11-banner-connect-ui.ac1",
+            "title": "Given status active or expired, when the banner renders in idle phase, then it renders an enabled \"Connect Linear\" button and no \"Open Linear authorization\" anchor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-banner-connect-ui.ac2",
+            "title": "Given hostname localhost, when the banner renders, then the \"Signed in from a different device? Paste the callback URL\" disclosure is closed; given hostname 192.168.1.20 it renders open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-banner-connect-ui.ac3",
+            "title": "Given phase refreshing, when the banner renders, then it shows \"Getting a fresh link…\" and the Connect Linear button is disabled; given phase awaiting-approval it shows a \"Check now\" button that calls checkNow.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-banner-connect-ui.ac4",
+            "title": "Given the disclosure is opened, when the operator submits a callback URL or clicks Mark completed, then the existing POST /callback and POST /complete requests are sent as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-playwright",
+        "title": "Playwright spec for expired link to one-click connect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4464-linear-connect.spec.ts"
+          ],
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4464-linear-connect.spec.ts"
+          ],
+          "expected_outputs": [
+            "the pan-4464-linear-connect spec passes",
+            "test-results/pan-4464/connected.png is written"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Set test.setTimeout(240_000) at module level (config default is 60 s; isolated-dashboard boot uses much of it). PRD WI-12. Boot an isolated dashboard with startIsolatedDashboard() from tests/fixtures/isolated-dashboard.js (throwaway OVERDECK_HOME, own port, own browser context — never a shared Playwright session). Script GET /api/linear-mcp-auth, POST /connect (202 refreshing) and POST /verify with page.route; fulfil https://linear.app/** with a stub page via context.route so nothing leaves the machine; capture the popup via context.waitForEvent(\"page\"). After the popup, bring the dashboard page to front, or click \"Check now\" if headless focus does not fire. Stop the dashboard in afterEach."
+        },
+        "items": [
+          {
+            "id": "wi12-playwright.ac1",
+            "title": "Given an expired intervention fixture, when the page loads, then the blocked row renders the link \"Fernkite: hosted Emma assessment\" with href \"/conv/3172\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-playwright.ac2",
+            "title": "Given the operator clicks Connect Linear, when /connect returns refreshing and GET then returns a fresh authUrl, then \"Getting a fresh link…\" appears and the popup URL ends with \"state=fresh\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-playwright.ac3",
+            "title": "Given /verify succeeds and GET returns status none, when the operator returns to the dashboard, then the toast \"Linear connected — 1 agent resumed\" appears and the text \"Linear authentication required\" is no longer rendered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-playwright.ac4",
+            "title": "Given the spec finishes, when the test-results directory is listed, then test-results/pan-4464/connected.png exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-docs",
+        "title": "Document the connect, refresh and verify flows in LINEAR-MCP-AUTH.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:20:31Z",
+        "metadata": {
+          "issueLabel": "pan-4464",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/LINEAR-MCP-AUTH.md"
+          ],
+          "verify_commands": [
+            "grep -n \"Connect and verify routes\" docs/LINEAR-MCP-AUTH.md",
+            "grep -n \"POST /api/linear-mcp-auth/verify\" docs/LINEAR-MCP-AUTH.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new subsection heading",
+            "grep prints the verify route line"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Update docs/LINEAR-MCP-AUTH.md: the Expiry TTL bullet (expired links are regenerated on demand by Connect Linear), the Projection bullet (conversationUrl resolved by tmux session, conversationTitle), Banner states (Connect Linear, phase copy, row label/link rule, fallback disclosure open only on non-loopback hosts with the loopback definition), Operator completion flows (new first flow \"Connect Linear (same machine)\" including the popup handling and why the verify request exists), a new \"Connect and verify routes\" subsection (status-code table, candidate order, both throttles, both exact copies and why neither reuses the wake copy), and the Tests list (the five new test files). No Mintlify page covers this banner."
+        },
+        "items": [
+          {
+            "id": "wi13-docs.ac1",
+            "title": "Given the updated doc, when grep runs for \"Connect and verify routes\", then it returns the new subsection heading, and the subsection lists POST /api/linear-mcp-auth/connect and POST /api/linear-mcp-auth/verify with their 200/202/403/409 responses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-docs.ac2",
+            "title": "Given the \"Banner states\" section, when a reader opens it, then it describes the Connect Linear button and states that the paste disclosure opens by default only on a non-loopback host.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-docs.ac3",
+            "title": "Given the \"Expiry TTL\" bullet, when a reader opens it, then it no longer says the link refreshes automatically and instead names Connect Linear as the regeneration path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-conv-lookup",
+        "to": "wi2-conv-title",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-conv-title",
+        "to": "wi5-connect-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-connect-route",
+        "to": "wi6-verify-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-connect-module",
+        "to": "wi5-connect-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-verify-module",
+        "to": "wi6-verify-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-conv-title",
+        "to": "wi8-connect-flow-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-loopback-host",
+        "to": "wi8-connect-flow-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-conv-title",
+        "to": "wi10-agent-row-links",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-agent-row-links",
+        "to": "wi11-banner-connect-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-loopback-host",
+        "to": "wi11-banner-connect-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-connect-flow-hook",
+        "to": "wi11-banner-connect-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-banner-connect-ui",
+        "to": "wi12-playwright",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4464-linear-mcp-auth-banner-should-be-one-click-expired-links-need-a-manual-retry-agents-aren-t-clickable-paste-the-callback-is-the-primary-path.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
