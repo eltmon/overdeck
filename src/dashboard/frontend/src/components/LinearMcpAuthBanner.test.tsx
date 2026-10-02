@@ -228,6 +228,7 @@ describe('LinearMcpAuthBanner', () => {
     setIntervention(intervention());
     render(<LinearMcpAuthBanner />);
 
+    fireEvent.click(screen.getByText('Signed in from a different device? Paste the callback URL'));
     fireEvent.change(screen.getByPlaceholderText(/Paste the localhost callback URL/), {
       target: { value: 'http://localhost:48271/callback?code=abc&state=xyz' },
     });
@@ -245,6 +246,7 @@ describe('LinearMcpAuthBanner', () => {
     setIntervention(intervention());
     render(<LinearMcpAuthBanner />);
 
+    fireEvent.click(screen.getByText('Signed in from a different device? Paste the callback URL'));
     expect(screen.getByText(/blocked agents will be woken to re-check/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Already authorized another way\? Mark completed/ }));
