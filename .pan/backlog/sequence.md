@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-02T12:43:52.459605Z · model: claude-opus-5-5 · open: 825_
+_Last sequenced: 2026-10-02T12:49:58.689836Z · model: claude-opus-5-5 · open: 826_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -141,6 +141,7 @@ _Last sequenced: 2026-10-02T12:43:52.459605Z · model: claude-opus-5-5 · open: 
 | 155 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 158 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
 | 160 | PAN-4299 | S | high | ok |  |  | Traefik binds 80/443/8080 on all interfaces; a LAN client can mint a dashboard session (PTY access) via forged Host header |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
@@ -1160,10 +1161,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-02T12:43:52.459605Z",
+  "generatedAt": "2026-10-02T12:49:58.689836Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 825,
+  "openCount": 826,
   "nodes": [
     {
       "issue": "PAN-4433",
@@ -11439,6 +11440,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "rationale": "New issue: well-specified UI+backend feature with clear AC; ranked mid-tier behind its in-pipeline blocker PAN-4254.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4487",
+      "rank": 158,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test",
+      "rationale": "New issue with a precise root cause and a one-line fix plus a named test. The whitelist silently discards three AgentState fields, so the MODEL inspector always shows a fallback spawn key and foreman ownership is lost on the first save. It touches the same whitelist PAN-4253 extends, so landing it first avoids a conflict and gives that slice a tested pattern.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12806,6 +12820,13 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4487",
+      "to": "PAN-4253",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
