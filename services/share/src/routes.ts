@@ -10,7 +10,7 @@ import type { CreateRoomResponse, RoomSnapshot, ShareScope } from '../../../pack
 import { verifyIdentity } from './account.ts';
 import { newHostToken, newShortCode, normalizeShortCode, sha256Hex } from './codes.ts';
 import type { Config, Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
-import { HDR_HOST_TOKEN_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
+import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { endedPage, invitePage } from './pages.ts';
 
 export const MAX_BODY_BYTES = 16 * 1024;
@@ -145,6 +145,45 @@ const deleteRoom: Handler = async (req, rc) => {
   return new Response(null, { status: 204 });
 };
 
+function isWebSocketUpgrade(req: Request): boolean {
+  return (req.headers.get('Upgrade') ?? '').toLowerCase() === 'websocket';
+}
+
+/** Shared checks for both WebSocket endpoints: 426 without an upgrade, 400 for any protocol but v=1. */
+function upgradeRefusal(req: Request): Response | null {
+  if (!isWebSocketUpgrade(req)) return json({ error: 'upgrade_required' }, 426, { Upgrade: 'websocket' });
+  if (new URL(req.url).searchParams.get('v') !== '1') return json({ error: 'unsupported_protocol' }, 400);
+  return null;
+}
+
+/** Forwards an upgrade to the room; anything but 101 (unknown, ended, wrong token) is 404. */
+async function forwardUpgrade(env: Env, shortCode: string, path: string, headers: Record<string, string>): Promise<Response> {
+  const res = await roomFetch(env, shortCode, path, { headers: { Upgrade: 'websocket', ...headers } });
+  return res.status === 101 ? res : json({ error: 'not_found' }, 404);
+}
+
+/** GET /v1/rooms/:code/host: the host server's signaling socket, authorized by the host token. */
+const hostSocket: Handler = async (req, rc) => {
+  const refused = upgradeRefusal(req);
+  if (refused) return refused;
+  const token = HOST_BEARER_RE.exec(req.headers.get('Authorization') ?? '')?.[1];
+  if (!token) return json({ error: 'invalid_token' }, 401);
+  const shortCode = normalizeShortCode(rc.params['code'] ?? '');
+  if (!shortCode) return json({ error: 'not_found' }, 404);
+  return forwardUpgrade(rc.env, shortCode, INTERNAL.host, { [HDR_HOST_TOKEN_HASH]: await sha256Hex(token) });
+};
+
+/** GET /v1/rooms/:code/join: a viewer server's signaling socket, authorized by its device token. */
+const joinSocket: Handler = async (req, rc) => {
+  const refused = upgradeRefusal(req);
+  if (refused) return refused;
+  const verified = await verifyIdentity(rc.env, req.headers.get('Authorization'));
+  if (!verified.ok) return json({ error: verified.error }, verified.status);
+  const shortCode = normalizeShortCode(rc.params['code'] ?? '');
+  if (!shortCode) return json({ error: 'not_found' }, 404);
+  return forwardUpgrade(rc.env, shortCode, INTERNAL.join, { [HDR_IDENTITY]: JSON.stringify(verified.identity) });
+};
+
 /** GET /s/:code: the invite landing page. It never reveals room data. */
 const landingPage: Handler = async (_req, rc) => {
   const shortCode = normalizeShortCode(rc.params['code'] ?? '');
@@ -159,6 +198,8 @@ const ROUTES: Route[] = [
   { method: 'GET', pattern: '/healthz', handler: async (_req, rc) => healthz(rc.env) },
   { method: 'POST', pattern: '/v1/rooms', handler: createRoom },
   { method: 'DELETE', pattern: '/v1/rooms/:code', handler: deleteRoom },
+  { method: 'GET', pattern: '/v1/rooms/:code/host', handler: hostSocket },
+  { method: 'GET', pattern: '/v1/rooms/:code/join', handler: joinSocket },
   { method: 'GET', pattern: '/s/:code', handler: landingPage },
 ];
 

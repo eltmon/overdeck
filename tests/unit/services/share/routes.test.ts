@@ -399,6 +399,54 @@ describe('GET /s/:code', () => {
   });
 });
 
+describe('GET /v1/rooms/:code/host and /join (upgrade routes)', () => {
+  const upgrade = (authorization: string) => ({ headers: { Upgrade: 'websocket', Authorization: authorization } });
+  const HOST_AUTH = `Bearer odh_${'b'.repeat(64)}`;
+  const DEVICE_AUTH = `Bearer ${DEVICE_TOKEN}`;
+
+  it('without an Upgrade header both answer 426; with v other than 1 both answer 400 unsupported_protocol', async () => {
+    for (const [path, auth] of [['host', HOST_AUTH], ['join', DEVICE_AUTH]] as const) {
+      const plain = await call('GET', `/v1/rooms/BCDFGHJK/${path}?v=1`, makeEnv(), { headers: { Authorization: auth } });
+      expect(plain.status).toBe(426);
+      const wrongVersion = await call('GET', `/v1/rooms/BCDFGHJK/${path}?v=2`, makeEnv(), upgrade(auth));
+      expect(wrongVersion.status).toBe(400);
+      expect(await wrongVersion.json()).toEqual({ error: 'unsupported_protocol' });
+    }
+  });
+
+  it('host forwards only the token hash; a non-101 DO reply is 404', async () => {
+    const rooms = fakeRooms(() => new Response(null, { status: 404 }));
+    const res = await call('GET', '/v1/rooms/bcdf-ghjk/host?v=1', makeEnv({ ROOMS: rooms.ns }), upgrade(HOST_AUTH));
+    expect(res.status).toBe(404);
+    expect(rooms.calls).toHaveLength(1);
+    expect(rooms.calls[0]).toMatchObject({ name: 'BCDFGHJK', path: '/host' });
+    expect(rooms.calls[0]?.headers.get(HDR_HOST_TOKEN_HASH)).toBe(await sha256Hex(`odh_${'b'.repeat(64)}`));
+    expect(rooms.calls[0]?.headers.get('Authorization')).toBeNull();
+  });
+
+  it('host with a malformed token is 401; join with a non-device token is 401 without calling verifyDevice', async () => {
+    const rooms = fakeRooms(defaultRoom);
+    const account = fakeAccount();
+    const env = makeEnv({ ROOMS: rooms.ns, ACCOUNT: account.binding });
+    expect((await call('GET', '/v1/rooms/BCDFGHJK/host?v=1', env, upgrade(DEVICE_AUTH))).status).toBe(401);
+    expect((await call('GET', '/v1/rooms/BCDFGHJK/join?v=1', env, upgrade(HOST_AUTH))).status).toBe(401);
+    expect(account.calls).toEqual([]);
+    expect(rooms.calls).toEqual([]);
+  });
+
+  it('join forwards the verified identity, never the bearer token', async () => {
+    const rooms = fakeRooms(() => new Response(null, { status: 404 }));
+    const res = await call('GET', '/v1/rooms/BCDFGHJK/join?v=1', makeEnv({ ROOMS: rooms.ns }), upgrade(DEVICE_AUTH));
+    expect(res.status).toBe(404);
+    expect(JSON.parse(rooms.calls[0]?.headers.get('X-Share-Identity') ?? '')).toEqual({
+      githubId: 42,
+      login: 'octo',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/42',
+    });
+    expect(rooms.calls[0]?.headers.get('Authorization')).toBeNull();
+  });
+});
+
 describe('security headers', () => {
   it('every response carries Cache-Control: no-store and X-Content-Type-Options: nosniff', () => {
     expect(seen.length).toBeGreaterThanOrEqual(30);
