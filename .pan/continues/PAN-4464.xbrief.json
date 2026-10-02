@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:52:02.424Z",
+  "updated": "2026-10-02T02:52:39.390Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,9 +74,10 @@
       "doneAt": "2026-10-02T02:49:54.299Z"
     },
     "wi12-playwright": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4464",
-      "claimedAt": "2026-10-02T02:49:59.036Z"
+      "claimedAt": "2026-10-02T02:49:59.036Z",
+      "doneAt": "2026-10-02T02:52:39.390Z"
     },
     "wi13-docs": {
       "status": "completed",
