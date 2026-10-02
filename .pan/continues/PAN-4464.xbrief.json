@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:49:54.299Z",
+  "updated": "2026-10-02T02:49:59.037Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,11 @@
       "claimedBy": "agent-pan-4464",
       "claimedAt": "2026-10-02T02:48:15.230Z",
       "doneAt": "2026-10-02T02:49:54.299Z"
+    },
+    "wi12-playwright": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:49:59.036Z"
     }
   }
 }
