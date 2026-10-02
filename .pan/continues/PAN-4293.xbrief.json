@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T03:37:30.145Z",
+  "updated": "2026-10-02T03:37:42.844Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
       "claimedBy": "agent-pan-4293",
       "claimedAt": "2026-10-02T03:34:55.436Z",
       "doneAt": "2026-10-02T03:37:30.144Z"
+    },
+    "account-schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:37:42.844Z"
     }
   }
 }
