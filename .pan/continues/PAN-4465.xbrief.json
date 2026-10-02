@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4465",
   "created": "2026-10-02T02:35:56.189Z",
-  "updated": "2026-10-02T03:35:25.656Z",
+  "updated": "2026-10-02T03:35:40.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "wire-pause.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T03:35:25.656Z"
+    },
+    "wire-unpause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:35:40.802Z"
     }
   }
 }
