@@ -123,6 +123,11 @@ export async function evaluateIssueMergeGate(
 export interface ConflictRepairGateResult {
   /** True when the PR is merge-ready in every respect except `mergeable: false`. */
   conflicting: boolean;
+  /**
+   * PAN-4467: GitHub only. The forge approved an older head but no approval
+   * is proven at this one; the repaired head needs a fresh review.
+   */
+  staleApproval?: boolean;
   reason?: string;
   facts: PrFacts;
 }
@@ -137,6 +142,11 @@ export interface ConflictRepairGateResult {
  * PR, so pull_request CI never runs on it; pending, absent or test-job-less
  * checks pass. Red checks still disqualify. The merge gate re-judges CI on the
  * repaired head.
+ *
+ * PAN-4467: a GitHub approval of an older head (the head moved since the
+ * approving review) still counts here and is reported as `staleApproval`; the
+ * merge gate still needs approval at the repaired head. A PR the forge does
+ * not call approved at any head is not repaired.
  */
 export async function evaluateConflictRepairGate(
   issueId: string,
@@ -159,11 +169,14 @@ export async function evaluateConflictRepairGate(
   if (!approvedAtHead && facts.forge === 'github') {
     approvedAtHead = (await forgeApprovalAtHead(facts, deps.readReviews, deps.overdeckLogins)) === true;
   }
+  // PAN-4467: an approval of an older head still routes a repair. Nothing
+  // merges on it: the merge gate needs approval at the repaired head.
+  const staleApproval = facts.forge === 'github' && !approvedAtHead && facts.approved === true;
   const asMergeable: PrFacts = {
     ...facts,
     mergeable: true,
     checks: 'green',
-    ...(approvedAtHead ? { approvedAtHead: true } : {}),
+    ...(approvedAtHead || staleApproval ? { approvedAtHead: true } : {}),
   };
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {
@@ -174,7 +187,8 @@ export async function evaluateConflictRepairGate(
     }
   }
   const readiness = evaluateMergeReadiness(asMergeable, { ciTestsRequired: false, uatRequired, requireApprovalAtHead: true });
-  return readiness.ready ? { conflicting: true, facts } : { conflicting: false, reason: readiness.reason, facts };
+  if (!readiness.ready) return { conflicting: false, reason: readiness.reason, facts };
+  return staleApproval ? { conflicting: true, staleApproval: true, facts } : { conflicting: true, facts };
 }
 
 /**

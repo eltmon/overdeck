@@ -1,0 +1,89 @@
+{
+  "version": "1",
+  "issueId": "PAN-4467",
+  "created": "2026-10-02T03:04:42.079Z",
+  "updated": "2026-10-02T03:54:10.812Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gate-stale-approval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4467",
+      "claimedAt": "2026-10-02T03:04:42.079Z",
+      "doneAt": "2026-10-02T03:20:19.661Z"
+    },
+    "repair-stale-prompt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4467",
+      "claimedAt": "2026-10-02T03:20:29.089Z",
+      "doneAt": "2026-10-02T03:31:32.480Z"
+    },
+    "log-declined-heads": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4467",
+      "claimedAt": "2026-10-02T03:31:40.376Z",
+      "doneAt": "2026-10-02T03:40:39.370Z"
+    },
+    "docs-stale-approval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4467",
+      "claimedAt": "2026-10-02T03:40:44.236Z",
+      "doneAt": "2026-10-02T03:49:35.351Z"
+    },
+    "gate-stale-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:42.595Z"
+    },
+    "gate-stale-approval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:53.994Z"
+    },
+    "gate-stale-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:05.587Z"
+    },
+    "gate-stale-approval.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:17.580Z"
+    },
+    "repair-stale-prompt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:33.193Z"
+    },
+    "repair-stale-prompt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:45.481Z"
+    },
+    "repair-stale-prompt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:58.127Z"
+    },
+    "log-declined-heads.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:10.610Z"
+    },
+    "log-declined-heads.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:22.836Z"
+    },
+    "log-declined-heads.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:35.226Z"
+    },
+    "docs-stale-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:47.136Z"
+    },
+    "docs-stale-approval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:58.975Z"
+    },
+    "docs-stale-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:10.811Z"
+    }
+  }
+}

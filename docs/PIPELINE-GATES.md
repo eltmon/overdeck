@@ -530,7 +530,7 @@ PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
 calls a PR *merge-ready but conflicting* when the forge reports
 `mergeable: false` and every other merge-gate condition holds under the same
 policy as `evaluateIssueMergeGate`, except CI: open, not a draft, no change
-request, no failed required UAT at the head, and approval proven at the head.
+request, no failed required UAT at the head, and an approval on the forge.
 A conflicting PR gets no `pull_request` CI, because GitHub builds no merge ref
 for it, so its head can never get a test result (PAN-4451). The predicate
 therefore accepts `pending` or `none` checks and a missing or skipped CI test
@@ -540,9 +540,21 @@ green CI and, in `verification.tests: ci` projects, a passed CI test job
 before anything merges. Before PAN-4451 the predicate demanded that CI too,
 and PR #4440 sat approved and CONFLICTING for about 19 hours. A verdict
 marker naming the head proves the approval; otherwise the GitHub reviews are
-read directly, because `withForgeApprovalAtHead` skips unmergeable PRs.
+read directly, because `withForgeApprovalAtHead` skips unmergeable PRs. An
+approval of an older head counts too (PAN-4467): when the head moved after the
+approving review, the predicate reports `staleApproval`, the repair prompt
+says the PR was approved at an older commit, and the journal entry carries
+`data.staleApproval: true`. The merge gate still needs an approval at the
+repaired head. A PR the forge does not call approved at any head (for example,
+an approval dismissed on push) is not repaired. Before PAN-4467 such a PR was
+skipped without a trace, and PR #4440 sat CONFLICTING for about 13 hours.
 Nothing is stored: the answer comes from `getPrFacts` at the moment it is
 asked.
+
+**Declined heads are logged.** When the gate declines a candidate whose open
+PR the forge calls `mergeable: false`, the patrol logs
+`[conflict-repair] <ISSUE>: conflicting head <head8> not repaired: <reason>`
+once per issue and head in each dashboard process.
 
 **The patrol.** `startConflictRepairPatrol`
 (`dashboard/server/services/conflict-repair-patrol.ts`) runs
@@ -1098,7 +1110,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
-| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
+| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
 | `blocked.woken` | `cloister/blocker-wake.ts` `tickBlockerWake`, once per declaration when all its blockers merged (`data.item`, `data.declaredAt`, `data.outcome`: `delivered` \| `unreachable`) |

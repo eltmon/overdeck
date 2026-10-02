@@ -13,6 +13,9 @@
  * the next tick counts those entries, so a dashboard restart never re-sends a
  * repair. The host (the dashboard's `conflict-repair-patrol.ts`) owns the
  * timer and the global skips; every I/O here is injectable.
+ *
+ * An approval of an older head counts too (PAN-4467); the repaired head is
+ * re-reviewed before it can merge.
  */
 import { existsSync } from 'node:fs';
 
@@ -65,6 +68,8 @@ const inFlight = new Set<string>();
 const lastBackstopAt = new Map<string, number>();
 /** `<issue>:<head>` pairs whose backstop refusal already raised Needs-you. */
 const refusalsSurfaced = new Set<string>();
+/** `<issue>:<head>` pairs whose declined conflicting head was already logged. */
+const declinesLogged = new Set<string>();
 /** Guarded-door answers that need the operator: the review will not start on its own. */
 const OPERATOR_REFUSALS = new Set<GuardedReviewRequestOutcome['kind']>(['circuit-breaker', 'no-project', 'dirty-workspace']);
 
@@ -72,6 +77,7 @@ export function __resetConflictRepairStateForTests(): void {
   inFlight.clear();
   lastBackstopAt.clear();
   refusalsSurfaced.clear();
+  declinesLogged.clear();
 }
 
 /**
@@ -91,11 +97,14 @@ export function buildConflictRepairPrompt(input: {
   issueId: string;
   head: string;
   conflictPaths: readonly string[];
+  staleApproval?: boolean;
 }): string {
   const { issueId, head } = input;
   const paths = input.conflictPaths.length > 0 ? input.conflictPaths.join(', ') : 'run git merge-tree to list them';
   return [
-    `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) is approved but now conflicts with origin/main, so it cannot merge.`,
+    input.staleApproval
+      ? `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) was approved at an older commit and now conflicts with origin/main, so it cannot merge.`
+      : `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) is approved but now conflicts with origin/main, so it cannot merge.`,
     'GitHub runs no CI on a conflicting PR; CI runs again on the head you push.',
     `Conflicting paths: ${paths}`,
     '',
@@ -181,6 +190,20 @@ function entriesForHead(entries: readonly PipelineJournalEntry[], head: string) 
 }
 
 /**
+ * PAN-4467: a candidate whose open PR conflicts but that the gate declines
+ * leaves one log line per head, so a skip is never silent.
+ */
+function logDeclinedConflict(d: Resolved, issueId: string, gate: ConflictRepairGateResult): void {
+  const { facts } = gate;
+  if (!facts.open || facts.mergeable !== false || !facts.headSha) return;
+  const head = facts.headSha.slice(0, 8);
+  const key = `${issueId}:${head}`;
+  if (declinesLogged.has(key)) return;
+  declinesLogged.add(key);
+  d.log(`[conflict-repair] ${issueId}: conflicting head ${head} not repaired: ${gate.reason ?? 'no reason given'}`);
+}
+
+/**
  * Raise Needs-you, then journal the escalation whatever the announcement did:
  * the entry is what stops the next tick escalating the same head again.
  */
@@ -223,7 +246,7 @@ async function dispatchRepair(
   } catch {
     // The paths only make the prompt more specific; the agent can list them.
   }
-  const prompt = buildConflictRepairPrompt({ issueId, head, conflictPaths });
+  const prompt = buildConflictRepairPrompt({ issueId, head, conflictPaths, staleApproval: gate.staleApproval === true });
   const dedupKey = `conflict-repair:${issueId.toLowerCase()}:${head}`;
   let failure: string | null = null;
   try {
@@ -241,9 +264,9 @@ async function dispatchRepair(
     type: 'conflict.repair-requested',
     issueId,
     source: SOURCE,
-    data: { head, agentId: target.agentId, conflictPaths },
+    data: { head, agentId: target.agentId, conflictPaths, ...(gate.staleApproval ? { staleApproval: true } : {}) },
   });
-  d.log(`[conflict-repair] ${issueId}: sent a sync-main repair for ${head} to ${target.agentId}`);
+  d.log(`[conflict-repair] ${issueId}: sent a sync-main repair for ${head} to ${target.agentId}${gate.staleApproval ? ' (stale approval)' : ''}`);
   return 'repair-requested';
 }
 
@@ -305,7 +328,10 @@ async function tickIssue(d: Resolved, issueId: string, workspacePath: string): P
   if (d.getIssuePause(issueId).status !== 'unpaused') return null;
 
   const gate = await d.evaluateGate(issueId);
-  if (!gate.conflicting) return reviewBackstop(d, issueId, entries, gate);
+  if (!gate.conflicting) {
+    logDeclinedConflict(d, issueId, gate);
+    return reviewBackstop(d, issueId, entries, gate);
+  }
   if (!gate.facts.headSha) return null;
 
   const head = gate.facts.headSha.slice(0, 8);

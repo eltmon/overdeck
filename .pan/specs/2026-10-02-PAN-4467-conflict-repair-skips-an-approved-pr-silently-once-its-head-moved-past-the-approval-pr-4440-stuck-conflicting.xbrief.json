@@ -1,0 +1,344 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T02:58:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4467: Conflict repair skips an approved PR silently once its head moved past the approval (PR #4440 stuck CONFLICTING)",
+    "updated": "2026-10-02T03:04:11.162Z"
+  },
+  "plan": {
+    "id": "pan-4467",
+    "title": "Conflict repair skips an approved PR silently once its head moved past the approval (PR #4440 stuck CONFLICTING)",
+    "status": "running",
+    "uid": "e8bae45c-a6d0-4aab-8917-d3ae74fa571b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-02T02:58:55Z",
+    "updated": "2026-10-02T03:04:11.162Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4467",
+        "label": "PAN-4467",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4467.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conflict-repair",
+      "merge-gate",
+      "cloister",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "An approved PR whose head moved past the approval (the agent merged main and pushed without re-requesting review) and that then turns CONFLICTING has no route out. evaluateConflictRepairGate requires approval at head, so it answers conflicting:false; tickIssue then runs reviewBackstop, which returns null because the PR is not mergeable; and tickIssue never logs the gate's reason. PR #4440 (PAN-4433) sat CONFLICTING for about 13 hours with zero [conflict-repair] log lines.",
+      "Proposal": "Treat a GitHub stale approval (facts.approved true, approval not proven at head) as repair-eligible in evaluateConflictRepairGate and report it as staleApproval:true. The patrol sends one sync-main repair per head as today; the prompt's first line says the PR was approved at an older commit and the conflict.repair-requested journal entry carries data.staleApproval:true. Nothing merges on it: the merge gate still needs approval at the repaired head, the prompt demands pan review request, requestReviewGuarded proceeds on a stale approval, and the review backstop re-requests review. Separately, tickIssue logs a declined conflicting head (open, mergeable:false) once per issue and head. Docs in PIPELINE-GATES.md and MERGE-WORKFLOW.md describe both.",
+      "NonGoals": "- Do not repair a PR whose approval was dismissed on the forge (facts.approved false) even if the journal says APPROVED; it is only logged.\n- Do not route the mergeable stale-approval deadlock (approved at an older head, PR mergeable, no review request, no prior repair entry); that is a separate follow-up issue.\n- Do not change evaluateIssueMergeGate, evaluateMergeReadiness, isConflictRepairCandidate, reviewBackstop, the grace/backstop timers, or the dashboard patrol host.\n- Do not call recordApprovalAtHead from evaluateConflictRepairGate.\n- Do not add a forge read, a journal entry type, or any persistent store for skip logs.\n- Do not edit changelog.mdx."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Route a stale-approval conflicting PR to a sync-main repair rather than straight to Needs-you.",
+        "rationale": "The repair unblocks the PR, and re-review before merge is already guaranteed: the merge gate needs approval at the new head, the prompt's step 5 demands pan review request, requestReviewGuarded proceeds when readApprovalStandsAtHead is false, and reviewBackstop re-requests review. Needs-you is still reached through the existing grace and unreachable escalations."
+      },
+      {
+        "summary": "This supersedes PAN-4451's non-goal 'Conflicting PRs whose approval does not stand at the head are not repaired'.",
+        "rationale": "PAN-4467 is the newer issue and explicitly asks for this route; PAN-4451 left it out assuming the agent's own review request would cover it, which PR #4440 disproved. Not a contradiction between authoritative inputs for one issue."
+      },
+      {
+        "summary": "Stale approval = facts.forge === 'github' && facts.approved === true && approval not proven at head; dismissed approvals (facts.approved false) are not repaired, only logged.",
+        "rationale": "The forge is authoritative over the pipeline journal (CLAUDE.md). GitLab never sets approvedAtHead, so the forge check prevents mislabeling every GitLab repair as stale."
+      },
+      {
+        "summary": "Skip-log dedup key is <ISSUE>:<head8>, in memory, re-logged once after a dashboard restart.",
+        "rationale": "The AC says once per issue and head; the module's existing refusalsSurfaced/lastBackstopAt dedup is in-memory and nothing is stored (Overdeck stores no derivable status)."
+      }
+    ],
+    "items": [
+      {
+        "id": "gate-stale-approval",
+        "title": "evaluateConflictRepairGate reports a stale GitHub approval as conflicting with staleApproval:true",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:58:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4467",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "repair-stale-prompt",
+            "log-declined-heads"
+          ],
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-gate-conflict-repair.test.ts passes including the stale-approval, no-approval, GitLab and PR #4440 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/cloister/merge-gate.ts add optional `staleApproval?: boolean` (JSDoc: PAN-4467, GitHub only) to ConflictRepairGateResult. In evaluateConflictRepairGate, after the existing approvedAtHead/forgeApprovalAtHead block, compute `const staleApproval = facts.forge === 'github' && !approvedAtHead && facts.approved === true;`, spread `approvedAtHead: true` into asMergeable when `approvedAtHead || staleApproval`, and return `{ conflicting: true, staleApproval: true, facts }` when ready and stale, `{ conflicting: true, facts }` when ready and not stale, unchanged not-ready result otherwise. Add the PAN-4467 JSDoc paragraph. Do NOT add any recordApprovalAtHead call and do NOT add a forge read. In merge-gate-conflict-repair.test.ts flip the 'only approving review names an older commit' test to expect conflicting:true + staleApproval:true, assert staleApproval undefined in the approved-at-head test, and add the three new tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "gate-stale-approval.ac1",
+            "title": "Given GitHub facts with approved:true, approvedAtHead unset, mergeable:false and the only approving review on an older commit, when evaluateConflictRepairGate runs, then it returns conflicting:true and staleApproval:true (test 'is conflicting with a stale approval when the only approving review names an older commit')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-stale-approval.ac2",
+            "title": "Given GitHub facts with reviewDecision REVIEW_REQUIRED, approved:false, mergeable:false, when the gate runs, then it returns conflicting:false with a reason containing 'not approved at PR HEAD' (test 'is not conflicting when the forge reports no approval at any head')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-stale-approval.ac3",
+            "title": "Given an approved GitLab MR with mergeable:false, when the gate runs, then it returns conflicting:true and staleApproval is undefined; given approval proven at head on GitHub, staleApproval is undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-stale-approval.ac4",
+            "title": "grep -n recordApprovalAtHead src/lib/cloister/merge-gate.ts shows only the import and the call inside evaluateIssueMergeGate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repair-stale-prompt",
+        "title": "Stale-approval repair prompt wording and journal data.staleApproval flag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T02:58:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4467",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/conflict-repair.ts",
+            "src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conflict-repair.test.ts passes including 'routes PR #4440 (approved at an older head, conflicting) to one repair per head'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/lib/cloister/conflict-repair.ts give buildConflictRepairPrompt an optional `staleApproval?: boolean` input; when true, the first line reads `CONFLICT REPAIR: the PR for ${issueId} (head ${head}) was approved at an older commit and now conflicts with origin/main, so it cannot merge.`; all other lines unchanged. In dispatchRepair pass `staleApproval: gate.staleApproval === true`, add `...(gate.staleApproval ? { staleApproval: true } : {})` to the conflict.repair-requested data, and append ' (stale approval)' to the 'sent a sync-main repair' log line when stale. Add the PAN-4467 sentence to the module header. In conflict-repair.test.ts add the prompt test and the end-to-end regression test wiring the real evaluateConflictRepairGate (value import from ../merge-gate.js) through the evaluateGate dep with PR #4440-shaped facts, as specified in the PRD. Tests keep the file's existing vi.useFakeTimers()/advanceTimersByTime pattern; no real setTimeout waits."
+        },
+        "items": [
+          {
+            "id": "repair-stale-prompt.ac1",
+            "title": "buildConflictRepairPrompt({ staleApproval: true, ... }) returns text containing 'was approved at an older commit and now conflicts' and still containing step 5's 'pan review request PAN-1166'; without the flag it still contains 'is approved but now conflicts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-stale-prompt.ac2",
+            "title": "Given an APPROVED journal and the real gate fed PR #4440-shaped facts (approval on an older commit, mergeable:false, checks green, testChecks none), when tickConflictRepair runs, then it returns ['PAN-1166: repair-requested'], delivers a prompt containing 'was approved at an older commit', and journals conflict.repair-requested with data.staleApproval true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-stale-prompt.ac3",
+            "title": "Given that repair was sent, when the patrol ticks again 60 s later it returns [] and delivers nothing; when it ticks after CONFLICT_REPAIR_GRACE_MS it returns ['PAN-1166: escalated'], so deliver and surfaceNeedsYou are each called exactly once for the head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "log-declined-heads",
+        "title": "tickIssue logs a declined conflicting head once per issue and head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:58:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4467",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/conflict-repair.ts",
+            "src/lib/cloister/__tests__/conflict-repair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/conflict-repair.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conflict-repair.test.ts passes including the 'declined conflicting heads' describe block",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/lib/cloister/conflict-repair.ts add a module-level `declinesLogged = new Set<string>()` next to refusalsSurfaced, clear it in __resetConflictRepairStateForTests, and add logDeclinedConflict(d, issueId, gate): return unless facts.open && facts.mergeable === false && facts.headSha; key `${issueId}:${head8}`; log once `[conflict-repair] ${issueId}: conflicting head ${head8} not repaired: ${gate.reason ?? 'no reason given'}` via d.log. In tickIssue replace the one-line `if (!gate.conflicting) return reviewBackstop(...)` with a block that calls logDeclinedConflict first, then returns reviewBackstop. Add the describe('tickConflictRepair — declined conflicting heads') tests from the PRD using an injected log = vi.fn()."
+        },
+        "items": [
+          {
+            "id": "log-declined-heads.ac1",
+            "title": "Given a candidate whose gate answers conflicting:false with reason 'PR is not approved at PR HEAD …' for an open PR with mergeable:false at HEAD_A, when the patrol ticks twice, then log receives 'PAN-1166: conflicting head aaaa1111 not repaired: PR is not approved at PR HEAD' exactly once and no conflict.* journal entry is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "log-declined-heads.ac2",
+            "title": "Given the same decline, when the head changes to HEAD_B, then a second 'not repaired' line for ffff6666 is logged; after __resetConflictRepairStateForTests the same head logs again once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "log-declined-heads.ac3",
+            "title": "Given a decline for a mergeable PR (gate(false)) or a closed PR (open:false, mergeable:false), when the patrol ticks, then no 'not repaired' line is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-stale-approval",
+        "title": "Document stale-approval repair and declined-head logging in PIPELINE-GATES.md and MERGE-WORKFLOW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T02:58:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4467",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'staleApproval' docs/PIPELINE-GATES.md",
+            "grep -n 'not repaired' docs/PIPELINE-GATES.md",
+            "grep -n 'PAN-4467' docs/MERGE-WORKFLOW.md",
+            "grep -n 'and an approval on' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "staleApproval appears in the predicate paragraph and the conflict.repair-requested journal row",
+            "the Declined heads are logged paragraph is found",
+            "MERGE-WORKFLOW.md carries the PAN-4467 sentence",
+            "the predicate condition list reads 'and an approval on the forge'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 text verbatim. docs/PIPELINE-GATES.md, section '## Conflict repair (PAN-4384)': in 'The predicate.' paragraph replace 'and approval proven at the head.' (which spans a line break after 'approval') with 'and an approval on the forge.' and add the PAN-4467 stale-approval sentences after the sentence ending 'skips unmergeable PRs.'; add a '**Declined heads are logged.**' paragraph after 'The patrol.' paragraph; append the data.staleApproval note to the conflict.repair-requested journal table row. docs/MERGE-WORKFLOW.md '## After another feature merges': add the PAN-4467 sentence after the sentence ending 'and run `pan review request <id>`.'."
+        },
+        "items": [
+          {
+            "id": "docs-stale-approval.ac1",
+            "title": "Given the edited docs/PIPELINE-GATES.md, when grep -n 'staleApproval' runs, then it returns the 'The predicate.' paragraph line stating an approval of an older head counts, the merge gate still needs approval at the repaired head, and a PR the forge does not call approved is not repaired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-stale-approval.ac2",
+            "title": "docs/PIPELINE-GATES.md contains a 'Declined heads are logged.' paragraph quoting the '[conflict-repair] <ISSUE>: conflicting head <head8> not repaired: <reason>' line and its once-per-issue-and-head rule, and the conflict.repair-requested journal row mentions data.staleApproval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-stale-approval.ac3",
+            "title": "Given the edited docs/MERGE-WORKFLOW.md, when grep -n 'PAN-4467' runs, then it returns the 'After another feature merges' sentence stating a PR whose approval names an older head is repaired and its repaired head is re-reviewed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-stale-approval",
+        "to": "repair-stale-prompt",
+        "type": "blocks"
+      },
+      {
+        "from": "repair-stale-prompt",
+        "to": "log-declined-heads",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4467-conflict-repair-skips-an-approved-pr-silently-once-its-head-moved-past-the-approval-pr-4440-stuck-conflicting.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
