@@ -3,8 +3,8 @@
 When an agent's Linear MCP OAuth session is missing or expired, the agent can
 only print an authorization URL into its own transcript and block — easy to
 miss. Overdeck surfaces that state as **one global dashboard intervention**: a
-top banner listing every blocked agent, the OAuth action, and two completion
-paths, followed by an automatic wake of each blocked agent once authentication
+top banner listing every blocked agent, a one-click **Connect Linear** action,
+and fallback completion paths, followed by an automatic wake of each blocked agent once authentication
 is healthy again.
 
 Related: [CODEX-AUTH.md](./CODEX-AUTH.md) — the same top-banner treatment for
@@ -84,8 +84,9 @@ into one **open lifecycle** plus the last completed one:
   URL is the agent-generated OAuth link the operator opens.
 - **Expiry TTL.** URLs expire after `LINEAR_MCP_AUTH_URL_TTL_MS` (30 minutes)
   from declaration unless the event carries its own `expiresAt`. The
-  projection reports `status: 'expired'` once the TTL passes; the link
-  refreshes automatically the next time a blocked agent emits a fresh
+  projection reports `status: 'expired'` once the TTL passes. An expired link
+  is regenerated on demand by **Connect Linear** (a refresh request, see
+  "Connect and verify routes"), or whenever a blocked agent emits a fresh
   `required` with a new URL.
 - **Close.** Any `linear_mcp_auth.healthy` event closes the open lifecycle
   (it becomes `lastCompleted`, and the projection returns to `status:
@@ -103,45 +104,138 @@ into one **open lifecycle** plus the last completed one:
 - **Projection.** `resolveLinearMcpAuthIntervention()` serves `GET
   /api/linear-mcp-auth` with `{ status, authUrl, authUrlAgentId,
   authUrlExpiresAt, declaredAt, blockedAgents[] }`; the route enriches each
-  blocked agent with `issueUrl`, its canonical tracker URL from the issues
-  read door (Linear web URL, GitHub html_url), so the banner can link every
-  issue. Because the fold reads the durable event store, banner state
+  blocked agent with projection-only fields that are never persisted in
+  events:
+  - `issueUrl` — its canonical tracker URL from the issues read door (Linear
+    web URL, GitHub html_url), so the banner can link every issue;
+  - `conversationUrl` — for `conv-*` agents, `/conv/<rowid>`. The agent id is
+    the conversation's tmux session, so it resolves through
+    `getConversationByTmuxSession`, falling back to the bare DB name
+    (`agentId` without `conv-`) so an archived conversation still links;
+  - `conversationTitle` — that conversation's title (`null` otherwise).
+
+  Because the fold reads the durable event store, banner state
   survives dashboard restarts.
 
 ## Banner states
 
-`src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx` (mounted in
-`AppChrome.tsx` under `CodexAuthBanner`; polling hook
-`src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts` — 5s while an
-intervention is active, 30s when idle):
+`src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx` is mounted in
+`AppChrome.tsx` under `CodexAuthBanner`. It reads everything from
+`src/dashboard/frontend/src/hooks/useLinearConnectFlow.ts`, which owns the
+status query (`useLinearMcpAuthStatus`): it polls every 1 s while a Connect
+Linear flow is in progress, else 5 s while an intervention is open and 30 s
+when idle.
 
 - **none** — banner hidden.
-- **active with authUrl** — "Linear authentication required" header, the
-  blocked-agent list with links to their canonical issue URLs, and an "Open
-  Linear authorization" anchor naming the owning agent.
-- **active without authUrl** — waiting-for-URL copy: no blocked agent has
-  produced an authorization URL yet.
-- **expired** — copy stating the link expired and refreshes automatically when
-  a blocked agent generates a fresh one; the stale authorization action is not
-  rendered, so the operator cannot start a flow the UI knows cannot complete.
+- **active or expired** — "Linear authentication required" header with one
+  **Connect Linear** button (disabled while a flow is in progress). When the
+  browser blocked the popup, an "Open Linear authorization" anchor to the
+  link replaces the button.
+- **Progress line**, by flow phase: "Opening Linear…", "Getting a fresh
+  link…", "Approve access in the Linear tab, then come back here." (with a
+  **Check now** button), "Checking Linear access…". With no flow running and
+  `status: 'expired'`: "The last authorization link expired — Connect Linear
+  gets a fresh one." A verify that does not connect within 60 s shows "Linear
+  still isn't connected. Finish approving in the Linear tab, then click Check
+  now."
+- **Blocked-agent rows** — label `conversationTitle ?? issueId ?? agentId`;
+  link `conversationUrl`, else the dashboard issue view `/issues/<issueId>`,
+  else plain text. The raw `agentId` is the link's `title`. An issue with a
+  tracker URL also gets an external-link icon ("Open <issueId> in tracker").
+- **Fallback disclosure** — "Signed in from a different device? Paste the
+  callback URL" holds the callback field, its submit button, and "Already
+  authorized another way? Mark completed". It starts open only when the
+  dashboard host is not a **loopback host** (`isLoopbackHost` in
+  `src/dashboard/frontend/src/lib/loopbackHost.ts`: `localhost`, any
+  `*.localhost` such as `overdeck.localhost`, `127.0.0.0/8`, `::1`/`[::1]`).
 
 ## Operator completion flows
 
-Two ways to resolve the intervention from the banner:
+1. **Connect Linear (same machine).** The click handler opens a blank tab
+   synchronously (`window.open('about:blank', '_blank')`; a `window.open`
+   after an `await` is popup-blocked), then POSTs
+   `/api/linear-mcp-auth/connect`. The server either returns the usable link
+   or asks a blocked agent for a fresh one (open-or-refresh, below); the
+   banner polls until a link different from the reported `previousAuthUrl`
+   arrives (90 s timeout → the tab closes and an error toast says "No fresh
+   Linear link yet — open a blocked conversation to check on it."). Before
+   navigating, the banner sets `tab.opener = null`. The operator approves in
+   that tab; Linear redirects to the owner's localhost callback listener and
+   Claude Code stores the token. That redirect fires no hook, so nothing
+   would close the lifecycle on its own. On a loopback dashboard host, the
+   first window `focus` or `visibilitychange` to visible at least 2 s after
+   navigation therefore POSTs `/api/linear-mcp-auth/verify`, which asks the
+   owner to make one Linear read; its hook emits `healthy`, the lifecycle
+   closes, and the wake pass resumes every blocked agent. **Check now** sends
+   the same request by hand. When the poll sees `status: 'none'` during a
+   flow, the banner toasts "Linear connected — N agent(s) resumed" and
+   unmounts.
+2. **Callback relay (fallback disclosure).** On a remote session the
+   localhost callback page fails to load in the operator's browser — the
+   operator copies the URL from the address bar into the banner's callback
+   field, which POSTs it to `/api/linear-mcp-auth/callback`. The server
+   validates it (localhost URL with `code` and `state` parameters), then
+   messages the URL-owning agent with the exact
+   `mcp__linear__complete_authentication` call to make, and appends a
+   `callback_relayed` event.
+3. **Mark completed (fallback disclosure).** If the operator authorized
+   another way (e.g. `claude mcp login linear`), "Already authorized another
+   way? Mark completed" POSTs to `/api/linear-mcp-auth/complete`, which
+   appends a `healthy` event with `source: 'operator'`, closing the
+   lifecycle. Blocked agents are woken to re-check; the banner returns if
+   authentication is still broken.
 
-1. **Callback relay.** The operator opens the authorization URL, approves in
-   the browser, and Linear redirects to a localhost callback URL. On a remote
-   session the callback page fails to load — the operator copies the URL from
-   the address bar into the banner's callback field, which POSTs it to
-   `/api/linear-mcp-auth/callback`. The server validates it (localhost URL
-   with `code` and `state` parameters), then messages the URL-owning agent
-   with the exact `mcp__linear__complete_authentication` call to make, and
-   appends a `callback_relayed` event.
-2. **Mark completed.** If the operator authorized another way (e.g. `claude
-   mcp login linear`), the banner's "Mark completed" button POSTs to
-   `/api/linear-mcp-auth/complete`, which appends a `healthy` event with
-   `source: 'operator'`, closing the lifecycle. Blocked agents are woken to
-   re-check; the banner returns if authentication is still broken.
+## Connect and verify routes
+
+Both routes reject requests without a trusted origin with `403`, return at
+once (the banner polls `GET /api/linear-mcp-auth` for the outcome), and send
+messages only through `messageAgent()` in `src/lib/agents/messaging.ts`. The
+logic lives in `src/lib/linear-mcp-auth-connect.ts` and
+`src/lib/linear-mcp-auth-verify.ts`.
+
+| Route | Result | Response |
+| --- | --- | --- |
+| `POST /api/linear-mcp-auth/connect` | link usable | `200 { action: 'open', authUrl, authUrlAgentId }` |
+| | refresh request delivered (or throttled) | `202 { action: 'refreshing', requestedFrom, previousAuthUrl }` |
+| | no open lifecycle | `409 { success: false, error: 'No Linear authorization is pending' }` |
+| | no candidate reachable | `409 { success: false, error }` |
+| | no trusted origin | `403 { error }` |
+| `POST /api/linear-mcp-auth/verify` | no open lifecycle | `200 { alreadyConnected: true }` |
+| | owner messaged (or throttled) | `202 { requestedFrom }` |
+| | no `authUrlAgentId` | `409 { success: false, error: 'No blocked agent owns the active Linear authorization URL' }` |
+| | owner not delivered | `409 { success: false, error }` |
+| | no trusted origin | `403 { error }` |
+
+- **Usable link.** `status === 'active'`, `authUrl !== null`, and the owner is
+  not confirmed dead (`isConfirmedDead(await isAlive(owner))` from
+  `src/lib/agents/liveness.ts`). A thrown probe or `runtime-indeterminate`
+  counts as alive, so a broken probe never forces a needless refresh. The
+  owner matters because Claude Code runs the OAuth callback listener inside
+  the owner's process.
+- **Refresh candidates.** `authUrlAgentId` first, then the other blocked
+  agents by `declaredAt` newest first, de-duplicated. The first
+  `delivered: true` outcome wins; a throw or `delivered: false` moves on.
+- **Throttles** (in-memory rate limits keyed by the lifecycle's
+  `declaredAt`, not stored state): a refresh is not resent within
+  `LINEAR_MCP_AUTH_REFRESH_THROTTLE_MS` (60 s), because a second
+  `mcp__linear__authenticate` call can replace the callback listener and
+  break the tab the operator already has open; a verify is not resent within
+  `LINEAR_MCP_AUTH_VERIFY_THROTTLE_MS` (15 s).
+- **Message copies.** Neither reuses `LINEAR_MCP_AUTH_WAKE_COPY`, because
+  that copy tells the agent to call `mcp__linear__authenticate` again on
+  failure, which would mint a new URL mid-flow.
+  - `LINEAR_MCP_AUTH_REFRESH_COPY` (caller `linear-mcp-auth-refresh`): "The
+    Linear authorization link you generated has expired and the operator
+    wants to connect now. Call mcp__linear__authenticate exactly once to
+    generate a fresh authorization URL, state the URL in one sentence, then
+    stop and wait — Overdeck shows the link to the operator and wakes you
+    when authentication is restored. Do not do anything else."
+  - `LINEAR_MCP_AUTH_VERIFY_COPY` (caller `linear-mcp-auth-verify`): "The
+    operator approved Linear access in their browser. Re-check Linear access
+    now with exactly one lightweight read (e.g. mcp__linear__list_issues with
+    a limit of 1). If it succeeds, resume your canonical task. If it fails or
+    the Linear tools are unavailable, do NOT call mcp__linear__authenticate —
+    stop and wait; the operator will retry from the dashboard."
 
 ## Wake semantics
 
@@ -295,7 +389,18 @@ has not yet been notified:
   garbage.
 - `src/lib/__tests__/linear-mcp-auth*.test.ts` — fold, projection, wake set,
   and wake outcomes.
-- `src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts` — the three
-  routes, callback validation, origin checks.
+- `src/lib/__tests__/linear-mcp-auth-connect.test.ts` — open vs refresh,
+  candidate order, unreachable, refresh throttle.
+- `src/lib/__tests__/linear-mcp-auth-verify.test.ts` — verify request, copy,
+  throttle, unreachable.
+- `src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts` — the five
+  routes, conversation URL/title projection, callback validation, origin
+  checks.
+- `src/dashboard/frontend/src/hooks/__tests__/useLinearConnectFlow.test.tsx` —
+  the Connect Linear flow under fake timers.
+- `src/dashboard/frontend/src/lib/__tests__/loopbackHost.test.ts` — the
+  loopback host predicate.
 - `src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx` —
-  banner states and both completion flows.
+  banner rows, Connect Linear, progress copy, and the fallback disclosure.
+- `src/dashboard/frontend/tests/pan-4464-linear-connect.spec.ts` — Playwright:
+  expired link → Connect Linear → mocked success (run `npm run build` first).

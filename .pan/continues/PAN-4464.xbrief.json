@@ -1,0 +1,273 @@
+{
+  "version": "1",
+  "issueId": "PAN-4464",
+  "created": "2026-10-02T02:25:19.481Z",
+  "updated": "2026-10-02T03:53:00.432Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-conv-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:25:19.481Z",
+      "doneAt": "2026-10-02T02:26:48.481Z"
+    },
+    "wi2-conv-title": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:26:50.095Z",
+      "doneAt": "2026-10-02T02:27:49.588Z"
+    },
+    "wi3-connect-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:27:51.093Z",
+      "doneAt": "2026-10-02T02:29:17.089Z"
+    },
+    "wi4-verify-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:29:19.051Z",
+      "doneAt": "2026-10-02T02:30:26.011Z"
+    },
+    "wi5-connect-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:30:27.829Z",
+      "doneAt": "2026-10-02T02:31:33.530Z"
+    },
+    "wi6-verify-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:31:34.921Z",
+      "doneAt": "2026-10-02T02:32:18.372Z"
+    },
+    "wi7-loopback-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:32:19.545Z",
+      "doneAt": "2026-10-02T02:32:53.186Z"
+    },
+    "wi8-connect-flow-hook": {
+      "status": "completed",
+      "doneAt": "2026-10-02T02:46:36.745Z"
+    },
+    "wi9-wake-all-regression": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:46:37.951Z",
+      "doneAt": "2026-10-02T02:47:26.142Z"
+    },
+    "wi10-agent-row-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:47:27.250Z",
+      "doneAt": "2026-10-02T02:48:14.197Z"
+    },
+    "wi11-banner-connect-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:48:15.230Z",
+      "doneAt": "2026-10-02T02:49:54.299Z"
+    },
+    "wi12-playwright": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:49:59.036Z",
+      "doneAt": "2026-10-02T02:52:39.390Z"
+    },
+    "wi13-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4464",
+      "claimedAt": "2026-10-02T02:51:48.666Z",
+      "doneAt": "2026-10-02T02:52:02.423Z"
+    },
+    "wi13-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:12:58.466Z"
+    },
+    "wi13-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:13:30.131Z"
+    },
+    "wi13-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:13:47.846Z"
+    },
+    "wi11-banner-connect-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:14:05.129Z"
+    },
+    "wi11-banner-connect-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:14:20.678Z"
+    },
+    "wi11-banner-connect-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:15:19.543Z"
+    },
+    "wi11-banner-connect-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:15:37.527Z"
+    },
+    "wi1-conv-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:16:32.428Z"
+    },
+    "wi1-conv-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:16:49.471Z"
+    },
+    "wi1-conv-lookup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:17:03.474Z"
+    },
+    "wi2-conv-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:17:17.886Z"
+    },
+    "wi2-conv-title.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:17:32.942Z"
+    },
+    "wi3-connect-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:17:47.450Z"
+    },
+    "wi3-connect-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:18:02.010Z"
+    },
+    "wi3-connect-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:18:17.743Z"
+    },
+    "wi3-connect-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:46:29.986Z"
+    },
+    "wi3-connect-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:46:42.231Z"
+    },
+    "wi4-verify-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:46:55.398Z"
+    },
+    "wi4-verify-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:47:08.342Z"
+    },
+    "wi4-verify-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:47:22.133Z"
+    },
+    "wi4-verify-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:47:35.363Z"
+    },
+    "wi5-connect-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:47:48.755Z"
+    },
+    "wi5-connect-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:48:02.593Z"
+    },
+    "wi5-connect-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:48:16.210Z"
+    },
+    "wi5-connect-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:48:29.073Z"
+    },
+    "wi6-verify-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:48:46.767Z"
+    },
+    "wi6-verify-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:49:00.194Z"
+    },
+    "wi6-verify-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:49:14.453Z"
+    },
+    "wi6-verify-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:49:26.672Z"
+    },
+    "wi7-loopback-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:49:39.150Z"
+    },
+    "wi7-loopback-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:49:51.194Z"
+    },
+    "wi8-connect-flow-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:04.075Z"
+    },
+    "wi8-connect-flow-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:17.127Z"
+    },
+    "wi8-connect-flow-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:30.193Z"
+    },
+    "wi8-connect-flow-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:42.881Z"
+    },
+    "wi8-connect-flow-hook.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:50:56.008Z"
+    },
+    "wi8-connect-flow-hook.ac6": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:12.094Z"
+    },
+    "wi9-wake-all-regression.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:24.362Z"
+    },
+    "wi9-wake-all-regression.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:36.366Z"
+    },
+    "wi10-agent-row-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:48.264Z"
+    },
+    "wi10-agent-row-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:59.966Z"
+    },
+    "wi10-agent-row-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:11.576Z"
+    },
+    "wi12-playwright.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:23.366Z"
+    },
+    "wi12-playwright.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:35.085Z"
+    },
+    "wi12-playwright.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:47.647Z"
+    },
+    "wi12-playwright.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:00.432Z"
+    }
+  }
+}

@@ -159,6 +159,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/linear-mcp-auth',                  kind: 'http', disposition: 'READ',        door: 'linear-mcp-auth event fold (resolveLinearMcpAuthIntervention)' },
   { surface: 'POST /api/linear-mcp-auth/callback',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events + messageAgent delivery door' },
   { surface: 'POST /api/linear-mcp-auth/complete',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events (appendLinearMcpAuthHealthyEvent)' },
+  { surface: 'POST /api/linear-mcp-auth/connect',         kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth-connect (messageAgent delivery door)' },
+  { surface: 'POST /api/linear-mcp-auth/verify',          kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth-verify (messageAgent delivery door)' },
 
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },

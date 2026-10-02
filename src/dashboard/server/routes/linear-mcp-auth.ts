@@ -7,8 +7,10 @@ import {
   resolveLinearMcpAuthIntervention,
   type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
+import { connectLinearMcpAuth } from '../../../lib/linear-mcp-auth-connect.js';
+import { requestLinearMcpAuthVerify } from '../../../lib/linear-mcp-auth-verify.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
-import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { getConversationByName, getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -78,8 +80,9 @@ function withIssueUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIn
 /**
  * Attach each blocked conversation's canonical dashboard URL — /conv/<rowid>,
  * the DB row id, which is how conversations are displayed everywhere else in
- * the dashboard. Resolved through the conversations read door by name.
- * Best-effort: an unresolvable conversation falls back to null and the banner
+ * the dashboard — and its title, so the banner can label the row. The blocked agent id is the conversation's tmux session
+ * (`conv-<name>`), so it resolves by tmux session first, then by the bare
+ * DB name so an archived conversation still links (PAN-4464). Best-effort: an unresolvable conversation falls back to null and the banner
  * renders the id as plain text.
  */
 function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIntervention {
@@ -87,16 +90,19 @@ function withConversationUrls(intervention: LinearMcpAuthIntervention): LinearMc
     ...intervention,
     blockedAgents: intervention.blockedAgents.map(agent => {
       if (!agent.agentId.startsWith('conv-')) {
-        return { ...agent, conversationUrl: null };
+        return { ...agent, conversationUrl: null, conversationTitle: null };
       }
-      let conversationUrl: string | null = null;
       try {
-        const conversation = getConversationByName(agent.agentId);
-        conversationUrl = conversation === null ? null : `/conv/${conversation.id}`;
+        const conversation = getConversationByTmuxSession(agent.agentId)
+          ?? getConversationByName(agent.agentId.slice('conv-'.length));
+        return {
+          ...agent,
+          conversationUrl: conversation === null ? null : `/conv/${conversation.id}`,
+          conversationTitle: conversation?.title ?? null,
+        };
       } catch {
-        conversationUrl = null;
+        return { ...agent, conversationUrl: null, conversationTitle: null };
       }
-      return { ...agent, conversationUrl };
     }),
   };
 }
@@ -159,8 +165,61 @@ const postLinearMcpAuthCompleteRoute = HttpRouter.add(
   })),
 );
 
+/** Connect Linear (PAN-4464): open the usable link, or ask a blocked agent
+ * for a fresh one. Returns at once; the banner polls GET for the new link. */
+const postLinearMcpAuthConnectRoute = HttpRouter.add(
+  'POST',
+  '/api/linear-mcp-auth/connect',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectInvalidOrigin(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => connectLinearMcpAuth());
+    switch (result.kind) {
+      case 'open':
+        return jsonResponse({ action: 'open', authUrl: result.authUrl, authUrlAgentId: result.authUrlAgentId });
+      case 'refreshing':
+        return jsonResponse(
+          { action: 'refreshing', requestedFrom: result.requestedFrom, previousAuthUrl: result.previousAuthUrl },
+          { status: 202 },
+        );
+      case 'nothing-pending':
+        return jsonResponse({ success: false, error: 'No Linear authorization is pending' }, { status: 409 });
+      case 'unreachable':
+        return jsonResponse({ success: false, error: result.error }, { status: 409 });
+    }
+  })),
+);
+
+/** Verify request (PAN-4464): ask the URL owner to re-check Linear access
+ * after a same-machine approval, so its hook closes the lifecycle. */
+const postLinearMcpAuthVerifyRoute = HttpRouter.add(
+  'POST',
+  '/api/linear-mcp-auth/verify',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectInvalidOrigin(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => requestLinearMcpAuthVerify());
+    switch (result.kind) {
+      case 'already-connected':
+        return jsonResponse({ alreadyConnected: true });
+      case 'requested':
+        return jsonResponse({ requestedFrom: result.requestedFrom }, { status: 202 });
+      case 'no-owner':
+        return jsonResponse({ success: false, error: 'No blocked agent owns the active Linear authorization URL' }, { status: 409 });
+      case 'unreachable':
+        return jsonResponse({ success: false, error: result.error }, { status: 409 });
+    }
+  })),
+);
+
 export const linearMcpAuthRouteLayer = Layer.mergeAll(
   getLinearMcpAuthRoute,
   postLinearMcpAuthCallbackRoute,
   postLinearMcpAuthCompleteRoute,
+  postLinearMcpAuthConnectRoute,
+  postLinearMcpAuthVerifyRoute,
 );

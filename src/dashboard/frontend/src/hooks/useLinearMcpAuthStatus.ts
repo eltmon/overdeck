@@ -13,6 +13,9 @@ export interface LinearMcpAuthBlockedAgent {
    * conversations read door; null for non-conversation agents or when the
    * conversation cannot be resolved. */
   conversationUrl?: string | null;
+  /** Conversation title projected by the server alongside conversationUrl;
+   * null for non-conversation agents or untitled/unresolved conversations. */
+  conversationTitle?: string | null;
 }
 
 export interface LinearMcpAuthStatus {
@@ -33,14 +36,18 @@ export async function fetchLinearMcpAuthStatus(): Promise<LinearMcpAuthStatus> {
   return res.json();
 }
 
-export function useLinearMcpAuthStatus() {
+export function useLinearMcpAuthStatus(options: { fast?: boolean } = {}) {
   return useQuery<LinearMcpAuthStatus>({
     queryKey: ['linear-mcp-auth'],
     queryFn: fetchLinearMcpAuthStatus,
     // Poll fast while an intervention is on screen so state changes (expired
     // link, new blocked agent, cleared banner) show up promptly; back off
     // when there is nothing to act on. Same active/idle shape as the codex
-    // auth pollers.
-    refetchInterval: (query) => (query.state.data?.status === 'none' ? 30_000 : 5_000),
+    // auth pollers. A Connect Linear flow in progress polls every second so
+    // a fresh link or the cleared lifecycle lands at once (PAN-4464).
+    refetchInterval: (query) => {
+      if (options.fast) return 1_000;
+      return query.state.data?.status === 'none' ? 30_000 : 5_000;
+    },
   });
 }
