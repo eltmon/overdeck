@@ -180,4 +180,11 @@ describe('useTerminalPermissionDialog', () => {
     act(() => result.current.onDismiss());
     expect(result.current.isOpen).toBe(false);
   });
+
+  it('Open terminal navigates to the conversation terminal view (PAN-4466)', () => {
+    window.history.pushState({}, '', '/');
+    const { result } = renderHook(() => useTerminalPermissionDialog(rows(DANGEROUS_RM), false), { wrapper });
+    act(() => result.current.onOpenTerminal());
+    expect(window.location.pathname + window.location.search).toBe('/conv/20260927-3978?view=terminal');
+  });
 });
