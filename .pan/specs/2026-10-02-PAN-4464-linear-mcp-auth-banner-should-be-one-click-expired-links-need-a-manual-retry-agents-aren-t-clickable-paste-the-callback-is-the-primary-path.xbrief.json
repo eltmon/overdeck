@@ -4,17 +4,17 @@
     "created": "2026-10-02T02:20:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4464: Linear MCP auth banner should be one click",
-    "updated": "2026-10-02T02:24:25.504Z"
+    "updated": "2026-10-02T02:25:12.814Z"
   },
   "plan": {
     "id": "pan-4464",
     "title": "Linear MCP auth banner should be one click: expired links need a manual retry, agents aren't clickable, paste-the-callback is the primary path",
-    "status": "proposed",
+    "status": "running",
     "uid": "9baa2946-5440-460a-b2cd-1b641e13b248",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-02T02:20:31Z",
-    "updated": "2026-10-02T02:24:25.504Z",
+    "updated": "2026-10-02T02:25:12.814Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4464",
@@ -994,5 +994,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
