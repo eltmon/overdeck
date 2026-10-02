@@ -1,7 +1,7 @@
 /**
  * The operator's "test locally with wrangler/Miniflare" (PRD PAN-4293 §7.15, D-24b, NFR-9).
  *
- * Bundles the real Worker with `wrangler deploy --dry-run` (no credentials, no upload), loads it into Miniflare
+ * Bundles the real Worker with wrangler's `--dry-run` deploy (no credentials, no upload), loads it into Miniflare
  * (real workerd) with a local D1 and the migrations applied, stubs GitHub through outboundService, and drives
  * the PKCE and device flows end to end.
  */

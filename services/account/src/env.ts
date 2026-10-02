@@ -1,7 +1,7 @@
 /**
  * Env, Deps and configuration for the account service (PRD PAN-4293 §7.4, D-23).
  *
- * Every secret is a Worker secret (`wrangler secret put`); only PUBLIC_BASE_URL is a committed var.
+ * Every secret is a Worker secret set by the operator (docs/ACCOUNT-SERVICE.md "Deploy"); only PUBLIC_BASE_URL is a committed var.
  * No value has a hardcoded default: missing required values make every route except /healthz return 503.
  */
 

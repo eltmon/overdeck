@@ -7,13 +7,13 @@
     {
       "binding": "DB",
       "database_name": "overdeck-account",
-      // Placeholder: the operator replaces it with the id `wrangler d1 create` prints. `--local` ignores it.
+      // Placeholder: the operator replaces it with the id printed when creating the D1 database (docs/ACCOUNT-SERVICE.md "Deploy"). `--local` ignores it.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
   "triggers": { "crons": ["0 * * * *"] },
   "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai" }
-  // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID: `wrangler secret put` (docs/ACCOUNT-SERVICE.md "Deploy").
+  // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID: Worker secrets set by the operator (docs/ACCOUNT-SERVICE.md "Deploy").
   // "services": [{ "binding": "VAULT", "service": "overdeck-vault", "entrypoint": "VaultRpc" }] — added by PAN-4297.
 }

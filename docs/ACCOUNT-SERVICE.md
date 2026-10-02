@@ -161,4 +161,16 @@ Agents may run `wrangler dev --local`, `wrangler d1 migrations apply overdeck-ac
 
 ## Deploy
 
-Operator-only; the runbook is filled in by the deploy-checkpoint item (PAN-4293 WI-17). No agent runs `wrangler deploy`, `wrangler login`, `wrangler d1 create`, `wrangler d1 migrations apply --remote`, `wrangler secret put` or `wrangler rollback`.
+Operator-only. No agent runs any of the commands below except the dry run in step 0; the custom-domain route in `wrangler.jsonc` creates the `account.overdeck.ai` DNS record in the Cloudflare zone on first deploy (the apex stays on Vercel).
+
+0. Before starting, confirm the bundle builds with no credentials: `npm --prefix services/account run build:dry` exits 0.
+1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps): homepage `https://account.overdeck.ai`, authorization callback URL `https://account.overdeck.ai/auth/github/callback`. Note the client id and generate a client secret.
+2. `cd services/account && npx wrangler login` (opens the browser for the Cloudflare account that owns the `overdeck.ai` zone).
+3. `npx wrangler d1 create overdeck-account`, paste the printed `database_id` into `wrangler.jsonc` (replacing the all-zero placeholder), and commit that change.
+4. `npx wrangler d1 migrations apply overdeck-account --remote` (applies `migrations/0001_init.sql` to the production database).
+5. `npx wrangler secret put GITHUB_CLIENT_ID`, then `npx wrangler secret put GITHUB_CLIENT_SECRET`, then `npx wrangler secret put OWNER_GITHUB_ID` (your numeric GitHub id, from `https://api.github.com/users/<login>` → `id`).
+6. `npx wrangler deploy` (uploads the Worker, binds D1, registers the hourly cron and the `account.overdeck.ai` custom domain).
+7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true`; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
+8. Rollback: `npx wrangler rollback` returns to the previous Worker version (the D1 schema is additive and stays).
+
+After deploying, the local client (PAN-4330) needs the base URL `https://account.overdeck.ai`; it reads `verification_uri` from the device-code response and never hardcodes the host.
