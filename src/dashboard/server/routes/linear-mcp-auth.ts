@@ -7,6 +7,7 @@ import {
   resolveLinearMcpAuthIntervention,
   type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
+import { connectLinearMcpAuth } from '../../../lib/linear-mcp-auth-connect.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { getConversationByName, getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -163,8 +164,36 @@ const postLinearMcpAuthCompleteRoute = HttpRouter.add(
   })),
 );
 
+/** Connect Linear (PAN-4464): open the usable link, or ask a blocked agent
+ * for a fresh one. Returns at once; the banner polls GET for the new link. */
+const postLinearMcpAuthConnectRoute = HttpRouter.add(
+  'POST',
+  '/api/linear-mcp-auth/connect',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectInvalidOrigin(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => connectLinearMcpAuth());
+    switch (result.kind) {
+      case 'open':
+        return jsonResponse({ action: 'open', authUrl: result.authUrl, authUrlAgentId: result.authUrlAgentId });
+      case 'refreshing':
+        return jsonResponse(
+          { action: 'refreshing', requestedFrom: result.requestedFrom, previousAuthUrl: result.previousAuthUrl },
+          { status: 202 },
+        );
+      case 'nothing-pending':
+        return jsonResponse({ success: false, error: 'No Linear authorization is pending' }, { status: 409 });
+      case 'unreachable':
+        return jsonResponse({ success: false, error: result.error }, { status: 409 });
+    }
+  })),
+);
+
 export const linearMcpAuthRouteLayer = Layer.mergeAll(
   getLinearMcpAuthRoute,
   postLinearMcpAuthCallbackRoute,
   postLinearMcpAuthCompleteRoute,
+  postLinearMcpAuthConnectRoute,
 );

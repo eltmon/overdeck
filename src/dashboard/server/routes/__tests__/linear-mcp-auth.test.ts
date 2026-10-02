@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getIssues: vi.fn(),
   getConversationByName: vi.fn(),
   getConversationByTmuxSession: vi.fn(),
+  connect: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents/messaging.js', () => ({
@@ -20,6 +21,10 @@ vi.mock('../../../../lib/linear-mcp-auth.js', () => ({
   appendLinearMcpAuthCallbackRelayedEvent: mocks.appendCallbackRelayed,
   appendLinearMcpAuthHealthyEvent: mocks.appendHealthy,
   resolveLinearMcpAuthIntervention: mocks.resolve,
+}));
+
+vi.mock('../../../../lib/linear-mcp-auth-connect.js', () => ({
+  connectLinearMcpAuth: mocks.connect,
 }));
 
 vi.mock('../../services/issue-service-singleton.js', () => ({
@@ -100,6 +105,7 @@ describe('Linear MCP auth routes', () => {
     mocks.getIssues.mockReset().mockReturnValue([]);
     mocks.getConversationByName.mockReset().mockReturnValue(null);
     mocks.getConversationByTmuxSession.mockReset().mockReturnValue(null);
+    mocks.connect.mockReset().mockResolvedValue({ kind: 'nothing-pending' });
   });
 
   it('GET returns the projection without side effects', async () => {
@@ -269,10 +275,51 @@ describe('Linear MCP auth routes', () => {
     });
   });
 
+  it('POST connect returns 200 open with the usable authorization URL', async () => {
+    mocks.connect.mockResolvedValue({ kind: 'open', authUrl: ACTIVE.authUrl, authUrlAgentId: 'agent-min-852' });
+
+    const result = await request('POST', '/api/linear-mcp-auth/connect');
+
+    expect(result).toEqual({
+      status: 200,
+      body: { action: 'open', authUrl: ACTIVE.authUrl, authUrlAgentId: 'agent-min-852' },
+    });
+  });
+
+  it('POST connect returns 202 refreshing when a blocked agent was asked for a fresh link', async () => {
+    mocks.connect.mockResolvedValue({ kind: 'refreshing', requestedFrom: 'conv-20261001-eba1', previousAuthUrl: ACTIVE.authUrl });
+
+    const result = await request('POST', '/api/linear-mcp-auth/connect');
+
+    expect(result).toEqual({
+      status: 202,
+      body: { action: 'refreshing', requestedFrom: 'conv-20261001-eba1', previousAuthUrl: ACTIVE.authUrl },
+    });
+  });
+
+  it('POST connect returns 409 when nothing is pending', async () => {
+    const result = await request('POST', '/api/linear-mcp-auth/connect');
+
+    expect(result).toEqual({ status: 409, body: { success: false, error: 'No Linear authorization is pending' } });
+  });
+
+  it('POST connect returns 409 with the error when no blocked agent is reachable', async () => {
+    mocks.connect.mockResolvedValue({ kind: 'unreachable', error: 'Could not reach any blocked agent' });
+
+    const result = await request('POST', '/api/linear-mcp-auth/connect');
+
+    expect(result).toEqual({ status: 409, body: { success: false, error: 'Could not reach any blocked agent' } });
+  });
+
   it('POST mutations reject requests without an origin', async () => {
     const result = await request('POST', '/api/linear-mcp-auth/complete', undefined, false);
 
     expect(result.status).toBe(403);
     expect(mocks.appendHealthy).not.toHaveBeenCalled();
+
+    const connect = await request('POST', '/api/linear-mcp-auth/connect', undefined, false);
+
+    expect(connect.status).toBe(403);
+    expect(mocks.connect).not.toHaveBeenCalled();
   });
 });
