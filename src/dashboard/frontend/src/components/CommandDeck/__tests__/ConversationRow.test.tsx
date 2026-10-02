@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ConversationRow } from '../ConversationRow';
 import type { Conversation } from '../ConversationList';
 import type { ConversationMutations } from '../useConversationMutations';
+import { useContinueOnDeviceStore } from '../../chat/continueOnDevice/continueOnDeviceStore';
 
 vi.mock('../../DialogProvider', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
@@ -348,5 +349,23 @@ describe('ConversationRow vault continuity badge (PAN-4447)', () => {
 
     renderRow({ origin: 'vault', vaultOwnerLabel: 'laptop', vaultContinuity: null });
     expect(screen.getAllByTestId('vault-owner-badge')[0]).toHaveTextContent('from laptop');
+  });
+});
+
+describe('ConversationRow Continue on another device (PAN-4455 WI-11)', () => {
+  it('a local row\'s menu opens the dialog for that conversation', () => {
+    useContinueOnDeviceStore.setState({ target: null });
+    renderRow({});
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Continue on another device' }));
+    expect(useContinueOnDeviceStore.getState().target).toMatchObject({ name: 'test-conversation', id: 1, viewMode: 'conversation' });
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+  });
+
+  it('a vault browse row\'s menu has no Continue on another device item', () => {
+    renderRow({ origin: 'vault', name: 'vault-12345678-aaaa-4bbb-8ccc-dddddddddddd', vaultOwnerLabel: 'laptop' });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.getByRole('menu', { name: 'Actions for Test conversation' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Continue on another device' })).toBeNull();
   });
 });
