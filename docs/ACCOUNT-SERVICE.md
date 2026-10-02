@@ -161,9 +161,8 @@ Agents may run `wrangler dev --local`, `wrangler d1 migrations apply overdeck-ac
 
 ## Deploy
 
-Operator-only. No agent runs any of the commands below except the dry run in step 0; the custom-domain route in `wrangler.jsonc` creates the `account.overdeck.ai` DNS record in the Cloudflare zone on first deploy (the apex stays on Vercel).
+Operator-only. No agent runs any of the commands below; the custom-domain route in `wrangler.jsonc` creates the `account.overdeck.ai` DNS record in the Cloudflare zone on first deploy (the apex stays on Vercel). Before starting, confirm the bundle builds with no credentials: `npm --prefix services/account run build:dry` exits 0.
 
-0. Before starting, confirm the bundle builds with no credentials: `npm --prefix services/account run build:dry` exits 0.
 1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps): homepage `https://account.overdeck.ai`, authorization callback URL `https://account.overdeck.ai/auth/github/callback`. Note the client id and generate a client secret.
 2. `cd services/account && npx wrangler login` (opens the browser for the Cloudflare account that owns the `overdeck.ai` zone).
 3. `npx wrangler d1 create overdeck-account`, paste the printed `database_id` into `wrangler.jsonc` (replacing the all-zero placeholder), and commit that change.

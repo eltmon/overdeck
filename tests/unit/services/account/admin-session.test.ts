@@ -15,7 +15,7 @@ function setup(identity: GitHubIdentity = OWNER, envOverrides: Partial<Env> = {}
 
 /** POST /admin/login then the GitHub callback; returns the callback response. */
 async function adminSignIn(env: Env, deps: TestDeps, query = 'code=gh') {
-  const login = await call('POST', '/admin/login', { env, deps, ip: '203.0.113.5' });
+  const login = await call('POST', '/admin/login', { env, deps, ip: '203.0.113.5', headers: { Origin: TEST_BASE_URL } });
   expect(login.status).toBe(302);
   const state = /__Host-od_state=([0-9a-f]{64});/.exec(login.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
   return call('GET', `/auth/github/callback?${query}&state=${state}`, { env, deps, ip: '203.0.113.5', headers: { Cookie: `__Host-od_state=${state}` } });
@@ -138,10 +138,18 @@ describe('admin sign-in and session (PAN-4293 account-admin-session)', () => {
     expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM admin_sessions').first<number>('n')).toBe(0);
   });
 
+  it('POST /admin/login without a matching Origin is 403', async () => {
+    const { env, deps } = setup();
+    expect((await call('POST', '/admin/login', { env, deps })).status).toBe(403);
+    expect((await call('POST', '/admin/login', { env, deps, headers: { Origin: 'https://evil.example' } })).status).toBe(403);
+    expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM auth_requests').first<number>('n')).toBe(0);
+  });
+
   it('POST /admin/login is rate limited to 10 per 10 minutes per IP', async () => {
     const { env, deps } = setup();
-    for (let i = 0; i < 10; i++) expect((await call('POST', '/admin/login', { env, deps, ip: '203.0.113.9' })).status).toBe(302);
-    const limited = await call('POST', '/admin/login', { env, deps, ip: '203.0.113.9' });
+    const headers = { Origin: TEST_BASE_URL };
+    for (let i = 0; i < 10; i++) expect((await call('POST', '/admin/login', { env, deps, ip: '203.0.113.9', headers })).status).toBe(302);
+    const limited = await call('POST', '/admin/login', { env, deps, ip: '203.0.113.9', headers });
     expect(limited.status).toBe(429);
     expect(limited.headers.get('Content-Type')).toContain('text/html');
   });

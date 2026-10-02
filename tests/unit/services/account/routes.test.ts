@@ -69,7 +69,7 @@ describe('account service route table (PAN-4293 account-scaffold)', () => {
       expect(admin.status).toBe(503);
       expect(await admin.json()).toEqual({ error: 'not_configured', missing: ['OWNER_GITHUB_ID'] });
 
-      const login = await track(call('POST', '/admin/login', { env }));
+      const login = await track(call('POST', '/admin/login', { env, headers: { Origin: 'https://account.test' } }));
       expect(login.status).toBe(503);
 
       const me = await track(call('GET', '/v1/me', { env }));

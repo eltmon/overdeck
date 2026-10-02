@@ -49,8 +49,13 @@ ${notice}
   );
 }
 
-/** POST /admin/login */
-export const login: Handler = async (_req, rc) => startGitHubLeg(rc, 'admin', {});
+/** POST /admin/login — no session yet, so only the D-20 Origin half applies. */
+export const login: Handler = async (req, rc) => {
+  if (req.headers.get('Origin') !== new URL(rc.config.publicBaseUrl).origin) {
+    return errorPage(403, REQUEST_REJECTED_MESSAGE, 'Request rejected');
+  }
+  return startGitHubLeg(rc, 'admin', {});
+};
 
 /** GitHub leg continuation for purpose 'admin': only the owner gets a session. */
 export async function onGitHubIdentity(rc: RequestContext, _payload: Payload, identity: GitHubIdentity): Promise<Response> {
