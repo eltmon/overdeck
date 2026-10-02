@@ -291,14 +291,25 @@ next WebSocket upgrade from that origin pass with no restart. The file is read
 only when the cache fills (`readSavedTrustedOriginsSync()`), never per request.
 
 **`GET /api/anywhere/status`** needs any dashboard credential and returns
-`{ machine, addresses, devices, vault, problems }` with
+`{ machine, addresses, devices, vault, problems, viewer }` with
 `Cache-Control: no-store` (`src/lib/remote-access/anywhere-status.ts`).
 `addresses` are the trusted origins, each flagged `loopback` by
 `isLoopbackOrigin()` (`src/lib/remote-access/loopback.ts`, the one loopback
 check, which `pan pair` re-exports as `isLoopbackBase`). `devices.active`
 counts unrevoked device records. `problems` are computed on the server, each
 with an `action` (`pair-dialog`, `settings-section`, or `none` with an optional
-`docsUrl`) that the UI maps to a button.
+`docsUrl`) that the UI maps to a button. `viewer.kind` is the caller's
+credential kind from `resolveDashboardCredential()` (`root-session`, `device`,
+`token`, `internal-token`, or `null`); the Continue on another device dialog
+offers **Also pair the device** only to the `root-session` (PAN-4455 D-3).
+
+**`POST /api/vault/sessions/by-conversation/:name/settle`** (PAN-4455, Hand off
+now, in `routes/vault.ts`) follows the setup, join and sync rule: only the
+**root session** or a **paired device** may call it, the internal token and
+scoped tokens get **403** without the service running, and every response is
+`Cache-Control: no-store`. A device also needs the `admin` scope, which
+`route-scopes.ts` already requires for routes it does not list. A conversation
+name longer than 100 characters never matches the route.
 
 ## Remote request gate
 

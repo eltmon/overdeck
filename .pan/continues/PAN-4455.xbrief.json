@@ -1,0 +1,336 @@
+{
+  "version": "1",
+  "issueId": "PAN-4455",
+  "created": "2026-10-02T03:14:15.221Z",
+  "updated": "2026-10-02T04:58:52.850Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "settle-on-queue": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:14:15.221Z",
+      "doneAt": "2026-10-02T03:23:10.822Z"
+    },
+    "handoff-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:23:21.429Z",
+      "doneAt": "2026-10-02T03:32:14.905Z"
+    },
+    "handoff-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:32:19.943Z",
+      "doneAt": "2026-10-02T03:35:55.154Z"
+    },
+    "handoff-two-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:35:58.922Z",
+      "doneAt": "2026-10-02T03:36:52.060Z"
+    },
+    "anywhere-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:36:56.450Z",
+      "doneAt": "2026-10-02T03:39:24.335Z"
+    },
+    "continue-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:39:28.385Z",
+      "doneAt": "2026-10-02T03:42:28.903Z"
+    },
+    "open-on-screen-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:42:34.920Z",
+      "doneAt": "2026-10-02T03:48:51.604Z"
+    },
+    "handoff-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:48:53.116Z",
+      "doneAt": "2026-10-02T03:51:27.628Z"
+    },
+    "dialog-shell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:51:32.509Z",
+      "doneAt": "2026-10-02T03:54:22.080Z"
+    },
+    "panel-menu-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T03:54:23.457Z",
+      "doneAt": "2026-10-02T04:03:05.975Z"
+    },
+    "row-continue-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:03:07.160Z",
+      "doneAt": "2026-10-02T04:16:44.384Z"
+    },
+    "vault-row-sync-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:16:50.302Z",
+      "doneAt": "2026-10-02T04:24:27.622Z"
+    },
+    "handoff-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:24:28.875Z",
+      "doneAt": "2026-10-02T04:26:41.291Z"
+    },
+    "pairing-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:26:42.287Z",
+      "doneAt": "2026-10-02T04:29:20.425Z"
+    },
+    "frontend-test-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:29:21.364Z",
+      "doneAt": "2026-10-02T04:29:48.293Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4455",
+      "claimedAt": "2026-10-02T04:29:49.292Z",
+      "doneAt": "2026-10-02T04:30:48.878Z"
+    },
+    "settle-on-queue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:46:45.508Z"
+    },
+    "settle-on-queue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:46:58.588Z"
+    },
+    "settle-on-queue.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:47:11.741Z"
+    },
+    "settle-on-queue.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:47:24.664Z"
+    },
+    "handoff-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:47:38.081Z"
+    },
+    "handoff-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:47:51.199Z"
+    },
+    "handoff-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:48:04.252Z"
+    },
+    "handoff-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:48:17.321Z"
+    },
+    "handoff-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:48:30.303Z"
+    },
+    "handoff-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:48:47.376Z"
+    },
+    "handoff-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:49:00.304Z"
+    },
+    "handoff-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:49:13.406Z"
+    },
+    "handoff-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:49:26.354Z"
+    },
+    "handoff-two-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:49:38.866Z"
+    },
+    "handoff-two-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:49:51.849Z"
+    },
+    "handoff-two-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:50:04.977Z"
+    },
+    "anywhere-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:50:19.689Z"
+    },
+    "anywhere-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:50:33.298Z"
+    },
+    "anywhere-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:50:47.355Z"
+    },
+    "continue-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:51:00.154Z"
+    },
+    "continue-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:51:13.115Z"
+    },
+    "continue-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:51:25.743Z"
+    },
+    "open-on-screen-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:51:38.435Z"
+    },
+    "open-on-screen-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:51:51.246Z"
+    },
+    "open-on-screen-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:52:03.922Z"
+    },
+    "open-on-screen-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:52:17.810Z"
+    },
+    "open-on-screen-tab.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:52:30.621Z"
+    },
+    "handoff-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:52:43.095Z"
+    },
+    "handoff-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:01.401Z"
+    },
+    "handoff-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:14.807Z"
+    },
+    "handoff-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:27.243Z"
+    },
+    "dialog-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:39.845Z"
+    },
+    "dialog-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:53:52.378Z"
+    },
+    "dialog-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:04.759Z"
+    },
+    "dialog-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:17.306Z"
+    },
+    "panel-menu-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:30.473Z"
+    },
+    "panel-menu-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:43.837Z"
+    },
+    "panel-menu-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:54:56.565Z"
+    },
+    "row-continue-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:55:09.881Z"
+    },
+    "row-continue-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:55:23.297Z"
+    },
+    "vault-row-sync-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:55:35.637Z"
+    },
+    "vault-row-sync-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:55:48.206Z"
+    },
+    "vault-row-sync-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:55:59.916Z"
+    },
+    "handoff-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:11.761Z"
+    },
+    "handoff-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:23.114Z"
+    },
+    "handoff-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:34.348Z"
+    },
+    "handoff-notice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:45.667Z"
+    },
+    "pairing-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:56:56.842Z"
+    },
+    "pairing-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:07.859Z"
+    },
+    "pairing-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:19.550Z"
+    },
+    "frontend-test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:35.763Z"
+    },
+    "frontend-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:47.892Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:57:59.642Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:58:11.290Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:58:22.893Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:58:35.176Z"
+    },
+    "handoff-route.ac4": {
+      "status": "cancelled"
+    }
+  }
+}

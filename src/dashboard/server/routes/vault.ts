@@ -15,6 +15,7 @@
  *   POST /api/vault/setup  — PAN-4446 FR-4, body { url, passphrase: { mode } }; returns the recovery phrase once
  *   POST /api/vault/join   — PAN-4446 FR-5, body { url, secret: { kind, value } }; also unlocks this machine
  *   POST /api/vault/sync   — PAN-4446 FR-6, one queued sync; 409 when the vault service is not running
+ *   POST /api/vault/sessions/by-conversation/:name/settle — PAN-4455 FR-8, settle one conversation now (Hand off now)
  *
  * Setup, join and sync answer only the root session or a paired device (D-8),
  * and every response from them is `Cache-Control: no-store` (D-11): the setup
@@ -38,6 +39,7 @@ import {
   syncVaultNow,
 } from '../services/vault-service.js';
 import { continueHere, previewContinue } from '../services/vault-continue.js';
+import { handOffConversation } from '../services/vault-handoff.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveDashboardCredential } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -246,7 +248,7 @@ function secretField(body: unknown): JoinSecret | null {
  * 500 with its message only (D-14); results are never logged (H-5).
  */
 function operatorVaultMutation(
-  handle: (body: unknown) => Promise<HttpServerResponse.HttpServerResponse>,
+  handle: (body: unknown, params: Readonly<Record<string, string | undefined>>) => Promise<HttpServerResponse.HttpServerResponse>,
 ) {
   return httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -254,9 +256,10 @@ function operatorVaultMutation(
     if (authError) return noStore(authError);
     const body = yield* readJsonBody;
     if (body === MALFORMED_JSON) return noStore(jsonResponse({ error: 'request body is not valid JSON' }, { status: 400 }));
+    const params = yield* HttpRouter.params;
     return yield* Effect.promise(async () => {
       try {
-        return noStore(await handle(body));
+        return noStore(await handle(body, params));
       } catch (error) {
         return noStore(jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 }));
       }
@@ -302,6 +305,22 @@ const postVaultSyncRoute = HttpRouter.add(
   }),
 );
 
+/** The router (find-my-way-ts `maxParamLength`) never matches a longer path parameter. */
+const MAX_CONVERSATION_NAME_LENGTH = 100;
+
+const postVaultHandOffRoute = HttpRouter.add(
+  'POST',
+  '/api/vault/sessions/by-conversation/:name/settle',
+  operatorVaultMutation(async (_body, params) => {
+    const name = params['name'] ?? '';
+    if (name === '' || name.length > MAX_CONVERSATION_NAME_LENGTH) {
+      return jsonResponse({ error: `name must be a conversation name of at most ${MAX_CONVERSATION_NAME_LENGTH} characters` }, { status: 400 });
+    }
+    const outcome = await handOffConversation(name);
+    return jsonResponse(outcome.body, { status: outcome.status });
+  }),
+);
+
 export const vaultRouteLayer = Layer.mergeAll(
   getVaultStatusRoute,
   getVaultEvictionBatchRoute,
@@ -314,4 +333,5 @@ export const vaultRouteLayer = Layer.mergeAll(
   postVaultSetupRoute,
   postVaultJoinRoute,
   postVaultSyncRoute,
+  postVaultHandOffRoute,
 );

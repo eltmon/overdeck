@@ -24,12 +24,16 @@ export interface AnywhereProblem {
   action: AnywhereAction;
 }
 
+export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token';
+
 export interface AnywhereStatus {
   machine: { environmentId: string; label: string } | null;
   addresses: Array<{ origin: string; loopback: boolean }>;
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
   problems: AnywhereProblem[];
+  /** Who is asking (PAN-4455 D-3); null when no credential resolves (a loopback peer with no session). */
+  viewer: { kind: AnywhereViewerKind | null };
 }
 
 const REMOTE_ACCESS_DOCS = 'https://overdeck.ai/configuration/remote-access';

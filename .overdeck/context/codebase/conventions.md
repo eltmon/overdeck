@@ -32,6 +32,9 @@
   `/ws/rpc` (Effect RPC) — terminals over raw `/ws/terminal`.
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
+- Dialogs opened from a menu use a zustand store plus a host mounted in
+  `main.tsx` (`LinkPullRequestDialogHost`, `ContinueOnDeviceDialogHost`), so the dialog outlives
+  the menu.
 
 ## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated under `.pan/` by PAN-3917)
 - PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (human-mutable narrative), committed on the feature branch.
@@ -50,4 +53,4 @@
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.
 
-<!-- last-verified: 2026-09-28 -->
+<!-- last-verified: 2026-10-02 -->

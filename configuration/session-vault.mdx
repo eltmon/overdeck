@@ -207,6 +207,32 @@ Back on the first machine, the dashboard then marks that conversation "continued
 those turns are not lost: they are saved as a separate fork, and the panel names the fork's id
 so you can find it again later.
 
+### From the conversation
+
+You do not have to wait for the next automatic save. In the dashboard, open the conversation's
+⋮ menu (in its header or on its row) and choose **Continue on another device**, then the
+**Hand off to another machine** tab, then **Hand off now**. The conversation and its code
+snapshot are saved to the vault immediately, and the dialog says:
+
+> Saved as version 4 at 10:42. On your other machine, open "Fix the parser" from desk and
+> click Continue here.
+
+If the conversation is still running, the composer then shows `Handed off at 10:42. New
+messages here will be saved as a separate copy.` with two buttons: **Keep working here**
+dismisses the notice, and **Stop this session** stops the conversation on this machine.
+
+If the secret scan finds something that looks like a credential, nothing is saved. The dialog
+lists each blocked line and the command to allow it, for example
+`pan vault allow-secret <transcript path> 7`; run it and click **Hand off now** again. If the
+conversation saved but its code snapshot did not (too large, or a credential in the code),
+the dialog says so and names the fix. When the vault is off or locked, the tab says why and
+links to Settings → Session Vault instead. Hand-off works for Claude Code and Codex
+conversations.
+
+On the other machine, the conversation appears after its next sync. To check right away,
+open the ⋮ menu of any conversation marked "from `<machine>`" and choose **Check for new
+conversations**. This arrives in the next release (v0.65.0).
+
 ### Your uncommitted code comes along
 
 Each save also takes an encrypted snapshot of the code the conversation was working on:
