@@ -196,6 +196,8 @@ export interface AgentState {
   reviewOutputPath?: string;
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
+  /** PAN-4433: when the reviewer was last dispatched (spawned or warm-resumed), taken before the call. */
+  reviewDispatchedAt?: string;
   /**
    * #3853: the operator asked for the review parent's current run (a forced
    * re-review). Rewritten on every dispatch, so an automatic cycle clears it.
@@ -287,6 +289,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     reviewOutputPath: raw.reviewOutputPath,
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewDispatchedAt: raw.reviewDispatchedAt,
     reviewOperatorRequested: raw.reviewOperatorRequested,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,

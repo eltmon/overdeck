@@ -121,6 +121,7 @@ export interface SpawnRunOptions {
   /** Run-scoped reviewer metadata persisted before the tmux session launches. */
   reviewRunId?: string;
   reviewDeadlineAt?: string;
+  reviewDispatchedAt?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;

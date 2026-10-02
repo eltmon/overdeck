@@ -3,9 +3,10 @@
  *
  * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
  * the record plane) with a handful of routines that only observe and
- * nudge/notify — never reconcile a stored copy. Three of them recover from
+ * nudge/notify — never reconcile a stored copy. Four of them recover from
  * the pipeline journal: `recoverStalledReviews`, `recoverUndispatchedReviews`
- * (PAN-4221, in undispatched-review-recovery.ts) and `retryDeferredHandoffs`
+ * (PAN-4221, in undispatched-review-recovery.ts), `recoverSilentReviewers`
+ * (PAN-4433, in silent-reviewer-recovery.ts) and `retryDeferredHandoffs`
  * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
  * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
  *
@@ -32,8 +33,9 @@ import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './p
 import { retryDeferredHandoffs } from './deferred-handoff.js';
 import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
 import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
+import { recoverSilentReviewers } from './silent-reviewer-recovery.js';
 
-export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews };
+export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -549,6 +551,8 @@ export async function runDeaconLite(): Promise<void> {
   await reapClosedIssueAgents();
   await recoverStalledReviews();
   await recoverUndispatchedReviews();
+  // PAN-4433: re-dispatch a reviewer that was dispatched but never produced output.
+  await recoverSilentReviewers();
   // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
   await retryDeferredHandoffs();
 }
