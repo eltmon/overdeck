@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
   getConversationByTmuxSession: vi.fn(),
   connect: vi.fn(),
+  verify: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents/messaging.js', () => ({
@@ -25,6 +26,10 @@ vi.mock('../../../../lib/linear-mcp-auth.js', () => ({
 
 vi.mock('../../../../lib/linear-mcp-auth-connect.js', () => ({
   connectLinearMcpAuth: mocks.connect,
+}));
+
+vi.mock('../../../../lib/linear-mcp-auth-verify.js', () => ({
+  requestLinearMcpAuthVerify: mocks.verify,
 }));
 
 vi.mock('../../services/issue-service-singleton.js', () => ({
@@ -106,6 +111,7 @@ describe('Linear MCP auth routes', () => {
     mocks.getConversationByName.mockReset().mockReturnValue(null);
     mocks.getConversationByTmuxSession.mockReset().mockReturnValue(null);
     mocks.connect.mockReset().mockResolvedValue({ kind: 'nothing-pending' });
+    mocks.verify.mockReset().mockResolvedValue({ kind: 'already-connected' });
   });
 
   it('GET returns the projection without side effects', async () => {
@@ -311,6 +317,42 @@ describe('Linear MCP auth routes', () => {
     expect(result).toEqual({ status: 409, body: { success: false, error: 'Could not reach any blocked agent' } });
   });
 
+  it('POST verify returns 200 alreadyConnected when no lifecycle is open', async () => {
+    const result = await request('POST', '/api/linear-mcp-auth/verify');
+
+    expect(result).toEqual({ status: 200, body: { alreadyConnected: true } });
+  });
+
+  it('POST verify returns 202 with the owner it asked to re-check', async () => {
+    mocks.verify.mockResolvedValue({ kind: 'requested', requestedFrom: 'conv-20261001-eba1' });
+
+    const result = await request('POST', '/api/linear-mcp-auth/verify');
+
+    expect(result).toEqual({ status: 202, body: { requestedFrom: 'conv-20261001-eba1' } });
+  });
+
+  it('POST verify returns 409 when no agent owns the authorization URL', async () => {
+    mocks.verify.mockResolvedValue({ kind: 'no-owner' });
+
+    const result = await request('POST', '/api/linear-mcp-auth/verify');
+
+    expect(result).toEqual({
+      status: 409,
+      body: { success: false, error: 'No blocked agent owns the active Linear authorization URL' },
+    });
+  });
+
+  it('POST verify returns 409 with the error when the owner is unreachable', async () => {
+    mocks.verify.mockResolvedValue({ kind: 'unreachable', error: 'Could not reach conv-20261001-eba1: pane is gone' });
+
+    const result = await request('POST', '/api/linear-mcp-auth/verify');
+
+    expect(result).toEqual({
+      status: 409,
+      body: { success: false, error: 'Could not reach conv-20261001-eba1: pane is gone' },
+    });
+  });
+
   it('POST mutations reject requests without an origin', async () => {
     const result = await request('POST', '/api/linear-mcp-auth/complete', undefined, false);
 
@@ -321,5 +363,10 @@ describe('Linear MCP auth routes', () => {
 
     expect(connect.status).toBe(403);
     expect(mocks.connect).not.toHaveBeenCalled();
+
+    const verify = await request('POST', '/api/linear-mcp-auth/verify', undefined, false);
+
+    expect(verify.status).toBe(403);
+    expect(mocks.verify).not.toHaveBeenCalled();
   });
 });

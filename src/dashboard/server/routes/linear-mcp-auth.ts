@@ -8,6 +8,7 @@ import {
   type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
 import { connectLinearMcpAuth } from '../../../lib/linear-mcp-auth-connect.js';
+import { requestLinearMcpAuthVerify } from '../../../lib/linear-mcp-auth-verify.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { getConversationByName, getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -191,9 +192,34 @@ const postLinearMcpAuthConnectRoute = HttpRouter.add(
   })),
 );
 
+/** Verify request (PAN-4464): ask the URL owner to re-check Linear access
+ * after a same-machine approval, so its hook closes the lifecycle. */
+const postLinearMcpAuthVerifyRoute = HttpRouter.add(
+  'POST',
+  '/api/linear-mcp-auth/verify',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectInvalidOrigin(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => requestLinearMcpAuthVerify());
+    switch (result.kind) {
+      case 'already-connected':
+        return jsonResponse({ alreadyConnected: true });
+      case 'requested':
+        return jsonResponse({ requestedFrom: result.requestedFrom }, { status: 202 });
+      case 'no-owner':
+        return jsonResponse({ success: false, error: 'No blocked agent owns the active Linear authorization URL' }, { status: 409 });
+      case 'unreachable':
+        return jsonResponse({ success: false, error: result.error }, { status: 409 });
+    }
+  })),
+);
+
 export const linearMcpAuthRouteLayer = Layer.mergeAll(
   getLinearMcpAuthRoute,
   postLinearMcpAuthCallbackRoute,
   postLinearMcpAuthCompleteRoute,
   postLinearMcpAuthConnectRoute,
+  postLinearMcpAuthVerifyRoute,
 );
