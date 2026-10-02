@@ -15,11 +15,19 @@ const COMMON_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
 };
 
+/**
+ * `same-origin`, not `no-referrer`: under `no-referrer` the Fetch Standard serializes the Origin of a same-origin
+ * form POST as `null`, so the /activate and /admin forms would fail their own Origin checks. `same-origin` keeps
+ * the real Origin on our forms, still sends no Referer to github.com, and a cross-site form still sends either
+ * its own origin or `null`, both of which the checks refuse.
+ */
+export const HTML_REFERRER_POLICY = 'same-origin';
+
 const HTML_HEADERS: Record<string, string> = {
   ...COMMON_HEADERS,
   'Content-Type': 'text/html; charset=utf-8',
   'Content-Security-Policy': HTML_CSP,
-  'Referrer-Policy': 'no-referrer',
+  'Referrer-Policy': HTML_REFERRER_POLICY,
 };
 
 function withHeaders(base: Record<string, string>, extra?: HeadersInit): Headers {

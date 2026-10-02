@@ -58,7 +58,7 @@ Fixed windows per (bucket, `sha256(CF-Connecting-IP)`) in the `rate_limits` tabl
 
 ## API
 
-Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; HTML responses also carry `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'` and `Referrer-Policy: no-referrer`. Request bodies over 16 KiB → 413. Unknown path → 404 `{"error":"not_found"}`; wrong method → 405 with `Allow`; `OPTIONS` → 405. When `PUBLIC_BASE_URL`, `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` is missing, every route except `/healthz` returns 503 `{"error":"not_configured","missing":[…]}`; `/admin*` also returns 503 listing `OWNER_GITHUB_ID` when that is unset or non-numeric.
+Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; HTML responses also carry `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'` and `Referrer-Policy: same-origin` (not `no-referrer`: that would make browsers send `Origin: null` on the service's own form posts, which the `/activate` and `/admin` Origin checks must refuse). Request bodies over 16 KiB → 413. Unknown path → 404 `{"error":"not_found"}`; wrong method → 405 with `Allow`; `OPTIONS` → 405. When `PUBLIC_BASE_URL`, `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` is missing, every route except `/healthz` returns 503 `{"error":"not_configured","missing":[…]}`; `/admin*` also returns 503 listing `OWNER_GITHUB_ID` when that is unset or non-numeric.
 
 | Method | Path | Auth | Request → response |
 | --- | --- | --- | --- |

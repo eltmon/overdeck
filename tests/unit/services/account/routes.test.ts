@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HTML_CSP } from '../../../../services/account/src/http.ts';
+import { HTML_CSP, HTML_REFERRER_POLICY } from '../../../../services/account/src/http.ts';
 import { escapeHtml, errorPage, inviteOnlyPage, rateLimitedPage } from '../../../../services/account/src/pages.ts';
 import { call, form, makeEnv } from './helpers/harness.ts';
 
@@ -150,7 +150,10 @@ describe('account service route table (PAN-4293 account-scaffold)', () => {
         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'",
       );
       expect(page.headers.get('X-Content-Type-Options')).toBe('nosniff');
-      expect(page.headers.get('Referrer-Policy')).toBe('no-referrer');
+      // Must stay `same-origin`: with `no-referrer` browsers send `Origin: null` on same-origin form POSTs,
+      // and the /activate and /admin Origin checks would refuse the service's own forms.
+      expect(page.headers.get('Referrer-Policy')).toBe('same-origin');
+      expect(HTML_REFERRER_POLICY).toBe('same-origin');
       expect(page.headers.get('Cache-Control')).toBe('no-store');
     }
     expect(pages[1]?.status).toBe(403);
