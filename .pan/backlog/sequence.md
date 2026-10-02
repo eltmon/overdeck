@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-02T11:35:48.981398Z · model: claude-opus-5-5 · open: 823_
+_Last sequenced: 2026-10-02T11:37:52.027542Z · model: claude-opus-5-5 · open: 823_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1158,7 +1158,7 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-02T11:35:48.981398Z",
+  "generatedAt": "2026-10-02T11:37:52.027542Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 823,
