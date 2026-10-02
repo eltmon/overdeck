@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:26:26.296Z",
+  "updated": "2026-10-02T04:26:38.005Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "account-device-flow.ac3": {
       "status": "completed",
       "doneAt": "2026-10-02T04:26:26.296Z"
+    },
+    "account-device-flow.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T04:26:38.005Z"
     }
   }
 }
