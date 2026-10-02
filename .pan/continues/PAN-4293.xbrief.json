@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4293",
   "created": "2026-10-02T03:06:27.091Z",
-  "updated": "2026-10-02T04:15:52.794Z",
+  "updated": "2026-10-02T04:22:02.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,9 +150,10 @@
       "doneAt": "2026-10-02T04:15:39.226Z"
     },
     "account-pkce-flow": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4293",
-      "claimedAt": "2026-10-02T04:15:52.794Z"
+      "claimedAt": "2026-10-02T04:15:52.794Z",
+      "doneAt": "2026-10-02T04:22:02.890Z"
     }
   }
 }
