@@ -1,0 +1,724 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T05:20:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-658: Shared Sessions v0 — slice 1, the Cloudflare share service",
+    "updated": "2026-10-02T05:22:38.047Z"
+  },
+  "plan": {
+    "id": "pan-658",
+    "title": "Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport",
+    "status": "proposed",
+    "uid": "ce132ffb-7754-4037-aec4-7e8bdc2b4b53",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-02T05:20:45Z",
+    "updated": "2026-10-02T05:22:38.047Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-658/.pan/drafts/pan-658.md",
+        "label": "PRD draft (.pan/drafts/pan-658.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4293",
+        "label": "PAN-4293 account service",
+        "type": "issue"
+      },
+      {
+        "uri": "https://developers.cloudflare.com/realtime/pricing/",
+        "label": "Cloudflare Realtime TURN pricing (verified 2026-10-02)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "cloudflare",
+      "durable-objects",
+      "webrtc",
+      "turn",
+      "overdeck-anywhere",
+      "security"
+    ],
+    "metadata": {
+      "sizeJustification": "Slice 1 is one self-contained Cloudflare Worker workspace (all source under services/share/ plus one type-only contracts file). The projected-surface heuristic counts 27 files because each unit test is its own file, and it counts every root file (package.json, bun.lock, CLAUDE.md) and docs/SHARED-SESSIONS.md as a separate subsystem; the real surface is services/share, packages/contracts and their tests. The rest of the feature is already split into sibling issues PAN-4473..PAN-4482.",
+      "canonicalFilename": "2026-10-02-PAN-658-shared-sessions-v0-github-auth-d-shared-conversation-panel-with-webrtc-transport.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck runs on each user's localhost, so there is no way to give someone a link to a live conversation. PAN-658 Shared Sessions v0 needs an overdeck.ai rendezvous service that enforces invite-only access (host-approval lobby, kick, revoke, block list, controller) and brokers WebRTC between the host's dashboard server and viewers without ever seeing content. The whole feature exceeds one reviewable plan, so it is split into eleven slices.",
+      "Proposal": "PAN-658 delivers slice 1: a Cloudflare Worker (services/share, share.overdeck.ai) with one ShareRoom Durable Object per room. The room rules are a pure reducer (lobby, admit incl. one-frame admit-as-contributor, kick, revoke/unrevoke block list, controller handoff/reclaim, 5-minute host-reconnect alarm, admission-gated SDP/ICE relay), persisted in Durable Object storage. Identity comes from the PAN-4293 account service through the ACCOUNT service binding (verifyDevice on PAN-4330 device tokens); TURN credentials come from Cloudflare Realtime TURN, issued only to the host and admitted viewers. Signaling protocol types live type-only in packages/contracts/src/sharing.ts. This is the right first slice because it is the only part testable end to end today (Miniflare on real workerd with a stubbed account binding) without the unmerged sign-in client or the host WebRTC dependency, and its observable behavior is the invite-only state machine — the issue's hard requirement. Deploy is an operator checkpoint.",
+      "NonGoals": "- Deploying anything to Cloudflare: no wrangler deploy, wrangler secret put, wrangler login or any remote command (operator checkpoint)\n- Editing services/account or the feature/pan-4293 branch (the githubLogin request is posted on PAN-4293)\n- Host dashboard share action, share record file, /api/shares routes and lobby panel UI (PAN-4473)\n- Host WebRTC hub, content wire format (SharedEnvelope/SharedHello/SharedMessage) and conversation bridge (PAN-4474)\n- Viewer surface, join intent, localhost-detect script and the Mintlify user page (PAN-4475)\n- Prompt drafts, contributor direct-submit queue and FIFO ordering (PAN-4476)\n- Read-only terminal channel (PAN-4477)\n- Host-side controller enforcement and handoff UI (PAN-4478); slice 1 only stores the controller in the room\n- Host re-park after restart and viewer auto-restore on the host side (PAN-4479)\n- pan share / pan join CLI verbs and skills (PAN-4480)\n- Hosted web join page or a browser-authenticated viewer WebSocket (PAN-4481, operator decision OD-1)\n- Signaling-privacy e2e and forced-TURN verification against real Cloudflare TURN (PAN-4482)\n- New tagged errors in src/lib/errors.ts or any src/ (dashboard, CLI, lib) code\n- A share-service GitHub OAuth app, identity JWT or JWKS endpoint (retired by D-R3-1)\n- A D1 database or cross-room registry for the share service\n- Self-hosted coturn, Fly.io deployment or infra/signaling/"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split Shared Sessions v0 into 11 slices; PAN-658 = slice 1 (share service); filed PAN-4473..PAN-4482 for slices 2-11",
+        "rationale": "The finalize lint caps a plan at 25 files / 6 subsystems; the full rev-2 PRD spans ~60 files across services, server, frontend, CLI and docs. The share service is the only slice testable end to end now."
+      },
+      {
+        "summary": "OD-1: v0 stays install-required; hosted web join filed as PAN-4481 for the operator to decide",
+        "rationale": "The issue body locks install-required; the operator asked for this to be flagged, not silently resolved. The PRD corrects rev 2's privacy reasoning (a static WebRTC viewer page keeps content p2p); the real gap is a web sign-in flow in PAN-4293."
+      },
+      {
+        "summary": "OD-2: share viewers must be allowlisted PAN-4293 accounts (verifyDevice ok:true required)",
+        "rationale": "Consistent with PAN-4293's invite-only phase; the alternative (identity-only participant grant) is a PAN-4293 change needing the operator. Raised on PAN-4293. This default conflicts most with the operator's 'give someone a link' goal."
+      },
+      {
+        "summary": "OD-3: transport is WebRTC DataChannels with Cloudflare Realtime TURN, not a WSS content relay",
+        "rationale": "The 2026-10-02 operator comment (SDP/ICE relay over Durable Object WebSockets + managed TURN) supersedes the 2026-07-04 WSS-relay recommendation."
+      },
+      {
+        "summary": "Host on Cloudflare: Worker overdeck-share + ShareRoom Durable Object (SQLite backend) + Realtime TURN; TURN pricing verified 1,000 GB/month free shared with SFU, then $0.05/GB",
+        "rationale": "Operator decision 2026-10-02 (PAN-4293 shares the platform); facts verified on developers.cloudflare.com/realtime/pricing and /realtime/turn."
+      },
+      {
+        "summary": "Drop the rev-2 identity JWT/JWKS; the Worker verifies device tokens through the ACCOUNT service binding and asserts identity to the host over its authenticated WebSocket (D-R3-1)",
+        "rationale": "The JWT was minted by the same service that relays the DTLS fingerprints, so it added no protection; the operator asked for identity to come from PAN-4293, not a second OAuth implementation."
+      },
+      {
+        "summary": "Require githubLogin from verifyDevice; answer 503 account_service_outdated without it; request posted on PAN-4293 (D-R3-5)",
+        "rationale": "The controller must see a handle to make an admission decision; showing an unnamed joiner would undermine invite-only."
+      },
+      {
+        "summary": "Join links are https://share.overdeck.ai/s/<code> (PUBLIC_BASE_URL var), not overdeck.ai/s/<id> (D-R3-4)",
+        "rationale": "The overdeck.ai apex is served by Vercel, so a Worker cannot own /s/*; the var makes a later move a config change."
+      },
+      {
+        "summary": "Room state lives in Durable Object storage and the 5-minute window is a DO alarm",
+        "rationale": "Hibernation evicts memory; storage makes rooms survive redeploys and makes host auto-restore correct."
+      },
+      {
+        "summary": "Admission frames are accepted only on the host WebSocket; the data owner relays a viewer-controller's commands (D-R3-3)",
+        "rationale": "Matches the issue: the data-owner machine stays the authority and enforces the controller role."
+      },
+      {
+        "summary": "Lobby occupants receive only status lobby / error not_admitted / close; SDP, ICE servers and snapshots are admission-gated in the reducer",
+        "rationale": "Makes FR-3 (link possession grants nothing) a property of the share service, not only of the host."
+      },
+      {
+        "summary": "Protocol types are type-only and import-free in packages/contracts/src/sharing.ts, imported by relative 'import type' from the Worker (D-R3-8)",
+        "rationale": "Keeps the Worker bundle free of contracts runtime code and typecheck:share independent of build:contracts while sharing one contract with later host/frontend slices."
+      },
+      {
+        "summary": "Host persistence becomes ${OVERDECK_HOME}/shared-sessions.json (0600) keyed by room, replacing the rev-2 shared_sessions table (slices 2/8)",
+        "rationale": "Post-Cut there is no schema.ts; the host token is a non-derivable secret, matching the access-tokens.json pattern."
+      },
+      {
+        "summary": "TURN credential TTL 3600 s, requested over the room WebSocket; room creation rate-limited 10 per GitHub account per 60 s; caps 50 participants / 20 lobby",
+        "rationale": "Bounded abuse surface with no extra HTTP endpoint; lobby occupants cannot consume TURN."
+      }
+    ],
+    "items": [
+      {
+        "id": "share-scaffold",
+        "title": "Scaffold the services/share Cloudflare Worker workspace with /healthz",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/package.json",
+            "services/share/tsconfig.json",
+            "services/share/wrangler.jsonc",
+            "services/share/.dev.vars.example",
+            "services/share/.gitignore",
+            "services/share/src/index.ts",
+            "services/share/src/env.ts",
+            "services/share/src/routes.ts",
+            "package.json",
+            "bun.lock",
+            "tests/unit/services/share/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npm --prefix services/share run build:dry",
+            "npx vitest run tests/unit/services/share/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "wrangler dry-run bundle written to services/share/dist with exit 0",
+            "routes.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1.1. Create the services/share workspace modeled on PAN-4293's services/account (read it on branch feature/pan-4293; do not import from it): package.json (@overdeck/share-service, scripts dev and build:dry, devDependencies pinned exactly @cloudflare/workers-types 5.20261002.1, miniflare 5.20261001.0-alpha, wrangler 4.146.0), tsconfig.json (copy of services/account/tsconfig.json), wrangler.jsonc per the PRD 'Wrangler config' block WITHOUT durable_objects/migrations (added by share-room-do), .dev.vars.example (TURN_KEY_ID=, TURN_KEY_API_TOKEN=), .gitignore (.dev.vars, .wrangler/, dist/). src/env.ts declares the full Env (ROOMS, ACCOUNT typed by a placeholder AccountBinding interface, optional ROOM_CREATE_LIMIT, PUBLIC_BASE_URL, TURN_KEY_ID, TURN_KEY_API_TOKEN), Deps {now, fetch, randomBytes}, parseConfig, INTERNAL paths {init,delete,status,host,join} and headers X-Share-Host-Token-Hash / X-Share-Identity. src/routes.ts: route table pipeline (404 {error:not_found}; 405 with Allow; config gate 503 {error:not_configured,missing} for all but /healthz; 16 KiB body guard 413; Cache-Control no-store + X-Content-Type-Options nosniff on every response) and GET /healthz -> {ok:true, configured, turn}. src/index.ts: export default { fetch } delegating to routes.handle with real Deps; the only module importing cloudflare:workers. Root package.json: append 'services/share' to workspaces.packages, add script typecheck:share = 'tsc --noEmit -p services/share/tsconfig.json', append '&& npm run typecheck:share' to typecheck (keep any services/account entries if PAN-4293 merged first). Run bun install so bun.lock updates."
+        },
+        "items": [
+          {
+            "id": "share-scaffold.ac1",
+            "title": "Given PUBLIC_BASE_URL is unset, when GET /healthz is requested, then it returns 200 {ok:true, configured:false, turn:false}; with PUBLIC_BASE_URL set it returns configured:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-scaffold.ac2",
+            "title": "Given a configured Env, when an unknown path is requested it returns 404 {error:'not_found'}, and when POST /healthz is requested it returns 405 with an Allow header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-scaffold.ac3",
+            "title": "When npm run typecheck:share and npm --prefix services/share run build:dry run, then both exit 0 and npm run typecheck includes typecheck:share",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-scaffold.ac4",
+            "title": "Every response from routes.handle carries Cache-Control: no-store and X-Content-Type-Options: nosniff (asserted in routes.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-protocol",
+        "title": "Add signaling protocol types to @overdeck/contracts and the share frame decoder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-658",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts",
+            "packages/contracts/src/index.ts",
+            "services/share/src/protocol.ts",
+            "tests/unit/services/share/protocol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npm run build:contracts",
+            "npx vitest run tests/unit/services/share/protocol.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "contracts build exits 0",
+            "protocol.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "share-room-state",
+            "share-rooms-http",
+            "share-room-do"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1.2. Create packages/contracts/src/sharing.ts with exactly the types in the PRD 'Signaling protocol' block (ShareProtocolVersion, ShareScope, ShareIdentity, RoomParticipant, RoomSnapshot, CreateRoomRequest/Response, SignalData, IceServer, ShareErrorCode, HostFrame, ServiceToHostFrame, ViewerFrame, ViewerStatus, ServiceToViewerFrame, ShareCloseCode). The file holds only type/interface declarations and NO import statements (D-R3-8). Add export * from \"./sharing\" to packages/contracts/src/index.ts. Create services/share/src/protocol.ts with decodeHostFrame(raw) and decodeViewerFrame(raw) returning {ok:true, frame} | {ok:false, code:'invalid_frame'|'frame_too_large'}: binary -> invalid_frame; string length > 65536 -> frame_too_large; non-JSON or non-object -> invalid_frame; unknown type -> invalid_frame; every field must have its exact primitive type; githubId must be a positive safe integer; build a NEW object from known keys only (extra keys dropped); SignalData needs sdp or candidate; sdp.sdp <= 32768 chars, candidate.candidate <= 2048 chars. Import the types with import type from '../../../packages/contracts/src/sharing.ts'. Implementation checkpoint: if typecheck:share cannot resolve that relative .ts import, keep the relative path and add the file to services/share/tsconfig.json include; never add a runtime dependency on @overdeck/contracts."
+        },
+        "items": [
+          {
+            "id": "share-protocol.ac1",
+            "title": "Given packages/contracts/src/sharing.ts, when it is grepped for '^import', then there are zero matches, and @overdeck/contracts exports ShareScope and HostFrame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-protocol.ac2",
+            "title": "Given a JSON host frame {type:'admit', githubId:7, contributor:true, extra:'x'}, when decodeHostFrame runs, then it returns ok with a frame that has no 'extra' key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-protocol.ac3",
+            "title": "Given a 65,537-character string or a binary ArrayBuffer, when either decoder runs, then it returns frame_too_large or invalid_frame respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-protocol.ac4",
+            "title": "Given githubId 1.5 or -1, an unknown type, or a signal frame with neither sdp nor candidate, when decoded, then the decoder rejects it with invalid_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-room-state",
+        "title": "Implement the pure room reducer: lobby, admission, block list, controller, reconnect window",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-658",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/share/src/room-state.ts",
+            "tests/unit/services/share/room-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/room-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "room-state.test.ts passes with no real-time waits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "NFR-9"
+          ],
+          "foundationFor": [
+            "share-room-do",
+            "share-turn"
+          ],
+          "parallelSafeReason": "Touches only services/share/src/room-state.ts and its own test file; no other item edits either file."
+        },
+        "narrative": {
+          "Action": "PRD WI-1.3 and section 'Room rules'. Create services/share/src/room-state.ts exporting HOST_RECONNECT_WINDOW_MS=300000, MAX_PARTICIPANTS=50, MAX_LOBBY=20, the ParticipantRecord/RoomRecord/RoomEvent/RoomEffect types, createRoom(input, now) (controller = dataOwner, hostConnected false, hostDisconnectedAt = now; the DO arms the alarm), reduce(room, event, now) and toSnapshot(room). Implement every row of the PRD transition table exactly, including: ended rooms close joiners 4004; blocked joiners close 4003 without notifying the host; data owner as viewer closes 4009; reconnecting existing participants keep their state (admitted -> status admitted, auto-restore); new joiners get exactly one status lobby frame; caps close 4013; lobby signal/ice-servers -> error not_admitted and nothing to the host; host signal to a lobby id -> error not_admitted to host and nothing to the viewer; admit with contributor; kick removes (rejoin = lobby); revoke removes + blocks; unrevoke; set-contributor; set-controller to dataOwner or admitted only; kicked/left/revoked controller returns control to dataOwner; host-disconnected arms set-alarm now+300000; alarm ends the room only when now - hostDisconnectedAt >= 300000; end/delete -> close-all 4004 + cancel-alarm + delete-storage; snapshot to host after every change only while host connected. reduce never mutates its input. Tests inject now; nothing sleeps."
+        },
+        "items": [
+          {
+            "id": "share-room-state.ac1",
+            "title": "Given a viewer in the lobby, when every HostFrame variant except admit targets it and other viewers join and the host connects, then every send-viewer effect addressed to it is status lobby or error not_admitted (exhaustive property test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-state.ac2",
+            "title": "Given a kicked viewer, when it reconnects, then it lands in the lobby; given a revoked viewer, when it reconnects, then reduce emits close-viewer 4003 until an unrevoke frame removes the block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-state.ac3",
+            "title": "Given an admitted viewer that disconnects, when it reconnects with no host action, then reduce emits status admitted for it (auto-restore) and the participant stays admitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-state.ac4",
+            "title": "Given host-disconnected at time t, when alarm is reduced at t+299999 then no effects are emitted, and when alarm is reduced at t+300000 then close-all 4004 and delete-storage are emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-state.ac5",
+            "title": "Given set-controller naming a lobby id, reduce returns error unknown_participant; naming the data owner it is accepted; kicking the controller returns controllerGithubId to the data owner; and the input record deep-equals its pre-reduce clone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-rooms-http",
+        "title": "Add room creation, link revoke and the /s/:code landing page with device-token identity",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/src/account.ts",
+            "services/share/src/codes.ts",
+            "services/share/src/pages.ts",
+            "services/share/src/routes.ts",
+            "services/share/src/env.ts",
+            "tests/unit/services/share/routes.test.ts",
+            "tests/unit/services/share/codes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/routes.test.ts tests/unit/services/share/codes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "routes.test.ts and codes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1.4 and sections 'Identity (src/account.ts)', 'Codes', 'HTTP API'. Move the AccountBinding type from env.ts into src/account.ts (structural AccountVerifyResult with optional githubLogin) and implement verifyIdentity with the five ordered rules (non 'Bearer odd_<64 hex>' -> 401 invalid_token without calling the binding; throw -> 503 account_unavailable; grant_expired -> 403; other errors -> 401 with that code; missing githubLogin -> 503 account_service_outdated; avatarUrl = https://avatars.githubusercontent.com/u/<githubId>). src/codes.ts: SHORT_CODE_ALPHABET 'BCDFGHJKLMNPQRSTVWXZ23456789', newShortCode (8 symbols, rejection sampling discarding bytes >= 252), normalizeShortCode (uppercase, strip spaces/dashes, null unless 8 alphabet symbols), newHostToken ('odh_' + 64 hex), sha256Hex, timingSafeEqualHex. routes.ts: POST /v1/rooms (verify identity; ROOM_CREATE_LIMIT.limit({key:String(githubId)}) failure -> 429 rate_limited + Retry-After 60; scope kind 'conversation', conversationId 1-200 chars no control chars else 400 invalid_request; DO init via env.ROOMS.get(env.ROOMS.idFromName(code)).fetch('https://room'+INTERNAL.init); DO 409 -> retry with a fresh code up to 3 times then 503 code_space_exhausted; 201 {shortCode, hostToken, joinUrl: PUBLIC_BASE_URL+'/s/'+code, snapshot}); DELETE /v1/rooms/:code (Bearer odh_ token hash to DO delete; unknown, ended or wrong token all -> 404); GET /s/:code (DO status: active -> 200 page with 'pan join <CODE>' and no room data; unknown/ended/invalid code -> 404 page; CSP as PAN-4293 HTML). Never log hostToken or its hash. Unit tests use a fake ROOMS namespace and fake ACCOUNT."
+        },
+        "items": [
+          {
+            "id": "share-rooms-http.ac1",
+            "title": "Given a fake ACCOUNT returning ok with githubLogin, when POST /v1/rooms is sent with a valid odd_ token and scope {kind:'conversation', conversationId:'c1'}, then it returns 201 whose joinUrl equals PUBLIC_BASE_URL + '/s/' + shortCode and hostToken matches ^odh_[0-9a-f]{64}$",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-rooms-http.ac2",
+            "title": "Given an Authorization header without the odd_ prefix, when POST /v1/rooms is sent, then it returns 401 invalid_token and the fake verifyDevice records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-rooms-http.ac3",
+            "title": "Given verifyDevice returns grant_expired, ok without githubLogin, or the rate limiter refuses, then POST /v1/rooms returns 403, 503 account_service_outdated, or 429 with Retry-After: 60 respectively; given PUBLIC_BASE_URL is unset it returns 503 not_configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-rooms-http.ac4",
+            "title": "Given the fake DO answers 409 to the first init, when POST /v1/rooms runs, then a second init with a different code is made; and DELETE with a wrong host token returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-rooms-http.ac5",
+            "title": "Given normalizeShortCode('bcdf-ghjk'), it returns 'BCDFGHJK'; a 7-symbol input returns null; and GET /s/<unknown code> returns a 404 HTML page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-room-do",
+        "title": "Implement the ShareRoom Durable Object with host and viewer WebSocket endpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/src/room.ts",
+            "services/share/src/index.ts",
+            "services/share/wrangler.jsonc",
+            "services/share/src/routes.ts",
+            "tests/integration/services/share/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npm --prefix services/share run build:dry",
+            "npx vitest run tests/integration/services/share/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "dry-run bundle includes the ShareRoom class with exit 0",
+            "miniflare.test.ts passes on real workerd"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ],
+          "parallelSafeReason": "Its shared files (index.ts, routes.ts, wrangler.jsonc) are ordered by blocks edges from share-scaffold and share-rooms-http, so it runs alone on them once those land."
+        },
+        "narrative": {
+          "Action": "PRD WI-1.5 and section 'Durable Object glue'. Create services/share/src/room.ts and export class ShareRoom extends DurableObject<Env> from src/index.ts (delegating to room.ts). Load the 'room' record via ctx.blockConcurrencyWhile; after each reduce persist with ctx.storage.put BEFORE executing effects; delete-storage -> deleteAll + deleteAlarm. Internal requests: POST /init (409 if exists; else createRoom, persist, setAlarm(now+300000), 201 snapshot), POST /delete (constant-time token-hash check; mismatch/none -> 404; else reduce delete -> 204), GET /status (200 {status} or 404), GET /host upgrade (token check; WebSocketPair; ctx.acceptWebSocket(server,['host']); serializeAttachment({role:'host'}); close older host socket 4008; reduce host-connected), GET /join upgrade (parse X-Share-Identity; close existing 'v:'+githubId sockets with 4008; accept with tags ['viewer','v:'+githubId]; reduce viewer-connected). Hibernation handlers webSocketMessage (decode via protocol.ts; decode failure -> error frame on that socket only), webSocketClose/webSocketError (reduce disconnect only if no other open socket holds that role/id), alarm() (reduce alarm with Date.now()). Effects map to ws.send/ws.close/setAlarm/deleteAlarm. Add durable_objects {ROOMS: ShareRoom} and migrations [{tag:'v1', new_sqlite_classes:['ShareRoom']}] to wrangler.jsonc. Add GET /v1/rooms/:code/host (Bearer odh_) and /join (Bearer odd_, verifyIdentity) upgrade routes in routes.ts (no upgrade header -> 426; v != 1 -> 400 unsupported_protocol). Integration test per PRD 'Local development and tests': bundle with wrangler deploy --dry-run, Miniflare with an inline account stub worker exporting AccountRpc bound via serviceBindings {ACCOUNT:{name:'account-stub', entrypoint:'AccountRpc'}}, durableObjects {ROOMS:'ShareRoom'}. Implementation checkpoint: if the pinned Miniflare rejects the named-entrypoint binding, use a fetch-function stub inside the test only and document why in a test comment."
+        },
+        "items": [
+          {
+            "id": "share-room-do.ac1",
+            "title": "Given a created room and a connected host WebSocket, when viewer A joins, then A receives exactly one frame {type:'status', status:'lobby'} and the host receives a room snapshot listing A with state lobby",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-do.ac2",
+            "title": "Given A is in the lobby, when the host sends a signal frame for A, then the host receives error not_admitted and A has still received only its single lobby frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-do.ac3",
+            "title": "Given the host admits A with contributor:true, then A receives status admitted with contributor:true, and signal frames relay host->A and A->host",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-do.ac4",
+            "title": "Given A is kicked, A's socket closes with 4010 and a rejoin yields status lobby; given A is revoked, the socket closes 4011, a rejoin closes 4003, and after unrevoke a rejoin yields status lobby",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-do.ac5",
+            "title": "Given DELETE /v1/rooms/<code> with the host token, then every open socket closes with 4004 and GET /s/<code> returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-turn",
+        "title": "Issue Cloudflare Realtime TURN credentials to the host and admitted viewers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/src/turn.ts",
+            "services/share/src/room.ts",
+            "tests/unit/services/share/turn.test.ts",
+            "tests/integration/services/share/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/turn.test.ts tests/integration/services/share/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "turn.test.ts and miniflare.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-7",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1.6 and section 'TURN credentials'. Create services/share/src/turn.ts: TURN_TTL_SECONDS=3600; fetchIceServers(turn | null, {fetch}) POSTs https://rtc.live.cloudflare.com/v1/turn/keys/<keyId>/credentials/generate-ice-servers with Authorization: Bearer <apiToken> and body {\"ttl\":3600}; null config -> not_configured with no fetch; non-201 -> http_error; each iceServers entry needs non-empty urls all starting stun:/turn:/turns: else bad_response; abort after 5000 ms via AbortController + setTimeout (NOT AbortSignal.timeout, which ignores vi fake timers) -> network_error. Never log the token or credentials. Wire the fetch-ice-servers effect in room.ts: success -> send {type:'ice-servers', iceServers} to the target; failure -> error turn_unavailable. Unit tests inject fetch and use vi.useFakeTimers + vi.advanceTimersByTimeAsync(5000) for the timeout. Extend miniflare.test.ts with TURN secrets set and rtc.live.cloudflare.com stubbed via outboundService."
+        },
+        "items": [
+          {
+            "id": "share-turn.ac1",
+            "title": "Given a null TURN config, when fetchIceServers runs, then it returns not_configured and the injected fetch records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-turn.ac2",
+            "title": "Given the stubbed API returns 201 with stun and turn URLs, then fetchIceServers returns them; given 500 it returns http_error; given a urls entry 'http://x' it returns bad_response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-turn.ac3",
+            "title": "Given a fetch that never resolves, when fake timers advance 5000 ms, then fetchIceServers returns network_error, and the request carried Authorization: Bearer <token> and body {\"ttl\":3600}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-turn.ac4",
+            "title": "Given the Miniflare room, when the host sends {type:'ice-servers'} it receives the stubbed iceServers, and when a lobby viewer sends it the viewer receives error not_admitted and the TURN stub records no request for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-docs",
+        "title": "Document the share service in docs/SHARED-SESSIONS.md and link it from CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T05:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/SHARED-SESSIONS.md",
+            "grep -n 'SHARED-SESSIONS.md' CLAUDE.md",
+            "grep -n 'Deploy' docs/SHARED-SESSIONS.md"
+          ],
+          "expected_outputs": [
+            "docs/SHARED-SESSIONS.md exists",
+            "CLAUDE.md topic index row present",
+            "Deploy section present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-8",
+            "FR-3",
+            "FR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1.7. Create docs/SHARED-SESSIONS.md structured like docs/ACCOUNT-SERVICE.md on branch feature/pan-4293, with sections: What it is; Slice map (link PAN-4473..PAN-4482); Rooms and the lobby (the reducer transition table in prose, including close codes 4003/4004/4008/4009/4010/4011/4013); HTTP API (full table); WebSocket protocol (frames); Identity and the allowlist (OD-2: viewers must be allowlisted on account.overdeck.ai/admin); TURN (pricing 1,000 GB/month free shared with SFU then $0.05/GB; per-allocation limits; TTL 3600 s); What the service can and cannot see; Local development (exact commands: npm --prefix services/share run dev, npm run typecheck:share, npx vitest run tests/unit/services/share/, npx vitest run tests/integration/services/share/, npm --prefix services/share run build:dry); Deploy (operator-only, numbered: 0 build:dry, 1 deploy PAN-4293 account Worker first, 2 create a Realtime TURN key in the Cloudflare dashboard, 3 wrangler secret put TURN_KEY_ID and TURN_KEY_API_TOKEN, 4 wrangler deploy, 5 curl https://share.overdeck.ai/healthz shows configured:true and turn:true, 6 wrangler rollback). State that no agent deploys. Add the row '| Shared Sessions share service (Cloudflare Worker, Durable Objects, TURN) | [docs/SHARED-SESSIONS.md](docs/SHARED-SESSIONS.md) |' to the CLAUDE.md Topic Index table."
+        },
+        "items": [
+          {
+            "id": "share-docs.ac1",
+            "title": "Given docs/SHARED-SESSIONS.md, when read, then its Deploy section lists wrangler secret put TURN_KEY_ID and states that deploying is operator-only and no agent deploys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-docs.ac2",
+            "title": "Given docs/SHARED-SESSIONS.md, its HTTP API table lists POST /v1/rooms, DELETE /v1/rooms/:code, GET /v1/rooms/:code/host, GET /v1/rooms/:code/join and GET /s/:code with the status codes the code returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-docs.ac3",
+            "title": "Given CLAUDE.md, its Topic Index contains a row linking docs/SHARED-SESSIONS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "share-scaffold",
+        "to": "share-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "share-protocol",
+        "to": "share-room-state",
+        "type": "blocks"
+      },
+      {
+        "from": "share-scaffold",
+        "to": "share-rooms-http",
+        "type": "blocks"
+      },
+      {
+        "from": "share-protocol",
+        "to": "share-rooms-http",
+        "type": "blocks"
+      },
+      {
+        "from": "share-room-state",
+        "to": "share-room-do",
+        "type": "blocks"
+      },
+      {
+        "from": "share-rooms-http",
+        "to": "share-room-do",
+        "type": "blocks"
+      },
+      {
+        "from": "share-room-do",
+        "to": "share-turn",
+        "type": "blocks"
+      },
+      {
+        "from": "share-room-do",
+        "to": "share-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "share-turn",
+        "to": "share-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "share-scaffold",
+        "to": "share-room-do",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
