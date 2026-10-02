@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4464",
   "created": "2026-10-02T02:25:19.481Z",
-  "updated": "2026-10-02T02:30:27.829Z",
+  "updated": "2026-10-02T02:31:33.531Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-02T02:30:26.011Z"
     },
     "wi5-connect-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4464",
-      "claimedAt": "2026-10-02T02:30:27.829Z"
+      "claimedAt": "2026-10-02T02:30:27.829Z",
+      "doneAt": "2026-10-02T02:31:33.530Z"
     }
   }
 }
