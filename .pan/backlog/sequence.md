@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-02T12:31:41.568369Z · model: claude-opus-5-5 · open: 824_
+_Last sequenced: 2026-10-02T12:42:07.275163Z · model: claude-opus-5-5 · open: 825_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -326,6 +326,7 @@ _Last sequenced: 2026-10-02T12:31:41.568369Z · model: claude-opus-5-5 · open: 
 | 359 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 362 | PAN-4486 | L | medium | ok |  | PAN-4254 | Split-button new-conversation dialog (model, effort, context, skills, issue link); blocked by PAN-4254 five-level effort |
 | 363 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
 | 364 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
 | 365 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
@@ -1159,10 +1160,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-02T12:31:41.568369Z",
+  "generatedAt": "2026-10-02T12:42:07.275163Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 824,
+  "openCount": 825,
   "nodes": [
     {
       "issue": "PAN-4433",
@@ -11423,6 +11424,21 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4486",
+      "rank": 362,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4254"
+      ],
+      "why": "Split-button new-conversation dialog (model, effort, context, skills, issue link); blocked by PAN-4254 five-level effort",
+      "rationale": "New issue: well-specified UI+backend feature with clear AC; ranked mid-tier behind its in-pipeline blocker PAN-4254.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12769,6 +12785,27 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4254",
+      "to": "PAN-4486",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4486",
+      "to": "PAN-1357",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4486",
+      "to": "PAN-743",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
