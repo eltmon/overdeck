@@ -46,8 +46,10 @@ const getConversationDiffFullRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     return yield* Effect.promise(async () => {
-      const response = await getConversationDiffFull(name, conversationDiffDependencies);
+      const response = await getConversationDiffFull(name, fileFilter, conversationDiffDependencies);
       return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),

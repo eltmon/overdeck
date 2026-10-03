@@ -26,6 +26,18 @@ function git(cwd: string, args: string[]): void {
   });
 }
 
+function gitAt(cwd: string, args: string[], isoDate: string): void {
+  execFileSync('git', args, {
+    cwd,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_DATE: isoDate,
+      GIT_COMMITTER_DATE: isoDate,
+    },
+  });
+}
+
 function createRepo(name: string, relativePath: string, content: string): string {
   const repo = join(testRoot, name);
   const filePath = join(repo, relativePath);
@@ -103,11 +115,13 @@ describe('getConversationDiffTurn', () => {
     expect(combinedDiff).toContain('diff --git a/README.md b/README.md');
     expect(combinedDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
 
-    const fullResult = await getConversationDiffFull('cross-repo', deps);
+    const fullResult = await getConversationDiffFull('cross-repo', undefined, deps);
     const fullDiff = (fullResult.body as { diff: string }).diff;
     expect(fullDiff).toContain('diff --git a/README.md b/README.md');
     expect(fullDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
     expect(fullDiff).toContain('+External change');
+    const fullFiles = (fullResult.body as { files: Array<{ path: string }> }).files;
+    expect(fullFiles.map((f) => f.path)).toContain('drafts/pan-2842.md');
   });
 });
 
@@ -189,5 +203,64 @@ describe('getConversationDiffVsMain', () => {
     const result = await getConversationDiffVsMain('does-not-exist', undefined);
 
     expect(result.status).toBe(404);
+  });
+});
+
+describe('getConversationDiffFull (PAN-4501: zero-turn files)', () => {
+  const FUTURE_DATE = new Date(Date.now() + 86_400_000).toISOString();
+
+  it('returns the uncommitted and post-start committed files with a non-empty diff when there are no edit turns', async () => {
+    const repo = createRepo('full-files-repo', 'a.txt', 'a\n');
+    const sessionFile = join(testRoot, 'session-full.jsonl');
+    writeFileSync(sessionFile, '');
+
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffFull } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'full-files', tmuxSession: 'conv-full-files', cwd: repo });
+
+    writeFileSync(join(repo, 'a.txt'), 'a\nuncommitted\n');
+    writeFileSync(join(repo, 'c.txt'), 'c\n');
+    git(repo, ['add', 'c.txt']);
+    gitAt(repo, ['commit', '--quiet', '-m', 'add c.txt'], FUTURE_DATE);
+
+    const deps = {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
+    };
+
+    const resultFull = await getConversationDiffFull('full-files', undefined, deps);
+
+    const files = (resultFull.body as { files: Array<{ path: string }> }).files;
+    expect(files.map((f) => f.path)).toEqual(['a.txt', 'c.txt']);
+    const diff = (resultFull.body as { diff: string }).diff;
+    expect(diff.length).toBeGreaterThan(0);
+  });
+
+  it('scopes the diff to fileFilter while files still lists every changed path', async () => {
+    const repo = createRepo('full-files-repo-filter', 'a.txt', 'a\n');
+    const sessionFile = join(testRoot, 'session-full-filter.jsonl');
+    writeFileSync(sessionFile, '');
+
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffFull } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'full-files-filter', tmuxSession: 'conv-full-files-filter', cwd: repo });
+
+    writeFileSync(join(repo, 'a.txt'), 'a\nuncommitted\n');
+    writeFileSync(join(repo, 'c.txt'), 'c\n');
+    git(repo, ['add', 'c.txt']);
+    gitAt(repo, ['commit', '--quiet', '-m', 'add c.txt'], FUTURE_DATE);
+
+    const deps = {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
+    };
+
+    const resultFiltered = await getConversationDiffFull('full-files-filter', 'a.txt', deps);
+
+    const diff = (resultFiltered.body as { diff: string }).diff;
+    expect(diff).toContain('a.txt');
+    expect(diff).not.toContain('c.txt');
+    const files = (resultFiltered.body as { files: Array<{ path: string }> }).files;
+    expect(files.map((f) => f.path)).toEqual(['a.txt', 'c.txt']);
   });
 });
