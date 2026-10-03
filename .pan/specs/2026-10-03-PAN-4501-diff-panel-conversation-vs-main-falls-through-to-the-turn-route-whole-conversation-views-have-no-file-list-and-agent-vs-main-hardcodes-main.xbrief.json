@@ -4,17 +4,17 @@
     "created": "2026-10-03T23:03:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4501: Diff panel: conversation 'vs main' falls through to the turn route, whole-conversation views have no file list, and agent 'vs main' hardcodes main",
-    "updated": "2026-10-03T23:10:23.760Z"
+    "updated": "2026-10-03T23:11:02.526Z"
   },
   "plan": {
     "id": "pan-4501",
     "title": "Diff panel: conversation 'vs main' falls through to the turn route, whole-conversation views have no file list, and agent 'vs main' hardcodes main",
-    "status": "proposed",
+    "status": "running",
     "uid": "d9fa5e8f-b167-4bce-90eb-c9928e7b2f34",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T23:03:38Z",
-    "updated": "2026-10-03T23:10:23.760Z",
+    "updated": "2026-10-03T23:11:02.526Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4501",
@@ -704,5 +704,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
