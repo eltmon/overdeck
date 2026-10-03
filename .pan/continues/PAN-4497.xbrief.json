@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4497",
   "created": "2026-10-03T21:34:28.916Z",
-  "updated": "2026-10-03T22:13:34.219Z",
+  "updated": "2026-10-03T22:13:46.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "flow-layout-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T22:13:34.219Z"
+    },
+    "overlap-playwright-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T22:13:46.580Z"
     }
   }
 }
