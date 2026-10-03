@@ -9,6 +9,7 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
 import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
+import { resolveRelaunchEffort } from './relaunch-effort.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostDisplayName, hostTransportFor } from '../runtimes/host-transport.js';
@@ -431,6 +432,11 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     }
     const effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
 
+    const relaunchEffort = resolveRelaunchEffort(agentState, { model, harness: effectiveHarness });
+    if (relaunchEffort.warning) logAgentLifecycle(normalizedId, `relaunch effort: ${relaunchEffort.warning}`);
+    agentState.effort = relaunchEffort.effort;
+    agentState.effortSource = relaunchEffort.source;
+
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -446,6 +452,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      effort: relaunchEffort.effort,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
