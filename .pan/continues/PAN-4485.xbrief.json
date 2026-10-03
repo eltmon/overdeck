@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4485",
   "created": "2026-10-03T01:28:53.863Z",
-  "updated": "2026-10-03T02:58:08.745Z",
+  "updated": "2026-10-03T02:58:17.736Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4485",
       "claimedAt": "2026-10-03T02:48:01.899Z",
       "doneAt": "2026-10-03T02:58:08.745Z"
+    },
+    "docs-clear-chain-ownership": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:58:17.736Z"
     }
   }
 }
