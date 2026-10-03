@@ -16,6 +16,7 @@ import {
   SessionsFeedRowSnapshot,
 } from "./types"
 import { EditorIdSchema, OpenInEditorInput } from "./editor"
+import { EffortLevelSchema } from "./effort"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -212,6 +213,10 @@ export const ConversationResponse = Schema.Struct({
   compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
   contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
   subagents: Schema.optional(Schema.Array(SubagentSummary)),
+  /** PAN-4255: effort read from the agent's transcript (claude-code only). */
+  observedEffort: Schema.optional(Schema.NullOr(EffortLevelSchema)),
+  /** PAN-4255: the effort the agent was launched/pinned with and its EffortSource layer. */
+  effortResolution: Schema.optional(Schema.NullOr(Schema.Struct({ effort: EffortLevelSchema, source: Schema.String }))),
 })
 export type ConversationResponse = typeof ConversationResponse.Type
 

@@ -50,6 +50,11 @@ vi.mock('../../services/agent-subagents.js', () => ({
   resolveAgentSubagentTranscript: vi.fn(() => Promise.resolve(null)),
 }));
 
+vi.mock('../../../../lib/agents.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/agents.js')>()),
+  getAgentState: vi.fn(() => null),
+}));
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return { ...actual, access: vi.fn(() => Promise.resolve()) };
@@ -70,6 +75,7 @@ import {
 } from '../../../../lib/agents/transcript-resolver.js';
 import { resolveAgentSubagentTranscript } from '../../services/agent-subagents.js';
 import { access } from 'node:fs/promises';
+import { getAgentState } from '../../../../lib/agents.js';
 
 const mockGetAgentWorkspace = vi.mocked(getAgentWorkspace);
 const mockParseEntireConversation = vi.mocked(parseEntireConversation);
@@ -80,6 +86,7 @@ const mockParseAcpConversationMessages = vi.mocked(parseAcpConversationMessages)
 const mockListAgentTranscriptCandidates = vi.mocked(listAgentTranscriptCandidates);
 const mockResolveAgentSubagentTranscript = vi.mocked(resolveAgentSubagentTranscript);
 const mockAccess = vi.mocked(access);
+const mockGetAgentState = vi.mocked(getAgentState);
 
 const EMPTY = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
@@ -102,6 +109,7 @@ describe('buildConversationResponse', () => {
     mockGetAgentWorkspace.mockResolvedValue('/workspace/feature-pan-473');
     mockListAgentTranscriptCandidates.mockResolvedValue([]);
     mockAccess.mockResolvedValue(undefined);
+    mockGetAgentState.mockReturnValue(null);
   });
 
   // ── claude-code (default harness) ─────────────────────────────────────────
@@ -130,6 +138,39 @@ describe('buildConversationResponse', () => {
     expect(result.streaming).toBe(false);
     expect(result.totalCost).toBe(0.42);
     expect(result.byteOffset).toBe(1024);
+  });
+
+  it('returns observed effort and the effort resolution (PAN-4255)', async () => {
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: '/some/path/session.jsonl' }]);
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-PAN-473',
+      harness: 'claude-code',
+      model: 'claude-opus-4-7',
+      effort: 'medium',
+      effortSource: 'role',
+    } as never);
+    mockParseEntireConversation.mockResolvedValue({
+      messages: [],
+      ...PARSE_RESULT_BASE,
+      observedEffort: 'low',
+    } as never);
+
+    const result = await buildAgentConversationResult('agent-PAN-473');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      observedEffort: 'low',
+      effortResolution: { effort: 'medium', source: 'role' },
+    });
+  });
+
+  it('returns null effort fields when the agent has no state', async () => {
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: '/some/path/session.jsonl' }]);
+    mockParseEntireConversation.mockResolvedValue({ messages: [], ...PARSE_RESULT_BASE } as never);
+
+    const result = await buildAgentConversationResult('agent-PAN-473');
+
+    expect(result.body).toMatchObject({ observedEffort: null, effortResolution: null });
   });
 
   it('strips latestCompactSummary (PAN-4245) from the HTTP response body', async () => {

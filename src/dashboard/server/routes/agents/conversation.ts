@@ -24,6 +24,7 @@ import {
 } from '../../../../lib/agents/transcript-resolver.js';
 import { isExternalAgentId, readExternalRegistration } from '../../../../lib/agents/external-registry.js';
 import { checkTranscriptPath } from '../../../../lib/agents/external-paths.js';
+import { resolveRelaunchEffort } from '../../../../lib/agents/relaunch-effort.js';
 import {
   isSafeSubagentId,
   listAgentSubagents,
@@ -198,8 +199,16 @@ export async function buildAgentConversationResult(
       : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
       : await sharedTranscriptParser(selected.kind)(selected.path);
     // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
-    const { latestCompactSummary: _latestCompactSummary, ...result } =
+    const { latestCompactSummary: _latestCompactSummary, ...parsed } =
       rawResult as typeof rawResult & { latestCompactSummary?: unknown };
+    // PAN-4255: the composer effort chip compares what the transcript shows with what was launched.
+    const state = isExternalAgentId(id) ? null : getAgentState(id);
+    const resolution = state ? resolveRelaunchEffort(state) : null;
+    const result = {
+      ...parsed,
+      observedEffort: selected.kind === 'claude' ? parsed.observedEffort ?? null : null,
+      effortResolution: resolution ? { effort: resolution.effort, source: resolution.source } : null,
+    };
 
     if (selected.kind === 'acp') {
       return { status: 200, body: {
