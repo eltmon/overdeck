@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:06:04.506Z",
+  "updated": "2026-10-03T23:06:21.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "kickoff-door.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T23:06:04.505Z"
+    },
+    "kickoff-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:21.004Z"
     }
   }
 }
