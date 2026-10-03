@@ -3,11 +3,12 @@
  * fork" composer notice, and its wiring into ComposerFooter for local rows.
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VaultContinuityNotice } from '../VaultContinuityNotice';
 import { ComposerFooter } from '../ComposerFooter';
 import type { Conversation, VaultContinuity } from '../../CommandDeck/ConversationList';
+import { installEffortDefaultFetchMock } from '../../../test-utils/strictFetchMock';
 
 // The composer's editor and pickers, stubbed the way VaultBrowseCopy.test.tsx does.
 vi.mock('lexical', () => ({ $getRoot: () => ({ getTextContent: () => '', clear: () => {} }) }));
@@ -34,8 +35,16 @@ vi.mock('../../Settings/modelCatalog', () => ({
   findModelDef: vi.fn(() => ({ name: 'Claude Sonnet 4.6' })),
 }));
 
-afterEach(() => {
+let fetchControl: ReturnType<typeof installEffortDefaultFetchMock>;
+
+beforeEach(() => {
+  fetchControl = installEffortDefaultFetchMock();
+});
+
+afterEach(async () => {
   cleanup();
+  await fetchControl.assertNoUnexpectedRequests();
+  vi.unstubAllGlobals();
 });
 
 const CONTINUED_ELSEWHERE: VaultContinuity = { kind: 'continued-elsewhere', vaultId: 'v-parent', ownerLabel: 'laptop-a' };
