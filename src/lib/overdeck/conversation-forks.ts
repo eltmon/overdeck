@@ -44,6 +44,7 @@ import {
 } from './conversation-runtime.js';
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import { conversationLaunchContext } from './conversation-launch-context.js';
+import { ConversationSkillFlagError, parseSkillFlagList, resolveConversationSkillFlags } from '../skill-overrides/conversation-flags.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -781,6 +782,24 @@ export async function handleConversationSummaryFork(
     if ('error' in projectResult) {
       return jsonResponse({ error: projectResult.error }, { status: 400 });
     }
+    // PAN-4499 FR-1–FR-4, D1, D4: --skill/--pack apply to the successor's skill layer only.
+    let flagOverrides: Record<string, boolean> | undefined;
+    try {
+      const skills = parseSkillFlagList(body['skills'], 'skills');
+      const packs = parseSkillFlagList(body['packs'], 'packs');
+      if (skills.length > 0 || packs.length > 0) {
+        const project = projectResult.projectKey ? await resolveRegisteredProject(projectResult.projectKey) : undefined;
+        const projectRoot = project && !('error' in project) ? project.config.path : undefined;
+        flagOverrides = await resolveConversationSkillFlags({ skills, packs }, projectRoot);
+      }
+    } catch (error) {
+      if (error instanceof ConversationSkillFlagError) return jsonResponse({ error: error.message }, { status: 400 });
+      throw error;
+    }
+    const mergedSkillOverrides = flagOverrides ? { ...(conv.skillOverrides ?? {}), ...flagOverrides } : undefined;
+    if (mergedSkillOverrides && Object.keys(mergedSkillOverrides).length > 200) {
+      return jsonResponse({ error: 'too many skill overrides' }, { status: 400 });
+    }
     const requestedHandoffAuthor = body['handoffAuthor'];
     let handoffAuthor: HandoffAuthor = 'external';
     if (requestedHandoffAuthor !== undefined) {
@@ -894,6 +913,7 @@ export async function handleConversationSummaryFork(
       forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
       // PAN-4185: a fork of a bare conversation stays bare.
       ...conversationLaunchContext(conv),
+      ...(mergedSkillOverrides ? { skillOverrides: mergedSkillOverrides } : {}),
       // Gauntlet lanes D3: the successor nests under its source. Launch-time fact, written once.
       parentName: conv.name,
     });
