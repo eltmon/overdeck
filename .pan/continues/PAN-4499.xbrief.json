@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:06:21.004Z",
+  "updated": "2026-10-03T23:06:31.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "kickoff-door.ac5": {
       "status": "completed",
       "doneAt": "2026-10-03T23:06:21.004Z"
+    },
+    "cli-skill-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:31.545Z"
     }
   }
 }
