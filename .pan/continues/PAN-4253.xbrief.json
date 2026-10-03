@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T01:59:28.940Z",
+  "updated": "2026-10-03T02:03:11.463Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-03T01:59:14.950Z"
     },
     "spawnconfig-effort-adapter": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4253",
-      "claimedAt": "2026-10-03T01:59:28.940Z"
+      "claimedAt": "2026-10-03T01:59:28.940Z",
+      "doneAt": "2026-10-03T02:03:11.463Z"
     }
   }
 }
