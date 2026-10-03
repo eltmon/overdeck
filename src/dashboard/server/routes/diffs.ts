@@ -19,6 +19,7 @@ import {
   diffAgainstMainFiles,
   listCheckpoints,
 } from '../../../lib/checkpoint/checkpoint-manager.js'
+import { diffOptionsFromSearchParams } from '../../../lib/diffs/diff-output.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,8 @@ const getTurnDiffRoute = HttpRouter.add(
         const fromTurnId = turnIdx > 0 ? checkpoints[turnIdx - 1] : turnId
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const diff = await Effect.runPromise(diffCheckpoints(workspace, agentId, fromTurnId, turnId, filePath))
+        const diffOptions = diffOptionsFromSearchParams(url.searchParams)
+        const diff = await Effect.runPromise(diffCheckpoints(workspace, agentId, fromTurnId, turnId, filePath, diffOptions))
 
         return jsonResponse({ agentId, turnId, fromTurnId, diff })
       } catch (error: unknown) {
@@ -174,8 +176,9 @@ const getFullDiffRoute = HttpRouter.add(
         const lastTurn = checkpoints[checkpoints.length - 1]!
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await Effect.runPromise(diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn))
-        const diff = filePath ? await Effect.runPromise(diffCheckpoints(workspace, agentId, firstTurn, lastTurn, filePath)) : undefined
+        const diffOptions = diffOptionsFromSearchParams(url.searchParams)
+        const files = await Effect.runPromise(diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn, diffOptions))
+        const diff = filePath ? await Effect.runPromise(diffCheckpoints(workspace, agentId, firstTurn, lastTurn, filePath, diffOptions)) : undefined
 
         return jsonResponse({
           agentId,
@@ -226,8 +229,9 @@ const getVsMainDiffRoute = HttpRouter.add(
 
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await diffAgainstMainFiles(workspace)
-        const diff = filePath ? await diffAgainstMain(workspace, filePath) : undefined
+        const diffOptions = diffOptionsFromSearchParams(url.searchParams)
+        const files = await diffAgainstMainFiles(workspace, diffOptions)
+        const diff = filePath ? await diffAgainstMain(workspace, filePath, diffOptions) : undefined
 
         return jsonResponse({ agentId, ...(diff !== undefined && { diff }), files })
       } catch (error: unknown) {

@@ -17,7 +17,7 @@ import { mkdtemp, rm } from 'fs/promises'
 import { Effect } from 'effect'
 import { CheckpointError, InvalidAgentIdError, VcsError } from '../errors.js'
 import { PAN_RUNTIME_SUBDIRS } from '../state-plane.js'
-import { parseNumstatWithStatus, type TurnDiffFileChange } from '../diffs/diff-output.js'
+import { diffOptionArgs, parseNumstatWithStatus, type DiffOptions, type TurnDiffFileChange } from '../diffs/diff-output.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -195,7 +195,14 @@ async function deleteCheckpointBody(cwd: string, agentId: string, turnId: string
   }
 }
 
-async function diffCheckpointsBody(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
+async function diffCheckpointsBody(
+  cwd: string,
+  agentId: string,
+  fromTurnId: string,
+  toTurnId: string,
+  filePath?: string,
+  options: DiffOptions = {},
+): Promise<string> {
   assertSafeAgentId(agentId)
   const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
   const toCommit = await resolveCheckpointCommit(cwd, agentId, toTurnId)
@@ -204,7 +211,7 @@ async function diffCheckpointsBody(cwd: string, agentId: string, fromTurnId: str
     throw new Error(`Checkpoint ref unavailable for diff: from=${fromTurnId}(${fromCommit}) to=${toTurnId}(${toCommit})`)
   }
 
-  const args = ['diff', '--patch', '--minimal', '--no-color', fromCommit, toCommit]
+  const args = ['diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), fromCommit, toCommit]
   if (filePath) args.push('--', filePath)
 
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
@@ -217,6 +224,7 @@ async function diffCheckpointFilesBody(
   agentId: string,
   fromTurnId: string,
   toTurnId: string,
+  options: DiffOptions = {},
 ): Promise<TurnDiffFileChange[]> {
   assertSafeAgentId(agentId)
   const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
@@ -228,7 +236,7 @@ async function diffCheckpointFilesBody(
 
   // Get additions/deletions per file
   const { stdout: numstat } = await execFileAsync('git', [
-    'diff', '--numstat', '--no-color', fromCommit, toCommit,
+    'diff', '--numstat', '--no-color', ...diffOptionArgs(options), fromCommit, toCommit,
   ], { cwd, encoding: 'utf-8' })
 
   // Get file status (A/M/D/R) per file
@@ -342,18 +350,18 @@ export async function deleteLegacyCheckpointRefs(cwd: string): Promise<number> {
 }
 
 /** Compute unified diff of the workspace against the main branch. */
-export async function diffAgainstMain(cwd: string, filePath?: string): Promise<string> {
-  const args = ['diff', '--patch', '--minimal', '--no-color', 'main...HEAD']
+export async function diffAgainstMain(cwd: string, filePath?: string, options: DiffOptions = {}): Promise<string> {
+  const args = ['diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), 'main...HEAD']
   if (filePath) args.push('--', filePath)
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }
 
 /** Get file change summary of the workspace against the main branch. */
-export async function diffAgainstMainFiles(cwd: string): Promise<TurnDiffFileChange[]> {
+export async function diffAgainstMainFiles(cwd: string, options: DiffOptions = {}): Promise<TurnDiffFileChange[]> {
   // Get additions/deletions per file
   const { stdout: numstat } = await execFileAsync('git', [
-    'diff', '--numstat', '--no-color', 'main...HEAD',
+    'diff', '--numstat', '--no-color', ...diffOptionArgs(options), 'main...HEAD',
   ], { cwd, encoding: 'utf-8' })
 
   // Get file status (A/M/D/R) per file
@@ -485,11 +493,12 @@ export function diffCheckpoints(
   fromTurnId: string,
   toTurnId: string,
   filePath?: string,
+  options: DiffOptions = {},
 ): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointsBody(cwd, agentId, fromTurnId, toTurnId, filePath),
+      try: () => diffCheckpointsBody(cwd, agentId, fromTurnId, toTurnId, filePath, options),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff', message: String(cause), cause }),
     })
@@ -502,11 +511,12 @@ export function diffCheckpointFiles(
   agentId: string,
   fromTurnId: string,
   toTurnId: string,
+  options: DiffOptions = {},
 ): Effect.Effect<TurnDiffFileChange[], CheckpointError | InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointFilesBody(cwd, agentId, fromTurnId, toTurnId),
+      try: () => diffCheckpointFilesBody(cwd, agentId, fromTurnId, toTurnId, options),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff-files', message: String(cause), cause }),
     })
