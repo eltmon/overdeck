@@ -21,6 +21,7 @@ import type {
   ConversationPullRequests, PullRequestKey, PullRequestLink, PullRequestLinkedConversation, PullRequestLinkSource,
 } from '@overdeck/contracts';
 import { getOverdeckDatabase } from './infra.js';
+import { parseSkillOverridesColumn } from './conversation-launch-context.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
@@ -270,6 +271,8 @@ export interface LegacyConversation {
   bareContext: boolean;
   /** PAN-4185: Claude Code skips native CLAUDE.md and auto-memory loading (CLAUDE_CODE_DISABLE_CLAUDE_MDS). */
   skipClaudeMd: boolean;
+  /** PAN-4486: per-conversation skill on/off map, applied as the narrowest layer at every launch. */
+  skillOverrides: Record<string, boolean> | null;
   /** PAN-4223: legacy rowid of the launching conversation (lane door) or the
    * handoff/fork source (successor). Write-once launch-time fact; null = root. */
   parentConversationId: number | null;
@@ -379,6 +382,7 @@ interface LegacyConversationRow {
   project_key: string | null;
   bare_context: number | null;
   skip_claude_md: number | null;
+  skill_overrides: string | null;
   parent_conversation_id: string | null;
   parent_legacy_id: number | null;
   parent_name: string | null;
@@ -426,6 +430,7 @@ const LEGACY_CONVERSATION_SELECT = `
     c.project_key,
     c.bare_context,
     c.skip_claude_md,
+    c.skill_overrides,
     c.parent_conversation_id,
     p.rowid AS parent_legacy_id,
     p.name AS parent_name,
@@ -553,6 +558,7 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     projectKey: row.project_key ?? null,
     bareContext: row.bare_context === 1,
     skipClaudeMd: row.skip_claude_md === 1,
+    skillOverrides: parseSkillOverridesColumn(row.skill_overrides),
     parentConversationId: row.parent_legacy_id ?? null,
     parentConversationName: row.parent_name ?? null,
     gauntletRun: row.gauntlet_run ?? null,
@@ -888,6 +894,8 @@ export function createConversation(opts: {
   bareContext?: boolean;
   /** PAN-4185: see LegacyConversation.skipClaudeMd. */
   skipClaudeMd?: boolean;
+  /** PAN-4486: see LegacyConversation.skillOverrides. An empty map stores NULL. */
+  skillOverrides?: Record<string, boolean> | null;
   /** PAN-4223: name of the launching (lane) or source (successor) conversation. Must exist. */
   parentName?: string;
   /** PAN-4223: lane facts; requires parentName. Omitted = a root or a successor. */
@@ -922,8 +930,8 @@ export function createConversation(opts: {
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
          tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
-         bare_context, skip_claude_md, parent_conversation_id, gauntlet_run, lane_key, lane_role, critic_of_conversation_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bare_context, skip_claude_md, skill_overrides, parent_conversation_id, gauntlet_run, lane_key, lane_role, critic_of_conversation_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -943,6 +951,7 @@ export function createConversation(opts: {
       opts.projectKey ?? null,
       opts.bareContext ? 1 : 0,
       opts.skipClaudeMd ? 1 : 0,
+      opts.skillOverrides && Object.keys(opts.skillOverrides).length > 0 ? JSON.stringify(opts.skillOverrides) : null,
       parentId,
       opts.lane?.run ?? null,
       opts.lane?.key ?? null,
