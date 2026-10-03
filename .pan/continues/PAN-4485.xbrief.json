@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4485",
   "created": "2026-10-03T01:28:53.863Z",
-  "updated": "2026-10-03T03:09:05.988Z",
+  "updated": "2026-10-03T03:09:15.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "list-running-repair.ac5": {
       "status": "completed",
       "doneAt": "2026-10-03T03:09:05.987Z"
+    },
+    "restart-all-once.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:15.957Z"
     }
   }
 }
