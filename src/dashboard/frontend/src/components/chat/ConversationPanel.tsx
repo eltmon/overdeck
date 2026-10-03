@@ -29,7 +29,7 @@ import {
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { ReviewerRoundMetadata } from '@overdeck/contracts';
+import type { EffortSource, ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
@@ -1132,6 +1132,9 @@ interface MessagesResponse {
   compacting?: boolean;
   contextUsage?: ContextUsage | null;
   subagents?: SubagentSummary[];
+  /** PAN-4255 (agent reads): transcript-observed effort and the launch/pinned resolution. */
+  observedEffort?: string | null;
+  effortResolution?: { effort: string; source: EffortSource } | null;
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
@@ -1505,6 +1508,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           contextWindowUsage={contextWindowUsage}
           agentBusy={agentBusy}
           subagentNotice={subagentNotice}
+          observedEffort={contextWindowUsage?.lastEffort ?? data?.observedEffort ?? null}
+          effortResolution={data?.effortResolution ?? null}
         />
       )}
     </div>

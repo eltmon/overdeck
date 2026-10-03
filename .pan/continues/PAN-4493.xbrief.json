@@ -1,0 +1,173 @@
+{
+  "version": "1",
+  "issueId": "PAN-4493",
+  "created": "2026-10-03T17:28:59.092Z",
+  "updated": "2026-10-03T18:53:22.464Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "attachment-read-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T17:28:59.092Z",
+      "doneAt": "2026-10-03T17:42:07.205Z"
+    },
+    "image-lightbox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T17:42:19.445Z",
+      "doneAt": "2026-10-03T17:49:58.663Z"
+    },
+    "composer-thumb-click": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T17:50:19.838Z",
+      "doneAt": "2026-10-03T18:01:55.410Z"
+    },
+    "attachment-ref-parser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T18:02:03.395Z",
+      "doneAt": "2026-10-03T18:11:34.147Z"
+    },
+    "sent-message-thumbnails": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T18:11:41.204Z",
+      "doneAt": "2026-10-03T18:19:51.328Z"
+    },
+    "ci-test-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T18:19:59.216Z",
+      "doneAt": "2026-10-03T18:27:39.608Z"
+    },
+    "docs-attachments": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T18:27:49.751Z",
+      "doneAt": "2026-10-03T18:34:36.882Z"
+    },
+    "playwright-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T18:34:41.119Z",
+      "doneAt": "2026-10-03T18:45:16.259Z"
+    },
+    "attachment-read-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:47:50.119Z"
+    },
+    "attachment-read-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:03.481Z"
+    },
+    "attachment-read-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:15.574Z"
+    },
+    "attachment-read-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:27.892Z"
+    },
+    "attachment-read-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:38.242Z"
+    },
+    "image-lightbox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:48.630Z"
+    },
+    "image-lightbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:58.983Z"
+    },
+    "image-lightbox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:49:11.166Z"
+    },
+    "image-lightbox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:49:26.648Z"
+    },
+    "composer-thumb-click.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:49:37.453Z"
+    },
+    "composer-thumb-click.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:49:48.652Z"
+    },
+    "composer-thumb-click.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:49:58.880Z"
+    },
+    "attachment-ref-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:10.572Z"
+    },
+    "attachment-ref-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:22.445Z"
+    },
+    "attachment-ref-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:36.361Z"
+    },
+    "attachment-ref-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:53.185Z"
+    },
+    "sent-message-thumbnails.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:51:05.975Z"
+    },
+    "sent-message-thumbnails.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:51:20.723Z"
+    },
+    "sent-message-thumbnails.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:51:36.887Z"
+    },
+    "sent-message-thumbnails.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:51:52.180Z"
+    },
+    "ci-test-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:04.920Z"
+    },
+    "ci-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:15.244Z"
+    },
+    "playwright-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:26.496Z"
+    },
+    "playwright-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:37.766Z"
+    },
+    "playwright-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:48.078Z"
+    },
+    "docs-attachments.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:59.435Z"
+    },
+    "docs-attachments.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:53:10.797Z"
+    },
+    "docs-attachments.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:53:22.464Z"
+    }
+  }
+}

@@ -71,6 +71,7 @@ import {
   postAgentSwitchModelRoute,
 } from './agents/control.js';
 import { postAgentsRoute } from './agents/spawn.js';
+import { postAgentEffortRoute } from './agents/effort.js';
 
 export {
   buildPanStartArgs,
@@ -143,6 +144,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentSwitchModelRoute,
   postAgentRestartFreshRoute,
   postAgentDeliveryMethodRoute,
+  postAgentEffortRoute,
   getAgentsRestartConfigRoute,
   postAgentsRestartWithConfigRoute,
 );

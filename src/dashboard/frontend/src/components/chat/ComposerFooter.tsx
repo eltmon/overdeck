@@ -14,7 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
-import { getHarnessBehavior, isEffortLevel } from '@overdeck/contracts';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { isServerWriteBlocked } from '../../lib/connectionState';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
@@ -25,11 +25,13 @@ import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
-import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
+import { EffortPicker } from './EffortPicker';
+import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
+import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -75,6 +77,10 @@ interface ComposerFooterProps {
   /** Claude Code's agent selector shows a subagent, not the main agent,
    * receiving typed input (PAN-4268). */
   subagentNotice?: SubagentRoutingNotice;
+  /** Effort read from the session transcript (PAN-4255). */
+  observedEffort?: string | null;
+  /** Agent-backed panels: the agent's launch/pinned effort and its source (PAN-4255). */
+  effortResolution?: EffortResolution | null;
 }
 
 type DeliverAs = 'auto' | 'steer' | 'follow_up';
@@ -84,19 +90,6 @@ const CLAUDE_STEER_TOOLTIP = 'Steer: interrupt the current turn and send now (Cl
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
-}
-
-function resolveComposerEffort(conversation: Conversation): EffortLevel {
-  if (conversation.harness === 'kimi-code' || conversation.harness === 'acp') {
-    if (conversation.effort === 'medium') return 'high';
-    if (conversation.effort === 'xhigh') return 'max';
-  }
-  const stored = conversation.effort === 'off' || conversation.effort === 'minimal' ? 'low' : conversation.effort;
-  if (isEffortLevel(stored)) return stored;
-  // The browser-global value is a draft default, not canonical session state.
-  // Only use it before a runtime session exists; older conversations whose
-  // effort was never persisted use the operator default instead.
-  return !conversation.sessionAlive && !conversation.claudeSessionId ? loadStoredEffort() : 'high';
 }
 
 function openComposerUi(
@@ -132,8 +125,9 @@ function ComposerFooterInput({
   contextWindowUsage = null,
   agentBusy = false,
   subagentNotice = null,
+  observedEffort = null,
+  effortResolution = null,
 }: ComposerFooterProps) {
-  const resolvedConversationEffort = resolveComposerEffort(conversation);
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   // Existing conversations are bound to the harness they were spawned with.
   // Falling back to a global localStorage default here caused the picker to
@@ -143,8 +137,6 @@ function ComposerFooterInput({
   // 'claude-code' (the safe runtime) when the conversation has no stored
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
-  const [effort, setEffort] = useState<EffortLevel>(resolvedConversationEffort);
-  const [effortVerified, setEffortVerified] = useState(Boolean(conversation.effort));
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending attachments, and their upload pump live in the module-level
@@ -169,17 +161,18 @@ function ComposerFooterInput({
   const editorRef = useRef<LexicalEditor | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousConversationNameRef = useRef(conversation.name);
+  // PAN-4493 D10: tracks which pending attachment (if any) owns the currently
+  // open lightbox, so removing that attachment closes it — without closing a
+  // lightbox some other composer or sent message opened.
+  const lightboxOwnerRef = useRef<{ id: string; src: string } | null>(null);
   // Updated synchronously on every render so the in-flight-send guards below see
   // the currently-mounted conversation immediately (PAN-539 attribution race).
   const currentConversationNameRef = useRef(conversation.name);
   currentConversationNameRef.current = conversation.name;
 
-  useEffect(() => {
-    setEffort(resolvedConversationEffort);
-    setEffortVerified(Boolean(conversation.effort));
-  }, [conversation.name, conversation.effort, resolvedConversationEffort]);
-
   const piConversation = isPiConversation(conversation);
+  const { effort, chip: effortChip, pending: effortPending, liveChangeEnabled, title: effortTitle, onChange: handleEffortChange } =
+    useComposerEffort({ conversation, agentId, harness, model, piConversation, observedEffort, effortResolution });
   // PAN-4292: the delivery selector follows the harness steer capability. Pi
   // steers over its control channel, which only the conversation route
   // carries; Claude Code steers with send-now keys on both routes.
@@ -279,30 +272,6 @@ function ComposerFooterInput({
     setHarness(newHarness);
     saveStoredHarness(newHarness);
   }, []);
-
-  const handleEffortChange = useCallback((nextEffort: EffortLevel) => {
-    const previousEffort = effort;
-    setEffort(nextEffort);
-    if ((!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode') || agentId || !conversation.sessionAlive) return;
-    void (async () => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/thinking-level`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level: nextEffort }),
-      });
-      if (!res.ok) {
-        setEffort(previousEffort);
-        const body = await res.text().catch(() => '');
-        throw new Error(`Failed to set thinking level (${res.status})${body ? `: ${body}` : ''}`);
-      }
-      const acknowledged = await res.json() as { effort?: EffortLevel };
-      setEffort(acknowledged.effort ?? nextEffort);
-      setEffortVerified(true);
-    })().catch((err: unknown) => {
-      console.error('[ComposerFooter] Failed to set thinking level:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to set thinking level');
-    });
-  }, [agentId, conversation.name, conversation.sessionAlive, effort, harness, piConversation]);
 
   const handleCompact = useCallback(() => {
     if (!piConversation || agentId || compactPending) return;
@@ -675,6 +644,20 @@ function ComposerFooterInput({
     return () => window.removeEventListener('keydown', handleVoiceShortcut);
   }, [isDisabled]);
 
+  // PAN-4493 D10: if the attachment that opened the lightbox is gone (removed
+  // or finished uploading away its preview), close it — but never a lightbox
+  // some other composer or sent message opened.
+  useEffect(() => {
+    const owner = lightboxOwnerRef.current;
+    if (!owner) return;
+    const stillPending = pendingAttachments.some((attachment) => attachment.id === owner.id);
+    if (stillPending) return;
+    if (useImageLightboxStore.getState().image?.src === owner.src) {
+      useImageLightboxStore.getState().close();
+    }
+    lightboxOwnerRef.current = null;
+  }, [pendingAttachments]);
+
   const handleCommandKey = useCallback(
     (key: 'Enter' | 'SteerEnter') => {
       // PAN-4292 D5: Ctrl/Cmd+Enter steers on a steer-capable harness, busy or
@@ -701,7 +684,17 @@ function ComposerFooterInput({
               return (
                 <div key={attachment.id} className={styles.composerImageCard}>
                   {attachment.previewUrl ? (
-                    <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
+                    <button
+                      type="button"
+                      className={styles.composerImageThumbButton}
+                      onClick={() => {
+                        lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
+                        openImageLightbox(attachment.previewUrl!, attachment.file.name);
+                      }}
+                      title={`View ${attachment.file.name}`}
+                    >
+                      <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
+                    </button>
                   ) : (
                     <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
                       <FileText size={16} />
@@ -800,7 +793,7 @@ function ComposerFooterInput({
             </span>
           )}
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker unverified={!effortVerified && Boolean(conversation.sessionAlive || conversation.claudeSessionId)} title={(!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode') ? 'Change effort in the native terminal for this session.' : 'Changes apply to subsequent turns after runtime acceptance.'} value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive || Boolean(agentId) || (!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode')} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
             <select

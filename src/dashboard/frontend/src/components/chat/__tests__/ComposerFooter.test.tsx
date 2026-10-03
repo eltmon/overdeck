@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
-import { resetComposerStore } from '../../../lib/composerStore';
+import { resetComposerStore, useComposerStore } from '../../../lib/composerStore';
 import { modelSupportsImages, findModelDef } from '../../Settings/modelCatalog';
+import { useImageLightboxStore } from '../ImageLightbox';
 
 const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, storedEffort, voiceWidgetRenders } = vi.hoisted(() => ({
   editorState: { text: '', onCommandKeyDown: null as null | ((key: 'Enter' | 'SteerEnter') => void) },
@@ -61,8 +62,8 @@ vi.mock('../defaultConversationModel', () => ({
 }));
 
 vi.mock('../EffortPicker', () => ({
-  EffortPicker: ({ value, onChange, unverified }: { value: string; onChange: (value: string) => void; unverified?: boolean }) => (
-    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{unverified ? 'Effort unverified' : value}</button>
+  EffortPicker: ({ value, onChange, chip }: { value: string; onChange: (value: string) => void; chip?: { level: string; source: string | null } | null }) => (
+    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{chip ? `${chip.level} · ${chip.source ?? ''}` : value}</button>
   ),
   loadStoredEffort: () => storedEffort.value,
 }));
@@ -134,6 +135,55 @@ describe('ComposerFooter attachments', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    act(() => useImageLightboxStore.getState().close());
+  });
+
+  it('opens the lightbox with the preview URL when an image thumbnail is clicked', () => {
+    const file = new File(['png-bytes'], 'paste.png', { type: 'image/png' });
+    act(() => {
+      useComposerStore.getState().enqueueAttachments(conversation.name, [file]);
+    });
+    render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.click(screen.getByTitle('View paste.png'));
+
+    expect(useImageLightboxStore.getState().image).toEqual({ src: 'blob:preview-url', alt: 'paste.png' });
+  });
+
+  it('closes the lightbox when the attachment it was opened from is removed', () => {
+    const file = new File(['png-bytes'], 'paste.png', { type: 'image/png' });
+    act(() => {
+      useComposerStore.getState().enqueueAttachments(conversation.name, [file]);
+    });
+    render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.click(screen.getByTitle('View paste.png'));
+    expect(useImageLightboxStore.getState().image).not.toBeNull();
+
+    act(() => {
+      useComposerStore.getState().removeAttachment(conversation.name, 'image-1');
+    });
+
+    expect(useImageLightboxStore.getState().image).toBeNull();
+  });
+
+  it('does not close a lightbox opened elsewhere when an unrelated attachment is removed', () => {
+    const file = new File(['png-bytes'], 'paste.png', { type: 'image/png' });
+    act(() => {
+      useComposerStore.getState().enqueueAttachments(conversation.name, [file]);
+    });
+    render(<ComposerFooter conversation={conversation} />);
+
+    // Opened by something other than this composer's own click handler.
+    act(() => {
+      useImageLightboxStore.getState().open('/elsewhere.png', 'elsewhere.png');
+    });
+
+    act(() => {
+      useComposerStore.getState().removeAttachment(conversation.name, 'image-1');
+    });
+
+    expect(useImageLightboxStore.getState().image).toEqual({ src: '/elsewhere.png', alt: 'elsewhere.png' });
   });
 
   it('shows and tracks the conversation effort instead of the browser default', () => {
@@ -153,11 +203,19 @@ describe('ComposerFooter attachments', () => {
     expect(screen.getByTestId('effort-picker')).toHaveTextContent('low');
   });
 
-  it('does not use the browser default for an existing session with no persisted effort', () => {
+  it('shows the default-chain effort and its source for an existing session with no persisted effort (PAN-4255)', async () => {
     storedEffort.value = 'max';
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith('/api/effort/default?')) {
+        return new Response(JSON.stringify({ effort: 'high', source: 'default', requested: 'high', clamped: false }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
     render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);
 
-    expect(screen.getByTestId('effort-picker')).toHaveTextContent('Effort unverified');
+    await waitFor(() => expect(screen.getByTestId('effort-picker')).toHaveTextContent('high · default'));
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
   it('uses the browser default only before a conversation session exists', () => {

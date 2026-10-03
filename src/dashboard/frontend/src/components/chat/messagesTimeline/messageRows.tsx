@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Bot, ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
 import type { ChatMessage, TurnDiffSummary } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
@@ -7,8 +7,38 @@ import { DiffStatLabel } from '../DiffStatLabel';
 import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { useComposerStore } from '../../../lib/composerStore';
-import { formatElapsed, formatTimestamp } from './helpers';
+import { openImageLightbox } from '../ImageLightbox';
+import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
+
+/** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
+function AttachmentThumbnails({ text }: { text: string }) {
+  const refs = useMemo(() => extractAttachmentImageRefs(text), [text]);
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const visible = refs.filter((ref) => !failed.has(ref.url));
+  if (visible.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="user-message-attachments">
+      {visible.map((ref) => (
+        <button
+          key={ref.url}
+          type="button"
+          className="cursor-zoom-in border-0 bg-transparent p-0"
+          title={`View ${ref.file}`}
+          onClick={() => openImageLightbox(ref.url, ref.file)}
+        >
+          <img
+            src={ref.url}
+            alt={ref.file}
+            loading="lazy"
+            className="h-24 w-24 rounded border border-border object-cover"
+            onError={() => setFailed((prev) => new Set(prev).add(ref.url))}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function isSummaryForkMessage(text: string): boolean {
   return text.startsWith('## Conversation Summary Fork') ||
@@ -48,6 +78,7 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
           title={`Claude Code routed this message to running subagent ${agentId}, not the main conversation.`}
         >
           <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+          <AttachmentThumbnails text={message.text} />
           <span className={styles.messageTimestamp}>{`Delivered to subagent · ${description}`}</span>
         </div>
       </div>
@@ -63,6 +94,7 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
           title="Not sent yet: the agent is waiting on a permission prompt. This message sends itself once the prompt is answered."
         >
           <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+          <AttachmentThumbnails text={message.text} />
           <span className={styles.messageTimestamp}>
             Waiting: the agent needs a permission answer first ·{' '}
             <button
@@ -87,6 +119,7 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
         <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+        <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>

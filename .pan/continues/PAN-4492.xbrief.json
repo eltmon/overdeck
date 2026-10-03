@@ -1,0 +1,137 @@
+{
+  "version": "1",
+  "issueId": "PAN-4492",
+  "created": "2026-10-03T17:09:07.431Z",
+  "updated": "2026-10-03T17:56:11.490Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-composer-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:09:07.431Z",
+      "doneAt": "2026-10-03T17:14:02.007Z"
+    },
+    "w2-herdr-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:14:13.060Z",
+      "doneAt": "2026-10-03T17:19:20.511Z"
+    },
+    "w3-herdr-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:19:38.944Z",
+      "doneAt": "2026-10-03T17:23:54.127Z"
+    },
+    "w4-soak-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:24:01.002Z",
+      "doneAt": "2026-10-03T17:35:02.279Z"
+    },
+    "w5-live-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:35:17.384Z",
+      "doneAt": "2026-10-03T17:44:34.649Z"
+    },
+    "w6-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:44:38.963Z",
+      "doneAt": "2026-10-03T17:45:52.248Z"
+    },
+    "w1-composer-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:51:52.130Z"
+    },
+    "w1-composer-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:05.288Z"
+    },
+    "w1-composer-presence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:17.545Z"
+    },
+    "w1-composer-presence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:29.435Z"
+    },
+    "w2-herdr-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:44.921Z"
+    },
+    "w2-herdr-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:55.162Z"
+    },
+    "w2-herdr-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:05.203Z"
+    },
+    "w2-herdr-submit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:15.414Z"
+    },
+    "w3-herdr-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:28.848Z"
+    },
+    "w3-herdr-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:39.837Z"
+    },
+    "w3-herdr-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:50.291Z"
+    },
+    "w3-herdr-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:01.766Z"
+    },
+    "w4-soak-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:17.033Z"
+    },
+    "w4-soak-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:28.906Z"
+    },
+    "w4-soak-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:41.032Z"
+    },
+    "w5-live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:56.436Z"
+    },
+    "w5-live-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:55:11.107Z"
+    },
+    "w5-live-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:55:23.523Z"
+    },
+    "w5-live-verify.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:55:34.304Z"
+    },
+    "w6-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:55:48.421Z"
+    },
+    "w6-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:56:00.007Z"
+    },
+    "w6-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:56:11.489Z"
+    }
+  }
+}

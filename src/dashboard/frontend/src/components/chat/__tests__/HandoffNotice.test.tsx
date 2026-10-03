@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Conversation, VaultContinuity } from '../../CommandDeck/ConversationList';
+import { installEffortDefaultFetchMock } from '../../../test-utils/strictFetchMock';
 
 const stop = vi.hoisted(() => vi.fn());
 vi.mock('../../CommandDeck/useConversationMutations', () => ({ useConversationMutations: () => ({ stop }) }));
@@ -57,13 +58,18 @@ const conversation: Conversation = {
 };
 
 describe('HandoffNotice in ComposerFooter (PAN-4455 WI-13)', () => {
+  let fetchControl: ReturnType<typeof installEffortDefaultFetchMock>;
+
   beforeEach(() => {
     stop.mockReset();
     useHandoffNoticeStore.setState({ notices: {} });
+    fetchControl = installEffortDefaultFetchMock();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
   });
 
   it('a recorded hand-off of a live conversation shows the notice above the editor', () => {

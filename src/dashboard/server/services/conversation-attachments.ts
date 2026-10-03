@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { getOverdeckHome } from '../../../lib/paths.js';
@@ -353,4 +353,29 @@ export async function removeConversationAttachment(name: string, attachmentPath:
   if (!(await isConversationAttachmentPath(name, attachmentPath))) return false;
   await rm(attachmentPath, { force: true });
   return true;
+}
+
+const IMAGE_CONTENT_TYPES: Readonly<Record<string, string>> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+
+/** PAN-4493: resolve a GET of one attachment to a servable image, or null (→ 404). */
+export async function resolveConversationImageAttachment(
+  name: string,
+  file: string,
+): Promise<{ path: string; contentType: string } | null> {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) return null;
+  if (!/^[A-Za-z0-9._-]+$/.test(file) || file.startsWith('.')) return null;
+  const contentType = IMAGE_CONTENT_TYPES[extname(file).toLowerCase()];
+  if (!contentType) return null;
+  const candidate = join(getConversationAttachmentDir(name), file);
+  if (!(await hasConversationAttachment(name, candidate))) return null;
+  const resolved = await realpath(candidate).catch(() => null);
+  if (!resolved) return null;
+  const info = await stat(resolved).catch(() => null);
+  return info?.isFile() ? { path: resolved, contentType } : null;
 }

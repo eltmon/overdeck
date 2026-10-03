@@ -137,3 +137,21 @@ export function formatElapsed(startIso: string, endIso: string): string {
   const rem = Math.round(s % 60);
   return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
 }
+
+const ATTACHMENT_IMAGE_REF = /\/conversation-attachments\/([A-Za-z0-9_-]{1,64})\/([A-Za-z0-9._-]+\.(?:png|jpe?g|gif|webp))(?![A-Za-z0-9._-])/gi;
+
+export interface AttachmentImageRef { conversationName: string; file: string; url: string }
+
+/** PAN-4493: image attachments a user message references, in first-seen order. */
+export function extractAttachmentImageRefs(text: string): AttachmentImageRef[] {
+  const seen = new Set<string>();
+  const refs: AttachmentImageRef[] = [];
+  for (const [, conversationName, file] of text.matchAll(ATTACHMENT_IMAGE_REF)) {
+    if (file.startsWith('.')) continue;
+    const url = `/api/conversations/${encodeURIComponent(conversationName)}/attachments/${encodeURIComponent(file)}`;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    refs.push({ conversationName, file, url });
+  }
+  return refs;
+}

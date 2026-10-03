@@ -10,6 +10,7 @@ import { installQueryRecovery } from './lib/queryRecovery';
 import { LinkPullRequestDialogHost } from './components/chat/LinkPullRequestDialog';
 import { ContinueOnDeviceDialogHost } from './components/chat/continueOnDevice/ContinueOnDeviceDialog';
 import { NewConversationDialogHost } from './components/newConversation/NewConversationDialog';
+import { ImageLightboxHost } from './components/chat/ImageLightbox';
 import './index.css';
 
 void initTelemetry();
@@ -65,6 +66,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <LinkPullRequestDialogHost />
           <ContinueOnDeviceDialogHost />
           <NewConversationDialogHost />
+          <ImageLightboxHost />
         </DialogProvider>
       </QueryClientProvider>
     </RootErrorBoundary>

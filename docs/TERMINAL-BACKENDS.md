@@ -622,6 +622,21 @@ Spawn guards are backend-aware too: "is this agent already running" is `agentPan
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
 
+### Submit verification on Claude Code panes (PAN-4492)
+
+For a Herdr-detected agent whose `agent` is `claude` (and any steer), `prompt` does not call
+`agent.prompt`: Herdr's own "type the text and press Enter" call types and submits in the same
+breath, so a large paste that is still rendering into Claude Code's composer can swallow the Enter,
+leaving the message sitting in the input box while delivery still reports it sent. Instead, `prompt`
+types the text with `pane.send_text` in bracketed paste, waits until the composer shows it (or a
+`[Pasted text #N` placeholder) plus the usual 600 ms–3 s settle, presses Enter with `pane.send_keys`,
+then watches the composer for up to 2 s and presses Enter once more only when the payload is still
+there, the agent is not `blocked`, and no choice menu or permission prompt is on screen. The routine
+lives in `src/lib/terminal-backends/herdr-submit.ts` (`pasteAndSubmitHerdrPane`); its resubmit and
+held-for-menu cases log a single `console.warn` line prefixed `[herdr-submit]`. Every other
+Herdr-detected harness, and any Claude Code prompt that carries `options.wait`, still goes through
+`agent.prompt` unchanged.
+
 ### Steer submit (`PromptOptions.submit`, PAN-4292)
 
 `prompt()` takes `submit: 'enter' | 'steer'` (default `enter`). `steer` finishes the prompt with
@@ -632,7 +647,7 @@ and sends the message at once. Every spelling of the chord lives in
 | Path | Steer submit |
 | --- | --- |
 | tmux (`sendKeys`) | paste, then `send-keys C-x C-s` (also for the resend chaser) |
-| Herdr | `pane.send_text` with the text in bracketed-paste markers, a 300 ms settle, then `pane.send_keys ctrl+x ctrl+s`. `agent.prompt` always ends with Enter, so a steer bypasses it; a `blocked` agent is refused. |
+| Herdr | Goes through the same paste-verify-submit routine as a plain Claude Code submit (`pasteAndSubmitHerdrPane`, PAN-4492): `pane.send_text` with the text in bracketed-paste markers, a 600 ms–3 s settle (not a fixed 300 ms), then `pane.send_keys ctrl+x ctrl+s`. `agent.prompt` always ends with Enter, so a steer bypasses it; a `blocked` agent is refused before anything is typed. If the chord doesn't clear the composer within 2 s, it resubmits once with `ctrl+x ctrl+s` — never Enter. |
 | PTY supervisor | writes `\x18\x13` instead of `\r` and answers `{"ok":true,"submit":"steer"}` |
 
 Claude Code also binds Ctrl+Enter to send-now, but no multiplexer carries it. A byte probe showed

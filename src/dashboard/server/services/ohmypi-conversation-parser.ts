@@ -322,6 +322,7 @@ export async function parseOhmypiConversationMessages(sessionFile: string): Prom
     totalCost,
     totalTokens,
     latestAssistantUsage: null,
+    observedEffort: null,
     contextBoundaryOffset: 0,
     contextActiveBytes: fileStats.size,
     pendingToolUse: new Map(),

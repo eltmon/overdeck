@@ -50,6 +50,8 @@ export interface ContextWindowSnapshot {
   readonly lastModel?: string | null;
   /** ISO timestamp of the most recent assistant turn. */
   readonly lastTurnAt?: string | null;
+  /** PAN-4255: effort observed in the session transcript (Claude Code only). */
+  readonly lastEffort?: string | null;
 }
 
 /**
@@ -83,6 +85,7 @@ export function toContextWindowSnapshot(
     lastCacheCreationTokens: usage.lastCacheCreationTokens,
     maxObservedInputTokens: usage.maxObservedInputTokens,
     lastModel: usage.lastModel,
+    lastEffort: usage.lastEffort,
     lastTurnAt: usage.lastTurnAt,
   };
 }

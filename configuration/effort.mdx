@@ -126,6 +126,46 @@ handoff — goes through one helper, `resolveRelaunchEffort()`
   role → project → default chain on its first relaunch, and that resolved
   value is then pinned for every relaunch after it.
 
+## Changing effort on a running session
+
+Pick a level in the composer's effort picker while a session runs. For a
+claude-code conversation the picker calls
+`POST /api/conversations/:name/thinking-level`; for an agent-backed panel
+(a work agent or any other claude-code agent) it calls
+`POST /api/agents/:id/effort`. Both take `{ "level": "<level>" }`.
+
+Claude Code has no control channel, so Overdeck types `/effort <level>` into
+the session's pane. It then waits up to 10 seconds for Claude Code's
+`Set effort level to <level> (…)` confirmation in the session transcript, and
+stores the level only after that confirmation arrives:
+
+- The level is first clamped to the model, the same as at launch.
+- A session that is mid-turn is refused (409 `busy`), because Claude Code
+  queues typed input during a turn and the change could land after the
+  window. A pending permission prompt or a subagent holding the input is also
+  refused (409), and nothing is typed.
+- No confirmation within 10 seconds answers 504 `not-confirmed`; a rejected
+  level answers 422 `effort-rejected`. In both cases the stored effort is
+  unchanged.
+- A confirmed change is stored as `explicit`: on the conversation row, or in
+  the agent's `state.json`, where [relaunch](#relaunch-keeps-effort) pins it.
+
+Claude Code itself saves `low`, `medium`, `high`, and `xhigh` as the default
+for new sessions of that model in `~/.claude/settings.json` (`max` is
+session-only). Overdeck does not change that file. Its own sessions always
+launch with `--effort`, so they are not affected, but your own interactive
+`claude` sessions of that model start at the saved level.
+
+**The effort chip.** For a running session the picker reads
+`<Level> · <source>`, for example `High · default` or `Low · set`. The source
+is the layer the level came from: `set` (an explicit choice), `item`, `plan`,
+`tier`, `sub-role`, `role`, `project`, or `default`. `terminal` means the
+session transcript shows a different level than Overdeck launched or stored,
+so someone ran `/effort` in the native terminal. The chip's tooltip says
+whether the level was **observed**, that is read from the session
+transcript (claude-code 2.1.280 and later write the effort on every
+assistant turn).
+
 ## What honors it today
 
 - `pan start <id>` for work-agent spawns.
@@ -142,6 +182,10 @@ handoff — goes through one helper, `resolveRelaunchEffort()`
   and its source come from `GET /api/effort/default?model=&harness=&issue=`), resume, restart-all, switch-model (clamped to the new model),
   and `pan handoff`/`pan fork --effort` (default: inherit the source
   conversation's effort). pi's `off`/`minimal` are stored as `low`.
+- Live change on a running session — claude-code conversations and
+  claude-code agents through `/effort`, and codex, ACP, OpenCode, and pi
+  conversations through their control channels — see
+  [Changing effort on a running session](#changing-effort-on-a-running-session).
 
 Everything else — specialist/review-parent/test/worker
 launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
@@ -150,7 +194,6 @@ hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
-| Live effort change on claude-code sessions, "Effort unverified" display | [#4255](https://github.com/eltmon/overdeck/issues/4255) |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
 | Planning (`pan plan`, PlanDialog) | [#4258](https://github.com/eltmon/overdeck/issues/4258) |

@@ -1,4 +1,4 @@
-import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
+import type { ChatMessage, CompactBoundary, EffortLevel, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
 
 /** The most recent compaction summary record encountered while parsing a transcript. */
 export interface CompactSummaryRecord {
@@ -25,6 +25,8 @@ export interface ParseResult {
   totalTokens: number;
   /** Last assistant usage observed after the active compact boundary. */
   latestAssistantUsage: LatestAssistantUsage | null;
+  /** PAN-4255: latest effort seen in the transcript (assistant `effort` or an /effort confirmation). Survives compaction. */
+  observedEffort: EffortLevel | null;
   /** Byte offset of the active compact boundary used for context-window usage. */
   contextBoundaryOffset: number;
   /** Bytes from the active compact boundary through EOF. */
@@ -71,6 +73,8 @@ export interface ParseState {
   proposedPlan?: ProposedPlan;
   /** Latest assistant usage observed after the active compact boundary. */
   latestAssistantUsage?: LatestAssistantUsage | null;
+  /** Latest effort observed in the transcript (PAN-4255); not reset at a compact boundary. */
+  observedEffort?: EffortLevel | null;
   /** Byte offset of the active compact boundary used for context-window usage. */
   contextBoundaryOffset?: number;
   /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
