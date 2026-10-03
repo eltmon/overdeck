@@ -27,6 +27,7 @@ export interface ForkViaServerOptions {
   localSummaryOnly?: boolean;
   includeThinkingInSummary?: boolean;
   model?: string;
+  effort?: string;
   summaryModel?: string;
   cwd?: string;
   harness?: RuntimeName;
@@ -51,6 +52,7 @@ export interface ForkResultConv {
   name: string;
   tmuxSession: string;
   model?: string | null;
+  effort?: string | null;
   harness?: string | null;
   forkStatus?: string | null;
   forkError?: string | null;
@@ -92,6 +94,7 @@ export async function forkConversationViaServer(
   if (opts.localSummaryOnly) body['localSummaryOnly'] = true;
   if (opts.includeThinkingInSummary) body['includeThinkingInSummary'] = true;
   if (opts.model) body['model'] = opts.model;
+  if (opts.effort) body['effort'] = opts.effort;
   if (opts.summaryModel) body['summaryModel'] = opts.summaryModel;
   if (opts.cwd) body['cwd'] = opts.cwd;
   if (opts.harness) body['harness'] = opts.harness;
