@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:19:46.622Z",
+  "updated": "2026-10-03T04:19:56.967Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "split-button.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T04:19:46.622Z"
+    },
+    "split-button.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:19:56.967Z"
     }
   }
 }
