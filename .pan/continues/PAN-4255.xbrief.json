@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:20:20.615Z",
+  "updated": "2026-10-03T18:20:33.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "effort-chip-label.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T18:20:20.615Z"
+    },
+    "effort-chip-label.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:20:33.684Z"
     }
   }
 }
