@@ -3,6 +3,7 @@
  * effort through to runtime.spawnAgent.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 
 vi.mock('../../runtimes/index.js', () => ({
   getRuntimeForAgent: vi.fn(),
@@ -10,11 +11,22 @@ vi.mock('../../runtimes/index.js', () => ({
 
 const agentStateMock = vi.hoisted(() => vi.fn());
 const saveAgentStateSyncMock = vi.hoisted(() => vi.fn());
+const spawnAgentMock = vi.hoisted(() => vi.fn());
+const stopAgentMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../agents.js', () => ({
   getAgentState: agentStateMock,
   saveAgentStateSync: saveAgentStateSyncMock,
   getAgentRuntimeStateSync: vi.fn(() => ({ state: 'idle' })),
+  spawnAgent: spawnAgentMock,
+  spawnRun: vi.fn(),
+  stopAgent: stopAgentMock,
+  getAgentDir: vi.fn((id: string) => `/tmp/${id}`),
+}));
+
+vi.mock('../handoff-context.js', () => ({
+  captureHandoffContext: vi.fn(async () => ({})),
+  buildHandoffPrompt: vi.fn(() => 'handoff prompt'),
 }));
 
 vi.mock('../specialists.js', () => ({
@@ -29,6 +41,7 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(() => false),
+  mkdirSync: vi.fn(),
 }));
 
 const execMock = vi.hoisted(() => vi.fn<[string, any?], string>().mockReturnValue(''));
@@ -60,6 +73,7 @@ vi.mock('child_process', () => {
 import { getRuntimeForAgent } from '../../runtimes/index.js';
 import { rotateSpecialistSession } from '../session-rotation.js';
 import { restartAgent } from '../service-crash.js';
+import { performHandoff } from '../handoff.js';
 
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
 
@@ -108,6 +122,32 @@ describe('relaunch effort propagation to runtime.spawnAgent (PAN-4253)', () => {
     await restartAgent({} as any, 'agent-crash-respawn');
 
     expect(mockRuntime.spawnAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ effort: 'max', effortSource: 'explicit' }),
+    );
+  });
+
+  it('performHandoff passes the persisted effort to spawnAgent', async () => {
+    agentStateMock.mockReturnValue({
+      id: 'agent-handoff',
+      issueId: 'PAN-4253',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-5',
+      effort: 'max',
+      effortSource: 'explicit',
+    });
+    spawnAgentMock.mockResolvedValue({ id: 'agent-handoff', costSoFar: 0 });
+    stopAgentMock.mockReturnValue(Effect.succeed(undefined));
+
+    const result = await performHandoff('agent-handoff', {
+      targetModel: 'claude-opus-5-5',
+      reason: 'test handoff',
+      waitForIdle: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(spawnAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({ effort: 'max', effortSource: 'explicit' }),
     );
   });

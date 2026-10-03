@@ -12,6 +12,7 @@ import { join } from 'path';
 import { Data } from 'effect';
 import type { AgentState } from '../agents.js';
 import { getAgentState, saveAgentStateSync, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
+import { resolveRelaunchEffort } from '../agents/relaunch-effort.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
@@ -142,6 +143,7 @@ async function performKillAndSpawn(
 
     // Step 6: Spawn new agent with target model
     // Use same agent ID to preserve identity
+    const relaunchEffort = resolveRelaunchEffort(state, { model: options.targetModel, harness: state.harness });
     const newState = await spawnAgent({
       issueId: state.issueId,
       workspace: state.workspace,
@@ -151,6 +153,8 @@ async function performKillAndSpawn(
       prompt,
       allowHost: state.hostOverride === true,
       startedBy: 'handoff',
+      effort: relaunchEffort.effort,
+      effortSource: relaunchEffort.source,
     });
 
     // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.
