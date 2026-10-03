@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:52:48.078Z",
+  "updated": "2026-10-03T18:52:59.435Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "playwright-e2e.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T18:52:48.078Z"
+    },
+    "docs-attachments.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:59.435Z"
     }
   }
 }
