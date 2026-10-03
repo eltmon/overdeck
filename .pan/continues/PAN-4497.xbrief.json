@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4497",
   "created": "2026-10-03T21:34:28.916Z",
-  "updated": "2026-10-03T22:13:00.417Z",
+  "updated": "2026-10-03T22:13:11.192Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
     "stable-keys-remeasure.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T22:13:00.417Z"
+    },
+    "flow-layout-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T22:13:11.192Z"
     }
   }
 }
