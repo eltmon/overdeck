@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4485",
   "created": "2026-10-03T01:28:53.863Z",
-  "updated": "2026-10-03T03:10:06.557Z",
+  "updated": "2026-10-03T03:10:19.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "stop-redirect-head.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T03:10:06.557Z"
+    },
+    "resume-redirect-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:19.110Z"
     }
   }
 }
