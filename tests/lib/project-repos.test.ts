@@ -8,6 +8,7 @@ const projectsMocks = vi.hoisted(() => ({
   getProject: vi.fn(),
   resolveProjectFromIssue: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
+  findProjectByPath: vi.fn(),
 }));
 
 vi.mock('../../src/lib/projects.js', async () => {
@@ -18,14 +19,17 @@ vi.mock('../../src/lib/projects.js', async () => {
     getProjectSync: projectsMocks.getProject,
     resolveProjectFromIssue: projectsMocks.resolveProjectFromIssue,
     resolveProjectFromIssueSync: projectsMocks.resolveProjectFromIssueSync,
+    findProjectByPath: projectsMocks.findProjectByPath,
   };
 });
 
 import {
   computeWorkspaceRepoRoots,
+  defaultBranchForRepo,
   inferProjectForge,
   normalizeForge,
   resolveConfiguredRepos,
+  resolveDefaultBranchForRepo,
   resolvePrimaryWorkspaceRepoDir,
   resolveProjectReposForIssue,
   type ResolvedProjectRepo,
@@ -255,5 +259,46 @@ describe('resolvePrimaryWorkspaceRepoDir', () => {
     });
 
     expect(resolvePrimaryWorkspaceRepoDir('MIN-850', workspace)).toBe(join(workspace, 'api'));
+  });
+});
+
+describe('defaultBranchForRepo / resolveDefaultBranchForRepo (PAN-4501)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns main when there is no project', () => {
+    expect(defaultBranchForRepo(null, '/x')).toBe('main');
+  });
+
+  it('returns the workspace default branch', () => {
+    const project = { workspace: { default_branch: 'trunk' } } as ProjectConfig;
+    expect(defaultBranchForRepo(project, '/x')).toBe('trunk');
+  });
+
+  it('ignores pr_target in favor of the workspace default branch', () => {
+    const project = { workspace: { default_branch: 'trunk', pr_target: 'release' } } as ProjectConfig;
+    expect(defaultBranchForRepo(project, '/x')).toBe('trunk');
+  });
+
+  it('matches a workspace.repos[] entry by trailing path segment, else falls back to the workspace default', () => {
+    const project = {
+      workspace: {
+        default_branch: 'main',
+        repos: [{ name: 'fe', path: 'frontend', default_branch: 'develop' }],
+      },
+    } as ProjectConfig;
+
+    expect(defaultBranchForRepo(project, '/p/workspaces/feature-x/frontend')).toBe('develop');
+    expect(defaultBranchForRepo(project, '/p/backend')).toBe('main');
+  });
+
+  it('resolves the project by explicit key first, then falls back to findProjectByPath', () => {
+    projectsMocks.getProject.mockReturnValue(null);
+    projectsMocks.findProjectByPath.mockReturnValue({ workspace: { default_branch: 'develop' } });
+
+    expect(resolveDefaultBranchForRepo('/r', 'k')).toBe('develop');
+    expect(projectsMocks.getProject).toHaveBeenCalledWith('k');
+    expect(projectsMocks.findProjectByPath).toHaveBeenCalledWith('/r');
   });
 });

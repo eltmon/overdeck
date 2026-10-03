@@ -1,6 +1,6 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from './projects.js';
+import { findProjectByPath, getProjectSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from './projects.js';
 import type { ForgeType } from './forge.js';
 import type { RepoConfig } from './workspace-config.js';
 
@@ -64,6 +64,27 @@ export function getRepoTargetBranch(
     projectConfig.workspace?.default_branch ||
     'main'
   );
+}
+
+/**
+ * The configured default branch for the repository at `repoRoot` (PAN-4501).
+ * Matching `workspace.repos[]` entry first, then `workspace.default_branch`,
+ * then 'main'. `pr_target` is deliberately ignored: this names the branch the
+ * repository is compared with, not the branch PRs target.
+ */
+export function defaultBranchForRepo(project: ProjectConfig | null, repoRoot: string): string {
+  const normalizedRoot = repoRoot.replace(/\/+$/, '');
+  const repo = project?.workspace?.repos?.find((r) => {
+    const rel = r.path?.replace(/^\.\/+/, '').replace(/\/+$/, '');
+    return !!rel && rel !== '.' && (normalizedRoot === rel || normalizedRoot.endsWith(`/${rel}`));
+  });
+  return repo?.default_branch || project?.workspace?.default_branch || 'main';
+}
+
+/** Looks the project up (explicit key first, then by path) and applies {@link defaultBranchForRepo}. */
+export function resolveDefaultBranchForRepo(repoRoot: string, projectKey?: string | null): string {
+  const project = (projectKey ? getProjectSync(projectKey) : null) ?? findProjectByPath(repoRoot);
+  return defaultBranchForRepo(project, repoRoot);
 }
 
 export function getRepoForge(repo: Partial<RepoConfig> | undefined, projectConfig: ProjectConfig): ForgeType {
