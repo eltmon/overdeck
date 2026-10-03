@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T17:40:43.080Z",
+  "updated": "2026-10-03T17:40:44.450Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4255",
       "claimedAt": "2026-10-03T17:39:10.900Z",
       "doneAt": "2026-10-03T17:40:43.079Z"
+    },
+    "conversation-effort-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4255",
+      "claimedAt": "2026-10-03T17:40:44.450Z"
     }
   }
 }
