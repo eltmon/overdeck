@@ -433,6 +433,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/skills',                           kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Skills index; outside 8 remodel domains' },
   { surface: 'GET /api/skills/overrides',                 kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG + projects.yaml + .pan/skill-overrides (PAN-3942)' },
   { surface: 'PUT /api/skills/overrides',                 kind: 'http', disposition: 'WRITE',       door: 'skill-overrides store (PAN-3942)' },
+  { surface: 'GET /api/effort/default',                   kind: 'http', disposition: 'READ',        door: 'resolveEffort (PAN-4486)' },
   { surface: 'GET /api/planning/:issueId/status',         kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (planning status)' },
   { surface: 'POST /api/planning/:issueId/message',       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver (planning session)' },
   { surface: 'DELETE /api/planning/:issueId',             kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
