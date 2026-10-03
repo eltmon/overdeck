@@ -1,0 +1,858 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T21:37:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4499: pan handoff: --skill/--pack for the new conversation, and --hold to create it without sending the kickoff",
+    "updated": "2026-10-03T21:42:19.462Z"
+  },
+  "plan": {
+    "id": "pan-4499",
+    "title": "pan handoff: --skill/--pack for the new conversation, and --hold to create it without sending the kickoff",
+    "status": "proposed",
+    "uid": "7f04b4bf-3a65-4f35-9ebe-51846aadb0af",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-03T21:37:24Z",
+    "updated": "2026-10-03T21:42:19.462Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4499",
+        "label": "PAN-4499",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4499.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "handoff",
+      "skills",
+      "skill-packs",
+      "conversations",
+      "cli",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One acceptance criterion (the combined `pan handoff --skill --pack --model --effort --hold` invocation, then a dashboard Send or `pan handoff start` delivering the kickoff once) spans the CLI, the server fork pipeline, a new SQLite column, a new route, and the dashboard composer; the hold is unusable without a start path and the dashboard start path is an explicit issue AC. Tests, the regenerated composer manifest, and the lockstep SKILL.md push the file count past 25 and the subsystem count (first two path segments) past 6, but every item is a small vertical slice and the files listed are mostly new leaf modules and their tests.",
+      "canonicalFilename": "2026-10-03-PAN-4499-pan-handoff-skill-pack-for-the-new-conversation-and-hold-to-create-it-without-sending-the-kickoff.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan handoff cannot give the new conversation its own skills (PAN-4486's per-conversation skill layer is only writable from the new-conversation dialog; the --issue workaround leaks the skill to every agent on the issue), and it always sends the handoff document as the first message, so the operator cannot inspect a successor before it starts working.",
+      "Proposal": "Add repeatable --skill and --pack to pan handoff. The server route validates them against the native and pack catalogs (400 before any row is created, listing known names) and writes them, on top of the inherited source map, into the successor's conversations.skill_overrides; --pack expands to <pack>/<skill>: true for every non-opt-in skill of the cached manifest. Add --hold: the fork pipeline authors and launches as today but stores the kickoff in a new conversations.held_kickoff column instead of sending it, finishing with forkStatus null. A new kickoff door (GET/POST /api/conversations/:name/kickoff) claims the held text atomically and delivers it once through the shared deliverForkSeed tail; pan handoff start <conv> and the dashboard composer Send both use it. The dashboard composer of a held conversation shows a waiting notice and is seeded with the kickoff; the fork modal parses --skill/--pack/--hold out of /handoff text and sends them. Docs and the pan-handoff skill describe all of it.",
+      "NonGoals": "- No change to skill resolution rules in resolve.ts or launch.ts, and no conversation-level pack toggle\n- No global, project, or issue skill-override write from pan handoff\n- No full skill picker in the fork modal; only parsed chips and a hold checkbox\n- No new forkStatus value for held conversations\n- No list badge or Command Deck row marker for held conversations\n- pan tell and other delivery paths do not clear the hold\n- No --hold on pan fork\n- No composer execution policy for /pan handoff start (stays terminal-only)\n- No edits to routes/conversations.ts (zero file-size headroom) and no allowlist raises"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Server validates --skill/--pack; the CLI forwards skills[] and packs[] and relays the 400 message.",
+        "rationale": "fork-client.ts documents the summary-fork route as the single owner of the fork pipeline; validating there keeps one door and covers the dashboard fork modal too."
+      },
+      {
+        "summary": "--pack expands to <pack>/<skill>: true entries for every non-opt-in skill in the cached manifest; uncached packs fail with the existing 'run pan skills pack sync' wording.",
+        "rationale": "The conversation layer stores per-skill values only and resolvePackSkill already honors them, so no resolver change is needed; skipping opt-in skills matches pack-toggle semantics at every other level."
+      },
+      {
+        "summary": "Requested skill entries are merged on top of the source conversation's inherited skill map (requested entries win).",
+        "rationale": "The fork route already copies the source's launch context; the flags are a narrower request for this successor."
+      },
+      {
+        "summary": "Core skills named by --skill are accepted and store nothing.",
+        "rationale": "Core skills are always on, so the request is already satisfied; rejecting it would be friction with no safety value."
+      },
+      {
+        "summary": "The held kickoff is stored as text in a new conversations.held_kickoff column read/written by a new leaf module, not through LegacyConversation.",
+        "rationale": "It covers the fallback-summary case that has no handoff document file, gives an atomic SQLite claim for exactly-once, and avoids src/lib/overdeck/conversations.ts, which has 3 lines of file-size headroom."
+      },
+      {
+        "summary": "A held pipeline finishes with forkStatus null; no 'held' forkStatus value.",
+        "rationale": "getStuckForks, recoverStuckForks, the lifecycle sweeper and the CLI's isForkResultInProgress all treat any non-null non-failed forkStatus as in flight."
+      },
+      {
+        "summary": "pan handoff start is a Commander subcommand mirroring planCmd.command('finalize'), with a fallback to intercepting convRef === 'start' if Commander misroutes.",
+        "rationale": "Matches the existing plan/plan finalize pattern; conversation names are generated (YYYYMMDD-xxxx) so 'start' is not a real conversation reference."
+      },
+      {
+        "summary": "The dashboard composer of a held conversation is seeded with the kickoff and its Send posts to the kickoff door (no text when unchanged, edited text otherwise).",
+        "rationale": "The issue asks for the kickoff ready in the composer with Send starting it; routing Send through the claim door makes exactly-once hold for both the dashboard and the CLI."
+      },
+      {
+        "summary": "The /handoff composer pass-through is implemented by parsing --skill/--pack/--hold out of the fork modal's initialFocus.",
+        "rationale": "Both /handoff (frontend regex) and /pan handoff (server control plane) already deliver the trailing text to ForkModal as initialFocus, so one parser covers both with no change to the composer regex, control plane, or open-fork-modal event."
+      }
+    ],
+    "items": [
+      {
+        "id": "skill-flags-resolver",
+        "title": "Resolve --skill/--pack requests into conversation skill-layer entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/conversation-flags.ts",
+            "src/lib/skill-overrides/__tests__/conversation-flags.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/conversation-flags.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-flags.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1: new module src/lib/skill-overrides/conversation-flags.ts exporting ConversationSkillFlagError, parseSkillFlagList(raw, 'skills'|'packs'), the pure expandConversationSkillFlags(flags, catalog), and resolveConversationSkillFlags(flags, projectRoot) which loads listSkillCatalog({ projectRoot }) and listPackCatalog() then expands. Follow the PRD's ordered rules exactly: pack expansion to non-opt-in <pack>/<skill>: true, uncached pack -> 'pack <id> is not cached; run pan skills pack sync <id>', unknown pack -> 'unknown pack: <id>. Known packs: ...', unknown skill -> 'unknown skill: <name>. Known skills: ...' (native names then cached pack skill ids, sorted), core skills accepted with no entry. Write the seven named tests with in-memory catalogs."
+        },
+        "items": [
+          {
+            "id": "skill-flags-resolver.ac1",
+            "title": "Given a cached pack with two non-opt-in skills and one opt-in skill, expandConversationSkillFlags({ packs: ['p'] }) returns exactly the two non-opt-in <pack>/<skill>: true entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-flags-resolver.ac2",
+            "title": "An unknown pack throws ConversationSkillFlagError whose message starts 'unknown pack: nope. Known packs:' and lists the registered pack ids; an uncached pack throws the 'run pan skills pack sync' message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-flags-resolver.ac3",
+            "title": "An unknown skill name or unknown <pack>/<skill> id throws a message starting 'unknown skill: <name>. Known skills:' that lists native names and cached pack skill ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-flags-resolver.ac4",
+            "title": "A core skill name (e.g. pan-done) is accepted and produces no entry; parseSkillFlagList rejects a non-array or a malformed id with 'Invalid skills'/'Invalid packs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-route-skills",
+        "title": "Fork route writes requested skills and packs on the successor's row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-skill-flags.test.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-skill-flags.test.ts src/lib/skill-overrides/__tests__/launch.test.ts src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors",
+            "lint-file-size reports conversation-forks.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-11",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 in handleConversationSummaryFork (src/lib/overdeck/conversation-forks.ts): after projectResult resolves, parse body.skills/body.packs with parseSkillFlagList, resolve them with resolveConversationSkillFlags using the resolved project's config.path as projectRoot, map ConversationSkillFlagError to a 400 before createConversation, merge onto conv.skillOverrides (requested entries win), reject a merged map over 200 entries with 400 'too many skill overrides', and add `...(mergedSkillOverrides ? { skillOverrides: mergedSkillOverrides } : {})` directly after `...conversationLaunchContext(conv),`. Keep net growth at or under 30 lines. Write the named route tests (harness copied from conversation-forks-parent-link.test.ts with a mocked catalog) and add the launch.test.ts case proving resolveLaunchPackSelection mounts a pack from conversation entries with no pack toggle."
+        },
+        "items": [
+          {
+            "id": "fork-route-skills.ac1",
+            "title": "Given body { forkMode: 'handoff', skills: ['grilling'], packs: ['mattpocock'] }, the created row's skillOverrides equals the source map plus grilling: true and every non-opt-in mattpocock/<skill>: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-skills.ac2",
+            "title": "Given skills: ['nope'] or packs: ['nope'], the route returns 400 with the 'unknown skill'/'unknown pack' message and listConversations() length is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-skills.ac3",
+            "title": "A request with no skills/packs creates a row whose skillOverrides equals the source's map, and no global/project/issue skill-override store setter is called in any case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-skills.ac4",
+            "title": "resolveLaunchPackSelection for a conversation whose row map is { 'mattpocock/a': true } with no pack toggles returns a selection containing pack mattpocock with skill a only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kickoff-store",
+        "title": "Add conversations.held_kickoff and its atomic store module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fork-route-hold",
+            "kickoff-door"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/conversation-kickoff-store.ts",
+            "src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-kickoff-store.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-kickoff-store.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: add `runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `held_kickoff` text')` with a PAN-4499 comment after the skill_overrides top-up in src/lib/overdeck/infra.ts, add the column to drizzle/overdeck/0000_overdeck_init.sql after skill_overrides, and create the leaf module src/lib/overdeck/conversation-kickoff-store.ts (imports only getOverdeckDatabase) with holdKickoff, readHeldKickoff, claimHeldKickoff (single db.transaction: select, return null when not held, else UPDATE ... SET held_kickoff = NULL WHERE name = ? AND held_kickoff IS NOT NULL and return the text) and restoreHeldKickoff (writes only when held_kickoff IS NULL). Write the four named tests against a real isolated SQLite home."
+        },
+        "items": [
+          {
+            "id": "kickoff-store.ac1",
+            "title": "After holdKickoff(name, 'doc'), readHeldKickoff(name) returns 'doc'; a fresh database created from the init SQL or the top-up both have the held_kickoff column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-store.ac2",
+            "title": "claimHeldKickoff returns the held text on the first call, returns null on the second call, and readHeldKickoff then returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-store.ac3",
+            "title": "claimHeldKickoff on a never-held conversation returns null; restoreHeldKickoff writes the text back only when nothing is held",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-route-hold",
+        "title": "Fork pipeline honors hold: launch, store the kickoff, send nothing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "kickoff-door",
+            "cli-hold-start"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-hold.test.ts src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the hold, enter-nudge and fork-recovery tests pass",
+            "typecheck completes without errors",
+            "lint-file-size reports conversation-forks.ts at or under 1000 and conversations.ts at or under 1222 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-12",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: add the single line `/** PAN-4499: launch without sending the kickoff. */ hold?: boolean;` to ForkRequest in src/lib/overdeck/conversations.ts; in conversation-forks.ts add hold to buildForkRequest, extract the exported deliverForkSeed(conv, seed, caller) from runForkPipeline's tail (calling self.injectForkSummary so existing spies keep working), add a last runForkPipeline parameter hold = false whose branch calls holdKickoff, markConversationActive and updateForkStatus(null) after ensureForkSessionReady, pass request.hold === true in recoverStuckForks, parse body.hold === true in handleConversationSummaryFork, reject hold with forkMode plain (400 'hold is not supported for plain forks'), and pass hold into buildForkRequest and runForkPipeline. Write the five named tests with fake timers where the pipeline waits."
+        },
+        "items": [
+          {
+            "id": "fork-route-hold.ac1",
+            "title": "Given a handoff request with hold: true, the pipeline launches the session, injectForkSummary is never called, readHeldKickoff(name) returns the authored kickoff text, and the row ends with forkStatus null and status active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-hold.ac2",
+            "title": "The persisted forkRequest JSON contains hold: true, and recoverStuckForks on such a row re-runs the pipeline without calling injectForkSummary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-hold.ac3",
+            "title": "A request with forkMode 'plain' and hold: true returns 400 'hold is not supported for plain forks' and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-hold.ac4",
+            "title": "A request without hold delivers the kickoff through deliverForkSeed exactly once, and the injectForkSummary namespace spy used by conversation-forks-enter-nudge.test.ts still receives the call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kickoff-door",
+        "title": "Kickoff door: GET/POST /api/conversations/:name/kickoff delivers a held kickoff once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-kickoff.ts",
+            "src/dashboard/server/routes/conversation-kickoff.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/conversation-kickoff-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-kickoff-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "kickoff route, no-loss matrix and route-scopes tests pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: new src/lib/overdeck/conversation-kickoff.ts with startHeldKickoff(name, text?) returning started/not-found/not-held/invalid (text optional; when given it must be a string of 1-100000 trimmed chars), which claims with claimHeldKickoff and starts deliverClaimedKickoff in the background via registerInFlightForkPipeline; deliverClaimedKickoff calls ensureForkSessionReady(conv, conv.claudeSessionId, false) then deliverForkSeed(conv, seed, 'handoff-kickoff'), and on a throw from either restores the hold and sets forkStatus 'failed' (never markConversationEnded). New top-level route file src/dashboard/server/routes/conversation-kickoff.ts with GET (404 / {held:true,text} / {held:false}) and POST (200 {success, conversation} / 404 / 409 'No held kickoff: the conversation was already started or was never held' / 400), following postConversationSummaryForkRoute's origin check and body reading; register conversationKickoffRouteLayer in server.ts next to conversationsRouteLayer; add the two no-loss-matrix rows and the two route-scopes rows (GET read:conversations, POST tell). Write the five named route tests."
+        },
+        "items": [
+          {
+            "id": "kickoff-door.ac1",
+            "title": "GET /api/conversations/:name/kickoff returns { held: true, text } for a held conversation, { held: false } after it is started, and 404 for an unknown name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-door.ac2",
+            "title": "The first POST returns 200 and calls deliverForkSeed once with the stored kickoff; a second POST returns 409 and deliverForkSeed is still called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-door.ac3",
+            "title": "POST with body { text: 'edited' } delivers 'edited'; POST on a never-held conversation returns 409 and delivers nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-door.ac4",
+            "title": "When ensureForkSessionReady throws, the held kickoff is restored (GET returns held: true again) and the row's forkStatus is 'failed' while its status is not ended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-door.ac5",
+            "title": "NO_LOSS_MATRIX contains rows for GET and POST /api/conversations/:name/kickoff, and requiredScopeFor returns 'read:conversations' for the GET and 'tell' for the POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-skill-flags",
+        "title": "CLI: pan handoff --skill and --pack forward to the server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "src/cli/commands/__tests__/fork-client.test.ts",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts src/cli/commands/__tests__/fork-client.test.ts",
+            "npm run build && npm run generate:slash-commands",
+            "npm run lint:skills",
+            "npm run lint:slash-commands",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "handoff and fork-client tests pass",
+            "node dist/cli/index.js handoff --help lists --skill and --pack",
+            "lint:skills and lint:slash-commands pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: add repeatable --skill <name> and --pack <id> options (collector default []) to the handoff command in src/cli/index.ts; add skill/pack to HandoffOptions in handoff.ts, pass them as skills/packs to forkConversationViaServer, and print Skills:/Packs: lines when non-empty; add skills/packs to ForkViaServerOptions and set body.skills/body.packs only when non-empty in fork-client.ts. In the same commit document both flags in a 'Skills for the new conversation' section of sync-sources/skills/pan-handoff/SKILL.md (successor only, inherit then override, unknown-name error, pack must be cached, opt-in skills skipped), rebuild, run npm run generate:slash-commands, and commit packages/contracts/src/composer-commands.generated.ts. Write the named handoff and fork-client tests, including that a flagless body has no skills/packs/hold keys."
+        },
+        "items": [
+          {
+            "id": "cli-skill-flags.ac1",
+            "title": "Given handoffCommand options { skill: ['grilling'], pack: ['mattpocock'], model: 'claude-opus-5-5', effort: 'high' }, forkConversationViaServer receives skills ['grilling'], packs ['mattpocock'], model and effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skill-flags.ac2",
+            "title": "forkConversationViaServer posts skills/packs only when non-empty, and a request without the new options produces a body with no skills, packs or hold key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skill-flags.ac3",
+            "title": "node dist/cli/index.js handoff --help prints --skill and --pack, and npm run lint:skills plus npm run lint:slash-commands exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-hold-start",
+        "title": "CLI: pan handoff --hold and pan handoff start <conv>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/handoff-start.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "src/cli/commands/__tests__/fork-client.test.ts",
+            "src/cli/commands/__tests__/handoff-start.test.ts",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts src/cli/commands/__tests__/fork-client.test.ts src/cli/commands/__tests__/handoff-start.test.ts",
+            "npm run build && npm run generate:slash-commands",
+            "node dist/cli/index.js handoff start --help",
+            "npm run lint:skills",
+            "npm run lint:slash-commands",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "handoff, fork-client and handoff-start tests pass",
+            "handoff start --help prints usage with <conv>",
+            "lint:skills and lint:slash-commands pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: assign the handoff command to handoffCmd in src/cli/index.ts, add --hold, and register handoffCmd.command('start <conv>') with lazyAction to ./commands/handoff-start.js handoffStartCommand (mirror planCmd.command('finalize')). Apply the D11 checkpoint: confirm `pan handoff self some focus` still reaches handoffCommand; if Commander misroutes, drop the subcommand and intercept convRef === 'start' at the top of handoffCommand instead. In handoff.ts pass hold and print the 'Held: the kickoff was not sent…pan handoff start <id>' line. In fork-client.ts send hold only when true, export dashboardBaseUrl, and extract the poll loop into exported waitForForkPipeline (same behavior). New handoff-start.ts resolves the conversation by id or name, POSTs /api/conversations/:name/kickoff with the loopback origin header, prints server errors and exits 1 on 400/404/409, polls with waitForForkPipeline, exits 1 with 'Kickoff failed: <forkError>' on failure, and prints 'Started conversation <name> — kickoff delivered' on success. Document --hold and pan handoff start in a 'Hold the new conversation' section of SKILL.md in the same commit and regenerate the composer manifest. Tests use vi.stubGlobal fetch and fake timers."
+        },
+        "items": [
+          {
+            "id": "cli-hold-start.ac1",
+            "title": "handoffCommand with { hold: true } passes hold: true to forkConversationViaServer and prints a line containing 'pan handoff start <id>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-hold-start.ac2",
+            "title": "handoffStartCommand('123') posts once to /api/conversations/<name>/kickoff, polls until forkStatus is null, and prints 'kickoff delivered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-hold-start.ac3",
+            "title": "handoffStartCommand exits 1 and prints the server's error when the door answers 409, and exits 1 with 'Kickoff failed:' when the polled forkStatus is 'failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-hold-start.ac4",
+            "title": "Parsing `pan handoff self some focus` still invokes handoffCommand with conv 'self', and `node dist/cli/index.js handoff start --help` prints the start usage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-held-composer",
+        "title": "Dashboard: held conversation composer shows the kickoff and Send starts it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/heldKickoff.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/heldKickoff.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/heldKickoff.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "heldKickoff and existing ComposerFooter tests pass",
+            "typecheck completes without errors",
+            "lint-file-size reports ComposerFooter.tsx at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: new src/dashboard/frontend/src/components/chat/heldKickoff.tsx with useHeldKickoff (react-query ['held-kickoff', name] on GET /api/conversations/:name/kickoff, refetchInterval 5000 only while held), startHeldKickoff (POST; HeldKickoffConflictError on 409), useSeedHeldKickoff (once per conversation, only when the editor is empty, one paragraph per line), kickoffUnchanged (whitespace-collapsed comparison), and HeldKickoffNotice ('Waiting to start. The handoff kickoff is in the composer — press Send to start this conversation.'). In ComposerFooter.tsx (stay at or under 1000 lines) use the hooks, render the notice above the input while held, and in the submit handler route a held conversation's Send to startHeldKickoff (no text when unchanged, edited text otherwise) instead of sendConversationMessage, clearing the editor on success and toasting 'This conversation was already started' on 409. Browser verification, if done, uses an isolated Playwright profile."
+        },
+        "items": [
+          {
+            "id": "dashboard-held-composer.ac1",
+            "title": "Given GET kickoff answers { held: true, text: 'KICK' }, the composer renders the 'Waiting to start' notice and its editor contains 'KICK'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-held-composer.ac2",
+            "title": "Pressing Send on a held conversation sends a POST to /api/conversations/<name>/kickoff and never calls the message route; unchanged text sends no text field, edited text sends the edited text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-held-composer.ac3",
+            "title": "A 409 from the kickoff door renders the toast 'This conversation was already started' and keeps the composer text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-modal-flags",
+        "title": "Dashboard: fork modal passes --skill/--pack/--hold from /handoff text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/handoffComposerArgs.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "handoffComposerArgs and ForkModal tests pass",
+            "typecheck completes without errors",
+            "lint-file-size passes with CommandDeck/index.tsx not grown"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9: new handoffComposerArgs.ts with parseHandoffComposerArgs(text) that removes --skill <v>, --skill=<v>, --pack <v>, --pack=<v> and --hold tokens and returns { focus, skills, packs, hold }. In ForkModal.tsx initialize focus/skills/packs/hold from it, show skills and packs as removable chips and a 'Hold — start it myself' checkbox for the handoff intent, and add a 15th onConfirm parameter handoffExtras { skills?, packs?, hold? } sent only for handoff with non-empty values. Forward it on the existing onConfirm lines in CommandDeck/index.tsx and ConversationList.tsx without adding lines, and add skills/packs/hold to submitFork and summaryForkConversation's body only when non-empty/true. Follow the pan-style-guide skill for chip and checkbox styling (no pill badges, no decorative color). Note: /pan handoff goes through src/lib/composer-commands/parser.ts, which keeps flag tokens but moves them after the positionals (argv = path, positionals, canonical flags), so the parser must remove the flag tokens wherever they appear; that path rejects --skill/--pack/--hold as unknown flags until cli-skill-flags and cli-hold-start regenerate composer-commands.generated.ts, while the /handoff frontend regex path works immediately."
+        },
+        "items": [
+          {
+            "id": "fork-modal-flags.ac1",
+            "title": "parseHandoffComposerArgs('--skill grilling --pack mattpocock --hold fix the tests') returns { focus: 'fix the tests', skills: ['grilling'], packs: ['mattpocock'], hold: true }, and --skill=x/--pack=y forms parse the same way",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-modal-flags.ac2",
+            "title": "Given initialFocus '--skill grilling --hold do X', the ForkModal focus field shows 'do X', a 'grilling' chip renders, and the hold checkbox is checked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-modal-flags.ac3",
+            "title": "Confirming that handoff calls onConfirm with handoffExtras { skills: ['grilling'], hold: true }, and the resulting summary-fork POST body contains skills and hold; a summary fork body contains neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-handoff-skills-hold",
+        "title": "Document handoff skills, packs, hold and the kickoff door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:37:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/FORKS.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -- '--hold' features/conversations.mdx docs/FORKS.md",
+            "grep -n 'held_kickoff' docs/FORKS.md"
+          ],
+          "expected_outputs": [
+            "--hold appears in the conversations.mdx flags table and in FORKS.md",
+            "FORKS.md names the held_kickoff column and the kickoff routes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10: in features/conversations.mdx add --skill <name>, --pack <id> and --hold rows to the pan handoff flags table (near line 397) and a 'Holding a handoff' subsection describing the dashboard waiting notice, the kickoff seeded in the composer, Send starting it, and pan handoff start <conv> (sends once; exits 1 with a 409 message if already started). In docs/FORKS.md add a 'Held kickoff (PAN-4499)' section naming conversations.held_kickoff, GET/POST /api/conversations/:name/kickoff, the claim and restore rules, ForkRequest.hold and restart recovery, and that skill flags write only the successor's skill_overrides with --pack expanded to non-opt-in skills. In .overdeck/context/codebase/architecture.md add the PAN-4499 notes to the skills paragraph and fork description and update the last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-handoff-skills-hold.ac1",
+            "title": "features/conversations.mdx renders rows for --skill <name>, --pack <id> and --hold in the pan handoff flags table and contains a 'Holding a handoff' subsection stating that pan handoff start <conv> sends the kickoff once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-handoff-skills-hold.ac2",
+            "title": "docs/FORKS.md contains a 'Held kickoff (PAN-4499)' section that names conversations.held_kickoff, both kickoff routes, the 409 on a second start, and the restore-on-failed-start rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "skill-flags-resolver",
+        "to": "fork-route-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-route-skills",
+        "to": "fork-route-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "kickoff-store",
+        "to": "fork-route-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "kickoff-store",
+        "to": "kickoff-door",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-route-hold",
+        "to": "kickoff-door",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-skill-flags",
+        "to": "cli-hold-start",
+        "type": "blocks"
+      },
+      {
+        "from": "kickoff-door",
+        "to": "cli-hold-start",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
