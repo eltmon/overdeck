@@ -231,6 +231,66 @@ describe('handoffCommand', () => {
     );
   });
 
+  it('forwards --effort to the fork server and prints it (PAN-4254)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 456,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      model: 'claude-sonnet-5',
+      effort: 'low',
+      harness: 'claude-code',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', [], { effort: 'low' });
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Effort: low');
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ effort: 'low' }),
+    );
+  });
+
+  it('sends no effort without --effort, letting the server inherit the source effort (PAN-4254)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 456,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      model: 'claude-sonnet-5',
+      effort: null,
+      harness: 'claude-code',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', [], {});
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Effort: default');
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ effort: undefined }),
+    );
+  });
+
   it('validates and forwards --issue to the fork server', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,

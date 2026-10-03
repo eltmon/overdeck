@@ -58,4 +58,18 @@ describe('forkConversationViaServer (PAN-4338)', () => {
     expect(body).not.toHaveProperty('allowPrimary');
     expect(body['callerKind']).toBe('agent');
   });
+
+  it('POSTs effort only when opts.effort is set (PAN-4254)', async () => {
+    await forkConversationViaServer(
+      'source',
+      { forkMode: 'summary', effort: 'low' },
+      { pollMs: 0, timeoutMs: 50 },
+    );
+    expect(postBody()['effort']).toBe('low');
+  });
+
+  it('omits effort when opts.effort is unset (PAN-4254)', async () => {
+    await forkConversationViaServer('source', { forkMode: 'summary' }, { pollMs: 0, timeoutMs: 50 });
+    expect(postBody()).not.toHaveProperty('effort');
+  });
 });

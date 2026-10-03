@@ -10,7 +10,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Lock, Search, LayoutGrid } from 'lucide-react';
-import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { EFFORT_LEVELS, compareEffort } from '@overdeck/contracts';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -53,21 +53,24 @@ type ProviderHarnesses = Partial<Record<string, Harness>>;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const EFFORT_WITHOUT_XHIGH = EFFORT_LEVELS.filter((level) => level !== 'xhigh');
+const EFFORT_UP_TO_HIGH = EFFORT_LEVELS.filter((level) => compareEffort(level, 'high') <= 0);
+
 /** @deprecated Use string — exported for backward compatibility only. */
 export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
-  'claude-fable-5-1': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-fable-5': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-opus-5-5': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-opus-5': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
-  'claude-sonnet-5-5': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-sonnet-5': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
+  'claude-fable-5-1': EFFORT_LEVELS,
+  'claude-fable-5': EFFORT_LEVELS,
+  'claude-opus-5-5': EFFORT_LEVELS,
+  'claude-opus-5': EFFORT_LEVELS,
+  'claude-opus-4-8': EFFORT_LEVELS,
+  'claude-opus-4-7': EFFORT_LEVELS,
+  'claude-opus-4-6': EFFORT_WITHOUT_XHIGH,
+  'claude-sonnet-5-5': EFFORT_LEVELS,
+  'claude-sonnet-5': EFFORT_LEVELS,
+  'claude-sonnet-4-6': EFFORT_WITHOUT_XHIGH,
   'claude-haiku-4-5-20251001': [],
 };
 
@@ -96,16 +99,16 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-fable-5', label: 'Claude Fable 5 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-5', label: 'Claude Opus 5 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'max'] },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (200K context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'max'] },
+      { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-fable-5', label: 'Claude Fable 5 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-opus-5', label: 'Claude Opus 5 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9, effortLevels: EFFORT_WITHOUT_XHIGH },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (200K context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: EFFORT_WITHOUT_XHIGH },
       { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (200K context)', provider: 'anthropic', costDisplay: '$3/1M', costPer1MTokens: 3, effortLevels: [] },
     ],
   },
@@ -113,16 +116,16 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
-      { id: 'gpt-6-astra', label: 'GPT-6 Astra (272K context)', provider: 'openai', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-6-astra', label: 'GPT-6 Astra (272K context)', provider: 'openai', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
       { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
-      { id: 'gpt-6-sol', label: 'GPT-6 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-6-luna', label: 'GPT-6 Luna (272K context)', provider: 'openai', costDisplay: '$0.3/1M', costPer1MTokens: 0.3, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (272K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-sol[372k]', label: 'GPT-5.6 Sol (372K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (272K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-terra[372k]', label: 'GPT-5.6 Terra (372K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (272K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'gpt-5.6-luna[372k]', label: 'GPT-5.6 Luna (372K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-6-sol', label: 'GPT-6 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-6-luna', label: 'GPT-6 Luna (272K context)', provider: 'openai', costDisplay: '$0.3/1M', costPer1MTokens: 0.3, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (272K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-sol[372k]', label: 'GPT-5.6 Sol (372K context)', provider: 'openai', costDisplay: '$17.5/1M', costPer1MTokens: 17.5, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (272K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-terra[372k]', label: 'GPT-5.6 Terra (372K context)', provider: 'openai', costDisplay: '$7/1M', costPer1MTokens: 7, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (272K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-5.6-luna[372k]', label: 'GPT-5.6 Luna (372K context)', provider: 'openai', costDisplay: '$0.7/1M', costPer1MTokens: 0.7, effortLevels: EFFORT_LEVELS },
     ],
   },
 ];
@@ -328,7 +331,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
               provider: 'openrouter',
               costDisplay: formatCost(m.promptCostPer1M),
               costPer1MTokens: m.promptCostPer1M ?? undefined,
-              effortLevels: m.supportsThinking ? ['low', 'medium', 'high'] : [],
+              effortLevels: m.supportsThinking ? EFFORT_UP_TO_HIGH : [],
             })),
           });
         }

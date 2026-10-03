@@ -14,7 +14,9 @@ import { buildHomeIntents, seedDiscussPrompt } from './homeComposerIntents';
 import { useTypeToFocus } from './useTypeToFocus';
 import { HomeComposerProjectChip } from './HomeComposerProjectChip';
 import { writePendingTerminal } from './pendingTerminal';
-import { ModelPicker, type Harness } from '../chat/ModelPicker';
+import { ModelPicker, MODEL_EFFORT_SUPPORT, type Harness } from '../chat/ModelPicker';
+import { EffortPicker, loadStoredEffort, type EffortLevel } from '../chat/EffortPicker';
+import { pickerEffortLevels } from '../shared/ModelPicker';
 import { ensureDefaultConversationModel, getDefaultConversationModel } from '../chat/defaultConversationModel';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import { NO_PROJECT_KEY } from '../CommandDeck/projectsData';
@@ -55,6 +57,7 @@ export function HomeComposer({ mode }: HomeComposerProps) {
 
   const [model, setModel] = useState(getDefaultConversationModel);
   const [harness, setHarness] = useState<Harness>();
+  const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   useEffect(() => {
     void ensureDefaultConversationModel().then(() => {
       const preferred = getDefaultConversationModel();
@@ -90,6 +93,10 @@ export function HomeComposer({ mode }: HomeComposerProps) {
     [mode, harness, codexAvailable],
   );
 
+  const effortLevels = model
+    ? (pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT])
+    : undefined;
+
   const rememberProjectChoice = (key: string | undefined) => {
     try {
       if (key) localStorage.setItem(TALK_PROJECT_STORAGE_KEY, key);
@@ -107,6 +114,7 @@ export function HomeComposer({ mode }: HomeComposerProps) {
           harness: params.codex ? 'codex' : harness,
           message: params.message,
           ...(projectKey ? { projectKey } : {}),
+          ...(effortLevels?.length !== 0 ? { effort } : {}),
         }),
       });
       if (!res.ok) {
@@ -171,6 +179,9 @@ export function HomeComposer({ mode }: HomeComposerProps) {
       />
       <div className="min-w-0 max-w-full">
         <ModelPicker value={model} onChange={setModel} harness={harness} onHarnessChange={setHarness} followProviderDefault disabled={spawn.isPending} />
+      </div>
+      <div className="min-w-0 max-w-full">
+        <EffortPicker value={effort} onChange={setEffort} availableLevels={effortLevels} disabled={spawn.isPending} />
       </div>
       {!model && <p className="w-full text-xs text-muted-foreground">Choose a model to start the conversation.</p>}
     </div>

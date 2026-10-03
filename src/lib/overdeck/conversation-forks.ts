@@ -12,6 +12,7 @@ import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
 import { findPrimaryCheckout, primaryCheckoutLabel } from '../projects/primary-checkout.js';
 import { validateCwdContainment } from './cwd-containment.js';
+import { isValidConversationEffort, resolveConversationEffort } from './conversation-effort.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -842,16 +843,23 @@ export async function handleConversationSummaryFork(
       explicitIssueId === undefined && conv.issueId == null
         ? await detectIssueIdFromBranch(effectiveCwd)
         : undefined;
+    const launchModel = model || conv.model;
+    const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
+    const requestedEffort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : undefined;
+    if (requestedEffort && !isValidConversationEffort(requestedEffort, launchHarness)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    const inheritedEffort = conv.effort && isValidConversationEffort(conv.effort, launchHarness) ? conv.effort : undefined;
+    const successorEffort = requestedEffort ?? inheritedEffort;
+    const launchEffort = successorEffort
+      ? resolveConversationEffort({ effort: successorEffort, model: launchModel ?? undefined, harness: launchHarness, issueId: explicitIssueId ?? conv.issueId ?? undefined })
+      : undefined;
     const { sessionId } = await reserveSummaryForkSession(effectiveCwd);
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const suffix = randomUUID().slice(0, 4);
     const newName = `${timestamp}-${suffix}`;
     const newTmux = `conv-${newName}`;
-    const launchModel = model || conv.model;
     // PAN-4160: same source generateSummaryForFork falls back to, so the
     // summary harness is chosen for the model that actually runs.
     const effectiveSummaryModel = summaryModel || loadConfigSync().config.conversations.forkSummaryModel;
-    const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
     const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
     const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
       ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
@@ -881,7 +889,7 @@ export async function handleConversationSummaryFork(
           : `Summary Fork of ${conv.name}`,
       claudeSessionId: sessionId,
       model: launchModel ?? undefined,
-      effort: conv.effort ?? undefined,
+      effort: launchEffort,
       harness: launchHarness,
       forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
       // PAN-4185: a fork of a bare conversation stays bare.

@@ -224,6 +224,7 @@ vi.mock('../chat/ModelPicker', () => ({
   loadStoredHarness: () => 'claude-code',
   saveStoredHarness: () => {},
   onKnownModelsSync: () => () => {},
+  MODEL_EFFORT_SUPPORT: {},
 }));
 
 vi.mock('../../lib/store', () => ({

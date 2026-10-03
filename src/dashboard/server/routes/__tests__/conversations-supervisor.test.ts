@@ -140,6 +140,9 @@ vi.mock('../../../../lib/tmux.js', () => ({
   // Real implementation asks systemd for the managed tmux server's MainPID and
   // returns undefined when there is none — the shape these tests run under.
   findManagedServerPid: vi.fn(() => undefined),
+  // PAN-4254 regression tests resume/restart a conversation that was never
+  // really spawned, so no harness process exists to detect as alive.
+  isHarnessProcessAlive: vi.fn(async () => false),
 }));
 
 // PAN-3974: owner teardown must close the companion terminal first. The spy
@@ -173,6 +176,15 @@ vi.mock('../../../../lib/agents/runtime-command.js', async (importOriginal) => {
   return { ...actual, waitForPromptReady: vi.fn(async (...args: Parameters<typeof actual.waitForPromptReady>) =>
     args[1] === 'muse' ? false : actual.waitForPromptReady(...args)) };
 });
+
+// PAN-4254 regression: handleConversationResume's claudeAlive check probes the
+// real Herdr socket (this host's default backend), which is indeterminate —
+// not absent — in a test environment and would otherwise short-circuit resume
+// into a reattach instead of a respawn.
+vi.mock('../../../../lib/overdeck/conversation-liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-liveness.js')>()),
+  conversationHarnessAlive: vi.fn(async () => false),
+}));
 
 function conversationDir(session: string): string {
   return join(overdeckHome, 'conversations', session);
@@ -705,6 +717,257 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       expect(vi.mocked(tmux.killSession).mock.calls.filter(([target]) => target === session)).toHaveLength(3);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('resumes a conversation whose stored effort is xhigh with --effort "xhigh" (PAN-4254 regression)', async () => {
+    createSupervisorSocket = true;
+    const name = 'resume-xhigh';
+    const session = 'conv-resume-xhigh';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationResume requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, {}, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).not.toBe(500);
+      await vi.waitFor(() => {
+        expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+      });
+      expect(launcherFor(session)).toContain('--effort "xhigh"');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('restarts a live conversation whose stored effort is xhigh with --effort "xhigh" (PAN-4254 regression)', async () => {
+    createSupervisorSocket = true;
+    const name = 'restart-xhigh';
+    const session = 'conv-restart-xhigh';
+    listedSessionNames = [session];
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+    conversations.createConversation({
+      name,
+      tmuxSession: session,
+      cwd: tmpdir(),
+      claudeSessionId: 'old-claude-session',
+      model: 'claude-opus-5-5',
+      harness: 'claude-code',
+    });
+    conversations.setConversationEffort(name, 'xhigh');
+    const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    const restart = await handleConversationRestartAll({ resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+    const result = decodeJsonResponse(restart);
+    expect(result['results']).toEqual([{ name, model: 'claude-opus-5-5', status: 'restarted' }]);
+    expect(launcherFor(session)).toContain('--effort "xhigh"');
+  });
+
+  it('creates a conversation with effort xhigh and stores/launches it unclamped (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { model: 'claude-opus-5-5', effort: 'xhigh' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(201);
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+    expect(conversations.getConversationByName(name)?.effort).toBe('xhigh');
+    await vi.waitFor(() => {
+      expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+    });
+    expect(launcherFor(session)).toContain('--effort "xhigh"');
+  });
+
+  it('clamps an unsupported create effort to the model\'s highest supported level (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { model: 'claude-sonnet-4-6', effort: 'xhigh' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(201);
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+    expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    await vi.waitFor(() => {
+      expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+    });
+    expect(launcherFor(session)).toContain('--effort "high"');
+  });
+
+  it('rejects an invalid create effort with 400 and creates no row (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+    const before = conversations.listConversations().length;
+
+    const response = await handleConversationCreate(
+      { model: 'claude-opus-5-5', effort: 'bogus' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid effort' });
+    expect(conversations.listConversations().length).toBe(before);
+  });
+
+  it('resume with a body effort persists the resolved level and launches with it (PAN-4254)', async () => {
+    createSupervisorSocket = true;
+    const name = 'resume-body-effort';
+    const session = 'conv-resume-body-effort';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationResume requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'high');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, { effort: 'low' }, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).not.toBe(500);
+      expect(conversations.getConversationByName(name)?.effort).toBe('low');
+      await vi.waitFor(() => {
+        expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+      });
+      expect(launcherFor(session)).toContain('--effort "low"');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('rejects an invalid resume body effort with 400 and leaves the stored value unchanged (PAN-4254)', async () => {
+    const name = 'resume-bogus-effort';
+    const session = 'conv-resume-bogus-effort';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'high');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, { effort: 'bogus' }, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).toBe(400);
+      expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid effort' });
+      expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('switch-model clamps a stored xhigh to high on a model without xhigh (PAN-4254)', async () => {
+    const name = 'switch-clamp-down';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationSwitchModel requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-sonnet-4-6' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('switch-model keeps a stored xhigh when switched to a model that still supports it (PAN-4254)', async () => {
+    const name = 'switch-clamp-keep';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'claude-sonnet-4-6',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-opus-5-5' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBe('xhigh');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('switch-model clears a stored opencode variant invalid for the new harness to NULL (PAN-4254)', async () => {
+    const name = 'switch-clamp-null';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'opencode/turbo',
+        harness: 'opencode',
+      });
+      conversations.setConversationEffort(name, 'turbo-variant');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-opus-5-5', harness: 'claude-code' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBeNull();
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
     }
   });
 });

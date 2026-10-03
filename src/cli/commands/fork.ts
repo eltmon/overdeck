@@ -8,6 +8,7 @@ import { sessionFilePath } from '../../lib/runtimes/storage/claude-code.js';
 
 interface ForkOptions {
   model?: string;
+  effort?: string;
   cwd?: string;
   project?: string;
   plain?: boolean;
@@ -61,6 +62,7 @@ export async function forkCommand(
   try {
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
+      effort: options.effort,
       cwd: options.cwd,
       projectKey: options.project,
       forkMode,
@@ -89,5 +91,6 @@ export async function forkCommand(
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
+  console.log(chalk.gray(`  Effort: ${newConv.effort || 'default'}`));
   console.log(chalk.gray(`  Dashboard: https://overdeck.localhost/conv/${newConv.id}`));
 }
