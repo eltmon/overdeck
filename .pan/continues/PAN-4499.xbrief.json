@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:05:02.960Z",
+  "updated": "2026-10-03T23:05:20.422Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "fork-route-hold.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T23:05:02.960Z"
+    },
+    "kickoff-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:05:20.422Z"
     }
   }
 }
