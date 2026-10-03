@@ -66,6 +66,36 @@ When a tick hits a substrate bug, the tick's job becomes fixing it (file it
 with the `substrate-improvement` label, launch the fix with `pan start`), not
 routing around it. Record each substrate fix in the state file below.
 
+## Doctrine and rails
+
+These come from `roles/flywheel.md`, which is never loaded on its own: this
+section is how they reach the loop. They bind every tick.
+
+- **You orchestrate; you never do the work.** Launch agents with `pan start`;
+  never write code, specs or plans yourself. The only files you write are the
+  state file and the report.
+- **Keep `main` green.** A red or unknown `main` is P0: every PR inherits the
+  failing check.
+- **Fix at the root.** Read the code to the exact `file:line` before you file a
+  substrate bug. An issue that restates an error message is a symptom log, not
+  a diagnosis.
+- **Recurrence is the step-back signal.** One stuck agent is an instance; the
+  same failure on two issues is a class, and a class is never fixed
+  instance-by-instance. File the issue that removes the cause.
+- **A recovery verb moves one instance; it never explains it.** Before the
+  first `pan resume`, `pan tell`, `pan sync-main` or `pan review restart` on an
+  issue, form a root-cause hypothesis from evidence (the agent's
+  `~/.overdeck/agents/<agent>/lifecycle.log`, the pane, the transcript, the PR's
+  reviews and checks) and write it in the state file. The same recovery verb
+  twice on one issue without a confirmed cause is a failed tick.
+- **Author/assignee gate (security-critical).** Act on an issue only if
+  `author.login ∈ {eltmon, panopticon-agent[bot]}` or `eltmon ∈ assignees`
+  (`gh issue view <num> --json author,assignees`). For Linear projects, only
+  issues assigned to the operator. Never weaken this default-deny.
+- **Saturation cap.** Never run more work agents than `roles.flywheel.maxAgents`.
+- **Merges stay explicit, deploys go through `pan reload`.** Never admin-merge
+  while `main` is red.
+
 ## Phase 1 — Orient
 
 1. Read the policies from `pan flywheel status --json` (the `.policies`
@@ -75,9 +105,31 @@ routing around it. Record each substrate fix in the state file below.
 3. If an order book is bound (started via `pan orders start`, or one is
    `running`), read it with `pan orders show <book-id>` — its Lane A/B items
    and prereqs take priority over the general backlog.
-4. List in-flight work: `gh pr list --search "is:open"` for this repo, and
-   `pan status` for live sessions. Anything already moving does not need a
-   new pick.
+4. List in-flight work: `gh pr list --search "is:open"` for this repo,
+   `pan status` for live sessions, and every issue with a workspace, branch,
+   agent or PR (`GET /api/issues/resource-allocated` on the dashboard, the
+   `pipeline-list` skill's view). This is the set Phase 1b drains.
+
+## Phase 1b — Drain what is already in flight
+
+Every tick, before picking anything new, walk every in-flight issue and ask
+"is it moving?". Clearing the pipeline outranks adding to it.
+
+| Stall | How you see it | First move |
+| --- | --- | --- |
+| Planned but never started | planning finished, no work agent; `agent.start_blocked` in the agent's `lifecycle.log` | read the block reason; it is usually a substrate bug |
+| Agent dead or idle | `pan show <id> --health` says the session is not running, or no activity for a long time with work left | read the pane and transcript tail, then `pan resume` or `pan tell` |
+| PR conflicts with `main` | `gh pr view <pr> --json mergeable` is `CONFLICTING` | tell the work agent to merge `main`; `pan sync-main` stops at conflicts and does not resolve them |
+| Review never reports | review requested, no verdict, no reviewer activity | `pan review restart <id>` |
+| Checks red | the PR's checks fail | if `main` is green, the PR broke it: tell the agent |
+| Merged, not closed out | PR merged, issue still open | `pan close <id>`; a close-out refused on the deploy row needs `pan reload` first |
+| Merged, not deployed (Overdeck) | the deployed build lacks the merge | `pan reload` once CI on `main` is green; it waits for the operator's restart approval, so say so in `needs-you` |
+
+For every stall: form the root-cause hypothesis first (Doctrine), act once,
+and if the cause is in Overdeck itself, file it with the `substrate-improvement`
+label and `file:line` evidence and launch the fix with `pan start` (TENET-10
+machinery goes to `needs-handoff` instead; see Guardrails). Two issues stuck the
+same way is a class: file the class.
 
 ## Pickup gate
 
@@ -116,9 +168,10 @@ not blocked, and not parked. "Parked" means the tracker issue carries the
 parked on purpose.
 
 If nothing is pickable — every remaining item is blocked, parked, or the
-book/backlog is empty — say so plainly in the tick marker (`phase=idle
-needs-you=pipeline idle — nothing pickable`) and stop the loop rather than
-inventing work.
+book/backlog is empty — do not invent work. If anything is still in flight,
+keep ticking and draining it (`phase=watch`). Only when nothing is pickable
+**and** nothing is in flight, say so plainly in the tick marker (`phase=idle
+needs-you=pipeline idle — nothing pickable`) and stop the loop.
 
 ## Phase 3 — Launch
 
@@ -189,7 +242,16 @@ flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 need
 
 The Flywheel page and `pan flywheel status` parse this line from the
 transcript; it is the only status this loop reports. Never `curl` or POST a
-status anywhere.
+status anywhere. Draining in-flight work reports as `phase=watch`.
+
+## Cadence
+
+Nothing outside this conversation wakes the loop, so every tick schedules the
+next one before it ends: run `sleep 450` as a background Bash command
+(`run_in_background`); its completion starts the next tick. Use 450 seconds
+while anything is in flight and 1000 seconds when idle. Never wait longer than
+1000 seconds: a gap past 20 minutes reads as a hung loop. Skip scheduling only
+when stopping.
 
 ## State file
 
