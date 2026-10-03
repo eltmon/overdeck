@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { exitCli } from '../exit.js';
 import { dashboardBaseUrl, ForkServerError, waitForForkPipeline, type ForkResultConv } from './fork-client.js';
-import { resolveConversation } from './handoff.js';
+import { resolveConversation } from './handoff-shared.js';
 
 /** PAN-4499 WI-7: send a `--hold` conversation's kickoff through the kickoff door. */
 export async function handoffStartCommand(convRef: string): Promise<void> {

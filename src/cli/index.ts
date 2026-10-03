@@ -386,7 +386,7 @@ program
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(lazyAction(() => import('./commands/fork.js'), 'forkCommand'));
 
-const handoffCmd = program
+program
   .command('handoff [conv] [focus...]')
   .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 10000 characters (keep it short; long briefs belong in a file the focus points at). Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
@@ -405,11 +405,6 @@ const handoffCmd = program
   .option('--pack <id>', 'Turn every skill of this cached skill pack on for the new conversation only (repeatable)', (value: string, previous: string[]) => [...previous, value], [] as string[])
   .option('--hold', 'Create and launch the new conversation without sending the kickoff; start it with Send in the dashboard or pan handoff start <conv>')
   .action(lazyAction(() => import('./commands/handoff.js'), 'handoffCommand'));
-
-handoffCmd
-  .command('start <conv>')
-  .description('Send the held kickoff of a conversation created with pan handoff --hold')
-  .action(lazyAction(() => import('./commands/handoff-start.js'), 'handoffStartCommand'));
 
 program
   .command('unarchive-conversation <query>')

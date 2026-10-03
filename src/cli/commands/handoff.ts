@@ -1,11 +1,11 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
-import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
 import { parseIssueId } from '../../lib/issue-id.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { resolveSessionFile } from '../../lib/overdeck/conversation-reads.js';
+import { resolveConversation } from './handoff-shared.js';
 
 interface HandoffOptions {
   model?: string;
@@ -23,13 +23,6 @@ interface HandoffOptions {
   skill?: string[];
   pack?: string[];
   hold?: boolean;
-}
-
-export function resolveConversation(convRef: string) {
-  if (/^\d+$/.test(convRef)) {
-    return getConversationById(parseInt(convRef, 10));
-  }
-  return getConversationByName(convRef);
 }
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
@@ -51,6 +44,20 @@ export async function handoffCommand(
   focusArgs: string[],
   options: HandoffOptions,
 ): Promise<void> {
+  // D11 fallback: `start` is not a Commander subcommand (a real one made
+  // agent-text-cli-verbs.test.ts treat every other handoff conv ref, e.g.
+  // "self"/"source-conv", as an unregistered subcommand attempt). Intercept
+  // it here instead.
+  if (convRef === 'start') {
+    const target = focusArgs[0];
+    if (!target) {
+      console.log(chalk.yellow('Usage: pan handoff start <conv>'));
+      return exitCli(1);
+    }
+    const { handoffStartCommand } = await import('./handoff-start.js');
+    return handoffStartCommand(target);
+  }
+
   // Self-detect when no conversation is given (or an explicit self-ref). This is
   // the deterministic answer to "hand off the conversation I'm in" — it replaces
   // the old scan-and-guess pattern that picked the wrong source (PAN-1520).
