@@ -3,7 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const projectsMocks = vi.hoisted(() => ({ findProjectByPath: vi.fn() }));
+vi.mock('../../../../src/lib/projects.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/projects.js')>('../../../../src/lib/projects.js');
+  return { ...actual, findProjectByPath: projectsMocks.findProjectByPath };
+});
 
 let testRoot: string;
 let testHome: string;
@@ -38,6 +44,7 @@ beforeEach(() => {
   testHome = join(testRoot, 'home');
   mkdirSync(testHome, { recursive: true });
   process.env.OVERDECK_HOME = testHome;
+  projectsMocks.findProjectByPath.mockReset();
 });
 
 afterEach(async () => {
@@ -101,5 +108,86 @@ describe('getConversationDiffTurn', () => {
     expect(fullDiff).toContain('diff --git a/README.md b/README.md');
     expect(fullDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
     expect(fullDiff).toContain('+External change');
+  });
+});
+
+describe('getConversationDiffVsMain', () => {
+  beforeEach(() => {
+    projectsMocks.findProjectByPath.mockReturnValue({ workspace: { default_branch: 'trunk' } });
+  });
+
+  function createBranchedRepo(name: string): string {
+    const repo = join(testRoot, name);
+    mkdirSync(repo, { recursive: true });
+    git(repo, ['init', '--quiet']);
+    git(repo, ['symbolic-ref', 'HEAD', 'refs/heads/trunk']);
+    git(repo, ['config', 'user.email', 'test@example.com']);
+    git(repo, ['config', 'user.name', 'Test User']);
+    writeFileSync(join(repo, 'a.txt'), 'a\n');
+    git(repo, ['add', 'a.txt']);
+    git(repo, ['commit', '--quiet', '-m', 'initial']);
+    git(repo, ['checkout', '--quiet', '-b', 'feature']);
+    writeFileSync(join(repo, 'b.txt'), 'b\n');
+    git(repo, ['add', 'b.txt']);
+    git(repo, ['commit', '--quiet', '-m', 'add b.txt']);
+    return repo;
+  }
+
+  it('returns baseBranch, baseRef, and the feature-branch files, with no turnId key', async () => {
+    const repo = createBranchedRepo('vs-main-repo');
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffVsMain } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'vs-main-conv', tmuxSession: 'conv-vs-main-conv', cwd: repo });
+
+    const result = await getConversationDiffVsMain('vs-main-conv', undefined);
+
+    expect(result.status).toBeUndefined();
+    expect(result.body).toMatchObject({ repoRoot: repo, baseBranch: 'trunk', baseRef: 'trunk' });
+    expect((result.body as { files: Array<{ path: string }> }).files.map((f) => f.path)).toEqual(['b.txt']);
+    expect(result.body).not.toHaveProperty('turnId');
+  });
+
+  it('includes a scoped diff when fileFilter is given', async () => {
+    const repo = createBranchedRepo('vs-main-repo-filter');
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffVsMain } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'vs-main-conv-filter', tmuxSession: 'conv-vs-main-conv-filter', cwd: repo });
+
+    const result = await getConversationDiffVsMain('vs-main-conv-filter', 'b.txt');
+
+    expect((result.body as { diff: string }).diff).toContain('+++ b/b.txt');
+  });
+
+  it('resolves repoRoot to the repository top level when the conversation cwd is a subdirectory', async () => {
+    const repo = createBranchedRepo('vs-main-repo-subdir');
+    const subdir = join(repo, 'nested');
+    mkdirSync(subdir, { recursive: true });
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffVsMain } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'vs-main-conv-subdir', tmuxSession: 'conv-vs-main-conv-subdir', cwd: subdir });
+
+    const result = await getConversationDiffVsMain('vs-main-conv-subdir', undefined);
+
+    expect((result.body as { repoRoot: string }).repoRoot).toBe(repo);
+  });
+
+  it('returns a null repoRoot/baseRef and no files when the cwd is not a repository', async () => {
+    const plainDir = join(testRoot, 'not-a-repo');
+    mkdirSync(plainDir, { recursive: true });
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffVsMain } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'vs-main-conv-not-repo', tmuxSession: 'conv-vs-main-conv-not-repo', cwd: plainDir });
+
+    const result = await getConversationDiffVsMain('vs-main-conv-not-repo', undefined);
+
+    expect(result.body).toMatchObject({ repoRoot: null, baseRef: null, files: [] });
+  });
+
+  it('returns 404 for an unknown conversation name', async () => {
+    const { getConversationDiffVsMain } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+
+    const result = await getConversationDiffVsMain('does-not-exist', undefined);
+
+    expect(result.status).toBe(404);
   });
 });

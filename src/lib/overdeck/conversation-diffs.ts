@@ -13,6 +13,7 @@ import {
   diffPatchFilesAgainstHead,
   type TurnDiffFileChange,
 } from '../checkpoint/checkpoint-manager.js';
+import { diffVsDefaultBranch } from '../checkpoint/vs-default-branch.js';
 import {
   getConversationById,
   getConversationByName,
@@ -60,20 +61,25 @@ function lookupConversation(name: string): Conversation | null {
   return getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
 }
 
-async function repoRootForFile(filePath: string, repoRootCache: Map<string, string | null>): Promise<string | null> {
-  const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
-  let repoRoot = repoRootCache.get(dir);
-  if (repoRoot !== undefined) return repoRoot;
-
+/** The git top-level of `dir`, or null when `dir` is not inside a repository (PAN-4501). */
+async function repoRootForDir(dir: string): Promise<string | null> {
   try {
     const { stdout } = await promisify(exec)(
       'git rev-parse --show-toplevel',
       { cwd: dir, encoding: 'utf-8' },
     );
-    repoRoot = stdout.trim();
+    return stdout.trim();
   } catch {
-    repoRoot = null;
+    return null;
   }
+}
+
+async function repoRootForFile(filePath: string, repoRootCache: Map<string, string | null>): Promise<string | null> {
+  const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
+  let repoRoot = repoRootCache.get(dir);
+  if (repoRoot !== undefined) return repoRoot;
+
+  repoRoot = await repoRootForDir(dir);
   repoRootCache.set(dir, repoRoot);
   return repoRoot;
 }
@@ -385,6 +391,32 @@ export async function getConversationDiffTurn(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] diff turn failed:', msg);
+    return result({ error: 'Internal server error' }, 500);
+  }
+}
+
+/**
+ * "vs main" for a conversation (PAN-4501): the conversation's repository
+ * (git top-level of its cwd) diffed three-dot against the project's default
+ * branch. Before this route existed, `/diffs/vs-main` fell through to
+ * `/diffs/:turnId` and returned "conversation start vs working tree".
+ */
+export async function getConversationDiffVsMain(
+  name: string,
+  fileFilter: string | undefined,
+): Promise<ConversationDiffResult> {
+  try {
+    const conv = lookupConversation(name);
+    if (!conv) return result({ error: 'Conversation not found' }, 404);
+    const repoRoot = await repoRootForDir(conv.cwd);
+    if (!repoRoot) {
+      return result({ repoRoot: null, baseBranch: null, baseRef: null, files: [], ...(fileFilter !== undefined && { diff: '' }) });
+    }
+    const diff = await diffVsDefaultBranch(repoRoot, { projectKey: conv.projectKey, ...(fileFilter !== undefined && { filePath: fileFilter }) });
+    return result({ repoRoot, ...diff });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] diff vs-main failed:', msg);
     return result({ error: 'Internal server error' }, 500);
   }
 }

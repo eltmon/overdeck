@@ -17,6 +17,8 @@ vi.mock('../../checkpoint/checkpoint-manager.js', () => ({
   diffPatchFilesAgainstHead: vi.fn(),
 }));
 
+vi.mock('../../checkpoint/vs-default-branch.js', () => ({ diffVsDefaultBranch: vi.fn() }));
+
 const conversationMocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
   getConversationById: vi.fn(),

@@ -2,11 +2,12 @@
  * Conversation diff routes (PAN-4501: moved out of routes/conversations.ts).
  * GET /api/conversations/:name/diffs          — per-turn summaries
  * GET /api/conversations/:name/diffs/full     — whole conversation
+ * GET /api/conversations/:name/diffs/vs-main  — conversation repo vs the project's default branch
  * GET /api/conversations/:name/diffs/:turnId  — one turn
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn } from '../../../lib/overdeck/conversation-diffs.js';
+import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn, getConversationDiffVsMain } from '../../../lib/overdeck/conversation-diffs.js';
 import { getCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { jsonResponse } from '../http-helpers.js';
 import { validateOrigin } from './origin-validation.js';
@@ -52,6 +53,26 @@ const getConversationDiffFullRoute = HttpRouter.add(
   }),
 );
 
+const getConversationDiffVsMainRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/diffs/vs-main',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
+    return yield* Effect.promise(async () => {
+      const response = await getConversationDiffVsMain(name, fileFilter);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
+    });
+  }),
+);
+
 const getConversationDiffTurnRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/diffs/:turnId',
@@ -76,5 +97,6 @@ const getConversationDiffTurnRoute = HttpRouter.add(
 export const conversationDiffRoutes = Layer.mergeAll(
   getConversationDiffsRoute,
   getConversationDiffFullRoute,
+  getConversationDiffVsMainRoute,
   getConversationDiffTurnRoute,
 );
