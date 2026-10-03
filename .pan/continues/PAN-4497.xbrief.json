@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4497",
   "created": "2026-10-03T21:34:28.916Z",
-  "updated": "2026-10-03T21:43:37.522Z",
+  "updated": "2026-10-03T21:43:44.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4497",
       "claimedAt": "2026-10-03T21:40:43.226Z",
       "doneAt": "2026-10-03T21:43:37.522Z"
+    },
+    "overlap-playwright-spec": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4497",
+      "claimedAt": "2026-10-03T21:43:44.873Z"
     }
   }
 }
