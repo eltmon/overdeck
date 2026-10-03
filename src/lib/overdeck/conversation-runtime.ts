@@ -40,6 +40,7 @@ import { conversationStateDir, readConversationPaneRole, writeConversationPaneRo
 import { validateCwdContainment } from './cwd-containment.js';
 import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
+import { isSupersededConversation, resolveClearChainHead } from './conversation-clear-chain.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -1072,15 +1073,19 @@ export async function handleConversationCreate(
 }
 export async function handleConversationStop(name: string, deps: { resolveSessionFileForCleanup?: (conv: Conversation) => string | null }): Promise<ReturnType<typeof jsonResponse>> {
   try {
-    const conv = getConversationByName(name);
-    if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    await stopConversationRuntime(conv, name);
-    markConversationEnded(name);
+    const requested = getConversationByName(name);
+    if (!requested) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    // PAN-4485: a superseded /clear row owns no runtime; its chain head does.
+    const conv = isSupersededConversation(requested) ? resolveClearChainHead(requested) : requested;
+    if (conv !== requested && requested.status !== 'ended') markConversationEnded(requested.name);
+    if (!conv) return jsonResponse({ success: true });
+    await stopConversationRuntime(conv, conv.name);
+    markConversationEnded(conv.name);
     void (async () => {
       await new Promise((r) => setTimeout(r, 500));
       await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile: deps.resolveSessionFileForCleanup?.(conv) ?? null });
     })();
-    return jsonResponse({ success: true });
+    return jsonResponse({ success: true, ...(conv !== requested ? { stoppedConversation: conv.name } : {}) });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] stop conversation failed:', msg);
