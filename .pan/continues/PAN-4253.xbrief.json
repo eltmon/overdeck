@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4253",
+  "created": "2026-10-03T01:29:37.432Z",
+  "updated": "2026-10-03T01:29:37.432Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "agent-state-effort-fields": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:29:37.432Z"
+    }
+  }
+}
