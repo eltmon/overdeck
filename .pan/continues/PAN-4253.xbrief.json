@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:30:49.770Z",
+  "updated": "2026-10-03T02:31:24.313Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "effort-relaunch-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:30:49.770Z"
+    },
+    "agent-state-effort-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:31:24.313Z"
     }
   }
 }
