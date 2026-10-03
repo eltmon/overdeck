@@ -1113,16 +1113,23 @@ export async function handleConversationResume(
   deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null> },
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
-    const conv = getConversationByName(name);
+    let conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
+    // PAN-4485: never respawn a superseded /clear row into the shared session — resume its chain head.
+    const requestedName = name;
+    if (isSupersededConversation(conv)) {
+      const head = resolveClearChainHead(conv);
+      if (!head) return jsonResponse({ error: 'Conversation was cleared and its continuation is unavailable', code: 'conversation-cleared' }, { status: 409 });
+      conv = head; name = head.name;
+    }
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
     const effort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : (conv.effort ?? undefined);
     const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
     if (claudeAlive) {
       updateLastAttached(name);
       markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', reattached: true });
+      return jsonResponse({ ...conv, status: 'active', reattached: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     }
     const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
     const harness: RuntimeName = conv.harness ?? 'claude-code';
@@ -1158,7 +1165,7 @@ export async function handleConversationResume(
       );
       if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
+      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     } catch (error) {
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
