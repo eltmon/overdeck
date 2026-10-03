@@ -1,14 +1,37 @@
 /** Request-body parsing for POST /api/conversations (PAN-4486): project/cwd resolution and launch-context flags. */
 import { stat } from 'node:fs/promises';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
+import { isCoreSkill } from '../skill-overrides/resolve.js';
 import type { ConversationLaunchContext } from './conversation-launch-context.js';
 
 /** A malformed create request; the route answers 400. */
 export class ConversationCreateInputError extends Error {}
 
-/** The PAN-4185 context opt-outs from a create request body. */
+const MAX_SKILL_OVERRIDES = 200;
+/** A skill name, or a pack skill id `pack/skill`. */
+const SKILL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(\/[A-Za-z0-9][A-Za-z0-9._-]*)?$/;
+
+/** The per-conversation skill map; undefined when absent or empty. Core skills cannot be overridden. */
+function parseSkillOverrides(raw: unknown): Record<string, boolean> | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new ConversationCreateInputError('Invalid skillOverrides');
+  const entries = Object.entries(raw);
+  if (entries.length > MAX_SKILL_OVERRIDES) throw new ConversationCreateInputError('Invalid skillOverrides');
+  for (const [key, value] of entries) {
+    if (!SKILL_ID_PATTERN.test(key) || typeof value !== 'boolean') throw new ConversationCreateInputError('Invalid skillOverrides');
+    if (isCoreSkill(key)) throw new ConversationCreateInputError(`Core skill cannot be overridden: ${key}`);
+  }
+  return entries.length > 0 ? Object.fromEntries(entries) as Record<string, boolean> : undefined;
+}
+
+/** The PAN-4185 context opt-outs and the PAN-4486 skill map from a create request body. */
 export function parseConversationLaunchContext(body: Record<string, unknown>): ConversationLaunchContext {
-  return { bareContext: body['bareContext'] === true, skipClaudeMd: body['skipClaudeMd'] === true };
+  const skillOverrides = parseSkillOverrides(body['skillOverrides']);
+  return {
+    bareContext: body['bareContext'] === true,
+    skipClaudeMd: body['skipClaudeMd'] === true,
+    ...(skillOverrides ? { skillOverrides } : {}),
+  };
 }
 
 export interface ResolvedRegisteredProject {

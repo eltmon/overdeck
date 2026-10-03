@@ -90,3 +90,27 @@ describe('handleConversationCreate context opt-outs (PAN-4185)', () => {
     expect(mocks.createConversation).toHaveBeenCalledWith(expect.objectContaining({ bareContext: false, skipClaudeMd: false }));
   });
 });
+
+describe('handleConversationCreate skillOverrides (PAN-4486)', () => {
+  it('stores a valid skill map on the conversation', async () => {
+    const res = await handleConversationCreate(
+      { model: 'claude-opus-5', skillOverrides: { grilling: false } },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect((res as unknown as { status: number }).status).toBe(201);
+    expect(mocks.createConversation).toHaveBeenCalledWith(expect.objectContaining({ skillOverrides: { grilling: false } }));
+  });
+
+  it('answers 400 and creates no row for a malformed or core-skill map', async () => {
+    mocks.createConversation.mockClear();
+    for (const skillOverrides of [{ grilling: 'no' }, { 'pan-done': false }]) {
+      const res = await handleConversationCreate(
+        { model: 'claude-opus-5', skillOverrides },
+        { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+      );
+      expect((res as unknown as { status: number }).status).toBe(400);
+    }
+    expect(mocks.createConversation).not.toHaveBeenCalled();
+  });
+});
