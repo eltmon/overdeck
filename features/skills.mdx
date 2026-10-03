@@ -223,11 +223,13 @@ The `pan sync` command:
 
 ## Turning skills on and off
 
-Every skill has an on/off state that you can set at three levels: a **global default**, a **project override**, and an **issue override**. The narrowest level that has a value wins:
+Every skill has an on/off state that you can set at three levels: a **global default**, a **project override**, and an **issue override**. A conversation can also carry its own values, the narrowest level of all. The narrowest level that has a value wins:
 
-**issue > project > global > default (on)**
+**conversation > issue > project > global > default (on)**
 
 A skill with no value at any level is on. The global level is two-state: a skill is either on (no stored value) or off. Project and issue levels are three-state: **Inherit**, **On**, or **Off**, so a project can turn on a skill that is off globally, and an issue can turn off a skill its project turned on.
+
+Conversation values are set only when the conversation is created, in the **New conversation with options…** dialog (see [Conversations](/features/conversations)). They are stored on the conversation row and applied at every launch, resume, restart and fork of that conversation. A conversation value for a pack skill (`pack/skill`) beats every level and every pack toggle, so a conversation can turn on one opt-in pack skill for itself. Core skills ignore conversation values too.
 
 ### Core skills are always on
 
@@ -242,6 +244,7 @@ The pipeline depends on these 11 skills, so they are always on and cannot be ove
 | Global | `~/.overdeck/config.yaml`, under `skills.overrides` (`<skill>: false`) |
 | Project | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_overrides` |
 | Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` in the project's plan home, committed and pushed on `main` as `chore(workspace): skill overrides for <ISSUE>` |
+| Conversation | `conversations.skill_overrides` (JSON) in `~/.overdeck/overdeck.db`; the conversation launcher passes `pan skills launch-settings --conversation <tmuxSession>` to apply it |
 
 Clearing the last override for an issue deletes its file and commits the deletion. Skills that exist only in a project's `.pan/skills/` directory are **project skills**: they appear in that project's settings and its issues, never on the global Skills page.
 
