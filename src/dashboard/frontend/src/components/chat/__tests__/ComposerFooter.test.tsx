@@ -61,8 +61,8 @@ vi.mock('../defaultConversationModel', () => ({
 }));
 
 vi.mock('../EffortPicker', () => ({
-  EffortPicker: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
-    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{value}</button>
+  EffortPicker: ({ value, onChange, chip }: { value: string; onChange: (value: string) => void; chip?: { level: string; source: string | null } | null }) => (
+    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{chip ? `${chip.level} · ${chip.source ?? ''}` : value}</button>
   ),
   loadStoredEffort: () => storedEffort.value,
 }));
@@ -153,11 +153,19 @@ describe('ComposerFooter attachments', () => {
     expect(screen.getByTestId('effort-picker')).toHaveTextContent('low');
   });
 
-  it('does not use the browser default for an existing session with no persisted effort', () => {
+  it('shows the default-chain effort and its source for an existing session with no persisted effort (PAN-4255)', async () => {
     storedEffort.value = 'max';
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith('/api/effort/default?')) {
+        return new Response(JSON.stringify({ effort: 'high', source: 'default', requested: 'high', clamped: false }), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
     render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);
 
-    expect(screen.getByTestId('effort-picker')).not.toHaveTextContent('max');
+    await waitFor(() => expect(screen.getByTestId('effort-picker')).toHaveTextContent('high · default'));
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
   it('uses the browser default only before a conversation session exists', () => {

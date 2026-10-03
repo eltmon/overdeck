@@ -70,7 +70,7 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     const chip = screen.getByTestId('effort-chip');
     expect(chip).toHaveTextContent('High · default');
     expect(chip).toHaveAttribute('data-observed', 'false');
-    expect(screen.queryByText('Effort unverified')).toBeNull();
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
   it('renders a native-terminal change', () => {
@@ -79,7 +79,7 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     const chip = screen.getByTestId('effort-chip');
     expect(chip).toHaveTextContent('Low · terminal');
     expect(chip).toHaveAttribute('data-observed', 'true');
-    expect(screen.queryByText('Effort unverified')).toBeNull();
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
   it('renders an observed level with no known source', () => {
@@ -92,7 +92,7 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     render(<EffortPicker value="high" onChange={vi.fn()} pending chip={{ level: 'high', source: 'explicit', observed: true }} />);
 
     expect(screen.getByTestId('effort-chip')).toHaveTextContent('Applying…');
-    expect(screen.queryByText('Effort unverified')).toBeNull();
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
   it('falls back to the draft label without a chip', () => {
@@ -101,6 +101,6 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     const chip = screen.getByTestId('effort-chip');
     expect(chip).toHaveTextContent('High (default)');
     expect(chip).not.toHaveAttribute('data-observed');
-    expect(screen.queryByText('Effort unverified')).toBeNull();
+    expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 });
