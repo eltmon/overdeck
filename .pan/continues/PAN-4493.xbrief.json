@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:50:36.361Z",
+  "updated": "2026-10-03T18:50:53.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "attachment-ref-parser.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T18:50:36.361Z"
+    },
+    "attachment-ref-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:53.185Z"
     }
   }
 }
