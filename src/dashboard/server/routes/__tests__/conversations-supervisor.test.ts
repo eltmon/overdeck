@@ -775,6 +775,61 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(result['results']).toEqual([{ name, model: 'claude-opus-5-5', status: 'restarted' }]);
     expect(launcherFor(session)).toContain('--effort "xhigh"');
   });
+
+  it('creates a conversation with effort xhigh and stores/launches it unclamped (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { model: 'claude-opus-5-5', effort: 'xhigh' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(201);
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+    expect(conversations.getConversationByName(name)?.effort).toBe('xhigh');
+    await vi.waitFor(() => {
+      expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+    });
+    expect(launcherFor(session)).toContain('--effort "xhigh"');
+  });
+
+  it('clamps an unsupported create effort to the model\'s highest supported level (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { model: 'claude-sonnet-4-6', effort: 'xhigh' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(201);
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+    expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    await vi.waitFor(() => {
+      expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+    });
+    expect(launcherFor(session)).toContain('--effort "high"');
+  });
+
+  it('rejects an invalid create effort with 400 and creates no row (PAN-4254)', async () => {
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+    const before = conversations.listConversations().length;
+
+    const response = await handleConversationCreate(
+      { model: 'claude-opus-5-5', effort: 'bogus' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid effort' });
+    expect(conversations.listConversations().length).toBe(before);
+  });
 });
 
 describe('companion terminal owner teardown (PAN-3974)', () => {

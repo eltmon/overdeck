@@ -52,7 +52,7 @@ import { canUseHarness } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModel, piProviderForModel, UnknownModelError } from '../providers.js';
-import { resolveConversationEffort } from './conversation-effort.js';
+import { isValidConversationEffort, resolveConversationEffort } from './conversation-effort.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -1034,7 +1034,8 @@ export async function handleConversationCreate(
     const launchContext: ConversationLaunchContext = { bareContext: body['bareContext'] === true, skipClaudeMd: body['skipClaudeMd'] === true };
     if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-    if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    if (effort && !isValidConversationEffort(effort, harness)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    const launchEffort = effort ? resolveConversationEffort({ effort, model, harness, issueId }) : undefined;
     let cwd = getDefaultCwd();
     let canonicalProjectKey: string | undefined;
     if (projectKey) {
@@ -1053,9 +1054,9 @@ export async function handleConversationCreate(
     console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
     const MAX_TITLE_LEN = 60;
     const title = message ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '') : 'New conversation';
-    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey, ...launchContext });
+    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort: launchEffort, harness, projectKey: canonicalProjectKey, ...launchContext });
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
-    void startConversationRuntime({ conv, tmuxSession, cwd, claudeSessionId, model, effort, issueId, harness, launchContext, message });
+    void startConversationRuntime({ conv, tmuxSession, cwd, claudeSessionId, model, effort: launchEffort, issueId, harness, launchContext, message });
     if (message) {
       void deps.generateAiTitle(name, message).catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
