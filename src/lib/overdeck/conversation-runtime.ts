@@ -408,6 +408,12 @@ export async function handleConversationSwitchModel(
     setConversationModel(name, model);
   }
   if (harnessChanged) setConversationHarness(name, harness);
+  if (conv.effort) {
+    const nextEffort = isValidConversationEffort(conv.effort, harness)
+      ? resolveConversationEffort({ effort: conv.effort, model, harness, issueId: conv.issueId ?? undefined })
+      : null;
+    if (nextEffort !== conv.effort) setConversationEffort(name, nextEffort);
+  }
   const updated = getConversationByName(name) ?? conv;
   return jsonResponse({
     ...updated,

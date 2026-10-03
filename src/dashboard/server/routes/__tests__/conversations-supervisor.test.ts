@@ -892,6 +892,84 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       else process.env.HOME = previousHome;
     }
   });
+
+  it('switch-model clamps a stored xhigh to high on a model without xhigh (PAN-4254)', async () => {
+    const name = 'switch-clamp-down';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationSwitchModel requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-sonnet-4-6' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('switch-model keeps a stored xhigh when switched to a model that still supports it (PAN-4254)', async () => {
+    const name = 'switch-clamp-keep';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'claude-sonnet-4-6',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-opus-5-5' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBe('xhigh');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('switch-model clears a stored opencode variant invalid for the new harness to NULL (PAN-4254)', async () => {
+    const name = 'switch-clamp-null';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: `conv-${name}`,
+        cwd: overdeckHome,
+        model: 'opencode/turbo',
+        harness: 'opencode',
+      });
+      conversations.setConversationEffort(name, 'turbo-variant');
+      const { handleConversationSwitchModel } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationSwitchModel(name, { model: 'claude-opus-5-5', harness: 'claude-code' });
+
+      expect(response.status).toBe(200);
+      expect(conversations.getConversationByName(name)?.effort).toBeNull();
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
 });
 
 describe('companion terminal owner teardown (PAN-3974)', () => {
