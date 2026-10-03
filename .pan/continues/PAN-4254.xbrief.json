@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:28:35.665Z",
+  "updated": "2026-10-03T02:30:39.822Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,10 @@
       "doneAt": "2026-10-03T02:28:32.069Z"
     },
     "lint-effort-ratchet": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4254",
-      "claimedAt": "2026-10-03T02:28:35.665Z"
+      "claimedAt": "2026-10-03T02:28:35.665Z",
+      "doneAt": "2026-10-03T02:30:39.822Z"
     }
   }
 }
