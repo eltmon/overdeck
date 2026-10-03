@@ -4,17 +4,17 @@
     "created": "2026-10-03T03:27:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4486: New conversation: keep one-click quick create, add a split-button dialog for model, effort, context, skills and linked issue",
-    "updated": "2026-10-03T03:31:33.718Z"
+    "updated": "2026-10-03T03:32:02.669Z"
   },
   "plan": {
     "id": "pan-4486",
     "title": "New conversation: keep one-click quick create, add a split-button dialog for model, effort, context, skills and linked issue",
-    "status": "proposed",
+    "status": "running",
     "uid": "a3629a32-fbe7-4b45-bdb6-df7ca0e98093",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T03:27:43Z",
-    "updated": "2026-10-03T03:31:33.718Z",
+    "updated": "2026-10-03T03:32:02.669Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4486",
@@ -1159,5 +1159,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
