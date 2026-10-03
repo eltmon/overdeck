@@ -504,6 +504,46 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('persists the caller-supplied effort and source on AgentState and the launcher (PAN-4253)', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-4253',
+      workspace,
+      role: 'work',
+      model: 'claude-opus-5-5',
+      effort: 'max',
+      effortSource: 'role',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-4253');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+
+    expect(persisted.effort).toBe('max');
+    expect(persisted.effortSource).toBe('role');
+    expect(launcher).toContain('--effort max');
+  });
+
+  it('writes no effort key on AgentState when spawnAgent is not given one (PAN-4253)', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-4254',
+      workspace,
+      role: 'work',
+      model: 'claude-opus-5-5',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-4254');
+    const raw = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as Record<string, unknown>;
+
+    expect('effort' in raw).toBe(false);
+    expect('effortSource' in raw).toBe(false);
+  });
+
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
     process.env.KIMI_API_KEY = 'test-kimi-key';

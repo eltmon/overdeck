@@ -365,6 +365,8 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       role: 'work',
       prompt: config.prompt,
       startedBy: config.env?.['OVERDECK_AGENT_STARTED_BY'] ?? 'runtime:claude-code',
+      effort: config.effort,
+      effortSource: config.effortSource,
     });
 
     // Get the session ID (we'll need to look it up from the workspace)

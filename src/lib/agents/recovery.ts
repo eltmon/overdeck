@@ -12,6 +12,7 @@ import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
+import { resolveRelaunchEffort } from './relaunch-effort.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
@@ -292,6 +293,10 @@ export async function restartAgent(
     agentState.model = newModel;
   }
   agentState.harness = effectiveHarness;
+  const relaunchEffort = resolveRelaunchEffort(agentState, { model: effectiveModel, harness: effectiveHarness });
+  if (relaunchEffort.warning) logLifecycle(normalizedId, `relaunch effort: ${relaunchEffort.warning}`);
+  agentState.effort = relaunchEffort.effort;
+  agentState.effortSource = relaunchEffort.source;
   agentState.status = 'starting';
   let freshSessionId: string | undefined;
   try {
@@ -321,6 +326,7 @@ export async function restartAgent(
       isPlanning: agentState.role === 'plan',
       harness: effectiveHarness,
       harnessBinaryPath: harnessLaunch.binaryPath,
+      effort: relaunchEffort.effort,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
@@ -584,6 +590,10 @@ export async function recoverAgent(
   // resurrected as work agents.
   const harnessLaunch = await prepareHarnessLaunch(recoveryHarness, { model: state.model });
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
+  const relaunchEffort = resolveRelaunchEffort(state, { model: state.model, harness: recoveryHarness });
+  if (relaunchEffort.warning) logAgentLifecycle(normalizedId, `relaunch effort: ${relaunchEffort.warning}`);
+  state.effort = relaunchEffort.effort;
+  state.effortSource = relaunchEffort.source;
   saveAgentStateSync(state);
 
   if (recoveryHarness === 'ohmypi') {
@@ -601,6 +611,7 @@ export async function recoverAgent(
       harness: 'ohmypi',
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      effort: relaunchEffort.effort,
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
@@ -646,6 +657,7 @@ export async function recoverAgent(
       supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      effort: relaunchEffort.effort,
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
@@ -703,6 +715,7 @@ export async function recoverAgent(
       harness: 'kimi-code',
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      effort: relaunchEffort.effort,
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
@@ -794,7 +807,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole, relaunchEffort.effort)
     : {};
   const recoveryLauncherContent = generateLauncherScript({
     role: recoveryRole,
@@ -803,7 +816,7 @@ export async function recoverAgent(
     setTerminalEnv: true,
     providerExports: (await getProviderExportsForModel(state.model, recoveryHarness)).trimEnd(),
     extraEnvExports: [harnessLaunch.pathExport],
-    baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
+    baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness, undefined, relaunchEffort.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
     ...(recoveryHarness === 'codex' ? {} : { promptInline: recoveryPrompt }),
     resumeSessionId: resolveRecoveryResumeSessionId(normalizedId, recoveryHarness),
