@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:13:35.721Z",
+  "updated": "2026-10-03T04:13:45.826Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "row-skill-overrides.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T04:13:35.721Z"
+    },
+    "row-skill-overrides.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:13:45.826Z"
     }
   }
 }
