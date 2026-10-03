@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:06:26.278Z",
+  "updated": "2026-10-03T02:09:19.912Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-10-03T02:06:21.077Z"
     },
     "cloister-handoff-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4253",
-      "claimedAt": "2026-10-03T02:06:26.277Z"
+      "claimedAt": "2026-10-03T02:06:26.277Z",
+      "doneAt": "2026-10-03T02:09:19.912Z"
     }
   }
 }
