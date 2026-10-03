@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T17:50:14.287Z",
+  "updated": "2026-10-03T17:52:55.754Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-10-03T17:50:13.066Z"
     },
     "effort-chip-label": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4255",
-      "claimedAt": "2026-10-03T17:50:14.287Z"
+      "claimedAt": "2026-10-03T17:50:14.287Z",
+      "doneAt": "2026-10-03T17:52:55.754Z"
     }
   }
 }
