@@ -43,6 +43,7 @@ import {
 } from './agent-state.js';
 import { saveAgentRuntimeState } from './runtime-state.js';
 import { clearReadySignal } from './identity.js';
+import { spawnEffortFields } from './relaunch-effort.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry } from './delivery.js';
 import { determineModel, getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import {
@@ -170,6 +171,7 @@ async function spawnRunWithoutConsentClaim(
       startedBy: options.startedBy,
       autoSpawnConsentRequired: options.autoSpawnConsentRequired,
       effort: options.effort,
+      effortSource: options.effortSource,
       slotIndex: slot?.slotIndex,
       slotItemId: slot?.slotItemId, foreman: options.foreman,
     }, acceptConsent);
@@ -225,6 +227,7 @@ async function spawnRunWithoutConsentClaim(
     role, foreman: options.foreman || undefined,
     model: selectedModel,
     modelSpawnKey,
+    ...spawnEffortFields(options.effort, options.effortSource),
     status: 'starting',
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
@@ -699,6 +702,7 @@ async function spawnAgentWithoutConsentClaim(
     role, foreman: options.foreman || undefined,
     model: selectedModel,
     modelSpawnKey,
+    ...spawnEffortFields(options.effort, options.effortSource),
     status: 'starting',
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),

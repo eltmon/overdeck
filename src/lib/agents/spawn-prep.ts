@@ -19,7 +19,7 @@ import { generateLauncherScript } from '../launcher-generator.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
-import type { MemoryIdentity } from '@overdeck/contracts';
+import type { EffortSource, MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
@@ -95,6 +95,8 @@ export interface SpawnOptions {
   autoSpawnConsentRequired?: boolean;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
+  /** Precedence layer that produced {@link SpawnOptions.effort}; persisted on AgentState. Defaults to 'explicit'. */
+  effortSource?: EffortSource;
 }
 
 export interface SpawnRunOptions {
@@ -125,6 +127,8 @@ export interface SpawnRunOptions {
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;
+  /** Precedence layer that produced {@link SpawnRunOptions.effort}; persisted on AgentState. Defaults to 'explicit'. */
+  effortSource?: EffortSource;
   extraEnvExports?: string[];
   resumeSessionId?: string;
   startedBy: string;
