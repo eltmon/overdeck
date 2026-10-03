@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:40:05.580Z",
+  "updated": "2026-10-03T02:40:18.094Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "resume-persists-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T02:40:05.579Z"
+    },
+    "resume-persists-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:40:18.094Z"
     }
   }
 }
