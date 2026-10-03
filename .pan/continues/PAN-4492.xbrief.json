@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:55:34.304Z",
+  "updated": "2026-10-03T17:55:48.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "w5-live-verify.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T17:55:34.304Z"
+    },
+    "w6-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:55:48.421Z"
     }
   }
 }
