@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:52:29.435Z",
+  "updated": "2026-10-03T17:52:44.922Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "w1-composer-presence.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T17:52:29.435Z"
+    },
+    "w2-herdr-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:52:44.921Z"
     }
   }
 }
