@@ -10,9 +10,16 @@
  * `console.warn` in-process).
  *
  * Usage:
- *   npx tsx scripts/herdr-submit-soak.ts --conv <conversation-name> \
+ *   npx tsx scripts/herdr-submit-soak.ts --conv <herdr-agent-name> \
  *     --cwd <conversation cwd> --session <claudeSessionId> \
  *     [--count 20] [--bytes 5120] [--tail "<last line>"]
+ *
+ * `--conv` is the name Herdr/`deliverAgentMessage` resolve as the agent, NOT
+ * a dashboard conversation's bare `name` field — for a conversation created
+ * from the dashboard that is its `tmuxSession` (e.g. `conv-20261003-2202`,
+ * not `20261003-2202`). A bare name misses `normalizeAgentId`'s known
+ * prefixes, gets rewritten to `agent-<name>`, and delivery falls through to
+ * a tmux `paste-buffer` against a session that does not exist.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -37,7 +44,7 @@ interface Args {
   tail: string;
 }
 
-const USAGE = 'Usage: npx tsx scripts/herdr-submit-soak.ts --conv <name> --cwd <cwd> --session <id> [--count 20] [--bytes 5120] [--tail "<last line>"]';
+const USAGE = 'Usage: npx tsx scripts/herdr-submit-soak.ts --conv <herdr-agent-name> --cwd <cwd> --session <id> [--count 20] [--bytes 5120] [--tail "<last line>"]';
 
 function parseArgs(argv: string[]): Args {
   if (argv.includes('--help')) {
@@ -116,7 +123,8 @@ async function main(): Promise<void> {
     const ok = result.ok && await waitForLanding(cwd, session, offset, message);
     const elapsed = Date.now() - start;
 
-    console.log(`#${i} ${ok ? 'landed' : 'NOT LANDED'} in ${elapsed}ms`);
+    const diagnostic = ok ? '' : ` (path=${result.path}${result.failure ? `, failure=${result.failure}` : ''})`;
+    console.log(`#${i} ${ok ? 'landed' : 'NOT LANDED'} in ${elapsed}ms${diagnostic}`);
     if (ok) landed += 1;
 
     await Effect.runPromise(herdrBackend.wait({ agentName: conv }, ['idle', 'done'], AGENT_SETTLE_TIMEOUT_MS));
