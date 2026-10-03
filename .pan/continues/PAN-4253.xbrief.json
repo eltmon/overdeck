@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:27:22.477Z",
+  "updated": "2026-10-03T02:27:32.944Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "start-passes-effort-source.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:27:22.477Z"
+    },
+    "spawn-prep-resume-honors-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:32.943Z"
     }
   }
 }
