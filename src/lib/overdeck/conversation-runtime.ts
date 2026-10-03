@@ -269,11 +269,11 @@ export function conversationSessionAliveFromState(
 }
 
 export function conversationNeedsRunningRepair(
-  conv: Pick<Conversation, 'status' | 'forkStatus'>,
+  conv: Pick<Conversation, 'status' | 'forkStatus'> & { clearedToConvId?: number | null },
   tmuxSessionAlive: boolean,
   harnessProcessAlive: boolean,
 ): boolean {
-  return conv.status === 'ended' && !conv.forkStatus && tmuxSessionAlive && harnessProcessAlive;
+  return conv.status === 'ended' && !conv.forkStatus && conv.clearedToConvId == null && tmuxSessionAlive && harnessProcessAlive;
 }
 /** Generate a default conversation name, e.g. 20260404-1234 */
 export function generateConversationName(): string {
