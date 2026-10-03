@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   prepareSupervisorForRelaunch: vi.fn(async () => ({ useSupervisor: false, supervisorScriptPath: undefined })),
   buildResumeMessageForAgent: vi.fn(async () => ({ error: 'test short-circuit: no transcript to resume' })),
   markKickoffRedelivered: vi.fn(),
+  prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/opt/claude/bin/claude', pathExport: 'export PATH="$PATH"' })),
 }));
 
 vi.mock('../../session-rotation.js', () => ({ ALLOW_SESSION_ROTATION_ON_RESUME: true }));
@@ -31,6 +32,11 @@ vi.mock('../../terminal-backends/launch.js', () => ({
   closeAgentPane: mocks.closeAgentPane,
   launchAgentPane: mocks.launchAgentPane,
 }));
+
+vi.mock('../../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../harness-binary.js')>();
+  return { ...actual, prepareHarnessLaunch: mocks.prepareHarnessLaunch };
+});
 
 vi.mock('../runtime-command.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../runtime-command.js')>();
@@ -63,6 +69,7 @@ beforeEach(() => {
   mocks.waitForPromptReady.mockResolvedValue(true);
   mocks.prepareSupervisorForRelaunch.mockResolvedValue({ useSupervisor: false, supervisorScriptPath: undefined });
   mocks.buildResumeMessageForAgent.mockResolvedValue({ error: 'test short-circuit: no transcript to resume' });
+  mocks.prepareHarnessLaunch.mockResolvedValue({ binaryPath: '/opt/claude/bin/claude', pathExport: 'export PATH="$PATH"' });
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-4253-message-fallback-home-'));
   prevOverdeckHome = process.env.OVERDECK_HOME;
