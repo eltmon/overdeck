@@ -17,6 +17,7 @@ import { mkdtemp, rm } from 'fs/promises'
 import { Effect } from 'effect'
 import { CheckpointError, InvalidAgentIdError, VcsError } from '../errors.js'
 import { PAN_RUNTIME_SUBDIRS } from '../state-plane.js'
+import { parseNumstatWithStatus, type TurnDiffFileChange } from '../diffs/diff-output.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -69,12 +70,7 @@ export function checkpointStateExclusions(): string[] {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface TurnDiffFileChange {
-  readonly path: string
-  readonly kind?: string      // A(dded), M(odified), D(eleted), R(enamed)
-  readonly additions: number
-  readonly deletions: number
-}
+export type { TurnDiffFileChange } from '../diffs/diff-output.js'
 
 // ─── Ref helpers ──────────────────────────────────────────────────────────────
 
@@ -436,33 +432,6 @@ export async function diffPatchFilesAgainstHead(cwd: string, filePaths: string[]
     'diff', '--patch', '--minimal', '--no-color', 'HEAD', '--', ...filePaths,
   ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
-}
-
-function parseNumstatWithStatus(numstat: string, nameStatus: string): TurnDiffFileChange[] {
-  const statusMap = new Map<string, string>()
-  for (const line of nameStatus.split('\n')) {
-    if (!line.trim()) continue
-    const parts = line.split('\t')
-    if (parts.length >= 2) {
-      statusMap.set(parts[parts.length - 1], parts[0])
-    }
-  }
-
-  const files: TurnDiffFileChange[] = []
-  for (const line of numstat.split('\n')) {
-    if (!line.trim()) continue
-    const [addStr, delStr, ...pathParts] = line.split('\t')
-    const path = pathParts.join('\t')
-    if (!path) continue
-    files.push({
-      path,
-      kind: statusMap.get(path),
-      additions: parseInt(addStr, 10) || 0,
-      deletions: parseInt(delStr, 10) || 0,
-    })
-  }
-
-  return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
 // ─── Effect API ──────────────────────────────────────────────────────────────
