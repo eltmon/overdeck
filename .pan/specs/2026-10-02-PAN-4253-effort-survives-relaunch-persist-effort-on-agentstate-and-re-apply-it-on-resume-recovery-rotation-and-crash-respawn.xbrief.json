@@ -4,17 +4,17 @@
     "created": "2026-10-02T12:53:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4253: Effort survives relaunch: persist effort on AgentState and re-apply it on resume, recovery, rotation and crash respawn",
-    "updated": "2026-10-02T12:55:35.113Z"
+    "updated": "2026-10-03T01:28:39.454Z"
   },
   "plan": {
     "id": "pan-4253",
     "title": "Effort survives relaunch: persist effort on AgentState and re-apply it on resume, recovery, rotation and crash respawn",
-    "status": "proposed",
+    "status": "running",
     "uid": "0aa167af-f3c6-4357-b6bd-fd595f2e73bd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-10-02T12:53:00Z",
-    "updated": "2026-10-02T12:55:35.113Z",
+    "updated": "2026-10-03T01:28:39.454Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4253",
@@ -887,5 +887,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
