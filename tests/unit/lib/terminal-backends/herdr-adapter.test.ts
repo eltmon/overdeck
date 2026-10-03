@@ -279,6 +279,9 @@ describe('HerdrBackend.prompt when the target metadata cannot be read', () => {
 
 describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
   const sender = { id: 'conv-4292' };
+  const RULE = '──────────────────────────────────────────────────────────';
+  const emptyComposer = [RULE, '❯ ', RULE].join('\n');
+  const composerWith = (text: string) => [RULE, `❯ ${text}`, RULE].join('\n');
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -289,23 +292,28 @@ describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
   });
 
   it('types the text in bracketed paste, then presses ctrl+x ctrl+s, never agent.prompt', async () => {
+    const text = 'change course';
+    let submitted = false;
     const { api, log } = fakeApi(({ method }) => {
       if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
+      if (method === 'pane.read') return { text: submitted ? emptyComposer : composerWith(text) };
+      if (method === 'pane.send_keys') { submitted = true; return {}; }
       return {};
     });
 
     const pending = Effect.runPromise(
-      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'change course', { messageId: 's1', sender, submit: 'steer' }),
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, text, { messageId: 's1', sender, submit: 'steer' }),
     );
-    await vi.advanceTimersByTimeAsync(0);
-    // The chord waits for the settle delay after the text.
-    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text']);
-    await vi.advanceTimersByTimeAsync(300);
+    // PAN-4492: the steer now pastes, waits for the settle, presses the
+    // chord, then watches the composer clear — advance past the whole window.
+    await vi.advanceTimersByTimeAsync(10_000);
 
     await expect(pending).resolves.toEqual({ delivered: true, messageId: 's1' });
-    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text', 'pane.send_keys']);
-    expect(log[1]?.params).toEqual({ pane_id: 'w1:p2', text: '\x1b[200~change course\x1b[201~' });
-    expect(log[2]?.params).toEqual({ pane_id: 'w1:p2', keys: ['ctrl+x', 'ctrl+s'] });
+    const calls = log.filter((c) => c.method !== 'pane.read' && c.method !== 'agent.get');
+    expect(calls.map((c) => c.method)).toEqual(['pane.send_text', 'pane.send_keys']);
+    expect(calls[0]?.params).toEqual({ pane_id: 'w1:p2', text: '\x1b[200~change course\x1b[201~' });
+    expect(calls[1]?.params).toEqual({ pane_id: 'w1:p2', keys: ['ctrl+x', 'ctrl+s'] });
+    expect(log.some((c) => c.method === 'agent.prompt')).toBe(false);
   });
 
   it('refuses a blocked agent without sending anything', async () => {
@@ -333,6 +341,56 @@ describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
     );
 
     expect(result).toMatchObject({ delivered: true, messageId: 's3' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'agent.prompt']);
+  });
+
+  it('routes an idle Claude Code pane through the paste-verify-submit routine instead of agent.prompt (PAN-4492)', async () => {
+    const text = 'queue this';
+    let submitted = false;
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent: 'claude', agent_status: 'idle', tokens: {} } };
+      if (method === 'pane.read') return { text: submitted ? emptyComposer : composerWith(text) };
+      if (method === 'pane.send_keys') { submitted = true; return {}; }
+      return {};
+    });
+
+    const pending = Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, text, { messageId: 's4', sender }),
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).resolves.toEqual({ delivered: true, messageId: 's4' });
+    const calls = log.filter((c) => c.method !== 'pane.read' && c.method !== 'agent.get');
+    expect(calls.map((c) => c.method)).toEqual(['pane.send_text', 'pane.send_keys']);
+    expect(calls[1]?.params).toEqual({ pane_id: 'w1:p2', keys: ['enter'] });
+    expect(log.some((c) => c.method === 'agent.prompt')).toBe(false);
+  });
+
+  it('keeps agent.prompt for a non-Claude Herdr agent (PAN-4492)', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent: 'codex', agent_status: 'idle', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'queue this', { messageId: 's5', sender }),
+    );
+
+    expect(result).toMatchObject({ delivered: true, messageId: 's5' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'agent.prompt']);
+  });
+
+  it('keeps agent.prompt for a waited Claude Code prompt (PAN-4492)', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent: 'claude', agent_status: 'idle', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'queue this', { messageId: 's6', sender, wait: { timeoutMs: 1000 } }),
+    );
+
+    expect(result).toMatchObject({ delivered: true, messageId: 's6' });
     expect(log.map((call) => call.method)).toEqual(['agent.get', 'agent.prompt']);
   });
 });
