@@ -1,27 +1,23 @@
 /**
  * EffortPicker (PAN-451)
  *
- * Selector for effort level (low/medium/high/max) to pass as --effort flag.
+ * Selector for effort level (low/medium/high/xhigh/max) to pass as --effort flag.
  * Selection is persisted to localStorage.
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
+import { EFFORT_LEVELS, isEffortLevel, type EffortLevel } from '@overdeck/contracts';
 import { useFloatingPickerPosition } from './useFloatingPickerPosition';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Effort definitions ───────────────────────────────────────────────────────
 
-const EFFORT_LEVELS = [
-  { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High (default)' },
-  { id: 'xhigh', label: 'Extra High' },
-  { id: 'max', label: 'Max' },
-] as const;
+export type { EffortLevel };
 
-export type EffortLevel = (typeof EFFORT_LEVELS)[number]['id'];
+const EFFORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High (default)', xhigh: 'Extra High', max: 'Max' };
+const EFFORT_OPTIONS = EFFORT_LEVELS.map((id) => ({ id, label: EFFORT_LABELS[id] }));
 
 const EFFORT_STORAGE_KEY = 'conv-composer-effort';
 // Operator default: 'high' — xhigh/max cost far more for almost no extra ROI
@@ -32,8 +28,8 @@ const DEFAULT_EFFORT: EffortLevel = 'high';
 export function loadStoredEffort(): EffortLevel {
   try {
     const stored = localStorage.getItem(EFFORT_STORAGE_KEY);
-    if (stored && EFFORT_LEVELS.some((e) => e.id === stored)) {
-      return stored as EffortLevel;
+    if (isEffortLevel(stored)) {
+      return stored;
     }
   } catch {
     // Ignore
@@ -62,14 +58,14 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
   // If model doesn't support effort, show a hint instead
   const noEffort = availableLevels !== undefined && availableLevels.length === 0;
   const filteredLevels = availableLevels && availableLevels.length > 0
-    ? EFFORT_LEVELS.filter((e) => availableLevels.includes(e.id))
-    : EFFORT_LEVELS;
+    ? EFFORT_OPTIONS.filter((e) => availableLevels.includes(e.id))
+    : EFFORT_OPTIONS;
 
   const selected =
     filteredLevels.find((e) => e.id === value)
     ?? filteredLevels.find((e) => e.id === 'medium')
     ?? filteredLevels[0]
-    ?? EFFORT_LEVELS[1]!;
+    ?? EFFORT_OPTIONS[1]!;
 
   useEffect(() => {
     if (!open) return;

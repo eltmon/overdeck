@@ -14,7 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
-import { getHarnessBehavior } from '@overdeck/contracts';
+import { getHarnessBehavior, isEffortLevel } from '@overdeck/contracts';
 import { isServerWriteBlocked } from '../../lib/connectionState';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
@@ -91,21 +91,12 @@ function resolveComposerEffort(conversation: Conversation): EffortLevel {
     if (conversation.effort === 'medium') return 'high';
     if (conversation.effort === 'xhigh') return 'max';
   }
-  switch (conversation.effort) {
-    case 'low':
-    case 'medium':
-    case 'high':
-    case 'xhigh':
-    case 'max':
-      return conversation.effort;
-    default:
-      // The browser-global value is a draft default, not canonical session state.
-      // Only use it before a runtime session exists; older conversations whose
-      // effort was never persisted use the operator default instead.
-      return !conversation.sessionAlive && !conversation.claudeSessionId
-        ? loadStoredEffort()
-        : 'high';
-  }
+  const stored = conversation.effort === 'off' || conversation.effort === 'minimal' ? 'low' : conversation.effort;
+  if (isEffortLevel(stored)) return stored;
+  // The browser-global value is a draft default, not canonical session state.
+  // Only use it before a runtime session exists; older conversations whose
+  // effort was never persisted use the operator default instead.
+  return !conversation.sessionAlive && !conversation.claudeSessionId ? loadStoredEffort() : 'high';
 }
 
 function openComposerUi(

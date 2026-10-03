@@ -1,0 +1,989 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T12:50:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4254: Conversations: accept all five effort levels, set effort at creation, keep it on switch-model, and add --effort to pan handoff/fork",
+    "updated": "2026-10-03T01:29:16.580Z"
+  },
+  "plan": {
+    "id": "pan-4254",
+    "title": "Conversations: accept all five effort levels, set effort at creation, keep it on switch-model, and add --effort to pan handoff/fork",
+    "status": "running",
+    "uid": "86e6cfdb-7771-495d-a656-548c88f9669e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-10-02T12:50:08Z",
+    "updated": "2026-10-03T01:29:16.580Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4254",
+        "label": "PAN-4254",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (program)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4254.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "effort",
+      "conversations",
+      "handoff",
+      "fork",
+      "dashboard",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "The two-segment subsystem rule counts each doc file (configuration/effort.mdx, features/conversations.mdx, docs/FORKS.md), scripts/lint-effort.sh and sync-sources/skills as separate subsystems; the code itself spans src/lib/overdeck, src/cli and src/dashboard/frontend. This is already one of eight sibling slices of PAN-4249, and splitting further would separate the CLI --effort flag from the server parameter it forwards and the create-payload picker from the create endpoint that stores it. Files_scope also lists two checkpoint-only fallback files (conversations-supervisor.test.ts, NewConversationPickers.tsx).",
+      "canonicalFilename": "2026-10-02-PAN-4254-conversations-accept-all-five-effort-levels-set-effort-at-creation-keep-it-on-switch-model-and-add-effort-to-pan-handoff-fork.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "SAFE_EFFORT_PATTERN (/^(low|medium|high)$/) in conversation-runtime.ts rejects xhigh/max at create and spawn while the thinking-level API persists them (and pi's off/minimal), so a conversation changed live to xhigh throws 'Invalid effort level' on resume and restart-all. The dashboard never sends effort on creation, resume does not persist a body effort, switch-model ignores effort, pan handoff/fork cannot set it, launch paths use ad hoc `?? 'high'` fallbacks with no clamping, and the frontend keeps private copies of the effort enum.",
+      "Proposal": "Add src/lib/overdeck/conversation-effort.ts (validate, canonicalize pi off/minimal to low, resolve via resolveEffort with the opencode free-form carve-out). spawnConversationSession, create, resume, switch-model and the summary-fork endpoint use it and persist the clamped level; the thinking-level API uses isEffortLevel and stores off/minimal as low. pan handoff/pan fork gain --effort (default inherits the parent). The Home composer and Command Deck sidebar get an effort picker sent in the create payload. EffortPicker/ModelPicker derive lists from the contracts EFFORT_LEVELS, resolveComposerEffort maps off/minimal to low, lint:effort baselines drop, and effort.mdx/conversations.mdx/FORKS.md describe the new behavior.",
+      "NonGoals": "- No change to lanes: src/lib/lanes/launch.ts keeps SAFE_EFFORT_PATTERN and still refuses xhigh/max (PAN-4223 D20)\n- No live effort change for claude-code conversations and no change to the 'Effort unverified' chip (PAN-4255)\n- No effort persistence on AgentState or agent relaunch paths (PAN-4253)\n- No change to Flywheel's spawnConversationSession(..., 'high', ...) call or other role launch surfaces (PAN-4256)\n- No effort display in conversation headers, pan status/show or cost data beyond the Effort line pan handoff/fork print (PAN-4259)\n- No removal of harness-adapter fallbacks outside conversation-runtime.ts, e.g. launcher-generator.ts piEffort/museEffort ?? 'high' (PAN-4260)\n- No attempt to launch pi with --thinking off/minimal\n- No CLI-side validation of --effort values (the server validates)\n- No xhigh or max default anywhere and no edit to sync-sources/rules/effort-high-default.md\n- No raise of any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lanes stay out of scope; SAFE_EFFORT_PATTERN stays exported for the lane door only",
+        "rationale": "The issue never names lanes, launch.test.ts asserts the lane door refuses xhigh, and including lanes adds four files and a subsystem; lint:effort keeps conversation-runtime.ts at baseline 1 for that line."
+      },
+      {
+        "summary": "pi off/minimal are persisted as low; the live pi runtime still receives off/minimal",
+        "rationale": "Nothing verifies omp --thinking off at launch and the ohmypi harness declares effortLevels low..xhigh; canonical storage removes the resume crash at the cost of relaunching off as low."
+      },
+      {
+        "summary": "Persist the clamped level (stored value = launched value) on create, resume, switch-model and fork",
+        "rationale": "A row must never claim a level the model cannot run; it keeps PAN-4255's verification display honest."
+      },
+      {
+        "summary": "Conversation launches pass issueId to resolveEffort so the project layer applies; no role/tier/plan layers",
+        "rationale": "PAN-4249 requires every launch path to call resolveEffort; conversations are not role launches but issue-scoped ones belong to a project."
+      },
+      {
+        "summary": "opencode keeps its free-form effort variant carve-out",
+        "rationale": "resolveEffort throws on non-canonical input while opencode legitimately accepts named variants."
+      },
+      {
+        "summary": "Absent effort is stored as NULL on create and fork",
+        "rationale": "Matches today's schema semantics; the launch still resolves the default high or the project layer."
+      },
+      {
+        "summary": "Switch-model clamps the stored effort and does not accept a new effort; an effort invalid for the new harness resets to NULL",
+        "rationale": "The issue asks only that switch-model keep effort clamped; resetting avoids a later launch throw."
+      },
+      {
+        "summary": "Fork precedence is request effort, then parent effort (when valid for the successor harness), then NULL",
+        "rationale": "Issue: 'The default inherits the parent's effort'; dropping an incompatible parent value avoids failing the fork."
+      },
+      {
+        "summary": "The CLI forwards --effort without validating it",
+        "rationale": "The server is the single validator and opencode variants must keep working; a 400 already surfaces as ForkServerError exit 1."
+      },
+      {
+        "summary": "Clean ModelPicker.tsx enum copies here although lint:effort tags that row PAN-4259",
+        "rationale": "The issue body explicitly assigns the EffortPicker/ModelPicker enum replacement to this slice."
+      },
+      {
+        "summary": "New-conversation pickers default to the browser-stored composer effort (loadStoredEffort, default high) and omit effort when the model has no effort levels",
+        "rationale": "Reuses the existing picker storage key and keeps the high default rule."
+      },
+      {
+        "summary": "The issue's simple/TalkItThrough.tsx reference is retargeted to home/HomeComposer.tsx",
+        "rationale": "PAN-4280 turned TalkItThrough.tsx into a re-export shim; the create payload now lives in HomeComposer.tsx."
+      }
+    ],
+    "items": [
+      {
+        "id": "conv-effort-module",
+        "title": "Add conversation-effort.ts with validate, canonicalize and resolve helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "spawn-resolves-effort",
+            "create-stores-effort",
+            "resume-persists-effort",
+            "switch-model-clamps",
+            "thinking-level-canonical",
+            "fork-effort-param"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-effort.ts",
+            "src/lib/overdeck/__tests__/conversation-effort.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-effort.test.ts passes",
+            "typecheck exits 0",
+            "lint:effort exits 0 and does not list conversation-effort.ts",
+            "lint:circular exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/overdeck/conversation-effort.ts exactly as the PRD snippet: canonicalConversationEffort (off/minimal -> low), isValidConversationEffort(value, harness) (five canonical levels, pi off/minimal, opencode free-form /^[a-z][a-z0-9_-]*$/ only on opencode), resolveConversationEffort({effort, model, harness, issueId}) which passes an opencode variant through and otherwise returns resolveEffort({explicit: canonical value or undefined, issueId, model, harness}).effort. Add the helper unit tests to the new file src/lib/overdeck/__tests__/conversation-effort.test.ts (table in PRD WI-2 'resolveConversationEffort table' and 'isValidConversationEffort'). No lint:effort pattern may appear in the new module."
+        },
+        "items": [
+          {
+            "id": "conv-effort-module.ac1",
+            "title": "Given model claude-opus-5-5 and harness claude-code, resolveConversationEffort returns 'xhigh' for 'xhigh' and 'max' for 'max'; given harness ohmypi it returns 'xhigh' for 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-effort-module.ac2",
+            "title": "resolveConversationEffort returns 'low' for 'off' and 'minimal', and defaults to 'high' when effort is undefined and no issueId is given",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-effort-module.ac3",
+            "title": "resolveConversationEffort rejects 'bogus' on claude-code by throwing InvalidEffortError, and returns 'bogus-variant' unchanged on opencode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-effort-module.ac4",
+            "title": "isValidConversationEffort returns true for the five levels and off/minimal on claude-code, false for 'bogus' on claude-code, and true for 'custom' on opencode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-resolves-effort",
+        "title": "spawnConversationSession launches at the resolved effort (xhigh resume/restart-all regression)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-effort.test.ts",
+            "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-effort.test.ts src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "both test files pass including the xhigh resume and restart-all regression",
+            "typecheck exits 0",
+            "lint:effort exits 0",
+            "lint:file-size exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/overdeck/conversation-runtime.ts change the spawnConversationSession parameter `effort: string = 'high'` to `effort?: string` (keep it positional), compute `const launchEffort = resolveConversationEffort({ effort, model, harness, issueId })` right after `const behavior = getHarnessBehavior(harness);`, replace every later use (museEffort, getAcpLauncherFields arg, prime effort, piEffort, initCodexHome effort, codexEffort, kimiCodeEffort, extraArgs --effort) with launchEffort, delete the late `throw new Error('Invalid effort level')` block, and change the SAFE_EFFORT_PATTERN comment to say it is for the lane door only. Add the regression test to conversation-effort.test.ts (copy the vi.mock block from conversation-runtime-launch.test.ts; temp OVERDECK_HOME; model claude-opus-5-5). Checkpoint: if resume/restart-all cannot be driven there, put those two cases in src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts. File must stay <= 1252 lines."
+        },
+        "items": [
+          {
+            "id": "spawn-resolves-effort.ac1",
+            "title": "Given a claude-opus-5-5 conversation whose stored effort was changed to 'xhigh', when handleConversationResume relaunches it, the launcher config extraArgs equals '--effort \"xhigh\"' and the response is not a 500",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-resolves-effort.ac2",
+            "title": "Given the same conversation is live, when handleConversationRestartAll runs, its launcher config extraArgs equals '--effort \"xhigh\"' and its result status is 'restarted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-resolves-effort.ac3",
+            "title": "rg -n \"effort \\?\\? 'high'|effort: string = 'high'\" src/lib/overdeck/conversation-runtime.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-resolves-effort.ac4",
+            "title": "spawnConversationSession throws an error containing 'Invalid effort level' when given effort 'bogus' on claude-code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-stores-effort",
+        "title": "POST /api/conversations accepts all five levels and stores the clamped effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-effort.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-effort.test.ts create cases pass",
+            "typecheck exits 0"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In handleConversationCreate replace the SAFE_EFFORT_PATTERN check with `if (effort && !isValidConversationEffort(effort, harness)) return 400 'Invalid effort'`, compute `launchEffort = effort ? resolveConversationEffort({ effort, model, harness, issueId }) : undefined`, and pass launchEffort to both createConversation and startConversationRuntime. Absent effort stays NULL in the row. Tests in conversation-effort.test.ts (await the background spawn with vi.waitFor on the captured launcher configs)."
+        },
+        "items": [
+          {
+            "id": "create-stores-effort.ac1",
+            "title": "Given body { model: 'claude-opus-5-5', effort: 'xhigh' }, handleConversationCreate persists effort 'xhigh' in the conversations row and the launched harness command carries --effort \"xhigh\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-stores-effort.ac2",
+            "title": "Given body { model: 'claude-sonnet-4-6', effort: 'xhigh' }, handleConversationCreate stores the clamped level 'high' (claude-sonnet-4-6 has no xhigh) and launches with --effort \"high\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-stores-effort.ac3",
+            "title": "Given effort 'bogus', handleConversationCreate returns 400 with error 'Invalid effort' and creates no conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-stores-effort.ac4",
+            "title": "Given no effort in the body, the row's effort is null and the launch defaults to --effort \"high\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-persists-effort",
+        "title": "Resume persists a body-supplied effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-effort.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-effort.test.ts resume cases pass",
+            "typecheck exits 0"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In handleConversationResume parse bodyEffort, return 400 'Invalid effort' when !isValidConversationEffort(bodyEffort, harness), otherwise setConversationEffort(name, resolveConversationEffort({ effort: bodyEffort, model, harness, issueId })) before spawning; launch with bodyEffort ?? conv.effort. Declare harness before use. Tests in conversation-effort.test.ts."
+        },
+        "items": [
+          {
+            "id": "resume-persists-effort.ac1",
+            "title": "Given a stored-'high' conversation, resume with body { effort: 'low' } persists 'low' in the row and launches with --effort \"low\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-persists-effort.ac2",
+            "title": "Given body { effort: 'bogus' }, resume returns 400 'Invalid effort' and preserves the previously stored effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-model-clamps",
+        "title": "Switch-model keeps the stored effort, clamped to the new model and harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-effort.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "conversation-effort.test.ts switch-model cases pass",
+            "typecheck exits 0",
+            "lint:file-size exits 0"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In handleConversationSwitchModel, after the model/harness setters, when conv.effort is non-null compute nextEffort = isValidConversationEffort(conv.effort, harness) ? resolveConversationEffort({ effort: conv.effort, model, harness, issueId }) : null and call setConversationEffort when it differs. No live set_thinking_level on a pi switch. Tests in conversation-effort.test.ts."
+        },
+        "items": [
+          {
+            "id": "switch-model-clamps.ac1",
+            "title": "Given a not-yet-started conversation with stored effort 'xhigh', switching to claude-sonnet-4-6 persists 'high' and the response's effort contains 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-model-clamps.ac2",
+            "title": "Given stored effort 'xhigh', switching to claude-opus-5-5 preserves 'xhigh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-model-clamps.ac3",
+            "title": "Given a stored opencode variant, switching the harness to claude-code resets the stored effort to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thinking-level-canonical",
+        "title": "Thinking-level API validates with isEffortLevel and stores pi off/minimal as low",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/__tests__/conversation-delivery.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-delivery.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "conversation-delivery.test.ts passes",
+            "typecheck exits 0",
+            "lint:effort reports 0 matches for conversation-delivery.ts"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/lib/overdeck/conversation-delivery.ts handleConversationThinkingLevel replace the inline ['low', 'medium', 'high', 'xhigh', 'max'].includes(...) with isEffortLevel(body['level']) from @overdeck/contracts, keep THINKING_LEVELS and the live set_thinking_level unchanged, and persist setConversationEffort(name, canonicalConversationEffort(level)). Extend src/lib/overdeck/__tests__/conversation-delivery.test.ts."
+        },
+        "items": [
+          {
+            "id": "thinking-level-canonical.ac1",
+            "title": "Given a pi conversation, POST level 'off' sends set_thinking_level with level 'off' to the runtime and persists effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-level-canonical.ac2",
+            "title": "Given a codex conversation, level 'max' is accepted and persisted as 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-level-canonical.ac3",
+            "title": "Given level 'bogus', the handler returns 400 'Invalid thinking level'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-effort-param",
+        "title": "Summary-fork endpoint accepts effort and the successor inherits the parent's effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both fork test files pass",
+            "typecheck exits 0"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/lib/overdeck/conversation-forks.ts handleConversationSummaryFork move `const launchModel` and `const launchHarness` above reserveSummaryForkSession, then parse body.effort (400 'Invalid effort' when !isValidConversationEffort(requested, launchHarness)), compute successorEffort = requested ?? (parent effort when valid for launchHarness), resolve it with resolveConversationEffort for launchModel/launchHarness, and pass it as effort to createConversation instead of conv.effort. Extend src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts."
+        },
+        "items": [
+          {
+            "id": "fork-effort-param.ac1",
+            "title": "Given a parent with stored effort 'xhigh' on claude-opus-5-5 and no effort in the request, the successor row persists effort 'xhigh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-effort-param.ac2",
+            "title": "Given body effort 'low', the successor row persists effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-effort-param.ac3",
+            "title": "Given body effort 'bogus', the endpoint returns 400 'Invalid effort' and creates no successor row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-effort-flag",
+        "title": "pan handoff and pan fork accept --effort and forward it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "src/cli/commands/__tests__/fork-client.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts src/cli/commands/__tests__/fork-client.test.ts",
+            "npm run typecheck",
+            "npm run build",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "handoff.test.ts and fork-client.test.ts pass",
+            "typecheck exits 0",
+            "lint exits 0 including lint-skills"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add `--effort <level>` to the fork and handoff commands in src/cli/index.ts; add effort to ForkViaServerOptions and ForkResultConv in src/cli/commands/fork-client.ts and `if (opts.effort) body['effort'] = opts.effort;`; forward options.effort and print `Effort: <newConv.effort || 'default'>` in src/cli/commands/handoff.ts and src/cli/commands/fork.ts; update sync-sources/skills/pan-handoff/SKILL.md (lockstep rule) with an --effort example and the inherit default. Extend src/cli/commands/__tests__/handoff.test.ts mirroring the --title/--issue/--project tests. Run npm run build before npm run lint so lint-skills sees the new help. Extend src/cli/commands/__tests__/fork-client.test.ts with one case asserting the POST body carries effort only when opts.effort is set."
+        },
+        "items": [
+          {
+            "id": "cli-effort-flag.ac1",
+            "title": "Given `pan handoff conv --effort low`, handoffCommand calls forkConversationViaServer with effort 'low' and prints 'Effort: low' when the server returns effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-effort-flag.ac2",
+            "title": "Given no --effort flag, handoffCommand forwards effort undefined so the server applies the parent's effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-effort-flag.ac3",
+            "title": "Given opts.effort 'low', forkConversationViaServer sends effort 'low' in the POST body; given no opts.effort the body contains no effort key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-effort-flag.ac4",
+            "title": "`node dist/cli/index.js fork --help` and `node dist/cli/index.js handoff --help` each prints an `--effort <level>` option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-effort-enum",
+        "title": "EffortPicker and ModelPicker derive effort lists from the contracts enum",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/EffortPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/EffortPicker.test.tsx src/components/chat/__tests__/ModelPicker.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "EffortPicker, ModelPicker and ComposerFooter frontend tests pass unedited",
+            "typecheck exits 0",
+            "lint:effort reports 0 matches for ModelPicker.tsx"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In src/dashboard/frontend/src/components/chat/EffortPicker.tsx replace the local level list with EFFORT_LEVELS + an EFFORT_LABELS record, re-export the contracts EffortLevel type, use isEffortLevel in loadStoredEffort, and fix the header comment. In src/dashboard/frontend/src/components/chat/ModelPicker.tsx replace each five-level literal with EFFORT_LEVELS, the four-level rows with EFFORT_WITHOUT_XHIGH and the three-level OpenRouter literal with EFFORT_UP_TO_HIGH (both derived via filter/compareEffort)."
+        },
+        "items": [
+          {
+            "id": "frontend-effort-enum.ac1",
+            "title": "bash scripts/lint-effort.sh exits 0 and prints no ModelPicker.tsx line (0 effort-enum matches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-effort-enum.ac2",
+            "title": "EffortPicker renders the options Low, Medium, High (default), Extra High and Max in EFFORT_LEVELS order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-effort-enum.ac3",
+            "title": "Given ComposerFooter.tsx is unchanged, npm run typecheck exits 0 against the re-exported EffortLevel type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-pi-effort",
+        "title": "Composer shows a stored pi off/minimal effort as low",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes",
+            "typecheck exits 0"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In src/dashboard/frontend/src/components/chat/ComposerFooter.tsx resolveComposerEffort, map 'off'/'minimal' to 'low', return the value when isEffortLevel(stored), otherwise keep the existing browser-default/high fallback. Keep the kimi-code/acp block and the unverified logic unchanged. Extend chat/__tests__/ComposerFooter.test.tsx."
+        },
+        "items": [
+          {
+            "id": "composer-pi-effort.ac1",
+            "title": "Given an ohmypi conversation with stored effort 'off', ComposerFooter renders the effort picker value 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-pi-effort.ac2",
+            "title": "Given stored effort 'xhigh', ComposerFooter renders the picker value 'xhigh' (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-conversation-effort-picker",
+        "title": "New-conversation surfaces show an effort picker and send effort in the create payload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/HomeComposer.tsx",
+            "src/dashboard/frontend/src/components/home/__tests__/HomeComposer.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/NewConversationPickers.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/home/__tests__/HomeComposer.test.tsx",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "HomeComposer.test.tsx passes",
+            "typecheck exits 0",
+            "lint:file-size exits 0 with CommandDeck/index.tsx <= 1612 lines"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In src/dashboard/frontend/src/components/home/HomeComposer.tsx add effort state from loadStoredEffort, an EffortPicker beside the ModelPicker, and effort in the POST /api/conversations body when the model's level list is non-empty. In src/dashboard/frontend/src/components/CommandDeck/index.tsx add sidebarEffort state, an EffortPicker after the sidebar ModelPicker, and effort in createConversationForProject's payload (add it to the useCallback deps). Checkpoint: if lint:file-size fails for CommandDeck/index.tsx (cap 1612), extract the sidebar ModelPicker/EffortPicker/RetrospectiveButton block into CommandDeck/NewConversationPickers.tsx; never raise the allowlist. Extend home/__tests__/HomeComposer.test.tsx."
+        },
+        "items": [
+          {
+            "id": "new-conversation-effort-picker.ac1",
+            "title": "Given the default picker state, submitting the Home composer posts a /api/conversations body containing effort 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-effort-picker.ac2",
+            "title": "Given the operator chooses Low in the Home composer effort picker, the posted body contains effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-effort-picker.ac3",
+            "title": "The Command Deck sidebar renders an effort picker next to the model picker and createConversationForProject includes effort in its POST payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation-effort-picker.ac4",
+            "title": "lint:file-size exits 0 with src/dashboard/frontend/src/components/CommandDeck/index.tsx at or under 1612 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-conversation-effort",
+        "title": "Document conversation effort in effort.mdx, conversations.mdx and FORKS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "features/conversations.mdx",
+            "docs/FORKS.md"
+          ],
+          "verify_commands": [
+            "! rg -n 'issues/4254' configuration/effort.mdx",
+            "rg -n -- '--effort' features/conversations.mdx docs/FORKS.md"
+          ],
+          "expected_outputs": [
+            "the negated rg exits 0 (no #4254 row remains in configuration/effort.mdx)",
+            "--effort appears in features/conversations.mdx and docs/FORKS.md"
+          ],
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. configuration/effort.mdx 'What honors it today': add the conversations bullet (creation pickers, resume, restart-all, switch-model clamping, pan handoff/fork --effort inheriting the source, pi off/minimal stored as low), remove conversations from the 'Everything else' sentence and delete the #4254 table row. features/conversations.mdx: add the --effort row to the pan handoff Options table and one sentence about the new-conversation effort picker. docs/FORKS.md 'What Gets Preserved': Effort row becomes Configurable, inherited unless effort/--effort overrides, clamped to the successor's model."
+        },
+        "items": [
+          {
+            "id": "docs-conversation-effort.ac1",
+            "title": "configuration/effort.mdx 'What honors it today' lists conversations (creation, resume, restart-all, switch-model, pan handoff/fork --effort) and contains no issues/4254 table row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-effort.ac2",
+            "title": "features/conversations.mdx pan handoff Options table contains an `--effort <level>` row saying the default inherits the source conversation's effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-effort.ac3",
+            "title": "docs/FORKS.md 'What Gets Preserved' Effort row contains the text that effort is inherited unless effort/--effort overrides it and is clamped to the successor's model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-effort-ratchet",
+        "title": "Lower lint:effort baselines for the files this slice cleans",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:50:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "scripts/lint-effort.sh"
+          ],
+          "verify_commands": [
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "lint:effort exits 0 and prints no 'note: lower BASELINE' line for conversation-runtime.ts, conversation-delivery.ts or ModelPicker.tsx"
+          ],
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. In scripts/lint-effort.sh set the conversation-runtime.ts baseline to 1 with a comment naming the lane-door SAFE_EFFORT_PATTERN (PAN-4223 D20, kept by PAN-4254 D11), delete the conversation-delivery.ts and ModelPicker.tsx rows, and adjust the header comment sentence about every row naming a sibling issue."
+        },
+        "items": [
+          {
+            "id": "lint-effort-ratchet.ac1",
+            "title": "npm run lint:effort exits 0 with BASELINE[conversation-runtime.ts]=1 and no rows for conversation-delivery.ts or ModelPicker.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-effort-ratchet.ac2",
+            "title": "Given a temporary `effort ?? 'high'` added to src/lib/overdeck/conversation-runtime.ts, npm run lint:effort exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conv-effort-module",
+        "to": "spawn-resolves-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-resolves-effort",
+        "to": "create-stores-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "create-stores-effort",
+        "to": "resume-persists-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-persists-effort",
+        "to": "switch-model-clamps",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-effort-module",
+        "to": "thinking-level-canonical",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-effort-module",
+        "to": "fork-effort-param",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-resolves-effort",
+        "to": "lint-effort-ratchet",
+        "type": "blocks"
+      },
+      {
+        "from": "thinking-level-canonical",
+        "to": "lint-effort-ratchet",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-effort-enum",
+        "to": "lint-effort-ratchet",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

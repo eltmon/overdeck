@@ -37,6 +37,8 @@ colleague.
 | **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
 
+A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar.
+
 The model picker spans the harness (Claude Code, Pi, Codex) and every routed
 provider, each with live per-million pricing — so a mid-conversation swap is one
 click:
@@ -343,6 +345,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
 | `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 500 characters.** |
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
+| `--effort <level>` | Reasoning effort for the new conversation (`low`, `medium`, `high`, `xhigh`, `max`). Defaults to the source conversation's effort, clamped to the new model. |
 | `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
 | `--cwd <path>` | Working directory for the new conversation. |
 | `--project <key-or-name>` | Registered project for the successor. Defaults to inheriting the source conversation's project, even when `--cwd` points outside that project's directory. |
