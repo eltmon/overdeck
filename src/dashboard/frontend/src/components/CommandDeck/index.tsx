@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { type IssueCostBreakdown } from './ProjectOverview';
@@ -24,7 +24,7 @@ import { MODEL_EFFORT_SUPPORT, loadStoredHarness, loadStoredModel, onKnownModels
 import { loadStoredEffort, type EffortLevel } from '../chat/EffortPicker';
 import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
-import { NewConversationContextOptions, loadStoredNewConversationContext, newConversationContextPayload, type NewConversationContext } from './NewConversationContextOptions';
+import { NewConversationSplitButton } from '../newConversation/NewConversationSplitButton';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
@@ -252,7 +252,6 @@ export function CommandDeck({
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
-  const [newConversationContext, setNewConversationContext] = useState<NewConversationContext>(loadStoredNewConversationContext);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
   const [sidebarEffort, setSidebarEffort] = useState<EffortLevel>(loadStoredEffort);
 
@@ -1133,7 +1132,7 @@ export function CommandDeck({
     async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
         const harness = harnessOverride ?? sidebarHarness;
-        const payload: Record<string, unknown> = { model: sidebarModel, harness, ...newConversationContextPayload(newConversationContext, harness) };
+        const payload: Record<string, unknown> = { model: sidebarModel, harness };
         const sidebarEffortLevels = pickerEffortLevels(sidebarModel) ?? MODEL_EFFORT_SUPPORT[sidebarModel as keyof typeof MODEL_EFFORT_SUPPORT];
         if (sidebarEffortLevels?.length !== 0) payload.effort = sidebarEffort;
         if (projectKey) payload.projectKey = projectKey;
@@ -1167,7 +1166,7 @@ export function CommandDeck({
         return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
-    [sidebarModel, sidebarHarness, sidebarEffort, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
+    [sidebarModel, sidebarHarness, sidebarEffort, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -1365,17 +1364,12 @@ export function CommandDeck({
                   effort={sidebarEffort}
                   onEffortChange={setSidebarEffort}
                 />
-                <button
-                  className={styles.conversationAddBtn}
-                  onClick={handleNewConversation}
-                  title="New conversation"
-                  aria-label="New conversation"
-                >
-                  <Plus size={13} />
-                </button>
+                <NewConversationSplitButton
+                  onQuickCreate={handleNewConversation}
+                  projectKey={selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined}
+                />
               </div>
             </div>
-            <NewConversationContextOptions value={newConversationContext} harness={sidebarHarness} onChange={setNewConversationContext} />
           </div>
 
           <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
