@@ -114,8 +114,12 @@ warning printed to stderr — a spawn never hard-fails over it.
   their codex/omp launcher fields (`getRoleRuntimeBaseCommand`,
   `getCodexLauncherFields`, `getOhmypiLauncherFields` in
   `src/lib/agents/runtime-command.ts`).
+- Conversations — dashboard creation (sidebar and Home composer effort
+  pickers), resume, restart-all, switch-model (clamped to the new model),
+  and `pan handoff`/`pan fork --effort` (default: inherit the source
+  conversation's effort). pi's `off`/`minimal` are stored as `low`.
 
-Everything else — conversations, specialist/review-parent/test/worker
+Everything else — specialist/review-parent/test/worker
 launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
 staffing, planning, and dashboard-wide display — still resolves effort ad
 hoc and is tracked in sibling issues:
@@ -123,7 +127,6 @@ hoc and is tracked in sibling issues:
 | Surface | Issue |
 | --- | --- |
 | Persisting effort across relaunch, resume, recovery, rotation, crash respawn | [#4253](https://github.com/eltmon/overdeck/issues/4253) |
-| Conversations (creation, switch-model, `pan handoff`/`fork`) | [#4254](https://github.com/eltmon/overdeck/issues/4254) |
 | Live effort change on claude-code sessions, "Effort unverified" display | [#4255](https://github.com/eltmon/overdeck/issues/4255) |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
