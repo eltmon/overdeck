@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:48:48.630Z",
+  "updated": "2026-10-03T18:48:58.983Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "image-lightbox.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T18:48:48.630Z"
+    },
+    "image-lightbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:58.983Z"
     }
   }
 }
