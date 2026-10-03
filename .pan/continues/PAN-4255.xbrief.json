@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:18:55.958Z",
+  "updated": "2026-10-03T18:19:07.478Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "agent-effort-door.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T18:18:55.958Z"
+    },
+    "observed-effort-context-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:19:07.478Z"
     }
   }
 }
