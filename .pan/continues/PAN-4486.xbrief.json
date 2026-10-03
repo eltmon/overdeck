@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:17:03.173Z",
+  "updated": "2026-10-03T04:17:13.338Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "effort-default-route.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T04:17:03.172Z"
+    },
+    "effort-default-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:17:13.337Z"
     }
   }
 }
