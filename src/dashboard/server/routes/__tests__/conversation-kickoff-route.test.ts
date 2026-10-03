@@ -102,6 +102,10 @@ describe('kickoff door routes (PAN-4499 WI-5)', () => {
     await waitForInFlightForkPipelines(0);
     expect(forkMocks.deliverForkSeed).toHaveBeenCalledTimes(1);
     expect(forkMocks.deliverForkSeed.mock.calls[0]?.[1]).toBe('do the thing');
+    // D8: the door stamps forkStatus so a poll never reports "delivered" before
+    // anything was sent, same as a fresh fork.
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    expect(getConversationByName('conv-b')?.forkStatus).toBe('spawning');
 
     const second = await request('POST', '/api/conversations/conv-b/kickoff', {});
     expect(second.status).toBe(409);

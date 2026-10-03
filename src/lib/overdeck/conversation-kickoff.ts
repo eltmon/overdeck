@@ -46,6 +46,11 @@ export async function startHeldKickoff(name: string, text?: unknown): Promise<St
   }
   const claimed = claimHeldKickoff(name);
   if (claimed === null) return { status: 'not-held' };
+  // D8: surface progress exactly like a fork — a held row's forkStatus is null
+  // until delivery starts, so a poll landing before ensureForkSessionReady's
+  // first updateForkStatus('injecting') would otherwise see null and report
+  // "delivered" before anything was sent.
+  updateForkStatus(name, 'spawning');
   registerInFlightForkPipeline(deliverClaimedKickoff(conv, editedText ?? claimed, claimed));
-  return { status: 'started', conversation: conv };
+  return { status: 'started', conversation: getConversationByName(name) ?? conv };
 }

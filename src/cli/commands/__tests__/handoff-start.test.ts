@@ -38,8 +38,11 @@ describe('handoffStartCommand', () => {
   });
 
   it('posts to the kickoff door and reports delivery', async () => {
+    // The door stamps forkStatus='spawning' before returning (PAN-4499
+    // correctness fix) so a poll never sees a stale null and reports delivery
+    // before anything was sent; the GET below is where it actually clears.
     fetchMock = vi.fn(async (url: string) =>
-      url.includes('/kickoff') ? jsonResponse(200, { success: true, conversation: { ...CONV, forkStatus: null } }) : jsonResponse(200, { ...CONV, forkStatus: null }));
+      url.includes('/kickoff') ? jsonResponse(200, { success: true, conversation: { ...CONV, forkStatus: 'spawning' } }) : jsonResponse(200, { ...CONV, forkStatus: null }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { handoffStartCommand } = await import('../handoff-start.js');
 
