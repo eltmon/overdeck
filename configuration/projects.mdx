@@ -89,7 +89,9 @@ Registration detects:
 - `tracker` — GitHub or GitLab, from the remote host
 - `workspace.default_branch` — the repository's default branch, or nothing at
   all when the repository is detached or has no commits yet (a guessed `main`
-  would point every later workspace at a branch that may not exist)
+  would point every later workspace at a branch that may not exist). The diff
+  panel's "vs main" view compares against this branch, so a project on
+  `master` or `trunk` still gets a correct "vs main" view.
 - `issue_prefix` — proposed from the project key, up to ten characters
 - The main workspace row
 
