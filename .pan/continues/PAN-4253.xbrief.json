@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:30:04.278Z",
+  "updated": "2026-10-03T02:30:16.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "cloister-rotation-crash-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:30:04.278Z"
+    },
+    "cloister-handoff-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:16.696Z"
     }
   }
 }
