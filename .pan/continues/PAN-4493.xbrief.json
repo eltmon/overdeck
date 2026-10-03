@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:34:41.119Z",
+  "updated": "2026-10-03T18:45:16.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-03T18:34:36.882Z"
     },
     "playwright-e2e": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4493",
-      "claimedAt": "2026-10-03T18:34:41.119Z"
+      "claimedAt": "2026-10-03T18:34:41.119Z",
+      "doneAt": "2026-10-03T18:45:16.259Z"
     }
   }
 }
