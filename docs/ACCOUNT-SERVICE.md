@@ -1,6 +1,6 @@
 # overdeck.ai account service
 
-Source: `services/account/`. Issue: PAN-4293. Design: `.pan/drafts/PAN-4293.md` (the PRD) and `.pan/drafts/anywhere-accounts.md` §6.9.
+Source: `services/account/`, licensed under FSL-1.1-MIT (`services/LICENSE.md`), not the repo's MIT license. Issue: PAN-4293. Design: `.pan/drafts/PAN-4293.md` (the PRD) and `.pan/drafts/anywhere-accounts.md` §6.9.
 
 ## What it is
 

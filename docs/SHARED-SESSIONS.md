@@ -1,6 +1,6 @@
 # Shared Sessions share service
 
-Source: `services/share/` and `packages/contracts/src/sharing.ts`. Issue: PAN-658 (slice 1 of Shared Sessions v0). Design: `.pan/drafts/pan-658.md` (the PRD).
+Source: `services/share/` (licensed under FSL-1.1-MIT, `services/LICENSE.md`) and `packages/contracts/src/sharing.ts` (MIT, like the rest of the repo). Issue: PAN-658 (slice 1 of Shared Sessions v0). Design: `.pan/drafts/pan-658.md` (the PRD).
 
 ## What it is
 

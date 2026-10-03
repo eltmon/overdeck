@@ -170,6 +170,12 @@ consists of hosted services.
     machines from anywhere, with hosted push notifications delivered through it), then shared
     sessions. The account service is built and invite-only: testers are added by the
     operator, and the hosted vault cap is 5 GB per tester.
+
+    The server code for these services is published in
+    [`services/`](https://github.com/eltmon/overdeck/tree/main/services) under the
+    [Functional Source License](https://fsl.software) (FSL-1.1-MIT): you can read, run,
+    modify and self-host it, but not offer it as a competing commercial service, and each
+    release becomes MIT two years after it ships. Everything else in Overdeck stays MIT.
     [PAN-4293](https://github.com/eltmon/overdeck/issues/4293),
     [PAN-4294](https://github.com/eltmon/overdeck/issues/4294),
     [PAN-4297](https://github.com/eltmon/overdeck/issues/4297),
@@ -315,6 +321,9 @@ The full reasoning, section by section. Open any one that interests you.
       few months. The people who value the vault most are the ones most likely to want
       someone else to run it. Bitwarden and Atuin both publish their servers and still run
       popular hosted services.
+    - The hosted services themselves are source-available under FSL-1.1-MIT rather than MIT.
+      That stops someone reselling them as a competing service; it does not limit running
+      them yourself, and each release turns MIT after two years.
   </Accordion>
 
   <Accordion title="8. Why a free hosted tier and not a trial" icon="gift">

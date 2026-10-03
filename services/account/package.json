@@ -2,6 +2,7 @@
   "name": "@overdeck/account-service",
   "version": "0.0.0",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "type": "module",
   "description": "overdeck.ai account service: Cloudflare Worker (D1) for GitHub sign-in, device tokens and the invite-only allowlist (PAN-4293)",
   "scripts": {

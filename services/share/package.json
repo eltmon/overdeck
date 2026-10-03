@@ -2,6 +2,7 @@
   "name": "@overdeck/share-service",
   "version": "0.0.0",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "type": "module",
   "description": "overdeck.ai share service: Cloudflare Worker (Durable Objects + Realtime TURN) that brokers invite-only WebRTC rooms for Shared Sessions (PAN-658)",
   "scripts": {
