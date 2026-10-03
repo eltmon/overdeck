@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:04:17.488Z",
+  "updated": "2026-10-03T23:04:31.252Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "fork-route-hold.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T23:04:17.487Z"
+    },
+    "fork-route-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:04:31.252Z"
     }
   }
 }
