@@ -9,6 +9,13 @@
  *   - assistant msgs   → left-aligned via ChatMarkdown
  *   - work log groups  → collapsible tool-call list
  *   - working          → animated dot indicator
+ *
+ * Virtual rows render in normal block flow inside one wrapper translated to
+ * the first visible row's offset, so two rows can never overlap while a
+ * height measurement is pending. Virtualizer keys are the row id alone; when
+ * the row width or `hideToolCalls` changes, every mounted row is re-read from
+ * the DOM in the same layout pass instead of calling the virtualizer's
+ * `measure()` (PAN-4497).
  */
 
 import {
@@ -80,7 +87,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(800);
+  // Width of the rows themselves (`.messagesTimelineInner` caps it at 760px),
+  // not the scroll container — see the re-measure effect below (PAN-4497).
+  const [rowWidth, setRowWidth] = useState(760);
   // Track whether user has manually scrolled up
   const isPinnedToBottomRef = useRef(true);
   // Set by wheel/touch/pointerdown/keydown — distinguishes a real user scroll
@@ -194,30 +203,33 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const virtualRows = rows.slice(0, firstUnvirtIdx);
   const tailRows = rows.slice(firstUnvirtIdx);
 
-  const widthKey = `width:${Math.round(width)}`;
-
   const rowVirtualizer = useVirtualizer({
     count: virtualRows.length,
     getScrollElement: () => scrollContainerRef.current,
-    getItemKey: (index) => `${widthKey}:${virtualRows[index]!.id}`,
+    getItemKey: (index) => virtualRows[index]!.id,
     estimateSize: (index) =>
-      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: width, hideToolCalls }),
+      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: rowWidth, hideToolCalls }),
     measureElement: (el) => el.getBoundingClientRect().height,
     useAnimationFrameWithResizeObserver: true,
     overscan: 8,
   });
 
-  // Remeasure rows when hideToolCalls changes so the virtualizer
-  // updates heights for collapsed / expanded work groups.
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [rowVirtualizer, hideToolCalls]);
-
-  // Observe container width for height estimation accuracy
+  // Re-read mounted rows in this layout pass when the row width or the tool-call
+  // toggle changes. Do not call measure() here: it drops every cached size, and
+  // resizeItem() writes only a changed size, so unchanged rows would fall back to
+  // their estimates and overlap (PAN-4497).
   useLayoutEffect(() => {
-    const el = scrollContainerRef.current;
+    rowVirtualizer.elementsCache.forEach((el) => {
+      if (!el.isConnected) return;
+      rowVirtualizer.resizeItem(rowVirtualizer.indexFromElement(el), el.getBoundingClientRect().height);
+    });
+  }, [rowVirtualizer, rowWidth, hideToolCalls]);
+
+  // Track the row width for estimates and for the re-measure above.
+  useLayoutEffect(() => {
+    const el = innerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const ro = new ResizeObserver(() => setRowWidth(Math.round(el.clientWidth)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -450,58 +462,66 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         style={{ flex: 1 }}
       >
       <div ref={innerRef} className={styles.messagesTimelineInner}>
-        {/* Virtual section — absolutely positioned rows */}
+        {/* Virtual section — rows stack in normal flow under one translated
+            wrapper, so two rows can never overlap while a measurement is
+            pending (PAN-4497). */}
         {virtualRows.length > 0 && (
           <div
             style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
           >
-            {dedupedVirtualItems.map((virtualItem) => {
-              const row = virtualRows[virtualItem.index]!;
-              const markersForRow = markersByAfterId.get(row.id);
-              return (
-                <div
-                  key={row.id}
-                  data-index={virtualItem.index}
-                  data-search-row-id={row.id}
-                  ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualItem.start}px)`,
-                    background: 'var(--background)',
-                    outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
-                    outlineOffset: '-2px',
-                    borderRadius: 8,
-                  }}
-                >
-                  <TimelineRowRenderer
-                    row={row}
-                    isStreaming={streaming}
-                    conversationName={conversationName}
-                    cwd={cwd}
-                    issueId={issueId}
-                    subagentByToolUseId={subagentByToolUseId}
-                    onOpenSubagent={onOpenSubagent}
-                    turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
-                    onOpenTurnDiff={onOpenTurnDiff}
-                    resolvedTheme={resolvedTheme}
-                    hideToolCalls={hideToolCalls}
-                    workingPhase={workingPhase}
-                    onConfirmCommand={onConfirmCommand}
-                    onOpenTerminal={onOpenTerminal}
-                    onPaneChoiceAnswered={onPaneChoiceAnswered}
-                  />
-                  {markersForRow?.map((marker) => (
-                    <RoundDivider
-                      key={`marker-${marker.round}-${marker.label ?? ''}`}
-                      marker={marker}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${dedupedVirtualItems[0]?.start ?? 0}px)`,
+              }}
+            >
+              {dedupedVirtualItems.map((virtualItem) => {
+                const row = virtualRows[virtualItem.index]!;
+                const markersForRow = markersByAfterId.get(row.id);
+                return (
+                  <div
+                    key={row.id}
+                    data-index={virtualItem.index}
+                    data-search-row-id={row.id}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      display: 'flow-root',
+                      background: 'var(--background)',
+                      outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                      outlineOffset: '-2px',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <TimelineRowRenderer
+                      row={row}
+                      isStreaming={streaming}
+                      conversationName={conversationName}
+                      cwd={cwd}
+                      issueId={issueId}
+                      subagentByToolUseId={subagentByToolUseId}
+                      onOpenSubagent={onOpenSubagent}
+                      turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
+                      onOpenTurnDiff={onOpenTurnDiff}
+                      resolvedTheme={resolvedTheme}
+                      hideToolCalls={hideToolCalls}
+                      workingPhase={workingPhase}
+                      onConfirmCommand={onConfirmCommand}
+                      onOpenTerminal={onOpenTerminal}
+                      onPaneChoiceAnswered={onPaneChoiceAnswered}
                     />
-                  ))}
-                </div>
-              );
-            })}
+                    {markersForRow?.map((marker) => (
+                      <RoundDivider
+                        key={`marker-${marker.round}-${marker.label ?? ''}`}
+                        marker={marker}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

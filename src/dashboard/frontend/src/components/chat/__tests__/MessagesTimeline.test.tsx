@@ -22,6 +22,13 @@ vi.mock('../ChatMarkdown', () => ({
   ),
 }));
 
+const { measureSpy, resizeItemSpy, indexFromElementSpy, elementsCache } = vi.hoisted(() => ({
+  measureSpy: vi.fn(),
+  resizeItemSpy: vi.fn(),
+  indexFromElementSpy: vi.fn((el: Element) => Number(el.getAttribute('data-index') ?? -1)),
+  elementsCache: new Map<string, Element>(),
+}));
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count, getItemKey, estimateSize }: {
     count: number;
@@ -35,9 +42,12 @@ vi.mock('@tanstack/react-virtual', () => ({
       size: estimateSize?.(index) ?? 40,
     })),
     getTotalSize: () => count * 40,
-    measure: vi.fn(),
+    measure: measureSpy,
     measureElement: vi.fn(),
     scrollToIndex: vi.fn(),
+    resizeItem: resizeItemSpy,
+    elementsCache,
+    indexFromElement: indexFromElementSpy,
   }),
 }));
 
@@ -489,6 +499,40 @@ describe('MessagesTimeline — roundMarkers', () => {
     expect(screen.queryByText(/tool calls were made/)).not.toBeInTheDocument();
     expect(screen.getByText('Bash')).toBeInTheDocument();
     expect(screen.getByText('Context compacted')).toBeInTheDocument();
+  });
+
+  it('re-reads mounted row heights after hideToolCalls changes (PAN-4497)', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const el = document.createElement('div');
+    el.setAttribute('data-index', '0');
+    Object.defineProperty(el, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ height: 123 }) as DOMRect,
+    });
+    document.body.appendChild(el);
+    elementsCache.set('a1', el);
+
+    try {
+      const { rerender } = render(
+        <MessagesTimeline messages={messages} workLog={[]} streaming={false} hideToolCalls={false} />,
+      );
+
+      resizeItemSpy.mockClear();
+      measureSpy.mockClear();
+
+      rerender(
+        <MessagesTimeline messages={messages} workLog={[]} streaming={false} hideToolCalls />,
+      );
+
+      expect(resizeItemSpy).toHaveBeenCalledWith(0, 123);
+      expect(measureSpy).not.toHaveBeenCalled();
+    } finally {
+      document.body.removeChild(el);
+      elementsCache.clear();
+    }
   });
 
   it('shows command detail for Codex shell work log rows', () => {

@@ -438,6 +438,16 @@ door that does not exist; a real record read door would be a separate change.
   composer thumbnail and the sent-message thumbnails open one shared lightbox
   (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
   thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
+- Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
+  the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
+  flow inside one wrapper translated to the first visible row's offset, so rows cannot
+  overlap while a height measurement is pending. Virtualizer keys are the row id, so
+  measured heights survive a width change. When the row width (capped at 760px by
+  `.messagesTimelineInner`) or "Hide tool calls" changes, the timeline re-reads every
+  mounted row's height in the same layout pass. It never calls the virtualizer's
+  `measure()`: that drops every cached height, and rows whose height did not change
+  would fall back to estimates and overlap. The
+  regression check is `src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts`.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route

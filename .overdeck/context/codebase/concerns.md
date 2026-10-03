@@ -376,4 +376,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   conversations launch through the terminal-backend door (Herdr default,
   PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
   conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
-<!-- last-verified: 2026-10-02 -->
+- TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
+  but re-reads no element; a row whose height did not change gets no
+  ResizeObserver callback, and `resizeItem` caches only a changed size. So in
+  `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
+  volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
+  (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
+<!-- last-verified: 2026-10-03 -->
