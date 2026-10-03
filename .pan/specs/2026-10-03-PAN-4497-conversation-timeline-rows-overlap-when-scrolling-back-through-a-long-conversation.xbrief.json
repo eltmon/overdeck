@@ -1,0 +1,338 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T21:28:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4497: Conversation timeline rows overlap when scrolling back through a long conversation",
+    "updated": "2026-10-03T21:33:41.803Z"
+  },
+  "plan": {
+    "id": "pan-4497",
+    "title": "Conversation timeline rows overlap when scrolling back through a long conversation",
+    "status": "proposed",
+    "uid": "a2afbf69-cbde-42a6-8f49-0616aeae3b7d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-03T21:28:44Z",
+    "updated": "2026-10-03T21:33:41.803Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4497",
+        "label": "PAN-4497",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversation",
+      "virtualization",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Virtual rows in the conversation timeline (MessagesTimeline.tsx) overlap. Verified live on 2026-10-03 against /conv/3183. Mechanism A (lasting): getItemKey embeds the scroll-container width, so any width change orphans every measured size; when the panel is wider than 792px the rows stay 760px wide, no row ResizeObserver fires, and mounted rows stay at their estimates (one row measured 520px in a 223px slot). The hideToolCalls effect calls measure(), which in virtual-core 3.17.11 clears the cache without re-reading any element, so it has the same defect. Mechanism B (transient): rows that mount during a fast upward wheel are positioned at estimates for about two frames because TanStack skips the sync measurement while scrolling; a per-frame probe saw 29 rows overlap by up to 614px.",
+      "Proposal": "WI-1: key virtual rows by row id alone, estimate with the row width (innerRef clientWidth, initial 760), remove the hideToolCalls measure() call (it drops every cached size, and resizeItem only writes changed sizes, so unchanged rows fall back to estimates), and in one layout effect on [rowWidth, hideToolCalls] call resizeItem() for every connected element in elementsCache with the cache intact. WI-2: render visible virtual rows in normal block flow inside one absolutely positioned wrapper translated to the first visible item's start, with display: flow-root on each row, so rows cannot overlap while a measurement is pending. WI-3: a Playwright spec on the isolated dashboard fixture asserts no overlapping row bounding boxes per frame while wheel-scrolling and when settled after a width change, a tool-group expansion, a late image load and a Hide-tool-calls toggle. WI-4: document the layout in docs/DASHBOARD-ARCHITECTURE.md. Full detail, before/after snippets and line references are in .pan/drafts/PAN-4497.md.",
+      "NonGoals": "- Changing the estimate formula in MessagesTimeline.logic.ts\n- Upgrading @tanstack/react-virtual or changing overscan or useAnimationFrameWithResizeObserver\n- Changing how tail rows render or ALWAYS_UNVIRTUALIZED_TAIL_ROWS\n- Changing ChatMarkdown.tsx or how wide tables scroll horizontally\n- Updating the OKF bundle in the separate overdeck-knowledge repository from this branch\n- Virtualizing or changing other lists (session transcripts, subagent transcripts)\n- Pointing any new spec at the operator's live dashboard on port 3011"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix both mechanisms: stable keys with explicit re-measure (lasting overlap) and flow layout under one translated wrapper (transient overlap during scroll).",
+        "rationale": "The issue AC requires no overlap at any scroll position. Only the flow layout makes overlap structurally impossible while a ResizeObserver measurement is pending; stable keys plus re-measure keep the total size and scroll offsets accurate. Both are small edits to one file and follow TanStack's own dynamic-size example."
+      },
+      {
+        "summary": "Re-measure mounted rows with resizeItem over elementsCache and never call rowVirtualizer.measure().",
+        "rationale": "virtual-core 3.17.11 resizeItem writes itemSizeCache only when delta != 0, and after measure() the delta is computed against the stale flat measurement array, so an unchanged row is never re-cached and falls back to its estimate. Keeping the cache intact and re-reading mounted rows corrects changed rows in the same layout pass; unmounted rows are corrected on mount."
+      },
+      {
+        "summary": "Track the row width (innerRef clientWidth, capped at 760px) rather than the scroll-container width.",
+        "rationale": "Row heights depend on the row width only. The container width changes without any row reflow whenever the panel is wider than 792px, which is exactly the state that produced the lasting overlap."
+      },
+      {
+        "summary": "Run the Playwright check on the isolated dashboard fixture (tests/fixtures/isolated-dashboard.ts) with route-mocked conversation data in a fresh browser context.",
+        "rationale": "The issue asks for an isolated browser profile; the fixture also serves the branch's built frontend, while the live dashboard on 3011 serves main's build and must not be touched."
+      },
+      {
+        "summary": "If Streamdown does not render an <img> for the fixture markdown image, drop only the image step and keep the other growth cases.",
+        "rationale": "Image thumbnails in user messages have a fixed 96px size and never grow, so the markdown image is the only late-growth image path; changing ChatMarkdown for a test is out of scope."
+      },
+      {
+        "summary": "Drop the 'fails on the main build' criterion; the planner's live probe output in the PRD is the pre-fix evidence.",
+        "rationale": "The spec item runs after both fixes are committed; reproducing the pre-fix build would need a checkout or stash in the workspace, which the worktree and stash rules forbid."
+      }
+    ],
+    "items": [
+      {
+        "id": "stable-keys-remeasure",
+        "title": "Key virtual rows by row id and re-measure mounted rows on row-width or hideToolCalls change",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:28:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4497",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "git grep -n widthKey -- src/dashboard/frontend/src",
+            "git grep -n 'rowVirtualizer.measure()' -- src/dashboard/frontend/src"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes, including the new 're-reads mounted row heights after hideToolCalls changes (PAN-4497)' case",
+            "typecheck completes without errors",
+            "git grep for widthKey prints nothing and exits 1",
+            "git grep for rowVirtualizer.measure() prints nothing and exits 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In MessagesTimeline.tsx: replace `const [width, setWidth] = useState(800)` (line 83) with `const [rowWidth, setRowWidth] = useState(760)`; delete `const widthKey` (line 197); set getItemKey to `(index) => virtualRows[index]!.id` and estimateSize to `timelineWidth: rowWidth`; replace the hideToolCalls useEffect (lines 210-214) and the scroll-container width observer (lines 216-223) with (a) a useLayoutEffect on [rowVirtualizer, rowWidth, hideToolCalls] that does NOT call rowVirtualizer.measure() and, for every connected element in rowVirtualizer.elementsCache, rowVirtualizer.resizeItem(rowVirtualizer.indexFromElement(el), el.getBoundingClientRect().height), and (b) a useLayoutEffect ResizeObserver on innerRef that calls setRowWidth(Math.round(el.clientWidth)). Leave the auto-scroll ResizeObserver on innerRef (lines 227-237) as it is. In MessagesTimeline.test.tsx extend the @tanstack/react-virtual mock with resizeItem, elementsCache (Map) and indexFromElement using vi.hoisted spies, and add the test named in the PRD (asserts resizeItem per connected element and that measure is not called)."
+        },
+        "items": [
+          {
+            "id": "stable-keys-remeasure.ac1",
+            "title": "Given MessagesTimeline.tsx on the branch, when `git grep -n widthKey -- src/dashboard/frontend/src` runs, then it returns no match and getItemKey returns `virtualRows[index]!.id`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stable-keys-remeasure.ac2",
+            "title": "Given a rendered timeline with one connected element in the mocked elementsCache, when hideToolCalls changes from false to true, then the vitest case asserts resizeItem(0, <height>) is called and measure is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stable-keys-remeasure.ac3",
+            "title": "Given the branch MessagesTimeline.tsx, when a reviewer reads the virtualizer options and effects, then estimateSize passes `timelineWidth: rowWidth` (innerRef clientWidth, initial 760) and no code path calls rowVirtualizer.measure() or renames virtualizer keys on a width change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flow-layout-rows",
+        "title": "Render visible virtual rows in normal flow inside one translated wrapper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:28:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4497",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size ratchet included)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. Inside the `height: rowVirtualizer.getTotalSize(), position: 'relative'` block (line 456), add one wrapper div with `position: 'absolute', top: 0, left: 0, width: '100%', transform: translateY(${dedupedVirtualItems[0]?.start ?? 0}px)` and render the mapped rows inside it. Remove `position`, `top`, `left`, `width` and `transform` from each row's style and add `display: 'flow-root'`; keep key, data-index, data-search-row-id, ref={rowVirtualizer.measureElement}, background, outline, outlineOffset and borderRadius unchanged. Do not add a custom rangeExtractor. Update the module header comment (lines 1-12) to state that virtual rows render in flow under one translated wrapper and are keyed by row id."
+        },
+        "items": [
+          {
+            "id": "flow-layout-rows.ac1",
+            "title": "Given the branch MessagesTimeline.tsx, when a reviewer reads the virtual block, then no row element has `position: absolute` or its own translateY and exactly one wrapper renders `translateY(<first visible item start>px)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flow-layout-rows.ac2",
+            "title": "Given a virtual row element, when it renders, then its style includes `display: flow-root` and preserves the existing background, outline, outlineOffset and borderRadius values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flow-layout-rows.ac3",
+            "title": "Given the existing MessagesTimeline.test.tsx suite (search, target message, round markers, hideToolCalls), when it runs on the branch, then every case passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overlap-playwright-spec",
+        "title": "Add the isolated-dashboard Playwright spec that asserts timeline rows never overlap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T21:28:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4497",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4497-timeline-overlap.spec.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "build completes and writes dist/dashboard",
+            "Playwright reports both pan-4497 tests passed",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. Create src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts using startIsolatedDashboard() from ./fixtures/isolated-dashboard.js in beforeAll/afterAll and browser.newContext({ viewport: { width: 2000, height: 1000 } }) per test. Route-mock conversation 4497 (name timeline-overlap-fixture) the way conversation-search.spec.ts and pan-4493-image-lightbox.spec.ts do. Build the fixture in code: 80 alternating messages with assistant text 200-4000 chars, a 12x15 GFM table in every fifth assistant message, a 10-entry Bash work-log group between every fourth pair, and one markdown image /pan-4497/tall.svg served as a 600x500 SVG after an 800 ms delay. Implement assertNoOverlap (adjacent [data-search-row-id] rows sorted by top; fail when prev.bottom - next.top > 1) and settle (two rAF + 200 ms). Assert the precondition scroll-container clientWidth > 800 and inner clientWidth == 760. Test 1: in-page per-frame rAF sampler over consecutive [data-index] rows while wheeling -400 every 30 ms to the top and +400 back, assertNoOverlap every 10 steps, sampler log empty at the end. Test 2: width 2000->1800->2000, Show-4-earlier expansion (next row moves down by the growth +/-2px), image load, Hide-tool-calls toggle twice, each followed by settle + assertNoOverlap. Honor the image-step checkpoint in the PRD. Do not build or check out main to show a red run; the planner's probe output in the PRD is the pre-fix evidence. No .skip, .only or skipIf."
+        },
+        "items": [
+          {
+            "id": "overlap-playwright-spec.ac1",
+            "title": "Given the branch build served by the isolated dashboard, when the spec wheels from the bottom to the top and back, then the per-frame sampler records zero overlapping adjacent rows and every settled assertNoOverlap passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlap-playwright-spec.ac2",
+            "title": "Given a panel wider than 792px, when the viewport width changes 2000 -> 1800 -> 2000, then assertNoOverlap passes after each settle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlap-playwright-spec.ac3",
+            "title": "Given a tool group with a 'Show 4 earlier' button, when the spec clicks it, then the next row's top moves down by the group's height growth within 2px and no rows overlap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overlap-playwright-spec.ac4",
+            "title": "Given the late-loading markdown image and the Hide tool calls toggle, when the image loads and the toggle is clicked twice, then assertNoOverlap passes after each step (or the spec carries a comment naming why Streamdown renders no img and the image step is dropped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-timeline-layout",
+        "title": "Document the timeline flow layout and re-measure rule in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T21:28:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4497",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Conversation timeline layout (PAN-4497)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints one matching line in docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the 'Conversation timeline layout (PAN-4497)' bullet from PRD WI-4 to docs/DASHBOARD-ARCHITECTURE.md directly after the 'Composer attachments (PAN-4493)' bullet (around line 434). Use the PRD wording: last 8 rows unvirtualized; visible virtual rows in normal flow under one wrapper translated to the first visible row's offset so rows cannot overlap while a measurement is pending; virtualizer keys are the row id; on a row-width change (rows capped at 760px by .messagesTimelineInner) or a Hide-tool-calls change the timeline clears the size cache and re-reads every mounted row because an unchanged row gets no ResizeObserver callback; the regression check is tests/pan-4497-timeline-overlap.spec.ts."
+        },
+        "items": [
+          {
+            "id": "docs-timeline-layout.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grep searches for 'Conversation timeline layout (PAN-4497)', then it returns one bullet that names the flow wrapper, row-id keys, the 760px row cap and the re-measure on row-width or Hide-tool-calls change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-timeline-layout.ac2",
+            "title": "Given the new bullet, when a reader follows its test reference, then it names src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts as the regression check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stable-keys-remeasure",
+        "to": "flow-layout-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "stable-keys-remeasure",
+        "to": "overlap-playwright-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "flow-layout-rows",
+        "to": "overlap-playwright-spec",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-03-PAN-4497-conversation-timeline-rows-overlap-when-scrolling-back-through-a-long-conversation.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
