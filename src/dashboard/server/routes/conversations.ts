@@ -1,4 +1,5 @@
 import { conversationSubagentInputRoutes } from './conversation-subagent-input.js';
+import { conversationDiffRoutes } from './conversation-diffs.js';
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
@@ -40,13 +41,7 @@ import {
   unarchiveConversationByName,
 } from '../../../lib/overdeck/conversation-archive.js';
 import {
-  getConversationDiffs,
-  getConversationDiffFull,
-  getConversationDiffTurn,
-} from '../../../lib/overdeck/conversation-diffs.js';
-import {
   generateAiTitle,
-  getCachedMessages,
   getConversationAbout,
   getConversationMessageLocator,
   getConversationMessagesRead,
@@ -926,64 +921,6 @@ const postConversationPlanActionRoute = HttpRouter.add(
     return yield* Effect.promise(() => handleConversationPlanAction(name, body));
   }),
 );
-const conversationDiffDependencies = {
-  resolveSessionFile,
-  getCachedMessages,
-};
-const getConversationDiffsRoute = HttpRouter.add(
-  'GET',
-  '/api/conversations/:name/diffs',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    const params = yield* HttpRouter.params;
-    const name = params['name'] ?? '';
-    return yield* Effect.promise(async () => {
-      const response = await getConversationDiffs(name, conversationDiffDependencies);
-      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
-    });
-  }),
-);
-const getConversationDiffFullRoute = HttpRouter.add(
-  'GET',
-  '/api/conversations/:name/diffs/full',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    const params = yield* HttpRouter.params;
-    const name = params['name'] ?? '';
-    return yield* Effect.promise(async () => {
-      const response = await getConversationDiffFull(name, conversationDiffDependencies);
-      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
-    });
-  }),
-);
-const getConversationDiffTurnRoute = HttpRouter.add(
-  'GET',
-  '/api/conversations/:name/diffs/:turnId',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    const params = yield* HttpRouter.params;
-    const name = params['name'] ?? '';
-    const turnId = params['turnId'] ?? '';
-    const reqUrl = new URL(request.url, 'http://localhost');
-    const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
-    return yield* Effect.promise(async () => {
-      const response = await getConversationDiffTurn(name, turnId, fileFilter, conversationDiffDependencies);
-      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
-    });
-  }),
-);
 //
 // Regenerate the conversation title from the *whole* transcript (not just the
 // opening message). This is an explicit user action, so it overrides even a
@@ -1063,9 +1000,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,
   postConversationPlanActionRoute,
-  getConversationDiffsRoute,
-  getConversationDiffFullRoute,
-  getConversationDiffTurnRoute,
+  conversationDiffRoutes,
   postConversationRetitleRoute,
   getConversationAboutRoute,
 );
