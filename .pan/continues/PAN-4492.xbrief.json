@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:53:15.415Z",
+  "updated": "2026-10-03T17:53:28.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "w2-herdr-submit.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T17:53:15.414Z"
+    },
+    "w3-herdr-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:53:28.848Z"
     }
   }
 }
