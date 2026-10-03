@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:45:52.248Z",
+  "updated": "2026-10-03T17:51:52.130Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4492",
       "claimedAt": "2026-10-03T17:44:38.963Z",
       "doneAt": "2026-10-03T17:45:52.248Z"
+    },
+    "w1-composer-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:51:52.130Z"
     }
   }
 }
