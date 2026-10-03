@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:52:04.920Z",
+  "updated": "2026-10-03T18:52:15.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "ci-test-subset.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T18:52:04.920Z"
+    },
+    "ci-test-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:52:15.244Z"
     }
   }
 }
