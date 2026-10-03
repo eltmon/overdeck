@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:18:25.232Z",
+  "updated": "2026-10-03T04:18:35.418Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,10 @@
     "issue-picker-field.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T04:18:25.232Z"
+    },
+    "issue-picker-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:18:35.418Z"
     }
   }
 }
