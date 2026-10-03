@@ -17,10 +17,12 @@ import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
-import { RetrospectiveButton } from './RetrospectiveButton';
+import { NewConversationPickers } from './NewConversationPickers';
 import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
-import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
+import { MODEL_EFFORT_SUPPORT, loadStoredHarness, loadStoredModel, onKnownModelsSync } from '../chat/ModelPicker';
+import { loadStoredEffort, type EffortLevel } from '../chat/EffortPicker';
+import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { NewConversationContextOptions, loadStoredNewConversationContext, newConversationContextPayload, type NewConversationContext } from './NewConversationContextOptions';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
@@ -252,6 +254,7 @@ export function CommandDeck({
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [newConversationContext, setNewConversationContext] = useState<NewConversationContext>(loadStoredNewConversationContext);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
+  const [sidebarEffort, setSidebarEffort] = useState<EffortLevel>(loadStoredEffort);
 
   // The mount-time loadStoredModel above runs before the picker's catalog
   // fetch completes, when only FALLBACK ids are "known" — a stored
@@ -1131,6 +1134,8 @@ export function CommandDeck({
       try {
         const harness = harnessOverride ?? sidebarHarness;
         const payload: Record<string, unknown> = { model: sidebarModel, harness, ...newConversationContextPayload(newConversationContext, harness) };
+        const sidebarEffortLevels = pickerEffortLevels(sidebarModel) ?? MODEL_EFFORT_SUPPORT[sidebarModel as keyof typeof MODEL_EFFORT_SUPPORT];
+        if (sidebarEffortLevels?.length !== 0) payload.effort = sidebarEffort;
         if (projectKey) payload.projectKey = projectKey;
         const trimmedMessage = message?.trim();
         if (trimmedMessage) payload.message = trimmedMessage;
@@ -1162,7 +1167,7 @@ export function CommandDeck({
         return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
-    [sidebarModel, sidebarHarness, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
+    [sidebarModel, sidebarHarness, sidebarEffort, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -1352,19 +1357,14 @@ export function CommandDeck({
             <div className={styles.sidebarHeaderRow}>
               <h2 className={styles.sidebarTitle}>Command Deck</h2>
               <div className={styles.sidebarHeaderGroup}>
-                <ModelPicker
-                  value={sidebarModel}
-                  onChange={(modelId) => {
-                    setSidebarModel(modelId);
-                    saveStoredModel(modelId);
-                  }}
-                  harness={sidebarHarness} followProviderDefault
-                  onHarnessChange={(harness) => {
-                    setSidebarHarness(harness);
-                    saveStoredHarness(harness);
-                  }}
+                <NewConversationPickers
+                  model={sidebarModel}
+                  onModelChange={setSidebarModel}
+                  harness={sidebarHarness}
+                  onHarnessChange={setSidebarHarness}
+                  effort={sidebarEffort}
+                  onEffortChange={setSidebarEffort}
                 />
-                <RetrospectiveButton model={sidebarModel} harness={sidebarHarness} />
                 <button
                   className={styles.conversationAddBtn}
                   onClick={handleNewConversation}
