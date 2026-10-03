@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:44:08.490Z",
+  "updated": "2026-10-03T02:44:21.460Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "new-conversation-effort-picker.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:44:08.490Z"
+    },
+    "new-conversation-effort-picker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:44:21.460Z"
     }
   }
 }
