@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T22:53:04.147Z",
+  "updated": "2026-10-03T23:01:56.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4499",
       "claimedAt": "2026-10-03T22:50:48.974Z",
       "doneAt": "2026-10-03T22:53:04.147Z"
+    },
+    "skill-flags-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:01:56.189Z"
     }
   }
 }
