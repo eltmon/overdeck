@@ -783,10 +783,11 @@ export async function buildAgentLaunchConfig(opts: {
       // appended system prompt instead of `--agent <file>` (Claude Code 2.1.195
       // dropped --agent file support); permission flags come from the global
       // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
-      // which short-circuits to the omp/codex form.
+      // which short-circuits to the omp/codex form. The injected effort is
+      // opts.effort when set, else the role frontmatter's.
       baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))}`,
+        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole), opts.effort)}`,
       resumeSessionId: opts.resumeSessionId,
       // PAN-3189: the git guard is emitted for launchers that carry an agent
       // id. Work/strike/review agents — the ones the stash/rebase rules exist
