@@ -4,6 +4,7 @@
  * GET /api/agents/:agentId/diffs          — all turn diff summaries
  * GET /api/agents/:agentId/diffs/:turnId  — unified diff for a specific turn
  * GET /api/agents/:agentId/diffs/full     — full thread diff (all turns combined)
+ * GET /api/agents/:agentId/diffs/vs-main  — workspace vs the project's default branch (three-dot)
  */
 
 import { Effect, Layer } from 'effect'
@@ -15,10 +16,9 @@ import {
   captureCheckpoint,
   diffCheckpoints,
   diffCheckpointFiles,
-  diffAgainstMain,
-  diffAgainstMainFiles,
   listCheckpoints,
 } from '../../../lib/checkpoint/checkpoint-manager.js'
+import { diffVsDefaultBranch } from '../../../lib/checkpoint/vs-default-branch.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,7 +195,7 @@ const getFullDiffRoute = HttpRouter.add(
 )
 
 // ─── Route: GET /api/agents/:agentId/diffs/vs-main ──────────────────────────
-// Full diff of the workspace against the main branch.
+// Workspace vs the project's configured default branch (PAN-4501).
 
 const getVsMainDiffRoute = HttpRouter.add(
   'GET',
@@ -226,10 +226,9 @@ const getVsMainDiffRoute = HttpRouter.add(
 
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await diffAgainstMainFiles(workspace)
-        const diff = filePath ? await diffAgainstMain(workspace, filePath) : undefined
+        const result = await diffVsDefaultBranch(workspace, { ...(filePath !== undefined && { filePath }) })
 
-        return jsonResponse({ agentId, ...(diff !== undefined && { diff }), files })
+        return jsonResponse({ agentId, ...result })
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error)
         console.error('[diffs] get vs-main diff failed:', msg)
