@@ -80,7 +80,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(800);
+  // Width of the rows themselves (`.messagesTimelineInner` caps it at 760px),
+  // not the scroll container — see the re-measure effect below (PAN-4497).
+  const [rowWidth, setRowWidth] = useState(760);
   // Track whether user has manually scrolled up
   const isPinnedToBottomRef = useRef(true);
   // Set by wheel/touch/pointerdown/keydown — distinguishes a real user scroll
@@ -194,30 +196,33 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const virtualRows = rows.slice(0, firstUnvirtIdx);
   const tailRows = rows.slice(firstUnvirtIdx);
 
-  const widthKey = `width:${Math.round(width)}`;
-
   const rowVirtualizer = useVirtualizer({
     count: virtualRows.length,
     getScrollElement: () => scrollContainerRef.current,
-    getItemKey: (index) => `${widthKey}:${virtualRows[index]!.id}`,
+    getItemKey: (index) => virtualRows[index]!.id,
     estimateSize: (index) =>
-      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: width, hideToolCalls }),
+      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: rowWidth, hideToolCalls }),
     measureElement: (el) => el.getBoundingClientRect().height,
     useAnimationFrameWithResizeObserver: true,
     overscan: 8,
   });
 
-  // Remeasure rows when hideToolCalls changes so the virtualizer
-  // updates heights for collapsed / expanded work groups.
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [rowVirtualizer, hideToolCalls]);
-
-  // Observe container width for height estimation accuracy
+  // Re-read mounted rows in this layout pass when the row width or the tool-call
+  // toggle changes. Do not call measure() here: it drops every cached size, and
+  // resizeItem() writes only a changed size, so unchanged rows would fall back to
+  // their estimates and overlap (PAN-4497).
   useLayoutEffect(() => {
-    const el = scrollContainerRef.current;
+    rowVirtualizer.elementsCache.forEach((el) => {
+      if (!el.isConnected) return;
+      rowVirtualizer.resizeItem(rowVirtualizer.indexFromElement(el), el.getBoundingClientRect().height);
+    });
+  }, [rowVirtualizer, rowWidth, hideToolCalls]);
+
+  // Track the row width for estimates and for the re-measure above.
+  useLayoutEffect(() => {
+    const el = innerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const ro = new ResizeObserver(() => setRowWidth(Math.round(el.clientWidth)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
