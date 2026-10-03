@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:03:16.912Z",
+  "updated": "2026-10-03T02:06:21.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-10-03T02:03:11.463Z"
     },
     "cloister-rotation-crash-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4253",
-      "claimedAt": "2026-10-03T02:03:16.912Z"
+      "claimedAt": "2026-10-03T02:03:16.912Z",
+      "doneAt": "2026-10-03T02:06:21.077Z"
     }
   }
 }
