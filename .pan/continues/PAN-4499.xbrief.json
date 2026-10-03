@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:03:39.415Z",
+  "updated": "2026-10-03T23:03:51.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "kickoff-store.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T23:03:39.414Z"
+    },
+    "kickoff-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:03:51.084Z"
     }
   }
 }
