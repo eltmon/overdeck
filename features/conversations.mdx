@@ -387,7 +387,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | Option | Description |
 |:-------|:------------|
 | `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
-| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 500 characters.** |
+| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 10,000 characters.** |
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
 | `--effort <level>` | Reasoning effort for the new conversation (`low`, `medium`, `high`, `xhigh`, `max`). Defaults to the source conversation's effort, clamped to the new model. |
 | `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
@@ -401,8 +401,8 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--hold` | Create and launch the new conversation without sending the kickoff. Start it with Send in the dashboard composer, or `pan handoff start <conv>`. |
 
 <Note>
-**Focus is hard-capped at 500 characters.** A longer focus is rejected with
-`Fork request rejected: focus must be 500 characters or fewer` and no
+**Focus is hard-capped at 10,000 characters** (PAN-3737; multi-line is fine). A longer focus is rejected with
+`focus must be 10000 characters or fewer` and no
 conversation is created. Keep it short and task-oriented — the detail belongs in
 the transcript the author reads; the focus only steers what the author
 emphasizes.
