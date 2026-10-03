@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:48:03.482Z",
+  "updated": "2026-10-03T18:48:15.574Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "attachment-read-route.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T18:48:03.481Z"
+    },
+    "attachment-read-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:48:15.574Z"
     }
   }
 }
