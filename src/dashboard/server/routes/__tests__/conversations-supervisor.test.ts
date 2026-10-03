@@ -767,7 +767,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       harness: 'claude-code',
     });
     conversations.setConversationEffort(name, 'xhigh');
-    const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-restart-all.js');
 
     const restart = await handleConversationRestartAll({ resolveSessionFile: vi.fn().mockResolvedValue(null) });
 
