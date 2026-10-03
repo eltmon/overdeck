@@ -830,6 +830,68 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid effort' });
     expect(conversations.listConversations().length).toBe(before);
   });
+
+  it('resume with a body effort persists the resolved level and launches with it (PAN-4254)', async () => {
+    createSupervisorSocket = true;
+    const name = 'resume-body-effort';
+    const session = 'conv-resume-body-effort';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationResume requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'high');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, { effort: 'low' }, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).not.toBe(500);
+      expect(conversations.getConversationByName(name)?.effort).toBe('low');
+      await vi.waitFor(() => {
+        expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+      });
+      expect(launcherFor(session)).toContain('--effort "low"');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('rejects an invalid resume body effort with 400 and leaves the stored value unchanged (PAN-4254)', async () => {
+    const name = 'resume-bogus-effort';
+    const session = 'conv-resume-bogus-effort';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome;
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'high');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, { effort: 'bogus' }, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).toBe(400);
+      expect(decodeJsonResponse(response)).toEqual({ error: 'Invalid effort' });
+      expect(conversations.getConversationByName(name)?.effort).toBe('high');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
 });
 
 describe('companion terminal owner teardown (PAN-3974)', () => {

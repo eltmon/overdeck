@@ -22,6 +22,7 @@ import {
   updateLastAttached,
   setConversationModel,
   setConversationHarness,
+  setConversationEffort,
   backfillConversationModel,
   archiveConversation,
   removeFavorite,
@@ -1112,7 +1113,6 @@ export async function handleConversationResume(
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
-    const effort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : (conv.effort ?? undefined);
     const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
     if (claudeAlive) {
       updateLastAttached(name);
@@ -1125,6 +1125,10 @@ export async function handleConversationResume(
     if (!(await validateCwdContainment(conv.cwd))) return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
     if (model && modelChanged && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (model && modelChanged) setConversationModel(name, model);
+    const bodyEffort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : undefined;
+    if (bodyEffort && !isValidConversationEffort(bodyEffort, harness)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    if (bodyEffort) setConversationEffort(name, resolveConversationEffort({ effort: bodyEffort, model, harness, issueId: conv.issueId ?? undefined }));
+    const effort = bodyEffort ?? conv.effort ?? undefined;
     let canResume = !!oldSessionId;
     if (oldSessionId) {
       const resumeFile = await deps.resolveSessionFile(conv);
@@ -1153,7 +1157,7 @@ export async function handleConversationResume(
       );
       if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
+      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true });
     } catch (error) {
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
