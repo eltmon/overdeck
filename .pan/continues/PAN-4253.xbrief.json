@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:30:28.105Z",
+  "updated": "2026-10-03T02:30:39.328Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "cloister-handoff-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:30:28.105Z"
+    },
+    "effort-relaunch-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:39.327Z"
     }
   }
 }
