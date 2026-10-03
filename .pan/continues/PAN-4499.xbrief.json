@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T23:06:52.231Z",
+  "updated": "2026-10-03T23:07:02.304Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "cli-skill-flags.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T23:06:52.230Z"
+    },
+    "cli-hold-start.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:02.304Z"
     }
   }
 }
