@@ -3,13 +3,14 @@
  * shows its owner on the row and a read-only notice in place of the composer.
  */
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ComposerFooter } from '../ComposerFooter';
 
 import { ConversationRow } from '../../CommandDeck/ConversationRow';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { ConversationMutations } from '../../CommandDeck/useConversationMutations';
+import { installEffortDefaultFetchMock } from '../../../test-utils/strictFetchMock';
 
 vi.mock('../../DialogProvider', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
@@ -40,8 +41,16 @@ vi.mock('../../Settings/modelCatalog', () => ({
   findModelDef: vi.fn(() => ({ name: 'Claude Sonnet 4.6' })),
 }));
 
-afterEach(() => {
+let fetchControl: ReturnType<typeof installEffortDefaultFetchMock>;
+
+beforeEach(() => {
+  fetchControl = installEffortDefaultFetchMock();
+});
+
+afterEach(async () => {
   cleanup();
+  await fetchControl.assertNoUnexpectedRequests();
+  vi.unstubAllGlobals();
 });
 
 const VAULT_ID = '00000000-0000-4000-8000-000000000042';

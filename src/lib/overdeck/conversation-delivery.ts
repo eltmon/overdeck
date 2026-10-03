@@ -19,6 +19,8 @@ import {
 import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
 import { isEffortLevel } from '@overdeck/contracts';
 import { canonicalConversationEffort } from './conversation-effort.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
+import { applyClaudeLiveEffort, LIVE_EFFORT_FAILURE_STATUS } from '../agents/effort-live.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostTransportFor, type HostTransport } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -364,17 +366,63 @@ export async function handleConversationPiAskAnswer(
   }
 }
 
+export interface ConversationThinkingLevelDeps {
+  applyLiveEffort?: typeof applyClaudeLiveEffort;
+  persistEffort?: typeof setConversationEffort;
+}
+
+/**
+ * PAN-4255: claude-code has no control channel, so the change is `/effort
+ * <level>` typed into the pane. The level is stored only after the transcript
+ * confirms it.
+ */
+async function handleClaudeConversationEffort(
+  conv: Conversation,
+  body: Record<string, unknown>,
+  deps: ConversationThinkingLevelDeps,
+): Promise<ReturnType<typeof jsonResponse>> {
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+  const level = body['level'];
+  if (!isEffortLevel(level)) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
+  if (!conv.claudeSessionId) {
+    return jsonResponse({ error: 'The session has no transcript yet; send a message first.' }, { status: 422 });
+  }
+
+  const resolved = resolveEffort({ explicit: level, model: conv.model ?? undefined, harness: 'claude-code' });
+  const result = await (deps.applyLiveEffort ?? applyClaudeLiveEffort)({
+    paneId: conv.tmuxSession,
+    workspace: conv.cwd,
+    sessionId: conv.claudeSessionId,
+    deliveryMethod: resolveConversationDeliveryMethod(conv),
+    caller: 'conversation-effort',
+  }, resolved.effort);
+  if (!result.ok) {
+    return jsonResponse({ error: result.error, code: result.code }, { status: LIVE_EFFORT_FAILURE_STATUS[result.code] });
+  }
+  (deps.persistEffort ?? setConversationEffort)(conv.name, result.effort);
+  return jsonResponse({
+    ok: true,
+    effort: result.effort,
+    source: 'explicit',
+    ...(resolved.warning ? { warning: resolved.warning } : {}),
+  });
+}
+
 export async function handleConversationThinkingLevel(
   name: string,
   body: Record<string, unknown>,
+  deps: ConversationThinkingLevelDeps = {},
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (harness === 'claude-code') return handleClaudeConversationEffort(conv, body, deps);
   const hostTransport = hostTransportFor(harness);
   if (harness !== 'codex' && hostTransport === null && !isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is supported for Codex, ACP, OpenCode, Prime Agent, and Pi conversations' }, { status: 400 });
+    return jsonResponse({ error: 'Thinking level control is supported for Claude Code, Codex, ACP, OpenCode, Prime Agent, and Pi conversations' }, { status: 400 });
   }
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });

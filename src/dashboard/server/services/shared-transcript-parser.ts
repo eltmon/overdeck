@@ -20,6 +20,7 @@ export function parseStateFromSnapshot(initial: ParseResult): ParseState {
     planToolUseIds: new Set(initial.planToolUseIds),
     proposedPlan: initial.proposedPlan,
     latestAssistantUsage: initial.latestAssistantUsage,
+    observedEffort: initial.observedEffort,
     contextBoundaryOffset: initial.contextBoundaryOffset,
     permissionMode: initial.permissionMode,
     countedUsageIds: new Set(initial.countedUsageIds),

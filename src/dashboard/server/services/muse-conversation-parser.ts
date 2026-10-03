@@ -36,7 +36,7 @@ export async function parseMuseConversationMessages(sessionFile: string): Promis
     messages, workLog: [], byteOffset: info.size, streaming, lastTurnCompletedAt,
     totalCost: usage?.cost_v2 ?? 0,
     totalTokens: usage ? usage.usage.inputTokens + usage.usage.outputTokens + (usage.usage.cacheReadTokens ?? 0) : 0,
-    latestAssistantUsage: null, contextBoundaryOffset: 0, contextActiveBytes: info.size,
+    latestAssistantUsage: null, observedEffort: null, contextBoundaryOffset: 0, contextActiveBytes: info.size,
     pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: sequence,
     mtimeMs: info.mtimeMs, planToolUseIds: new Set(), compactBoundaries: [], fileEditsByAssistantId: new Map(),
   };

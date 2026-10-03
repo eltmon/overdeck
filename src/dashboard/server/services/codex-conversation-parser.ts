@@ -239,6 +239,7 @@ export function createCodexConversationAccumulator(sessionFile: string) {
       totalCost,
       totalTokens,
       latestAssistantUsage: null,
+      observedEffort: null,
       contextBoundaryOffset: 0,
       contextActiveBytes: size,
       pendingToolUse: new Map(),

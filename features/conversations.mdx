@@ -39,6 +39,19 @@ colleague.
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
+### Changing effort while a conversation runs
+
+Pick a level in the composer's effort picker while the session runs. For Claude
+Code, Overdeck sends `/effort <level>` to the session and keeps the new level
+only after Claude Code confirms it in the transcript; a session that is mid-turn
+is refused, so try again when it is idle. While the change applies the picker
+reads `Applying…`, and then it shows the level and where it came from, such as
+`High · default` or `Low · set`. `terminal` means the session was changed with
+`/effort` in the native CLI. Claude Code also saves `low` through `xhigh` as the
+default for your own new sessions of that model in `~/.claude/settings.json`;
+Overdeck's sessions always launch with an explicit effort, so they are not
+affected.
+
 The model picker spans the harness (Claude Code, Pi, Codex) and every routed
 provider, each with live per-million pricing — so a mid-conversation swap is one
 click:

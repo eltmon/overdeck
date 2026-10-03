@@ -121,6 +121,8 @@ export interface ContextUsage {
   maxObservedInputTokens?: number;
   /** Model the last assistant turn ran under, from JSONL. May differ from the conversation's stored `model`. */
   lastModel?: string | null;
+  /** PAN-4255: effort observed in the transcript (assistant `effort` or an /effort confirmation). Claude Code only. */
+  lastEffort?: string | null;
   /** ISO timestamp of the last assistant turn. */
   lastTurnAt?: string | null;
 }

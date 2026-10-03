@@ -349,6 +349,7 @@ function snapshotResult(cache: AcpParserCacheEntry, fileSize: number, mtimeMs: n
     totalCost: 0,
     totalTokens: 0,
     latestAssistantUsage: null,
+    observedEffort: null,
     contextBoundaryOffset: 0,
     contextActiveBytes: fileSize,
     pendingToolUse: new Map(

@@ -1,0 +1,863 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T17:33:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4255: Change effort live on claude-code sessions and replace 'Effort unverified' with the effective effort and its source",
+    "updated": "2026-10-03T17:37:54.470Z"
+  },
+  "plan": {
+    "id": "pan-4255",
+    "title": "Change effort live on claude-code sessions and replace 'Effort unverified' with the effective effort and its source",
+    "status": "running",
+    "uid": "b9daaab1-0093-453a-b8d8-7a860cea72de",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-03T17:33:45Z",
+    "updated": "2026-10-03T17:37:54.470Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4255",
+        "label": "PAN-4255",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4255.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (foundation)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "claude-code",
+      "composer",
+      "dashboard",
+      "agents"
+    ],
+    "metadata": {
+      "sizeJustification": "This is already slice S3 of an eight-way decomposition of PAN-4249. The 34 files are one vertical feature: two server doors that share one live-change core, the transcript reader that confirms and observes effort, and the composer chip that calls the doors and shows the result. 14 of the files are tests, 3 are docs. Splitting further would ship a chip with no door or a door no UI calls.",
+      "canonicalFilename": "2026-10-03-PAN-4255-change-effort-live-on-claude-code-sessions-and-replace-effort-unverified-with-the-effective-effort-and-its-source.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "claude-code conversations cannot change effort from the dashboard: POST /api/conversations/:name/thinking-level returns 400 for claude-code, the composer picker is disabled with 'Change effort in the native terminal', and the chip reads 'Effort unverified' for almost every claude-code session. Work agents have no live-change API.",
+      "Proposal": "Deliver '/effort <level>' to the running claude-code pane through the existing verified delivery door (idle check, ensure-main input target, deliverAgentMessage), confirm via Claude Code's 'Set effort level to <level>' transcript record, and only then persist (conversation row, or AgentState effort+effortSource 'explicit'). Add POST /api/agents/:id/effort. Carry the observed effort (assistant 'effort' field or the confirmation record) as ContextUsage.lastEffort and on the agent conversation response. Replace 'Effort unverified' with a '<Level> · <source>' chip computed by a pure resolver, wired through a new useComposerEffort hook. See .pan/drafts/PAN-4255.md.",
+      "NonGoals": "- No /effort auto or /effort ultracode; only the five canonical levels.\n- No writes to ~/.claude/settings.json and no attempt to stop Claude Code saving its per-model default.\n- No live-change door for codex, ACP, OpenCode, kimi-code, muse, or pi agents; existing conversation branches for those harnesses are unchanged.\n- No effort display on the Agents page, issue view, Command Deck rows, pan status/show, cost ledger, or sessions.json (PAN-4259).\n- No effort_source column on conversations and no write-back of a native-terminal /effort change into stored effort.\n- No CLI verb for live effort change.\n- No edits to src/lib/agents/delivery.ts, src/dashboard/server/routes/conversations.ts, or src/dashboard/server/routes/command-deck.ts.\n- No CLIProxy/GPT-via-claude-code effort handling (PAN-4260).\n- No xhigh or max default anywhere; no new `?? 'high'` fallback or effort enum copy."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Confirmation = Claude Code's '<local-command-stdout>Set effort level to <level>' transcript record after the delivery offset; 10 s timeout persists nothing.",
+        "rationale": "Verified empirically on Claude Code 2.1.284: the record appears immediately without a turn, and rejections print 'Invalid argument:'. It is an observed fact, matching the issue's 'verified means observed'."
+      },
+      {
+        "summary": "Refuse a live change with 409 busy only when the session is not idle within 5 s and the runtime mirror affirmatively reports it active; unknown state proceeds. Refuse with 409 permission-pending when the pane shows a permission prompt.",
+        "rationale": "Claude Code queues typed input mid-turn, so a queued /effort could apply after the confirmation window; but a never-used conversation may have no mirror state, and refusing on unknown would block every first change. The pane permission guard mirrors PAN-4278."
+      },
+      {
+        "summary": "Do not restore ~/.claude/settings.json after /effort; document the per-model default side effect instead.",
+        "rationale": "Restoring races Claude Code's own write and could make the running session reload settings and undo the change; Overdeck sessions always launch with --effort so they are unaffected."
+      },
+      {
+        "summary": "Observed effort travels as ContextUsage.lastEffort (beside lastModel) for conversations and as observedEffort/effortResolution on the agent conversation response for agents.",
+        "rationale": "Reuses existing HTTP/WS transport; command-deck.ts (1329/1331 lines) and routes/conversations.ts (1072/1072) cannot grow."
+      },
+      {
+        "summary": "Chip shows '<Level> · <source>' with source words set/item/plan/tier/sub-role/role/project/default/terminal; observed is a separate tooltip/data attribute.",
+        "rationale": "The issue asks for effective effort and its source and bans guessed verification; 'terminal' flags a native /effort change that differs from the stored level."
+      },
+      {
+        "summary": "No effort_source column on conversations: a stored effort reads as 'set'; a null effort resolves through the existing GET /api/effort/default.",
+        "rationale": "Smallest change consistent with S2's storage; no schema migration for a display detail."
+      },
+      {
+        "summary": "The agent door supports claude-code agents only; other harnesses answer 400.",
+        "rationale": "The issue scopes S3 to claude-code; conversation branches for other harnesses already exist and stay unchanged."
+      },
+      {
+        "summary": "Clean the lint-effort baseline row tagged PAN-4255 by deriving ThinkingLevel from EffortLevel.",
+        "rationale": "The PAN-4249 brief tells siblings to lower the baseline for files they own; the row names this issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "transcript-effort-parser",
+        "title": "Add the pure /effort transcript parser leaf module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-effort-transcript.ts",
+            "src/lib/__tests__/claude-effort-transcript.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/claude-effort-transcript.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "claude-effort-transcript.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4255.md W1. Create src/lib/claude-effort-transcript.ts exporting parseEffortCommandStdout(content) -> {kind:'set',level}|{kind:'rejected',message}|null and observedEffortFromRecord(record) -> EffortLevel|null, pure, importing only @overdeck/contracts. Use the exact regexes and record rules in W1 (assistant: effort then perTurnEffort; user string content with a 'Set effort level to' stdout; isSidechain:true -> null). Table-test with the literal low/max/Invalid argument strings from the PRD's Empirical facts section."
+        },
+        "items": [
+          {
+            "id": "transcript-effort-parser.ac1",
+            "title": "Given the literal stdout '<local-command-stdout>Set effort level to low (saved as your default for new sessions): …', parseEffortCommandStdout returns { kind: 'set', level: 'low' }, and the max '(this session only)' string returns level 'max'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-effort-parser.ac2",
+            "title": "Given the literal '<local-command-stdout>Invalid argument: bogus. Valid options are: …' string, parseEffortCommandStdout returns kind 'rejected' with the 'Invalid argument: bogus…' message; the '<command-name>/effort</command-name>' record content returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-effort-parser.ac3",
+            "title": "observedEffortFromRecord returns 'low' for { type: 'assistant', effort: 'low' }, 'xhigh' for an assistant record with only perTurnEffort 'xhigh', and null for a record with isSidechain: true or effort 'auto'; `npx vitest run src/lib/__tests__/claude-effort-transcript.test.ts` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-effort-core",
+        "title": "Add applyClaudeLiveEffort: deliver /effort and wait for the transcript confirmation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4255",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/effort-live.ts",
+            "src/lib/agents/__tests__/effort-live.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/effort-live.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "effort-live.test.ts exits 0 under fake timers",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "conversation-effort-door",
+            "agent-effort-door"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Create src/lib/agents/effort-live.ts with ClaudeLiveEffortTarget, ClaudeLiveEffortResult, injectable deps (waitForIdle, runtimeState, readPane, ensureMain, snapshot, deliver, readSince), the timing constants (5000/10000/250 ms), and applyClaudeLiveEffort(target, level, deps). Steps in order: (1) waitForAgentIdle; refuse 'busy' only when not idle AND getAgentRuntimeStateSync(paneId)?.state === 'active' (unknown state proceeds); (1a) read the pane via resolveAgentPaneIo(paneId).read(PANE_CAPTURE_LINES) and refuse 'permission-pending' when parsePermissionPrompt finds a prompt (PAN-4278), before ensure-main; (2) ensureMainInputTarget; (3) captureTranscriptUserRecordSnapshot offset; (4) deliverAgentMessage(paneId, `/effort ${level}`, caller, deliveryMethod); (5) poll the session file from the offset with fs/promises for the first <local-command-stdout> effort result (set -> ok, rejected -> effort-rejected); (6) timeout -> not-confirmed. Missing file = no records yet. Do not edit src/lib/agents/delivery.ts. Tests use vi.useFakeTimers and vi.advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "live-effort-core.ac1",
+            "title": "Given readSince yields the low confirmation record on the second poll, applyClaudeLiveEffort returns { ok: true, effort: 'low' } and deliver was called exactly once with (paneId, '/effort low', caller, deliveryMethod).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-core.ac2",
+            "title": "Given no confirmation record within 10000 ms of fake time, it returns code 'not-confirmed'; given an 'Invalid argument' record, it returns code 'effort-rejected'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-core.ac3",
+            "title": "Given waitForIdle resolves false and runtimeState returns { state: 'active' }, it returns code 'busy' and deliver is never called; given runtimeState returns null instead, delivery proceeds and deliver is called once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-core.ac4",
+            "title": "Given readPane returns a screen that parsePermissionPrompt recognizes, it returns code 'permission-pending' and neither ensureMain nor deliver is called; given ensureMain returns ok:false it returns 'input-target-not-main' without delivering; given deliver returns ok:false it returns 'not-delivered' and the transcript is never read.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-core.ac5",
+            "title": "`npx vitest run src/lib/agents/__tests__/effort-live.test.ts` exits 0 and `rg -n \"execSync\" src/lib/agents/effort-live.ts` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-effort-door",
+        "title": "Accept claude-code in POST /api/conversations/:name/thinking-level and persist only after confirmation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/__tests__/conversation-live-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-live-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-live-effort.test.ts exits 0",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In handleConversationThinkingLevel add an optional deps param (applyLiveEffort, persistEffort) and route harness 'claude-code' to a private handleClaudeConversationEffort before the existing harness guard: ended -> 422; invalid level -> 400; no claudeSessionId -> 422; clamp with resolveEffort({explicit, model, harness:'claude-code'}); call applyClaudeLiveEffort with paneId conv.tmuxSession, workspace conv.cwd, sessionId conv.claudeSessionId, deliveryMethod resolveConversationDeliveryMethod(conv); ok -> setConversationEffort(name, confirmed) and 200 {ok, effort, source:'explicit', warning?}; failures -> D13 status with {error, code}, never persisting. Leave codex/ACP/pi branches and src/dashboard/server/routes/conversations.ts unchanged."
+        },
+        "items": [
+          {
+            "id": "conversation-effort-door.ac1",
+            "title": "Given a live claude-code conversation and applyLiveEffort resolving { ok: true, effort: 'low' }, a POST body { level: 'low' } returns 200 { ok: true, effort: 'low', source: 'explicit' }, applyLiveEffort received paneId equal to conv.tmuxSession, and persistEffort was called with (name, 'low').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-effort-door.ac2",
+            "title": "Given applyLiveEffort resolves code 'not-confirmed', the handler returns 504 and persistEffort is never called; 'effort-rejected' returns 422 and 'busy' returns 409, also without persisting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-effort-door.ac3",
+            "title": "Given applyLiveEffort resolves code 'permission-pending', the handler returns 409 with code 'permission-pending' and persistEffort is never called; a body { level: 'bogus' } returns 400 without calling applyLiveEffort.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-effort-door.ac4",
+            "title": "`npx vitest run src/lib/overdeck/__tests__/conversation-live-effort.test.ts` exits 0 and `git diff --stat origin/main -- src/dashboard/server/routes/conversations.ts` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-effort-door",
+        "title": "Add POST /api/agents/:id/effort that persists effort to agent state after confirmation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/agent-live-effort.ts",
+            "src/dashboard/server/routes/agents/effort.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/agents/__tests__/agent-live-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/agent-live-effort.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "agent-live-effort.test.ts and no-loss-matrix.test.ts exit 0",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Create handleAgentLiveEffort(rawId, body, deps) in src/lib/agents/agent-live-effort.ts (getAgentState from ./agent-state-read.js; normalizeAgentId from ./identity.js): unknown -> 404; non-claude-code harness -> 400; invalid level -> 400; isAlive verdict not alive -> 422; no workspace/sessionId (getLatestSessionId) -> 422; clamp with resolveEffort; deliveryMethod by the supervisor rule from messaging.ts:784-786; applyClaudeLiveEffort with paneId = agent id, caller 'agent-effort'; ok -> saveAgentStateSync({...fresh state, effort, effortSource:'explicit'}) and 200; failures -> D13 codes without writing state. Add src/dashboard/server/routes/agents/effort.ts (pattern of postAgentPokeRoute, with validateAgentMessageOrigin), register postAgentEffortRoute in the agentsRouteLayer barrel, and add the no-loss-matrix row from the PRD."
+        },
+        "items": [
+          {
+            "id": "agent-effort-door.ac1",
+            "title": "Given a live claude-code agent and applyLiveEffort resolving { ok: true, effort: 'medium' }, the handler returns 200 and saveAgentState is called once with effort 'medium' and effortSource 'explicit'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-effort-door.ac2",
+            "title": "Given applyLiveEffort resolves code 'not-confirmed', the handler returns 504 and saveAgentState is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-effort-door.ac3",
+            "title": "Given a codex agent the handler returns 400 without calling applyLiveEffort; an unknown id returns 404; a dead session returns 422.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-effort-door.ac4",
+            "title": "`rg -n \"'/api/agents/:id/effort'\" src/dashboard/server/routes/agents/effort.ts tests/unit/lib/overdeck/no-loss-matrix.ts` prints a match in both files and `npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observed-effort-context-usage",
+        "title": "Carry observed effort in ContextUsage.lastEffort from the transcript parsers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4255",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/services/conversation/types.ts",
+            "src/dashboard/server/services/conversation/parser.ts",
+            "src/dashboard/server/services/conversation/context-usage.ts",
+            "src/dashboard/server/services/conversation/__tests__/observed-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/observed-effort.test.ts src/dashboard/server/services/__tests__/conversation-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "observed-effort.test.ts and conversation-service.test.ts exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "foundationFor": [
+            "agent-conversation-effort-fields",
+            "composer-effort-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. Add lastEffort (optional NullOr String) to ContextUsage in packages/contracts/src/rpc.ts after lastModel. Add observedEffort: EffortLevel | null to ParseResult and the incremental parser state in types.ts. In parser.ts track observedEffort from observedEffortFromRecord(entry) on every entry, carried from priorState, NOT reset at the compact boundary, returned and carried in state, null in the initial results. In context-usage.ts pass observedEffort into buildContextUsage as lastEffort, from result.observedEffort in contextUsageFromParseResult and from a running observedEffortFromRecord value in readLatestAssistantUsage (checked before the assistant filter)."
+        },
+        "items": [
+          {
+            "id": "observed-effort-context-usage.ac1",
+            "title": "Given a transcript with an assistant record effort 'high' followed by the low /effort confirmation record, contextUsageFromParseResult(parsed, model).lastEffort equals 'low' and computeContextUsage(file, model) resolves lastEffort 'low'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observed-effort-context-usage.ac2",
+            "title": "Given a transcript with no effort fields, both readers return lastEffort null; given a compact boundary after an effort 'low' turn, the incremental parser still reports observedEffort 'low'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observed-effort-context-usage.ac3",
+            "title": "`npx vitest run src/dashboard/server/services/conversation/__tests__/observed-effort.test.ts src/dashboard/server/services/__tests__/conversation-service.test.ts` exits 0 and `npm run typecheck` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-conversation-effort-fields",
+        "title": "Return observedEffort and effortResolution from GET /api/agents/:id/conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "src/dashboard/server/routes/__tests__/agents-conversation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-conversation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-conversation.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In buildAgentConversationResult add observedEffort (result.observedEffort ?? null for claude transcripts, null for codex/ACP) and effortResolution ({effort, source} from resolveRelaunchEffort(state) when the agent state exists, else null) to the 200 body. Checkpoint: if the parse-result spread does not carry observedEffort, set it explicitly. Do not edit src/dashboard/server/routes/command-deck.ts."
+        },
+        "items": [
+          {
+            "id": "agent-conversation-effort-fields.ac1",
+            "title": "Given agent state { effort: 'medium', effortSource: 'role', harness: 'claude-code' } and a transcript whose last assistant record has effort 'low', GET /api/agents/:id/conversation returns observedEffort 'low' and effortResolution { effort: 'medium', source: 'role' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-conversation-effort-fields.ac2",
+            "title": "Given no agent state for the id, the body returns effortResolution null; `npx vitest run src/dashboard/server/routes/__tests__/agents-conversation.test.ts` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-chip-label",
+        "title": "Replace the 'Effort unverified' label with a level-and-source chip in EffortPicker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/effortChip.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/effortChip.test.ts",
+            "src/dashboard/frontend/src/components/chat/EffortPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/EffortPicker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/effortChip.test.ts src/dashboard/frontend/src/components/chat/__tests__/EffortPicker.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "effortChip.test.ts and EffortPicker.test.tsx exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Create effortChip.ts with EffortChip, EFFORT_SOURCE_LABELS (explicit->set, …, terminal), resolveEffortChip({resolved, observed}) implementing rules 1-5 exactly, and effortChipTitle(chip, {liveChangeEnabled, harness}). In EffortPicker.tsx delete the unverified prop and the 'Effort unverified' text; add chip and pending props; the button label is 'Applying…' when pending, '<Short> · <source>' when chip is set (Short: Low, Medium, High, Extra High, Max), else the existing label; add data-testid='effort-chip' and data-observed. Dropdown unchanged."
+        },
+        "items": [
+          {
+            "id": "effort-chip-label.ac1",
+            "title": "resolveEffortChip returns { level: 'low', source: 'terminal', observed: true } for resolved { effort: 'high', source: 'default' } with observed 'low', and { level: 'high', source: 'default', observed: true } when observed is 'high'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-chip-label.ac2",
+            "title": "resolveEffortChip returns { level: 'max', source: null, observed: true } when resolved is null and observed is 'max', and null when both are absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-chip-label.ac3",
+            "title": "EffortPicker renders 'High · default' for chip { level: 'high', source: 'default' }, 'Applying…' when pending, and screen.queryByText('Effort unverified') is null in every rendered case.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-chip-label.ac4",
+            "title": "`rg -n \"Effort unverified\" src/dashboard/frontend/src/components/chat/EffortPicker.tsx` prints nothing and both test files exit 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-effort-wiring",
+        "title": "Wire the composer chip and live change for claude-code conversations and agents through a useComposerEffort hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useComposerEffort.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useComposerEffort.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/lib/contextWindow.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/useComposerEffort.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "useComposerEffort.test.tsx and ComposerFooter.test.tsx exit 0",
+            "typecheck completes without errors",
+            "lint:file-size passes",
+            "lint:effort passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. Map lastEffort in contextWindow.ts. Add observedEffort/effortResolution to MessagesResponse in ConversationPanel.tsx and pass observedEffort={contextWindowUsage?.lastEffort ?? data?.observedEffort ?? null} and effortResolution={data?.effortResolution ?? null} to ComposerFooter (max +6 lines; cap 1531). Create useComposerEffort that owns every effort concern now in ComposerFooter (resolveComposerEffort moves unchanged; effortVerified is deleted): liveChangeEnabled rule, resolution (agent prop / conversation.effort as explicit / fetchEffortDefault via useQuery / local override after a successful pick), chip via resolveEffortChip, pending state, POST to /api/agents/:id/effort when agentId else /api/conversations/:name/thinking-level, error restore + toast.error. ComposerFooter renders EffortPicker with chip/pending/title from the hook and must end at or below 956 lines. Rewrite ComposerFooter.test.tsx:160 to assert the chip instead of 'Effort unverified'. For kimi-code/acp conversations feed the chip the same mapped value resolveComposerEffort gives the picker (medium->high, xhigh->max)."
+        },
+        "items": [
+          {
+            "id": "composer-effort-wiring.ac1",
+            "title": "Given a live claude-code conversation with effort 'high' and observedEffort 'high', the hook returns chip { level: 'high', source: 'explicit', observed: true } and liveChangeEnabled true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-effort-wiring.ac2",
+            "title": "When onChange('low') runs for that conversation, fetch receives POST /api/conversations/<name>/thinking-level with body { level: 'low' }, and after a 200 { effort: 'low' } response the chip renders 'Low · set'; with agentId 'agent-pan-1' the POST goes to /api/agents/agent-pan-1/effort.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-effort-wiring.ac3",
+            "title": "Given a 504 response, the hook restores effort 'high', clears pending, and calls toast.error with the response's error text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-effort-wiring.ac4",
+            "title": "`rg -n \"Effort unverified|effortVerified\" src/dashboard/frontend/src` prints nothing and `wc -l < src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` prints a number at or below 956.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-chip-playwright",
+        "title": "Add a Playwright spec that shows the chip level and source in an isolated browser context",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/effort-chip.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/effort-chip.spec.ts"
+          ],
+          "expected_outputs": [
+            "effort-chip.spec.ts reports 1 passed (or all passed) in Playwright's per-test isolated context"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. Model on src/dashboard/frontend/tests/composer-commands.spec.ts: route-mock /api/conversations (one live claude-code conversation, effort null, claudeSessionId set, and contextUsage.lastEffort 'high' on the row because WS streaming skips the HTTP messages fetch), /api/effort/default* -> {effort:'high', source:'default', requested:'high', clamped:false}, the messages read with contextUsage.lastEffort 'high', and POST **/thinking-level -> {ok:true, effort:'low', source:'explicit'}. Each test uses Playwright's fresh browser context (the isolated profile); do not reuse another agent's browser session. Run against an isolated dashboard if the shared one is unavailable, and inspect the screenshot yourself. Default DASHBOARD_URL http://localhost:3010 as in composer-commands.spec.ts."
+        },
+        "items": [
+          {
+            "id": "effort-chip-playwright.ac1",
+            "title": "Given the mocks, the element getByTestId('effort-chip') renders the text 'High · default' with data-observed='true', and page.getByText('Effort unverified') has count 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-chip-playwright.ac2",
+            "title": "When the operator picks 'Low' from the dropdown, the intercepted POST body equals { level: 'low' } and the chip renders 'Low · set'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-chip-playwright.ac3",
+            "title": "The spec creates its page in Playwright's per-test browser context and exits 0 via `npx playwright test tests/effort-chip.spec.ts`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thinking-level-lint-cleanup",
+        "title": "Derive pi ThinkingLevel from EffortLevel and delete its lint-effort baseline row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/conversation-control.ts",
+            "scripts/lint-effort.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:effort",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint:effort exits 0 with no row for conversation-control.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. Replace the literal union in src/lib/runtimes/conversation-control.ts with `export type ThinkingLevel = 'off' | 'minimal' | Exclude<EffortLevel, 'max'>` importing EffortLevel type from @overdeck/contracts, and delete the `[\"src/lib/runtimes/conversation-control.ts\"]=1 # PAN-4255` row from scripts/lint-effort.sh. Leave THINKING_LEVELS in conversation-delivery.ts unchanged."
+        },
+        "items": [
+          {
+            "id": "thinking-level-lint-cleanup.ac1",
+            "title": "`npm run lint:effort` exits 0 and `rg -n \"conversation-control.ts\" scripts/lint-effort.sh` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-level-lint-cleanup.ac2",
+            "title": "`rg -n \"'low' \\| 'medium'\" src/lib/runtimes/conversation-control.ts` prints nothing and `npm run typecheck` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-effort-docs",
+        "title": "Document live effort change, both doors, the chip, and the settings.json side effect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4255",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rg -n \"## Changing effort on a running session|settings.json\" configuration/effort.mdx",
+            "rg -n \"### Changing effort while a conversation runs\" features/conversations.mdx",
+            "rg -n \"/api/agents/:id/effort\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each rg prints at least one match",
+            "configuration/effort.mdx no longer contains the PAN-4255 sibling-table row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. configuration/effort.mdx: add '## Changing effort on a running session' before '## What honors it today' (picker and both doors send /effort, 10 s confirmation, busy refusal, pinned for relaunch, Claude Code saves low-xhigh as its per-model default in ~/.claude/settings.json and Overdeck does not change that file, chip '<Level> · <source>' vocabulary and what observed means); add a live-change bullet under What honors it today; delete the sibling-table row for #4255. features/conversations.mdx: add '### Changing effort while a conversation runs' under The conversation surface. docs/DASHBOARD-ARCHITECTURE.md: add a 'Live effort (PAN-4255)' bullet after the Delivery modes bullet naming both doors, applyClaudeLiveEffort, the status codes, and the confirmation record."
+        },
+        "items": [
+          {
+            "id": "live-effort-docs.ac1",
+            "title": "configuration/effort.mdx contains the heading '## Changing effort on a running session' and the text '~/.claude/settings.json', and `rg -n 'Effort unverified\" display' configuration/effort.mdx` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-docs.ac2",
+            "title": "features/conversations.mdx contains '### Changing effort while a conversation runs' describing the 'High · default' chip and the 'terminal' source.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-effort-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains '/api/agents/:id/effort' and '/api/conversations/:name/thinking-level' in a bullet that names the 504 not-confirmed response.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "transcript-effort-parser",
+        "to": "live-effort-core",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-effort-parser",
+        "to": "observed-effort-context-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "live-effort-core",
+        "to": "conversation-effort-door",
+        "type": "blocks"
+      },
+      {
+        "from": "live-effort-core",
+        "to": "agent-effort-door",
+        "type": "blocks"
+      },
+      {
+        "from": "observed-effort-context-usage",
+        "to": "agent-conversation-effort-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "observed-effort-context-usage",
+        "to": "composer-effort-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-chip-label",
+        "to": "composer-effort-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-effort-wiring",
+        "to": "effort-chip-playwright",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

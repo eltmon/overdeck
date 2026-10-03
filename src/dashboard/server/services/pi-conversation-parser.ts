@@ -385,6 +385,7 @@ export async function parsePiConversationMessages(sessionFile: string, options: 
     totalCost,
     totalTokens,
     latestAssistantUsage: null,
+    observedEffort: null,
     contextBoundaryOffset: 0,
     contextActiveBytes: fileStats.size,
     pendingToolUse: new Map(),

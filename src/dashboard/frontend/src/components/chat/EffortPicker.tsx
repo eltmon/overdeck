@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { EFFORT_LEVELS, isEffortLevel, type EffortLevel } from '@overdeck/contracts';
 import { useFloatingPickerPosition } from './useFloatingPickerPosition';
+import { EFFORT_SOURCE_LABELS, type EffortChip } from './effortChip';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Effort definitions ───────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ export type { EffortLevel };
 
 const EFFORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High (default)', xhigh: 'Extra High', max: 'Max' };
 const EFFORT_OPTIONS = EFFORT_LEVELS.map((id) => ({ id, label: EFFORT_LABELS[id] }));
+const SHORT_LABELS: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
 
 const EFFORT_STORAGE_KEY = 'conv-composer-effort';
 // Operator default: 'high' — xhigh/max cost far more for almost no extra ROI
@@ -43,13 +45,16 @@ interface EffortPickerProps {
   value: EffortLevel;
   onChange: (effort: EffortLevel) => void;
   disabled?: boolean;
-  unverified?: boolean;
+  /** PAN-4255: a running session's effective level and its source; the button reads `<Level> · <source>`. */
+  chip?: EffortChip | null;
+  /** A live change is in flight. */
+  pending?: boolean;
   title?: string;
   /** Effort level IDs available for the current model. Empty = not supported. */
   availableLevels?: readonly string[];
 }
 
-export function EffortPicker({ value, onChange, disabled = false, availableLevels, unverified = false, title }: EffortPickerProps) {
+export function EffortPicker({ value, onChange, disabled = false, availableLevels, chip = null, pending = false, title }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -84,6 +89,12 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
     setOpen(false);
   }
 
+  const buttonLabel = pending
+    ? 'Applying…'
+    : chip
+      ? `${SHORT_LABELS[chip.level]}${chip.source ? ` · ${EFFORT_SOURCE_LABELS[chip.source]}` : ''}`
+      : selected.label;
+
   if (noEffort) {
     return (
       <div className={styles.pickerContainer}>
@@ -100,8 +111,10 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
         disabled={disabled}
         title={title}
         type="button"
+        data-testid="effort-chip"
+        data-observed={chip ? String(chip.observed) : undefined}
       >
-        <span className={styles.pickerLabel}>{unverified ? 'Effort unverified' : selected.label}</span>
+        <span className={styles.pickerLabel}>{buttonLabel}</span>
         <ChevronDown size={11} />
       </button>
 

@@ -106,6 +106,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents/:id/has-session',                          kind: 'http', disposition: 'READ',       door: 'AgentsResolver.isAlive (duplicate)' },
   { surface: 'POST /api/agents/:id/reset-session',                       kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.switchModel (session-clear)' },
   { surface: 'POST /api/agents/:id/delivery-method',                     kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.setDeliveryMethod' },
+  { surface: 'POST /api/agents/:id/effort',                              kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.setEffort (live /effort, PAN-4255)' },
   { surface: 'POST /api/agents/:id/switch-model',                        kind: 'http', disposition: 'DELETE',     door: 'Agent model locked after spawn; route preserved as 409 compatibility rejection' },
   { surface: 'DELETE /api/agents/:id',                                   kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.stop (DELETE alias)' },
   { surface: 'POST /api/agents/:id/stop',                                kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.stop' },

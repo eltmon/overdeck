@@ -41,7 +41,6 @@ declare -A BASELINE=(
   ["src/lib/launcher-codex-command.ts"]=1                        # PAN-4260
   ["packages/pi-extension/src/index.ts"]=1                       # PAN-4260
   ["packages/ohmypi-extension/src/index.ts"]=1                   # PAN-4260
-  ["src/lib/runtimes/conversation-control.ts"]=1                 # PAN-4255
   ["src/lib/planning/spawn-planning-session.ts"]=2               # PAN-4258
   ["src/cli/commands/plan.ts"]=1                                 # PAN-4258
   ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258

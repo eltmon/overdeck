@@ -40,3 +40,15 @@ export function installStrictFetchMock(handler: FetchHandler) {
     },
   };
 }
+
+/**
+ * PAN-4255: ComposerFooter asks `GET /api/effort/default` for a live session
+ * with no stored effort (its effort chip). Answers only that request.
+ */
+export function installEffortDefaultFetchMock() {
+  return installStrictFetchMock(({ method, url }) => (
+    method === 'GET' && url.startsWith('/api/effort/default?')
+      ? Response.json({ effort: 'high', source: 'default', requested: 'high', clamped: false })
+      : undefined
+  ));
+}
