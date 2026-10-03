@@ -4564,6 +4564,14 @@
   border-radius: 4px;
 }
 
+.composerImageThumbButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  display: inline-flex;
+}
+
 .composerImageMeta {
   display: flex;
   flex-direction: column;
