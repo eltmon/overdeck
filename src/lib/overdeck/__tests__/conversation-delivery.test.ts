@@ -14,17 +14,33 @@ vi.mock('../../config-yaml.js', () => ({
   loadConfigSync: () => ({ config: { codex: { transport } } }),
 }));
 
+let conversationHarness: string = 'codex';
+
 vi.mock('../conversations.js', () => ({
   getConversationById: vi.fn(() => null),
   getConversationByName: vi.fn(() => ({
     id: 1,
     name: 'conv-test',
     tmuxSession: 'conv-test',
-    harness: 'codex',
+    harness: conversationHarness,
   })),
   setConversationEffort: vi.fn(),
   updateConversationDeliveryMethod: vi.fn(),
 }));
+
+vi.mock('../../runtimes/conversation-control.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtimes/conversation-control.js')>();
+  return {
+    ...actual,
+    // PAN-4254: simulate an instant ack so sendConversationControlCommand's
+    // pending promise (used by the pi thinking-level path) resolves without
+    // a real control-channel runtime on the other end.
+    writeConversationControlCommand: vi.fn(async (_session: string, command: { id: string }) => {
+      const { resolveConversationControlAck } = await import('../conversation-delivery.js');
+      resolveConversationControlAck({ id: command.id, ok: true });
+    }),
+  };
+});
 
 vi.mock('../conversation-runtime.js', () => ({
   tmuxSessionExists: vi.fn(async () => true),
@@ -85,6 +101,7 @@ describe('conversation codex approvals', () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-conv-delivery-'));
     process.env.OVERDECK_HOME = tmpHome;
     transport = 'app-server';
+    conversationHarness = 'codex';
     nextResponses = [];
     httpBodies.length = 0;
     vi.clearAllMocks();
@@ -108,6 +125,30 @@ describe('conversation codex approvals', () => {
   it('does not persist an effort change when the live host is unavailable', async () => {
     await expect(handleConversationThinkingLevel('conv-test', { level: 'high' })).rejects.toThrow('socket missing');
     expect(setConversationEffort).not.toHaveBeenCalled();
+  });
+
+  it('accepts max for a codex conversation (PAN-4254)', async () => {
+    seedAppServerFiles();
+    const response = await handleConversationThinkingLevel('conv-test', { level: 'max' });
+    expect(response.status).toBe(200);
+    expect(httpBodies).toEqual([{ op: 'set-effort', effort: 'max' }]);
+    expect(setConversationEffort).toHaveBeenCalledWith('conv-test', 'max');
+  });
+
+  it('rejects a bogus thinking level with 400 (PAN-4254)', async () => {
+    const response = await handleConversationThinkingLevel('conv-test', { level: 'bogus' });
+    expect(response.status).toBe(400);
+    expect(setConversationEffort).not.toHaveBeenCalled();
+  });
+
+  it('sends set_thinking_level off to a pi conversation and stores it canonically as low (PAN-4254)', async () => {
+    conversationHarness = 'ohmypi';
+
+    const response = await handleConversationThinkingLevel('conv-test', { level: 'off' });
+
+    expect(response.status).toBe(200);
+    expect(httpBodies).toHaveLength(0);
+    expect(setConversationEffort).toHaveBeenCalledWith('conv-test', 'low');
   });
 
   it('sources app-server pending approval input from status without pane capture', async () => {
