@@ -45,6 +45,7 @@ import {
   canReplaceTitle,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { isSupersededConversation } from './conversation-clear-chain.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
@@ -384,7 +385,7 @@ export async function getConversationsPendingInputFeed(
     const conversations = listConversations({ limit: 1000 });
     const liveSessionNames = new Set(await deps.listSessionNames());
     const alive = conversations.filter(
-      (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
+      (conv) => !conv.forkStatus && !isSupersededConversation(conv) && liveSessionNames.has(conv.tmuxSession),
     );
     const rows = await withConcurrencyLimit(
       alive.map((conv) => async () => {

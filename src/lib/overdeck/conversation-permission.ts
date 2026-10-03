@@ -21,6 +21,7 @@ import {
   getConversationByName,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
 import {
   parsePermissionPrompt,
   permissionKeystrokes,
@@ -236,6 +237,8 @@ export async function handleConversationPermissionAnswer(
     if (!isClaudeCodeConversation(conv)) {
       return { body: { error: 'Not a Claude Code conversation' }, status: 400 };
     }
+    // PAN-4485: a superseded /clear row answers nothing; its chain head does.
+    if (isSupersededConversation(conv)) return { body: clearedConversationRefusal(conv), status: 409 };
 
     const io = deps.io ?? await resolveAgentPaneIo(conv.tmuxSession);
     const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));

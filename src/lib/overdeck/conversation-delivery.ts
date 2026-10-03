@@ -16,6 +16,7 @@ import {
   updateConversationDeliveryMethod,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
 import { isEffortLevel } from '@overdeck/contracts';
 import { canonicalConversationEffort } from './conversation-effort.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -239,6 +240,8 @@ export async function handleConversationPlanAction(
     if (!conv) {
       return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     }
+    // PAN-4485: a superseded /clear row answers nothing; its chain head does.
+    if (isSupersededConversation(conv)) return jsonResponse(clearedConversationRefusal(conv), { status: 409 });
     const action = typeof body['action'] === 'string' ? body['action'] : '';
     const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
     const error = await deliverPlanActionToSession(

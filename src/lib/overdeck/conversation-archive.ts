@@ -1,5 +1,6 @@
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { parseRelativeTime } from '../conversations/search.js';
+import { isSupersededConversation } from './conversation-clear-chain.js';
 import {
   archiveConversation,
   getConversationByName,
@@ -150,8 +151,10 @@ export async function archiveConversationByName(
     if (!conv) return result({ error: 'Conversation not found' }, 404);
     if (conv.archivedAt) return result({ error: 'Conversation is already archived' }, 400);
 
-    await deps.stopConversationRuntime(conv, name);
-    markConversationEnded(name);
+    // PAN-4485: a superseded /clear row owns no runtime; archiving it must
+    // not stop the chain head's shared session.
+    if (!isSupersededConversation(conv)) await deps.stopConversationRuntime(conv, name);
+    if (conv.status !== 'ended') markConversationEnded(name);
     archiveConversation(name);
     removeFavorite('conversation', name);
     deps.invalidateFavoritesCache();

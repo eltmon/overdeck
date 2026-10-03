@@ -40,7 +40,8 @@ import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
-import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
+import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
+import { isSupersededConversation, resolveClearChainHead } from './conversation-clear-chain.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -271,11 +272,11 @@ export function conversationSessionAliveFromState(
 }
 
 export function conversationNeedsRunningRepair(
-  conv: Pick<Conversation, 'status' | 'forkStatus'>,
+  conv: Pick<Conversation, 'status' | 'forkStatus'> & { clearedToConvId?: number | null },
   tmuxSessionAlive: boolean,
   harnessProcessAlive: boolean,
 ): boolean {
-  return conv.status === 'ended' && !conv.forkStatus && tmuxSessionAlive && harnessProcessAlive;
+  return conv.status === 'ended' && !conv.forkStatus && conv.clearedToConvId == null && tmuxSessionAlive && harnessProcessAlive;
 }
 /** Generate a default conversation name, e.g. 20260404-1234 */
 export function generateConversationName(): string {
@@ -1079,15 +1080,19 @@ export async function handleConversationCreate(
 }
 export async function handleConversationStop(name: string, deps: { resolveSessionFileForCleanup?: (conv: Conversation) => string | null }): Promise<ReturnType<typeof jsonResponse>> {
   try {
-    const conv = getConversationByName(name);
-    if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    await stopConversationRuntime(conv, name);
-    markConversationEnded(name);
+    const requested = getConversationByName(name);
+    if (!requested) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    // PAN-4485: a superseded /clear row owns no runtime; its chain head does.
+    const conv = isSupersededConversation(requested) ? resolveClearChainHead(requested) : requested;
+    if (conv !== requested && requested.status !== 'ended') markConversationEnded(requested.name);
+    if (!conv) return jsonResponse({ success: true });
+    await stopConversationRuntime(conv, conv.name);
+    markConversationEnded(conv.name);
     void (async () => {
       await new Promise((r) => setTimeout(r, 500));
       await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile: deps.resolveSessionFileForCleanup?.(conv) ?? null });
     })();
-    return jsonResponse({ success: true });
+    return jsonResponse({ success: true, ...(conv !== requested ? { stoppedConversation: conv.name } : {}) });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] stop conversation failed:', msg);
@@ -1115,15 +1120,22 @@ export async function handleConversationResume(
   deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null> },
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
-    const conv = getConversationByName(name);
+    let conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
+    // PAN-4485: never respawn a superseded /clear row into the shared session — resume its chain head.
+    const requestedName = name;
+    if (isSupersededConversation(conv)) {
+      const head = resolveClearChainHead(conv);
+      if (!head) return jsonResponse({ error: 'Conversation was cleared and its continuation is unavailable', code: 'conversation-cleared' }, { status: 409 });
+      conv = head; name = head.name;
+    }
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
     const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
     if (claudeAlive) {
       updateLastAttached(name);
       markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', reattached: true });
+      return jsonResponse({ ...conv, status: 'active', reattached: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     }
     const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
     const harness: RuntimeName = conv.harness ?? 'claude-code';
@@ -1163,7 +1175,7 @@ export async function handleConversationResume(
       );
       if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true });
+      return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     } catch (error) {
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
@@ -1186,8 +1198,10 @@ export async function handleConversationDelete(
   try {
     const conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    await stopConversationRuntime(conv, name);
-    markConversationEnded(name);
+    // PAN-4485: a superseded /clear row owns no runtime; deleting it must not
+    // stop the chain head's shared session.
+    if (!isSupersededConversation(conv)) await stopConversationRuntime(conv, name);
+    if (conv.status !== 'ended') markConversationEnded(name);
     archiveConversation(name);
     removeFavorite('conversation', name);
     deps.invalidateFavoritesCache();
@@ -1196,57 +1210,6 @@ export async function handleConversationDelete(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] delete conversation failed:', msg);
-    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-export async function handleConversationRestartAll(
-  deps: { resolveSessionFile: (conv: Conversation) => Promise<string | null> },
-): Promise<ReturnType<typeof jsonResponse>> {
-  try {
-    const allConvs = listConversations();
-    const liveSessionNames = await listLiveConversationSessions();
-    if (!liveSessionNames) return jsonResponse({ error: 'Terminal backend did not answer; no conversation restarted' }, { status: 503 });
-    const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
-    const results: { name: string; model: string | null; status: string }[] = [];
-    for (const conv of convs) {
-      const respawn = markRespawnPending(conv.tmuxSession);
-      let attemptedHarness: RuntimeName = conv.harness ?? 'claude-code';
-      try {
-        await closeConversationPane(conv.tmuxSession);
-        const oldSessionId = conv.claudeSessionId;
-        const sessionFileForResume = await deps.resolveSessionFile(conv);
-        const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
-        const harness = await resolveAllowedHarness(conv.harness, conv.model);
-        attemptedHarness = harness;
-        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') {
-          await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
-        }
-        if (harness === 'kimi-code' && !conv.bareContext) {
-          await deliverMandatoryKimiResumeContext(
-            conv.tmuxSession, conv.cwd, resolveConversationDeliveryMethod(conv),
-          );
-        }
-        setConversationHarness(conv.name, harness);
-        markConversationActive(conv.name);
-        results.push({ name: conv.name, model: conv.model, status: 'restarted' });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
-        // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
-        // acp — a failed capture must not leave a running tmux session with no
-        // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse' || attemptedHarness === 'prime-agent') await stopConversationRuntime(conv, conv.name);
-        results.push({ name: conv.name, model: conv.model, status: 'failed' });
-      } finally {
-        respawn.done();
-      }
-    }
-    console.log(`[conversations] Restarted ${results.filter(r => r.status === 'restarted').length}/${convs.length} conversations`);
-    return jsonResponse({ restarted: results.length, results });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[conversations] restart conversations failed:', msg);
     return jsonResponse({ error: 'Internal server error' }, { status: 500 });
   }
 }
