@@ -45,6 +45,7 @@ import {
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import { conversationLaunchContext } from './conversation-launch-context.js';
 import { ConversationSkillFlagError, parseSkillFlagList, resolveConversationSkillFlags } from '../skill-overrides/conversation-flags.js';
+import { holdKickoff } from './conversation-kickoff-store.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -199,6 +200,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
     ...(params.title !== undefined ? { title: params.title } : {}),
+    ...(params.hold ? { hold: true } : {}),
   };
 }
 
@@ -417,6 +419,21 @@ export function handleForkPipelineFailure(name: string, err: unknown): void {
   markConversationEnded(name);
 }
 
+/** PAN-4499 D7: the shared delivery tail for a fork's kickoff — a fresh fork or a kickoff door claim. */
+export async function deliverForkSeed(conv: Conversation, seed: string, caller: string): Promise<void> {
+  const injection = await self.injectForkSummary(conv, seed, caller);
+  markConversationActive(conv.name);
+  if (injection === 'stranded') {
+    updateForkStatus(
+      conv.name,
+      'failed',
+      'Summary was delivered to the terminal but never submitted. Open the Terminal tab and press Enter to submit it; the session is alive.',
+    );
+    return;
+  }
+  updateForkStatus(conv.name, null);
+}
+
 export async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
@@ -431,6 +448,7 @@ export async function runForkPipeline(
   handoffAuthorModel?: string,
   handoffAuthorHarness?: RuntimeName,
   customTitle?: string,
+  hold = false,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -560,17 +578,13 @@ export async function runForkPipeline(
   }
   updateForkStatus(convName, 'spawning');
   await self.ensureForkSessionReady(conv, sessionId, false);
-  const injection = await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
-  markConversationActive(convName);
-  if (injection === 'stranded') {
-    updateForkStatus(
-      convName,
-      'failed',
-      'Summary was delivered to the terminal but never submitted. Open the Terminal tab and press Enter to submit it; the session is alive.',
-    );
+  if (hold) {
+    holdKickoff(convName, summary);
+    markConversationActive(convName);
+    updateForkStatus(convName, null);
     return;
   }
-  updateForkStatus(convName, null);
+  await self.deliverForkSeed(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 }
 
 function parsePersistedForkRequest(raw: string): ForkRequest | null {
@@ -676,6 +690,7 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthorModel,
         request.handoffAuthorHarness,
         request.title,
+        request.hold === true,
       ));
       recovered += 1;
     } catch (error) {
@@ -752,6 +767,10 @@ export async function handleConversationSummaryFork(
     } else if (body['plain'] === true) {
       console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
       forkMode = 'plain';
+    }
+    const hold = body['hold'] === true;
+    if (hold && forkMode === 'plain') {
+      return jsonResponse({ error: 'hold is not supported for plain forks' }, { status: 400 });
     }
     const focusResult = parseSummaryForkFocus(body['focus']);
     if (!focusResult.ok) {
@@ -931,13 +950,14 @@ export async function handleConversationSummaryFork(
       ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
       ...(customTitle !== undefined ? { title: customTitle } : {}),
+      ...(hold ? { hold: true } : {}),
     });
     // Every later spawn of this conversation reads its pane role from here.
     await writeConversationPaneRole(newTmux, paneRole);
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(
-      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle),
+      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle, hold),
     ).catch((err) => {
       handleForkPipelineFailure(newConv.name, err);
     });
