@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:29:16.608Z",
+  "updated": "2026-10-03T02:29:28.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "messaging-fallback-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:29:16.608Z"
+    },
+    "spawnconfig-effort-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:28.802Z"
     }
   }
 }
