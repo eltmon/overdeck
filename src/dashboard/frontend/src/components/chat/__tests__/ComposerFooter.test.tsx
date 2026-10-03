@@ -61,8 +61,8 @@ vi.mock('../defaultConversationModel', () => ({
 }));
 
 vi.mock('../EffortPicker', () => ({
-  EffortPicker: ({ value, onChange, unverified }: { value: string; onChange: (value: string) => void; unverified?: boolean }) => (
-    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{unverified ? 'Effort unverified' : value}</button>
+  EffortPicker: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
+    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{value}</button>
   ),
   loadStoredEffort: () => storedEffort.value,
 }));
@@ -157,7 +157,7 @@ describe('ComposerFooter attachments', () => {
     storedEffort.value = 'max';
     render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);
 
-    expect(screen.getByTestId('effort-picker')).toHaveTextContent('Effort unverified');
+    expect(screen.getByTestId('effort-picker')).not.toHaveTextContent('max');
   });
 
   it('uses the browser default only before a conversation session exists', () => {

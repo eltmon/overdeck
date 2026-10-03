@@ -144,7 +144,6 @@ function ComposerFooterInput({
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(resolvedConversationEffort);
-  const [effortVerified, setEffortVerified] = useState(Boolean(conversation.effort));
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending attachments, and their upload pump live in the module-level
@@ -176,7 +175,6 @@ function ComposerFooterInput({
 
   useEffect(() => {
     setEffort(resolvedConversationEffort);
-    setEffortVerified(Boolean(conversation.effort));
   }, [conversation.name, conversation.effort, resolvedConversationEffort]);
 
   const piConversation = isPiConversation(conversation);
@@ -297,7 +295,6 @@ function ComposerFooterInput({
       }
       const acknowledged = await res.json() as { effort?: EffortLevel };
       setEffort(acknowledged.effort ?? nextEffort);
-      setEffortVerified(true);
     })().catch((err: unknown) => {
       console.error('[ComposerFooter] Failed to set thinking level:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to set thinking level');
@@ -800,7 +797,7 @@ function ComposerFooterInput({
             </span>
           )}
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker unverified={!effortVerified && Boolean(conversation.sessionAlive || conversation.claudeSessionId)} title={(!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode') ? 'Change effort in the native terminal for this session.' : 'Changes apply to subsequent turns after runtime acceptance.'} value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive || Boolean(agentId) || (!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode')} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker title={(!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode') ? 'Change effort in the native terminal for this session.' : 'Changes apply to subsequent turns after runtime acceptance.'} value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive || Boolean(agentId) || (!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode')} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
             <select

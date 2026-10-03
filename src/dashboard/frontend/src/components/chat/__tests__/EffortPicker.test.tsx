@@ -62,3 +62,45 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     expect(screen.queryByTestId('effort-picker-dropdown')).not.toBeInTheDocument();
   });
 });
+
+describe('chat EffortPicker chip label (PAN-4255)', () => {
+  it('renders the level and source for a launch value', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'high', source: 'default', observed: false }} />);
+
+    const chip = screen.getByTestId('effort-chip');
+    expect(chip).toHaveTextContent('High · default');
+    expect(chip).toHaveAttribute('data-observed', 'false');
+    expect(screen.queryByText('Effort unverified')).toBeNull();
+  });
+
+  it('renders a native-terminal change', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'low', source: 'terminal', observed: true }} />);
+
+    const chip = screen.getByTestId('effort-chip');
+    expect(chip).toHaveTextContent('Low · terminal');
+    expect(chip).toHaveAttribute('data-observed', 'true');
+    expect(screen.queryByText('Effort unverified')).toBeNull();
+  });
+
+  it('renders an observed level with no known source', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'xhigh', source: null, observed: true }} />);
+
+    expect(screen.getByTestId('effort-chip')).toHaveTextContent(/^Extra High$/);
+  });
+
+  it('renders Applying… while a change is pending', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} pending chip={{ level: 'high', source: 'explicit', observed: true }} />);
+
+    expect(screen.getByTestId('effort-chip')).toHaveTextContent('Applying…');
+    expect(screen.queryByText('Effort unverified')).toBeNull();
+  });
+
+  it('falls back to the draft label without a chip', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} />);
+
+    const chip = screen.getByTestId('effort-chip');
+    expect(chip).toHaveTextContent('High (default)');
+    expect(chip).not.toHaveAttribute('data-observed');
+    expect(screen.queryByText('Effort unverified')).toBeNull();
+  });
+});
