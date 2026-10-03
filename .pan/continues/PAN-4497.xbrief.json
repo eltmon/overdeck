@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4497",
   "created": "2026-10-03T21:34:28.916Z",
-  "updated": "2026-10-03T22:09:38.242Z",
+  "updated": "2026-10-03T22:12:22.240Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4497",
       "claimedAt": "2026-10-03T22:09:01.574Z",
       "doneAt": "2026-10-03T22:09:38.241Z"
+    },
+    "stable-keys-remeasure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T22:12:22.240Z"
     }
   }
 }
