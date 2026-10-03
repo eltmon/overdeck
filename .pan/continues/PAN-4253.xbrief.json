@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:27:43.839Z",
+  "updated": "2026-10-03T02:27:56.050Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "spawn-prep-resume-honors-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:27:43.839Z"
+    },
+    "resume-reapplies-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:56.049Z"
     }
   }
 }
