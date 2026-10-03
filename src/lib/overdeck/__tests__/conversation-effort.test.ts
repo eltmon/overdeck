@@ -52,3 +52,19 @@ describe('canonicalConversationEffort', () => {
     expect(canonicalConversationEffort('xhigh')).toBe('xhigh');
   });
 });
+
+describe('spawnConversationSession effort validation (PAN-4254 regression)', () => {
+  it('throws an Invalid effort level error for a bogus value on claude-code', async () => {
+    const { spawnConversationSession } = await import('../conversation-runtime.js');
+    await expect(spawnConversationSession(
+      'conv-bogus-effort',
+      '/tmp',
+      'session-bogus-effort',
+      'claude-opus-5-5',
+      'bogus',
+      undefined,
+      false,
+      'claude-code',
+    )).rejects.toThrow('Invalid effort level');
+  });
+});

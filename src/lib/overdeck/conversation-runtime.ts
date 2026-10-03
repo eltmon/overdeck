@@ -52,6 +52,7 @@ import { canUseHarness } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModel, piProviderForModel, UnknownModelError } from '../providers.js';
+import { resolveConversationEffort } from './conversation-effort.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -202,7 +203,7 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
 // pattern once rejected (PAN-2979). Shell safety comes from single-quote
 // wrapping at the launcher, not from this character set.
 const SAFE_MODEL_PATTERN = MODEL_ID_PATTERN;
-export const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/; // shared with the lane door (PAN-4223 D20)
+export const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/; // lane door only (PAN-4223 D20); conversations validate through conversation-effort.ts (PAN-4254)
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 const PI_CONVERSATION_SOURCE_CONTRACT = [
   'Pi conversation source contract:',
@@ -550,7 +551,7 @@ export async function spawnConversationSession(
   cwd: string,
   claudeSessionId: string,
   model?: string,
-  effort: string = 'high',
+  effort?: string,
   issueId?: string,
   resume = false,
   harness: RuntimeName = 'claude-code',
@@ -559,6 +560,7 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
+  const launchEffort = resolveConversationEffort({ effort, model, harness, issueId });
   const harnessLaunch = await prepareHarnessLaunch(harness, { model });
   const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
@@ -592,7 +594,7 @@ export async function spawnConversationSession(
   const museFields = harness === 'muse' ? {
     harness: 'muse' as const,
     museModel: model,
-    museEffort: effort,
+    museEffort: launchEffort,
     museContextFile: bareContext ? undefined : await materializeMuseContext(tmuxSession, cwd),
     museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
   } : undefined;
@@ -607,7 +609,7 @@ export async function spawnConversationSession(
       : undefined;
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
-      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', effort),
+      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort),
       ...(bareContext ? { acpContextFile: undefined } : {}),
       resumeSessionId,
     };
@@ -618,7 +620,7 @@ export async function spawnConversationSession(
     // Unlike acp-session-id, the pointer and the recorded id stay: the host
     // verifies the resumed session against both (D7).
     primeLaunch = await getPrimeAgentLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, {
-      authMode: await getProviderAuthMode(model), effort,
+      authMode: await getProviderAuthMode(model), effort: launchEffort,
       resumeSessionFile: resume ? await requirePrimeAgentSessionFile(tmuxSession) : undefined,
       withContext: !bareContext,
     });
@@ -650,7 +652,7 @@ export async function spawnConversationSession(
         : undefined;
       piFields = {
         harness: 'ohmypi',
-        piEffort: effort ?? 'high',
+        piEffort: launchEffort,
         piMode: 'tui',
         piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
         piSessionDir,
@@ -671,7 +673,7 @@ export async function spawnConversationSession(
       initCodexHome(codexHome, {
         trustedDir: cwd,
         model,
-        effort,
+        effort: launchEffort,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
@@ -683,7 +685,7 @@ export async function spawnConversationSession(
       codexFields = {
         harness: 'codex',
         codexMode: codexTransport,
-        codexEffort: effort ?? 'high',
+        codexEffort: launchEffort,
         codexHome,
         codexSessionDir: codexSessionsRoot(codexHome),
         ...(codexTransport === 'app-server' ? { codexNativeEndpoint: true } : {}),
@@ -709,7 +711,7 @@ export async function spawnConversationSession(
         kimiCodeModel: model,
         kimiCodeYolo: true,
         kimiContextDelivery: 'initial-message',
-        kimiCodeEffort: effort ?? 'high',
+        kimiCodeEffort: launchEffort,
         ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
       };
     }
@@ -718,9 +720,6 @@ export async function spawnConversationSession(
   if (behavior.contextLayerKind === 'pi' && model) {
     const piProvider = piProviderForModel(model);
     if (piProvider) launcherModel = `${piProvider}/${model}`;
-  }
-  if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) {
-    throw new Error('Invalid effort level');
   }
   const backend = launch.backend ?? await resolveLaunchBackend();
   const useSupervisor = conversationUsesSupervisor(harness, backend.name, { codexTransport });
@@ -815,7 +814,7 @@ export async function spawnConversationSession(
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !primeLaunch && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !primeLaunch && !kimiCodeFields && !museFields ? `--effort "${launchEffort}"` : undefined,
         keepAlive: backend.name === 'tmux', // a sleep loop in a Herdr pane reads as a live harness (#3992)
         execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,

@@ -140,6 +140,9 @@ vi.mock('../../../../lib/tmux.js', () => ({
   // Real implementation asks systemd for the managed tmux server's MainPID and
   // returns undefined when there is none — the shape these tests run under.
   findManagedServerPid: vi.fn(() => undefined),
+  // PAN-4254 regression tests resume/restart a conversation that was never
+  // really spawned, so no harness process exists to detect as alive.
+  isHarnessProcessAlive: vi.fn(async () => false),
 }));
 
 // PAN-3974: owner teardown must close the companion terminal first. The spy
@@ -173,6 +176,15 @@ vi.mock('../../../../lib/agents/runtime-command.js', async (importOriginal) => {
   return { ...actual, waitForPromptReady: vi.fn(async (...args: Parameters<typeof actual.waitForPromptReady>) =>
     args[1] === 'muse' ? false : actual.waitForPromptReady(...args)) };
 });
+
+// PAN-4254 regression: handleConversationResume's claudeAlive check probes the
+// real Herdr socket (this host's default backend), which is indeterminate —
+// not absent — in a test environment and would otherwise short-circuit resume
+// into a reattach instead of a respawn.
+vi.mock('../../../../lib/overdeck/conversation-liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-liveness.js')>()),
+  conversationHarnessAlive: vi.fn(async () => false),
+}));
 
 function conversationDir(session: string): string {
   return join(overdeckHome, 'conversations', session);
@@ -706,6 +718,62 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('resumes a conversation whose stored effort is xhigh with --effort "xhigh" (PAN-4254 regression)', async () => {
+    createSupervisorSocket = true;
+    const name = 'resume-xhigh';
+    const session = 'conv-resume-xhigh';
+    const previousHome = process.env.HOME;
+    process.env.HOME = overdeckHome; // handleConversationResume requires conv.cwd under $HOME
+    try {
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: overdeckHome,
+        claudeSessionId: 'old-claude-session',
+        model: 'claude-opus-5-5',
+        harness: 'claude-code',
+      });
+      conversations.setConversationEffort(name, 'xhigh');
+      const { handleConversationResume } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const response = await handleConversationResume(name, {}, { resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+      expect(response.status).not.toBe(500);
+      await vi.waitFor(() => {
+        expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+      });
+      expect(launcherFor(session)).toContain('--effort "xhigh"');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+    }
+  });
+
+  it('restarts a live conversation whose stored effort is xhigh with --effort "xhigh" (PAN-4254 regression)', async () => {
+    createSupervisorSocket = true;
+    const name = 'restart-xhigh';
+    const session = 'conv-restart-xhigh';
+    listedSessionNames = [session];
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+    conversations.createConversation({
+      name,
+      tmuxSession: session,
+      cwd: tmpdir(),
+      claudeSessionId: 'old-claude-session',
+      model: 'claude-opus-5-5',
+      harness: 'claude-code',
+    });
+    conversations.setConversationEffort(name, 'xhigh');
+    const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    const restart = await handleConversationRestartAll({ resolveSessionFile: vi.fn().mockResolvedValue(null) });
+
+    const result = decodeJsonResponse(restart);
+    expect(result['results']).toEqual([{ name, model: 'claude-opus-5-5', status: 'restarted' }]);
+    expect(launcherFor(session)).toContain('--effort "xhigh"');
   });
 });
 
