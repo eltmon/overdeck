@@ -9,6 +9,7 @@ import { resolveSessionFile } from '../../lib/overdeck/conversation-reads.js';
 
 interface HandoffOptions {
   model?: string;
+  effort?: string;
   harness?: string;
   cwd?: string;
   project?: string;
@@ -126,6 +127,7 @@ export async function handoffCommand(
   try {
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
+      effort: options.effort,
       cwd: options.cwd,
       projectKey: options.project,
       issueId,
@@ -164,6 +166,7 @@ export async function handoffCommand(
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
+  console.log(chalk.gray(`  Effort: ${newConv.effort || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
   if (newConv.projectKey) console.log(chalk.gray(`  Project: ${newConv.projectKey}`));
   console.log(chalk.gray(`  Issue: ${newConv.issueId ?? 'none'}${options.issue ? ' (from --issue)' : ''}`));

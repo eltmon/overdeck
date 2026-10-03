@@ -146,6 +146,13 @@ describe('ComposerFooter attachments', () => {
     expect(screen.getByTestId('effort-picker')).toHaveTextContent('low');
   });
 
+  it('renders a pi off effort as low (PAN-4254)', () => {
+    storedEffort.value = 'max';
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi', effort: 'off' }} />);
+
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('low');
+  });
+
   it('does not use the browser default for an existing session with no persisted effort', () => {
     storedEffort.value = 'max';
     render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);

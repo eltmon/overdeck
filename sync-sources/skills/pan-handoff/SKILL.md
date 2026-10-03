@@ -67,6 +67,7 @@ pan handoff self continue the API wiring # same, with focus
 pan handoff 42
 pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
+pan handoff source-conv --effort low cheap follow-up
 pan handoff source-conv --harness pi
 pan handoff source-conv --cwd /home/you/Projects/project/workspaces/feature-pan-123
 pan handoff source-conv --cwd /home/you/Projects/isolated-worktree --project mind-your-now
@@ -85,6 +86,8 @@ Use `--project <key-or-name>` when the successor runs from a `--cwd` outside the
 Use `--issue <id>` to attach the new conversation to a specific issue (e.g. `PAN-1234`). The flag is validated; an invalid ID rejects the request and creates no conversation. When `--issue` is omitted, the new conversation inherits the source conversation's issue association, if any. With `--issue` and no `--cwd`, the new conversation starts in the issue workspace (`workspaces/feature-<issue>`) when it exists.
 
 Use `--role <role>` to set the new conversation's pane role: `conversation` (the default), `work`, `review`, `test` or `plan`. A handoff with `--issue` and `--role review` appears as that issue's Review row in the dashboard; without `--role` it is an issue-scoped conversation. The role sticks across every respawn and resume of that conversation.
+
+Use `--effort <level>` to set the new conversation's reasoning effort: `low`, `medium`, `high`, `xhigh` or `max`. Without the flag, the successor inherits the source conversation's effort (clamped to the new model when it differs). The server validates the value; an invalid level is rejected.
 
 ## When to use
 

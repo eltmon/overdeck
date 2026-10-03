@@ -17,6 +17,8 @@ import {
   type LegacyConversation as Conversation,
 } from './conversations.js';
 import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
+import { isEffortLevel } from '@overdeck/contracts';
+import { canonicalConversationEffort } from './conversation-effort.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostTransportFor, type HostTransport } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -379,7 +381,7 @@ export async function handleConversationThinkingLevel(
   }
 
   const level = harness === 'codex' || hostTransport !== null
-    ? (typeof body['level'] === 'string' && ['low', 'medium', 'high', 'xhigh', 'max'].includes(body['level']) ? body['level'] : null)
+    ? (isEffortLevel(body['level']) ? body['level'] : null)
     : parseThinkingLevel(body['level']);
   if (!level) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
 
@@ -394,7 +396,7 @@ export async function handleConversationThinkingLevel(
   } else {
     await sendConversationControlCommand(conv, { type: 'set_thinking_level', level: level as ThinkingLevel });
   }
-  setConversationEffort(name, level);
+  setConversationEffort(name, canonicalConversationEffort(level));
   const updated = getConversationByName(name) ?? conv;
   return jsonResponse({ ok: true, effort: updated.effort ?? level });
 }
