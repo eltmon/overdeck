@@ -4,17 +4,17 @@
     "created": "2026-10-03T17:01:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4492: Composer messages to Claude Code on Herdr sometimes arrive without Enter: Herdr delivery has no submit verification",
-    "updated": "2026-10-03T17:08:27.384Z"
+    "updated": "2026-10-03T17:08:51.949Z"
   },
   "plan": {
     "id": "pan-4492",
     "title": "Composer messages to Claude Code on Herdr sometimes arrive without Enter: Herdr delivery has no submit verification",
-    "status": "proposed",
+    "status": "running",
     "uid": "6784cbf6-d6ce-4b36-bd2c-3c9b7fe4e411",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T17:01:37Z",
-    "updated": "2026-10-03T17:08:27.384Z",
+    "updated": "2026-10-03T17:08:51.949Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4492",
@@ -529,5 +529,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
