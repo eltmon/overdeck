@@ -18,6 +18,7 @@ const CONVERSATIONS_ROUTE_FILE = join(
 const CONVERSATION_ROUTE_SURFACE_FILES = [
   CONVERSATIONS_ROUTE_FILE,
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversation-subagent-input.ts'),
+  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversation-diffs.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-archive.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-delivery.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-diffs.ts'),
