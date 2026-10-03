@@ -1,0 +1,708 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T23:03:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4501: Diff panel: conversation 'vs main' falls through to the turn route, whole-conversation views have no file list, and agent 'vs main' hardcodes main",
+    "updated": "2026-10-03T23:10:23.760Z"
+  },
+  "plan": {
+    "id": "pan-4501",
+    "title": "Diff panel: conversation 'vs main' falls through to the turn route, whole-conversation views have no file list, and agent 'vs main' hardcodes main",
+    "status": "proposed",
+    "uid": "d9fa5e8f-b167-4bce-90eb-c9928e7b2f34",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-03T23:03:38Z",
+    "updated": "2026-10-03T23:10:23.760Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4501",
+        "label": "PAN-4501",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "diff-panel",
+      "git",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "The conversation 'vs main' chip requests /diffs/vs-main, which has no route and falls through to /diffs/:turnId (conversation start vs working tree). Whole-conversation responses (/full and the fallthrough) carry no files, so the file picker is empty. A conversation with no edit turns shows 'No completed turns yet' even when its repository changed. The agent vs-main view hardcodes main...HEAD and ignores the configured default branch.",
+      "Proposal": "Add a default-branch resolver (repo default_branch, then workspace.default_branch, then main; never pr_target) and a shared diffVsDefaultBranch helper (three-dot <baseRef>...HEAD, local branch before origin, missing base = baseRef null + empty files). Use it from the agent vs-main route and a new conversation /diffs/vs-main route (in a new routes/conversation-diffs.ts file, since routes/conversations.ts is at its size cap). Make /diffs/full return files and honor ?file=. Remove the DiffPanel 'No completed turns yet' guard. Document the semantics.",
+      "NonGoals": "- An arbitrary two-ref compare or whitespace toggle (PAN-3178)\n- Including uncommitted working-tree changes in 'vs main'\n- Relabeling the 'vs main' chip with the real branch name\n- Showing untracked (never-added) files in any diff view\n- Multi-repository 'vs main' for a conversation (cwd repository only)\n- A new button to open the diff panel for a conversation with no edit turns\n- Changing getRepoTargetBranch or PR-sync behavior\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "'vs main' keeps three-dot <baseRef>...HEAD semantics (committed changes only) for both agents and conversations.",
+        "rationale": "The issue's rollout note accepts an empty view when HEAD is an ancestor of the default branch, and the two-ref compare is tracked on PAN-3178; one helper with one meaning avoids two definitions of 'vs main'."
+      },
+      {
+        "summary": "Default branch = matching workspace.repos[].default_branch, then workspace.default_branch, then 'main'; pr_target is ignored.",
+        "rationale": "The issue says 'configured default branch'; pr_target names a PR target, not the branch a repository is compared with. The 'main' fallback matches every other default-branch caller in src/lib."
+      },
+      {
+        "summary": "Resolve the base ref local branch first, then origin/<branch>; a missing ref returns 200 with baseRef null and files [].",
+        "rationale": "The issue's fixture is a local repo with no remote, so local-first is required; a 200 empty result degrades to the panel's empty-list state instead of 'Failed to fetch diff'."
+      },
+      {
+        "summary": "The conversation repository is git rev-parse --show-toplevel of conv.cwd, and conv.projectKey overrides cwd-based project lookup.",
+        "rationale": "The existing existsSync(cwd/.git) check misses a cwd in a subdirectory; projectKey is the operator's explicit project assignment (PAN-1577)."
+      },
+      {
+        "summary": "Remove the 'No completed turns yet' guard for every DiffPanel, agents included.",
+        "rationale": "Smallest change that makes All turns work with zero summaries; for agents with fewer than two checkpoints /full already returns files [], so the only visible change is 'No changed files in this selection.'"
+      },
+      {
+        "summary": "Move the conversation diff routes into a new routes/conversation-diffs.ts before adding the vs-main route.",
+        "rationale": "routes/conversations.ts is 1072 lines at its 1072-line allowlist cap; agents may not raise caps, and conversation-subagent-input.ts is the precedent for split route files."
+      }
+    ],
+    "items": [
+      {
+        "id": "default-branch-resolver",
+        "title": "Add defaultBranchForRepo and resolveDefaultBranchForRepo to project-repos",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-1"
+          ],
+          "files_scope": [
+            "src/lib/project-repos.ts",
+            "tests/lib/project-repos.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/project-repos.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/project-repos.test.ts reports all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: add the pure defaultBranchForRepo(project, repoRoot) (matching workspace.repos[] entry by trailing path segment, then workspace.default_branch, then main; pr_target ignored) and resolveDefaultBranchForRepo(repoRoot, projectKey?) (getProjectSync(projectKey) first, then findProjectByPath(repoRoot)) to src/lib/project-repos.ts, and add the listed unit tests to tests/lib/project-repos.test.ts, extending its existing projects.js mock with findProjectByPath."
+        },
+        "items": [
+          {
+            "id": "default-branch-resolver.ac1",
+            "title": "Given a project with workspace.default_branch \"trunk\" and pr_target \"release\", defaultBranchForRepo returns \"trunk\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-resolver.ac2",
+            "title": "Given a workspace.repos[] entry with path \"frontend\" and default_branch \"develop\", defaultBranchForRepo returns \"develop\" for root /p/workspaces/feature-x/frontend and the workspace default for /p/backend.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-resolver.ac3",
+            "title": "Given no project, defaultBranchForRepo falls back to \"main\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-branch-resolver.ac4",
+            "title": "When getProjectSync(projectKey) returns null, resolveDefaultBranchForRepo falls back to findProjectByPath(repoRoot).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "checkpoint-diff-against-base",
+        "title": "Add base-parameterized diffAgainstBase helpers and resolveBaseRef to checkpoint-manager",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "files_scope": [
+            "src/lib/checkpoint/checkpoint-manager.ts",
+            "src/lib/checkpoint/__tests__/diff-against-base.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/checkpoint/__tests__/diff-against-base.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "diff-against-base.test.ts reports all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: in checkpoint-manager.ts add diffAgainstBase(cwd, baseRef, filePath?) and diffAgainstBaseFiles(cwd, baseRef) (same bodies as diffAgainstMain/diffAgainstMainFiles but with `${baseRef}...HEAD`) and resolveBaseRef(cwd, branch) (local branch first, then origin/<branch>, else null). Leave diffAgainstMain/diffAgainstMainFiles in place; agent-vs-main-route deletes them. Add a fixture-repo test (default branch trunk via git symbolic-ref before the first commit, no remote)."
+        },
+        "items": [
+          {
+            "id": "checkpoint-diff-against-base.ac1",
+            "title": "Given a fixture repo with default branch trunk and no remote, resolveBaseRef(repo, \"trunk\") returns \"trunk\" and resolveBaseRef(repo, \"main\") returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checkpoint-diff-against-base.ac2",
+            "title": "Given HEAD on a feature branch with one modified and one added file, diffAgainstBaseFiles(repo, \"trunk\") returns exactly those two paths with kinds M and A.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checkpoint-diff-against-base.ac3",
+            "title": "Given HEAD checked out on trunk itself, diffAgainstBaseFiles(repo, \"trunk\") returns an empty array.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checkpoint-diff-against-base.ac4",
+            "title": "Given an uncommitted edit on the feature branch, diffAgainstBaseFiles does not list it (three-dot, committed only).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vs-default-branch-helper",
+        "title": "Add the shared diffVsDefaultBranch helper used by both vs-main routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "difficulty": "medium",
+          "kind": "backend",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "agent-vs-main-route",
+            "conversation-vs-main-route"
+          ],
+          "files_scope": [
+            "src/lib/checkpoint/vs-default-branch.ts",
+            "src/lib/checkpoint/__tests__/vs-default-branch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/checkpoint/__tests__/vs-default-branch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vs-default-branch.test.ts reports all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: create src/lib/checkpoint/vs-default-branch.ts exporting VsDefaultBranchDiff and diffVsDefaultBranch(repoRoot, { projectKey?, filePath? }) which resolves the configured default branch, resolves its base ref, and returns { baseBranch, baseRef, files, diff? } with three-dot semantics; a missing base ref returns baseRef null and files []. Test it against a fixture repo with projects.js mocked."
+        },
+        "items": [
+          {
+            "id": "vs-default-branch-helper.ac1",
+            "title": "Given findProjectByPath returns default_branch \"trunk\", diffVsDefaultBranch returns baseBranch \"trunk\", baseRef \"trunk\", the feature-branch files, and no diff key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vs-default-branch-helper.ac2",
+            "title": "Given filePath \"b.txt\", the result contains a diff with \"+++ b/b.txt\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vs-default-branch-helper.ac3",
+            "title": "Given no project config and no main branch in the repo, diffVsDefaultBranch returns baseBranch \"main\", baseRef null and files [].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vs-default-branch-helper.ac4",
+            "title": "Given projectKey \"k\" whose project sets default_branch \"trunk\" while findProjectByPath returns null, the result baseBranch is \"trunk\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-vs-main-route",
+        "title": "Agent /diffs/vs-main route diffs against the project default branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "api",
+          "traces": [
+            "FR-3"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/diffs.ts",
+            "src/lib/checkpoint/checkpoint-manager.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n -F -e diffAgainstMain -e \"'main...HEAD'\" -- src/lib/checkpoint src/dashboard/server/routes/diffs.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "git grep prints no matches"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: in src/dashboard/server/routes/diffs.ts replace the diffAgainstMainFiles/diffAgainstMain calls in the vs-main route with diffVsDefaultBranch(workspace, { filePath }) and return { agentId, ...result }; delete diffAgainstMain and diffAgainstMainFiles from checkpoint-manager.ts (no callers remain); fix the module header and route comment to describe the configured default branch."
+        },
+        "items": [
+          {
+            "id": "agent-vs-main-route.ac1",
+            "title": "Given an agent workspace in a project whose default branch is trunk, GET /api/agents/<id>/diffs/vs-main returns baseBranch \"trunk\" and the files committed since trunk.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-vs-main-route.ac2",
+            "title": "When git grep -n -F -e diffAgainstMain -e \"'main...HEAD'\" -- src/lib/checkpoint src/dashboard/server/routes/diffs.ts runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-vs-main-route.ac3",
+            "title": "The routes/diffs.ts module header lists GET /api/agents/:agentId/diffs/vs-main and says it compares with the configured default branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-conversation-diff-routes",
+        "title": "Move conversation diff routes into routes/conversation-diffs.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "refactor",
+          "traces": [
+            "NFR-2",
+            "FR-7"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/conversations-no-loss.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both no-loss test files report all tests passed",
+            "typecheck exits 0",
+            "lint-file-size.sh exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 as a pure move: create src/dashboard/server/routes/conversation-diffs.ts exporting conversationDiffRoutes (Layer.mergeAll of the three existing conversation diff routes plus conversationDiffDependencies), compose it into conversationsRouteLayer, delete the moved block and imports from conversations.ts, and add the new file to CONVERSATION_ROUTE_SURFACE_FILES in conversations-no-loss.test.ts. No behavior change."
+        },
+        "items": [
+          {
+            "id": "extract-conversation-diff-routes.ac1",
+            "title": "When wc -l src/dashboard/server/routes/conversations.ts runs, then it prints a count at most 1072.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-conversation-diff-routes.ac2",
+            "title": "Given the routes moved, conversations-no-loss.test.ts still finds GET /api/conversations/:name/diffs, /diffs/full and /diffs/:turnId and counts 40 routes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-conversation-diff-routes.ac3",
+            "title": "When bash scripts/lint-file-size.sh runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-vs-main-route",
+        "title": "Add GET /api/conversations/:name/diffs/vs-main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "api",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts",
+            "src/lib/overdeck/__tests__/conversation-diffs.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts src/lib/overdeck/__tests__/conversation-diffs.test.ts tests/unit/dashboard/server/routes/conversations-no-loss.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files report all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: add getConversationDiffVsMain(name, fileFilter) to conversation-diffs.ts (git top-level of conv.cwd via a new repoRootForDir helper, then diffVsDefaultBranch with conv.projectKey), register GET /api/conversations/:name/diffs/vs-main next to /full in routes/conversation-diffs.ts, add the no-loss matrix row, bump the locked conversation route list to 41, mock vs-default-branch.js in the mocked suite, and add the fixture-repo tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "conversation-vs-main-route.ac1",
+            "title": "Given a conversation whose repository default branch is trunk, getConversationDiffVsMain returns baseBranch \"trunk\", baseRef \"trunk\", the feature-branch files, and no turnId key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-vs-main-route.ac2",
+            "title": "Given fileFilter \"b.txt\", the response contains a diff with \"+++ b/b.txt\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-vs-main-route.ac3",
+            "title": "Given a conversation cwd in a repo subdirectory, the response repoRoot is the repository top level; given a cwd outside any repo, it returns repoRoot null and files [].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-vs-main-route.ac4",
+            "title": "When the no-loss tests run, then they find GET /api/conversations/:name/diffs/vs-main and count 41 conversation routes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-full-files",
+        "title": "Conversation /diffs/full returns files and honors ?file=",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "api",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts src/lib/overdeck/__tests__/conversation-diffs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both conversation-diffs test files report all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: change getConversationDiffFull to (name, fileFilter, deps), use lookupConversation and repoRootForDir, compute files for the cwd repo since the conversation-start commit plus the external edited repos, filter only the diff by fileFilter, return { diff, files } sorted and de-duplicated; make diffFilesSinceBase omit the pathspec when given no paths; pass ?file= from the /full route."
+        },
+        "items": [
+          {
+            "id": "conversation-full-files.ac1",
+            "title": "Given a conversation with zero edit turns whose repository has an uncommitted edit to a.txt and a new commit adding c.txt after it started, getConversationDiffFull returns files containing a.txt and c.txt and a non-empty diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-full-files.ac2",
+            "title": "Given fileFilter \"a.txt\", the diff contains a.txt and not c.txt while files still lists both.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-full-files.ac3",
+            "title": "Given the existing cross-repo fixture (its getConversationDiffFull call moved to (name, undefined, deps)), the /full response files contains drafts/pan-2842.md from the external repository.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diffpanel-zero-turns",
+        "title": "Diff panel shows file lists for All turns and vs main with zero turn summaries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "frontend",
+          "traces": [
+            "FR-6"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/App/StandaloneRoutes.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DiffPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/__tests__/DiffPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DiffPanel.test.tsx reports all tests passed",
+            "typecheck exits 0"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: remove the orderedTurnDiffSummaries.length === 0 && !isVsMain \"No completed turns yet.\" branch from the DiffPanel render so the file picker renders from the /full or /vs-main response, update the related comment in StandaloneRoutes.tsx, and add DiffPanel.test.tsx with mocked fetch covering both chips and file selection."
+        },
+        "items": [
+          {
+            "id": "diffpanel-zero-turns.ac1",
+            "title": "Given zero turn summaries and a conversation diffUrlPrefix, DiffPanel fetches /api/conversations/c1/diffs/full and renders x.ts from the response files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-zero-turns.ac2",
+            "title": "Given defaultView vs-main, DiffPanel fetches /api/conversations/c1/diffs/vs-main and renders x.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-zero-turns.ac3",
+            "title": "When x.ts is clicked in the vs-main view, then the next fetch URL is /api/conversations/c1/diffs/vs-main?file=x.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffpanel-zero-turns.ac4",
+            "title": "Given zero turn summaries, DiffPanel never renders the text \"No completed turns yet.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-vs-main-default-branch",
+        "title": "Document vs-main default-branch semantics and the /full file list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:03:38Z",
+        "metadata": {
+          "issueLabel": "pan-4501",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "trivial",
+          "kind": "docs",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ],
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "configuration/projects.mdx"
+          ],
+          "verify_commands": [
+            "grep -n \"diffs/vs-main\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"vs main\" configuration/projects.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints the new DASHBOARD-ARCHITECTURE.md bullet",
+            "grep prints the new projects.mdx sentence"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9: add a bullet to docs/DASHBOARD-ARCHITECTURE.md after the /diffs polling bullet describing /diffs/vs-main three-dot default-branch semantics, local-before-origin ref resolution, the baseRef null case, /diffs/full files and ?file=, and routes/conversation-diffs.ts; add a sentence to the workspace.default_branch bullet in configuration/projects.mdx that the diff panel vs main view compares against it."
+        },
+        "items": [
+          {
+            "id": "docs-vs-main-default-branch.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a bullet that names /diffs/vs-main, the <base>...HEAD three-dot comparison, and the default-branch lookup order excluding pr_target.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-vs-main-default-branch.ac2",
+            "title": "The workspace.default_branch bullet in configuration/projects.mdx contains a sentence saying the diff panel \"vs main\" view compares against that branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "default-branch-resolver",
+        "to": "vs-default-branch-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "checkpoint-diff-against-base",
+        "to": "vs-default-branch-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "checkpoint-diff-against-base",
+        "to": "agent-vs-main-route",
+        "type": "blocks"
+      },
+      {
+        "from": "vs-default-branch-helper",
+        "to": "agent-vs-main-route",
+        "type": "blocks"
+      },
+      {
+        "from": "vs-default-branch-helper",
+        "to": "conversation-vs-main-route",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-conversation-diff-routes",
+        "to": "conversation-vs-main-route",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-conversation-diff-routes",
+        "to": "conversation-full-files",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-vs-main-route",
+        "to": "conversation-full-files",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-03-PAN-4501-diff-panel-conversation-vs-main-falls-through-to-the-turn-route-whole-conversation-views-have-no-file-list-and-agent-vs-main-hardcodes-main.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
