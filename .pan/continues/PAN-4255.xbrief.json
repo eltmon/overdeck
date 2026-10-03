@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:19:31.112Z",
+  "updated": "2026-10-03T18:19:42.509Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "observed-effort-context-usage.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T18:19:31.112Z"
+    },
+    "agent-conversation-effort-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:19:42.509Z"
     }
   }
 }
