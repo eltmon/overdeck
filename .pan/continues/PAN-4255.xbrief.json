@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:16:01.742Z",
+  "updated": "2026-10-03T18:16:12.247Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "transcript-effort-parser.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T18:16:01.742Z"
+    },
+    "transcript-effort-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:16:12.247Z"
     }
   }
 }
