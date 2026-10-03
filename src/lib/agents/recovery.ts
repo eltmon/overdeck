@@ -12,6 +12,7 @@ import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
+import { resolveRelaunchEffort } from './relaunch-effort.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
@@ -292,6 +293,10 @@ export async function restartAgent(
     agentState.model = newModel;
   }
   agentState.harness = effectiveHarness;
+  const relaunchEffort = resolveRelaunchEffort(agentState, { model: effectiveModel, harness: effectiveHarness });
+  if (relaunchEffort.warning) logLifecycle(normalizedId, `relaunch effort: ${relaunchEffort.warning}`);
+  agentState.effort = relaunchEffort.effort;
+  agentState.effortSource = relaunchEffort.source;
   agentState.status = 'starting';
   let freshSessionId: string | undefined;
   try {
@@ -321,6 +326,7 @@ export async function restartAgent(
       isPlanning: agentState.role === 'plan',
       harness: effectiveHarness,
       harnessBinaryPath: harnessLaunch.binaryPath,
+      effort: relaunchEffort.effort,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
