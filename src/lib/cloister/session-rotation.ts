@@ -14,6 +14,7 @@ import { Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
+import { resolveRelaunchEffort } from '../agents/relaunch-effort.js';
 import type { SpecialistAgentName } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
 import { killSession } from '../tmux.js';
@@ -244,11 +245,14 @@ export async function rotateSpecialistSession(
       ? `You are resuming from a rotated session. Here's your memory:\n\n${memoryContent}\n\nContinue from where you left off.`
       : 'Session rotated. Continue from where you left off.';
 
+    const relaunchEffort = resolveRelaunchEffort(agentState, { harness: runtime.name });
     const newAgent = await runtime.spawnAgent({
       agentId,
       workspace: agentState.workspace,
       prompt,
       runtime: runtime.name,
+      effort: relaunchEffort.effort,
+      effortSource: relaunchEffort.source,
     });
 
     console.log(`Started fresh session: ${newAgent.sessionId.substring(0, 8)}`);

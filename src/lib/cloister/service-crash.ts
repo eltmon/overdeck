@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, saveAgentStateSync } from '../agents.js';
+import { resolveRelaunchEffort } from '../agents/relaunch-effort.js';
 import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { setCloisterSpawnsPaused } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
@@ -419,12 +420,15 @@ export async function restartAgent(_host: CrashHost, agentId: string): Promise<v
   // Restart with --resume using spawnAgent with sessionId
   console.log(`🔔 Restarting ${agentId} with session ${agentState.sessionId.substring(0, 8)}...`);
   saveAgentStateSync({ ...agentState, startedBy: 'deacon:crash-respawn' });
+  const relaunchEffort = resolveRelaunchEffort(agentState, { harness: runtime.name });
   runtime.spawnAgent({
     agentId,
     workspace: agentState.workspace,
     sessionId: agentState.sessionId,
     runtime: runtime.name,
     env: { OVERDECK_AGENT_STARTED_BY: 'deacon:crash-respawn' },
+    effort: relaunchEffort.effort,
+    effortSource: relaunchEffort.source,
   });
   console.log(`🔔 Successfully restarted ${agentId}`);
 }
