@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4501",
   "created": "2026-10-03T23:11:20.651Z",
-  "updated": "2026-10-03T23:45:02.385Z",
+  "updated": "2026-10-03T23:45:17.063Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "extract-conversation-diff-routes.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T23:45:02.384Z"
+    },
+    "conversation-vs-main-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:17.063Z"
     }
   }
 }
