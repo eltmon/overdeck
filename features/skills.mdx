@@ -244,7 +244,7 @@ The pipeline depends on these 11 skills, so they are always on and cannot be ove
 | Global | `~/.overdeck/config.yaml`, under `skills.overrides` (`<skill>: false`) |
 | Project | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_overrides` |
 | Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` in the project's plan home, committed and pushed on `main` as `chore(workspace): skill overrides for <ISSUE>` |
-| Conversation | `conversations.skill_overrides` (JSON) in `~/.overdeck/overdeck.db`; the conversation launcher passes `pan skills launch-settings --conversation <tmuxSession>` to apply it |
+| Conversation | `conversations.skill_overrides` (JSON) in `~/.overdeck/overdeck.db`; the conversation's launcher rereads it at every launch |
 
 Clearing the last override for an issue deletes its file and commits the deletion. Skills that exist only in a project's `.pan/skills/` directory are **project skills**: they appear in that project's settings and its issues, never on the global Skills page.
 
