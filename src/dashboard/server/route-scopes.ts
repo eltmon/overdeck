@@ -38,6 +38,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/agents/:id/message', scope: 'tell' },
   { method: 'POST', path: '/api/agents/:id/tell', scope: 'tell' },
   { method: 'POST', path: '/api/conversations/:name/message', scope: 'tell' },
+  { method: 'GET', path: '/api/conversations/:name/kickoff', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/kickoff', scope: 'tell' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */
