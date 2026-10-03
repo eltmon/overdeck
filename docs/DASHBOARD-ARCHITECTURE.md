@@ -377,6 +377,18 @@ door that does not exist; a real record read door would be a separate change.
   `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
   `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
   response carries `steerDegraded` with the reason.
+- Live effort (PAN-4255). `POST /api/conversations/:name/thinking-level` (claude-code branch) and
+  `POST /api/agents/:id/effort` (claude-code agents only; other harnesses answer **400**) both call
+  `applyClaudeLiveEffort` (`src/lib/agents/effort-live.ts`): a mid-turn session is refused, then the
+  pane is checked for a permission prompt and the main input target, `/effort <level>` is delivered
+  through `deliverAgentMessage`, and the session transcript is polled from the pre-delivery offset
+  for 10 s. Confirmation is the user record `<local-command-stdout>Set effort level to <level> …`;
+  only then does the door persist the level (`setConversationEffort`, or `effort` +
+  `effortSource: 'explicit'` in agent state). Status codes: **409** `busy` / `permission-pending` /
+  `input-target-not-main`, **422** `effort-rejected` or session not running, **502**
+  `not-delivered`, **504** `not-confirmed`. The transcript's observed effort reaches the composer
+  chip as `ContextUsage.lastEffort` (conversations) and `observedEffort` + `effortResolution` on
+  `GET /api/agents/:id/conversation` (agents).
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
