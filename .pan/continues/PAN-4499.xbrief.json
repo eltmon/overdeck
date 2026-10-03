@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4499",
+  "created": "2026-10-03T21:43:21.945Z",
+  "updated": "2026-10-03T21:43:21.946Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "skill-flags-resolver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T21:43:21.945Z"
+    }
+  }
+}
