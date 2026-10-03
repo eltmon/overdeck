@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:23:54.127Z",
+  "updated": "2026-10-03T17:24:01.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4492",
       "claimedAt": "2026-10-03T17:19:38.944Z",
       "doneAt": "2026-10-03T17:23:54.127Z"
+    },
+    "w4-soak-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:24:01.002Z"
     }
   }
 }
