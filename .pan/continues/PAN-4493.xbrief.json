@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T17:42:07.206Z",
+  "updated": "2026-10-03T17:42:19.445Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4493",
       "claimedAt": "2026-10-03T17:28:59.092Z",
       "doneAt": "2026-10-03T17:42:07.205Z"
+    },
+    "image-lightbox": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4493",
+      "claimedAt": "2026-10-03T17:42:19.445Z"
     }
   }
 }
