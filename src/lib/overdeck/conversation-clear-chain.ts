@@ -2,6 +2,11 @@
  * PAN-4485: a post-/clear chain (parent → sibling → …) shares one terminal
  * session. Only the chain head — the row whose clearedToConvId is null —
  * owns it. A superseded row (clearedToConvId set) owns nothing.
+ *
+ * The one ownership resolver every lifecycle write and input door uses:
+ * list repair, stop, resume, restart-all, delete, archive, the pending-input
+ * feed, and the plan-action/permission/pane-choice doors. See
+ * docs/DASHBOARD-ARCHITECTURE.md for the full rule.
  */
 import { getConversationById, type LegacyConversation } from './conversations.js';
 

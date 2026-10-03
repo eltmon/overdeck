@@ -435,6 +435,16 @@ door that does not exist; a real record read door would be a separate change.
   respawn window still ends the row (PAN-3962). The 10-second conversation poller stays
   as the backstop. It does not resurrect a row whose end is newer than its census
   snapshot, or whose harness a fresh probe finds gone.
+- A post-`/clear` sibling shares its parent's terminal session (PAN-4485). The parent
+  (`cleared_to_conv_id` set) is superseded and owns nothing; the chain head — the
+  newest row, `cleared_to_conv_id` null — owns the session.
+  `src/lib/overdeck/conversation-clear-chain.ts` is the one resolver: list repair
+  never revives a superseded row and re-ends one stored `active`; stop and resume on a
+  superseded row act on the chain head (resume answers 409 `conversation-cleared` when
+  the chain is broken); delete and archive of a superseded row stop nothing;
+  restart-all restarts each live session once, through its owner; plan-action,
+  permission and pane-choice answers on a superseded row return 409. There is no
+  boot-time conversation auto-resume.
 - Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
   The server coalesces matching concurrent requests and retains their result, including
   ambiguous failures. Changed text or command confirmation requires a new ID. Receipts
