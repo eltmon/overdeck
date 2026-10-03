@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:27:01.072Z",
+  "updated": "2026-10-03T02:27:11.622Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "spawn-persists-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:27:01.072Z"
+    },
+    "start-passes-effort-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:11.622Z"
     }
   }
 }
