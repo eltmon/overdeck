@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:35:02.279Z",
+  "updated": "2026-10-03T17:35:17.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4492",
       "claimedAt": "2026-10-03T17:24:01.002Z",
       "doneAt": "2026-10-03T17:35:02.279Z"
+    },
+    "w5-live-verify": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:35:17.384Z"
     }
   }
 }
