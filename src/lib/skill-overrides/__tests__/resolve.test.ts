@@ -68,6 +68,27 @@ describe('resolveSkillStates', () => {
   });
 });
 
+describe('conversation layer (PAN-4486)', () => {
+  it('lets a conversation override beat the issue override', () => {
+    const states = resolveSkillStates(catalog, { global: {}, issue: { grilling: true }, conversation: { grilling: false } });
+    expect(stateOf(states, 'grilling')).toMatchObject({ enabled: false, source: 'conversation' });
+  });
+
+  it('keeps a core skill on when the conversation layer turns it off', () => {
+    const states = resolveSkillStates(catalog, { global: {}, conversation: { 'pan-done': false } });
+    expect(stateOf(states, 'pan-done')).toMatchObject({ enabled: true, source: 'core' });
+  });
+
+  it('turns an opt-in pack skill on through the conversation layer alone', () => {
+    expect(resolvePackSkill('p/s', true, { global: {}, conversation: { 'p/s': true } }))
+      .toEqual({ enabled: true, source: 'conversation' });
+  });
+
+  it('includes a skill that is off only in the conversation layer', () => {
+    expect(disabledSkillNames({ global: {}, conversation: { grilling: false } })).toEqual(['grilling']);
+  });
+});
+
 describe('disabledSkillNames', () => {
   it('returns sorted non-core names resolved off, including names outside any catalog', () => {
     expect(disabledSkillNames({
