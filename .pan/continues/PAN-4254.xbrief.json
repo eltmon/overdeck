@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4254",
+  "created": "2026-10-03T01:29:43.536Z",
+  "updated": "2026-10-03T01:29:43.536Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "conv-effort-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4254",
+      "claimedAt": "2026-10-03T01:29:43.536Z"
+    }
+  }
+}
