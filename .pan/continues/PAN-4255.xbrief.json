@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:19:07.478Z",
+  "updated": "2026-10-03T18:19:19.379Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "observed-effort-context-usage.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T18:19:07.478Z"
+    },
+    "observed-effort-context-usage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:19:19.379Z"
     }
   }
 }
