@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4485",
   "created": "2026-10-03T01:28:53.863Z",
-  "updated": "2026-10-03T03:09:15.957Z",
+  "updated": "2026-10-03T03:09:25.824Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "restart-all-once.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T03:09:15.957Z"
+    },
+    "restart-all-once.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:25.824Z"
     }
   }
 }
