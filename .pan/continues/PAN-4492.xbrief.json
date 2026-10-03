@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4492",
+  "created": "2026-10-03T17:09:07.431Z",
+  "updated": "2026-10-03T17:09:07.431Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-composer-presence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4492",
+      "claimedAt": "2026-10-03T17:09:07.431Z"
+    }
+  }
+}
