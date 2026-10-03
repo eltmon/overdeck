@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4499",
   "created": "2026-10-03T21:43:21.945Z",
-  "updated": "2026-10-03T21:49:29.336Z",
+  "updated": "2026-10-03T21:49:37.469Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4499",
       "claimedAt": "2026-10-03T21:43:21.945Z",
       "doneAt": "2026-10-03T21:49:29.336Z"
+    },
+    "fork-route-skills": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T21:49:37.469Z"
     }
   }
 }
