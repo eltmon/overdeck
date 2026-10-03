@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:17:34.013Z",
+  "updated": "2026-10-03T04:17:44.452Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "skills-field.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T04:17:34.013Z"
+    },
+    "skills-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:17:44.452Z"
     }
   }
 }
