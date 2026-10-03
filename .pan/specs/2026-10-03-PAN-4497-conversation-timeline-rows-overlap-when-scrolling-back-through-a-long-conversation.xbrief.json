@@ -4,17 +4,17 @@
     "created": "2026-10-03T21:28:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4497: Conversation timeline rows overlap when scrolling back through a long conversation",
-    "updated": "2026-10-03T21:33:41.803Z"
+    "updated": "2026-10-03T21:34:12.884Z"
   },
   "plan": {
     "id": "pan-4497",
     "title": "Conversation timeline rows overlap when scrolling back through a long conversation",
-    "status": "proposed",
+    "status": "running",
     "uid": "a2afbf69-cbde-42a6-8f49-0616aeae3b7d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T21:28:44Z",
-    "updated": "2026-10-03T21:33:41.803Z",
+    "updated": "2026-10-03T21:34:12.884Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4497",
@@ -334,5 +334,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
