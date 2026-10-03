@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:28:54.666Z",
+  "updated": "2026-10-03T02:29:06.030Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "recover-reapplies-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:28:54.666Z"
+    },
+    "messaging-fallback-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:06.030Z"
     }
   }
 }
