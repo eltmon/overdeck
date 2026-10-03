@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4493",
   "created": "2026-10-03T17:28:59.092Z",
-  "updated": "2026-10-03T18:49:58.880Z",
+  "updated": "2026-10-03T18:50:10.573Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "composer-thumb-click.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T18:49:58.880Z"
+    },
+    "attachment-ref-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:50:10.572Z"
     }
   }
 }
