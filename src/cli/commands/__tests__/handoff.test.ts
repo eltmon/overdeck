@@ -449,6 +449,33 @@ describe('handoffCommand', () => {
     expect(output).toContain('Issue: PAN-9005');
   });
 
+  it('forwards --skill and --pack to the server', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { model: 'claude-opus-5-5', effort: 'high', skill: ['grilling'], pack: ['mattpocock'] });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ model: 'claude-opus-5-5', effort: 'high', skills: ['grilling'], packs: ['mattpocock'] }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Skills: grilling');
+    expect(output).toContain('Packs: mattpocock');
+  });
+
   it('annotates an explicit --issue in the handoff output', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,

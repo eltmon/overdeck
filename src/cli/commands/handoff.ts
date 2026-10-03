@@ -20,6 +20,8 @@ interface HandoffOptions {
   authorHarness?: string;
   title?: string;
   allowPrimary?: boolean;
+  skill?: string[];
+  pack?: string[];
 }
 
 function resolveConversation(convRef: string) {
@@ -118,6 +120,8 @@ export async function handoffCommand(
     console.log(chalk.gray(`  Title: ${customTitle} (--title)`));
   }
   if (role) console.log(chalk.gray(`  Role: ${role}`));
+  if (options.skill?.length) console.log(chalk.gray(`  Skills: ${options.skill.join(', ')}`));
+  if (options.pack?.length) console.log(chalk.gray(`  Packs: ${options.pack.join(', ')}`));
   console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
 
   // PAN-1568: route through the dashboard server, which authors the doc AND
@@ -138,6 +142,8 @@ export async function handoffCommand(
       handoffAuthor: author,
       handoffAuthorModel: options.authorModel,
       allowPrimary: options.allowPrimary,
+      skills: options.skill,
+      packs: options.pack,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {

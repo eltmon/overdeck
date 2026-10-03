@@ -43,6 +43,9 @@ export interface ForkViaServerOptions {
   handoffAuthorHarness?: RuntimeName;
   /** Operator only: let --cwd be a project's primary checkout (PAN-4338). */
   allowPrimary?: boolean;
+  /** Turn on, for the new conversation only (PAN-4499). */
+  skills?: string[];
+  packs?: string[];
   /** Who is asking; defaults to the caller's own environment. */
   callerKind?: 'operator' | 'agent';
 }
@@ -109,6 +112,8 @@ export async function forkConversationViaServer(
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;
   body['callerKind'] = opts.callerKind ?? verdictCallerFromEnv(process.env, readAncestorAgentIds).kind;
   if (opts.allowPrimary) body['allowPrimary'] = true;
+  if (opts.skills?.length) body['skills'] = opts.skills;
+  if (opts.packs?.length) body['packs'] = opts.packs;
 
   let res: Response;
   try {

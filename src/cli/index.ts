@@ -401,6 +401,8 @@ program
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
   .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
+  .option('--skill <name>', 'Turn this skill on for the new conversation only (repeatable); a pack skill is <pack>/<skill>', (value: string, previous: string[]) => [...previous, value], [] as string[])
+  .option('--pack <id>', 'Turn every skill of this cached skill pack on for the new conversation only (repeatable)', (value: string, previous: string[]) => [...previous, value], [] as string[])
   .action(lazyAction(() => import('./commands/handoff.js'), 'handoffCommand'));
 
 program

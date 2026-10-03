@@ -72,4 +72,21 @@ describe('forkConversationViaServer (PAN-4338)', () => {
     await forkConversationViaServer('source', { forkMode: 'summary' }, { pollMs: 0, timeoutMs: 50 });
     expect(postBody()).not.toHaveProperty('effort');
   });
+
+  it('sends skills and packs only when given (PAN-4499)', async () => {
+    await forkConversationViaServer(
+      'source',
+      { forkMode: 'handoff', skills: ['grilling'], packs: ['mattpocock'] },
+      { pollMs: 0, timeoutMs: 50 },
+    );
+    expect(postBody()).toMatchObject({ skills: ['grilling'], packs: ['mattpocock'] });
+  });
+
+  it('a flagless request body carries no skills, packs or hold keys (PAN-4499 NFR-1)', async () => {
+    await forkConversationViaServer('source', { forkMode: 'summary' }, { pollMs: 0, timeoutMs: 50 });
+    const body = postBody();
+    expect(body).not.toHaveProperty('skills');
+    expect(body).not.toHaveProperty('packs');
+    expect(body).not.toHaveProperty('hold');
+  });
 });
