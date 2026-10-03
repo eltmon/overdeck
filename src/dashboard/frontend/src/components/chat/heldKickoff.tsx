@@ -5,7 +5,7 @@
  * other test files mount `ComposerFooter` with no `QueryClientProvider`
  * ancestor, and an unconditional `useQuery` call there would break every one.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -59,7 +59,11 @@ export function useHeldKickoff(conversationName: string): HeldKickoff & { refres
     };
   }, [conversationName]);
 
-  return { ...state, refresh: () => loadRef.current() };
+  // Stable identity: `heldKickoff` sits in ComposerFooter's handleSubmit
+  // useCallback deps, and a fresh object/function every render there would
+  // recreate handleSubmit (and everything downstream of it) on every render.
+  const refresh = useCallback(() => loadRef.current(), []);
+  return useMemo(() => ({ ...state, refresh }), [state, refresh]);
 }
 
 /** POSTs the kickoff door. Throws HeldKickoffConflictError on 409, Error(body.error) otherwise. */
