@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4485",
   "created": "2026-10-03T01:28:53.863Z",
-  "updated": "2026-10-03T02:07:05.483Z",
+  "updated": "2026-10-03T02:07:17.455Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4485",
       "claimedAt": "2026-10-03T01:57:32.380Z",
       "doneAt": "2026-10-03T02:07:05.482Z"
+    },
+    "resume-redirect-head": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:07:17.455Z"
     }
   }
 }
