@@ -218,8 +218,17 @@ You can attach files to a composer message in three ways:
 
 Supported attachments include images (`png`, `jpg`, `gif`, `webp`) and text/code/PDF
 files such as `md`, `json`, `ts`, `py`, `log`, `csv`, `yaml`, and `pdf`. Files are
-uploaded to the conversation's private attachment store and referenced as
-`@/attachments/conv/<path>` in the message the agent receives.
+uploaded to the conversation's private attachment folder,
+`~/.overdeck/conversation-attachments/<conversation>/`, and the message the agent
+receives refers to each one as `@<absolute path>`.
+
+### Viewing images
+
+Click an image thumbnail in the composer to open it full size, even while it is
+still uploading. A sent message that includes an image shows a thumbnail under
+its text; click it to open the image full size. Press Escape or click outside
+the image to close it. If the file was removed, the thumbnail does not appear
+and the path stays in the message.
 
 ### Vision gating
 

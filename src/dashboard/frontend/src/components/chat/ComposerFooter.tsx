@@ -31,6 +31,7 @@ import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
+import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -160,6 +161,10 @@ function ComposerFooterInput({
   const editorRef = useRef<LexicalEditor | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousConversationNameRef = useRef(conversation.name);
+  // PAN-4493 D10: tracks which pending attachment (if any) owns the currently
+  // open lightbox, so removing that attachment closes it — without closing a
+  // lightbox some other composer or sent message opened.
+  const lightboxOwnerRef = useRef<{ id: string; src: string } | null>(null);
   // Updated synchronously on every render so the in-flight-send guards below see
   // the currently-mounted conversation immediately (PAN-539 attribution race).
   const currentConversationNameRef = useRef(conversation.name);
@@ -639,6 +644,20 @@ function ComposerFooterInput({
     return () => window.removeEventListener('keydown', handleVoiceShortcut);
   }, [isDisabled]);
 
+  // PAN-4493 D10: if the attachment that opened the lightbox is gone (removed
+  // or finished uploading away its preview), close it — but never a lightbox
+  // some other composer or sent message opened.
+  useEffect(() => {
+    const owner = lightboxOwnerRef.current;
+    if (!owner) return;
+    const stillPending = pendingAttachments.some((attachment) => attachment.id === owner.id);
+    if (stillPending) return;
+    if (useImageLightboxStore.getState().image?.src === owner.src) {
+      useImageLightboxStore.getState().close();
+    }
+    lightboxOwnerRef.current = null;
+  }, [pendingAttachments]);
+
   const handleCommandKey = useCallback(
     (key: 'Enter' | 'SteerEnter') => {
       // PAN-4292 D5: Ctrl/Cmd+Enter steers on a steer-capable harness, busy or
@@ -665,7 +684,17 @@ function ComposerFooterInput({
               return (
                 <div key={attachment.id} className={styles.composerImageCard}>
                   {attachment.previewUrl ? (
-                    <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
+                    <button
+                      type="button"
+                      className={styles.composerImageThumbButton}
+                      onClick={() => {
+                        lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
+                        openImageLightbox(attachment.previewUrl!, attachment.file.name);
+                      }}
+                      title={`View ${attachment.file.name}`}
+                    >
+                      <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
+                    </button>
                   ) : (
                     <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
                       <FileText size={16} />

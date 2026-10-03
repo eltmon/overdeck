@@ -430,6 +430,14 @@ door that does not exist; a real record read door would be a separate change.
   around. On Herdr a Claude Code composer send is submit-verified: Overdeck presses
   Enter itself after the paste shows in the composer and resends Enter once if the
   message is still there (PAN-4492).
+- Composer attachments (PAN-4493): `POST /api/conversations/:name/upload-image` stores
+  a file in `~/.overdeck/conversation-attachments/<name>/`. `GET
+  /api/conversations/:name/attachments/:file` (`routes/conversation-attachments.ts`)
+  serves an image (`png`, `jpg`, `jpeg`, `gif`, `webp`) from that folder only; every
+  other name, traversal, non-image file or other conversation's file is 404. The
+  composer thumbnail and the sent-message thumbnails open one shared lightbox
+  (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
+  thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route

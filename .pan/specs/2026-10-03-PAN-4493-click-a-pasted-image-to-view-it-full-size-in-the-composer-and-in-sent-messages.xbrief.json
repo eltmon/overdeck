@@ -1,0 +1,672 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T17:21:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4493: Click a pasted image to view it full size, in the composer and in sent messages",
+    "updated": "2026-10-03T17:28:07.936Z"
+  },
+  "plan": {
+    "id": "pan-4493",
+    "title": "Click a pasted image to view it full size, in the composer and in sent messages",
+    "status": "proposed",
+    "uid": "e636b98f-cecc-48b9-b257-9d9522425227",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-03T17:21:29Z",
+    "updated": "2026-10-03T17:28:07.936Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4493",
+        "label": "PAN-4493",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "attachments",
+      "frontend",
+      "api"
+    ],
+    "narratives": {
+      "Problem": "A pasted image shows only as a 32x32 composer thumbnail that cannot be clicked, and after send the timeline shows only the @/…/conversation-attachments/<name>/<uuid>.png path. No route reads an attachment back, so the operator cannot view what they pasted.",
+      "Proposal": "Add GET /api/conversations/:name/attachments/:file (new route file, images only, realpath containment, 404 on everything else, no-loss matrix row). Add one shared ImageLightbox (store + host in main.tsx). Make the composer thumbnail a button that opens it with the local previewUrl. Parse image attachment references from user message text and render a clickable thumbnail strip beneath the unchanged text. Cover with unit tests, a Playwright spec in a fresh context, and docs in features/conversations.mdx and docs/DASHBOARD-ARCHITECTURE.md.",
+      "NonGoals": "- No zoom, pan, rotate, download, or next/previous controls in the lightbox\n- No thumbnails for non-image attachments (text, code, PDF); they stay as path text\n- The route must never serve a non-image file or read outside the requested conversation's attachments folder\n- No route-scopes.ts row for the new route\n- No change to upload, delete, cleanup, or retention of attachments\n- No rewriting or stripping of the user message text; the path reference stays visible\n- No images in assistant messages or tool-call rows\n- No edits to src/dashboard/server/routes/conversations.ts and no file-size allowlist raises"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The read route serves image files only (png/jpg/jpeg/gif/webp); every other name returns 404.",
+        "rationale": "The attachments folder also holds uploaded .html/.js/text/PDF files; serving .html same-origin would execute operator-uploaded script in the dashboard origin. The feature only needs images."
+      },
+      {
+        "summary": "Every route failure (bad name, traversal, other conversation, non-image, missing, escaping symlink) returns 404; origin failure returns 403.",
+        "rationale": "The issue AC asks for 404 on any other name; 403 for origin matches every other conversation route."
+      },
+      {
+        "summary": "No DB lookup in the route; filesystem realpath containment via hasConversationAttachment decides.",
+        "rationale": "Folders exist only for real conversations and are cleaned on delete; keeps the route and its test DB-free."
+      },
+      {
+        "summary": "The route lives in a new file routes/conversation-attachments.ts registered in server.ts.",
+        "rationale": "routes/conversations.ts sits exactly at its 1072-line file-size allowlist cap; any addition fails npm run lint and agents may not raise the allowlist."
+      },
+      {
+        "summary": "One shared lightbox using the dialog-host pattern (zustand store + host in main.tsx).",
+        "rationale": "conventions.md prescribes it; the timeline is virtualized, so a row-owned overlay would unmount when its row scrolls out."
+      },
+      {
+        "summary": "Sent messages keep their text unchanged and show a thumbnail strip beneath it (beside, not instead of).",
+        "rationale": "The issue allows either; ChatMarkdown already linkifies absolute paths, so replacing the token would fight that renderer and lose the copyable path."
+      },
+      {
+        "summary": "Thumbnail URLs take the conversation name from the path segment in the message, so UserMessageRow needs no new prop; bare '- /path' (non-Claude harness form) references also match.",
+        "rationale": "Handles post-/clear and forked conversations whose transcripts reference a parent's folder, and covers transformMessageForHarness output."
+      },
+      {
+        "summary": "A thumbnail whose image fails to load renders nothing; the path text remains.",
+        "rationale": "Unreferenced attachments are cleaned up; a broken-image icon is noise."
+      },
+      {
+        "summary": "No route-scopes.ts row; scoped access tokens need admin for the new route.",
+        "rationale": "The dashboard page uses the root session and paired devices are admin, so nothing user-facing breaks; widening a scope is a separate security decision."
+      },
+      {
+        "summary": "The composer closes the lightbox only when the attachment it opened is removed or sent, tracked per composer by attachment id.",
+        "rationale": "The preview object URL is revoked at that moment; scoping by owner id stops one mounted composer from closing a lightbox another composer opened."
+      }
+    ],
+    "items": [
+      {
+        "id": "attachment-read-route",
+        "title": "Serve conversation image attachments via GET /api/conversations/:name/attachments/:file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4493",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-attachments.ts",
+            "src/dashboard/server/routes/conversation-attachments.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/conversation-attachments-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-attachments-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-attachments-route.test.ts passes all named cases",
+            "no-loss-matrix.test.ts and route-scopes.test.ts pass",
+            "typecheck and lint complete without errors (lint-file-size reports no growth in routes/conversations.ts)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "attachment-ref-parser",
+            "sent-message-thumbnails",
+            "playwright-e2e"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add exported resolveConversationImageAttachment(name, file) to services/conversation-attachments.ts (name regex /^[a-zA-Z0-9_-]{1,64}$/, file regex /^[A-Za-z0-9._-]+$/ and no leading dot, image-extension→content-type map for .png/.jpg/.jpeg/.gif/.webp, hasConversationAttachment realpath containment, realpath + stat isFile). Create routes/conversation-attachments.ts exporting conversationAttachmentRoutes = HttpRouter.add('GET', '/api/conversations/:name/attachments/:file', ...) with validateOrigin (403), decodeURIComponent of both params in try/catch, 404 {error:'Attachment not found'} on every failure, async readFile, HttpServerResponse.uint8Array with contentType and headers X-Content-Type-Options: nosniff and Cache-Control: private, max-age=31536000, immutable. Register it in server.ts Layer.mergeAll after conversationPermissionRoutes. Add a READ row to tests/unit/lib/overdeck/no-loss-matrix.ts. Do NOT edit routes/conversations.ts (at its 1072-line file-size cap). Unit tests use a temp OVERDECK_HOME with real files, a cross-conversation file, an .html file and an escaping symlink. Test harness: send 200/404 requests with no Origin and no Referer (a GET with neither passes validateOrigin); only the 403 test sends an untrusted Origin. Treat a router no-match failure on decoded traversal paths as 404 (Effect.catch → status 404)."
+        },
+        "items": [
+          {
+            "id": "attachment-read-route.ac1",
+            "title": "Given a PNG at conversation-attachments/conv-a/a.png, when GET /api/conversations/conv-a/attachments/a.png is called, then it returns 200 with content-type image/png, x-content-type-options nosniff, and the exact file bytes (named test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-read-route.ac2",
+            "title": "Given conv-b/b.png exists, when GET /api/conversations/conv-a/attachments/b.png or the encoded traversals ..%2Fconv-b%2Fb.png and %2E%2E%2Fconv-b%2Fb.png are called, then each returns 404 (named tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-read-route.ac3",
+            "title": "Given conv-a holds page.html and a symlink escape.png pointing outside the folder, when either is requested, then the route returns 404, and a missing nope.png and a conversation name bad.name also return 404 (named tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-read-route.ac4",
+            "title": "Given an Origin header of https://evil.example, when the route is called, then it returns 403 (named test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-read-route.ac5",
+            "title": "no-loss-matrix.test.ts passes with a READ row for GET /api/conversations/:name/attachments/:file, and git diff shows no change to src/dashboard/server/routes/conversations.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "image-lightbox",
+        "title": "Add a shared image lightbox (store + host mounted in main.tsx)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ImageLightbox.tsx",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ImageLightbox.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/ImageLightbox.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ImageLightbox.test.tsx passes five tests",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create components/chat/ImageLightbox.tsx exporting useImageLightboxStore (zustand: image {src, alt} | null, open, close), openImageLightbox(src, alt), and ImageLightboxHost: a fixed full-screen backdrop (role=dialog, aria-modal=true, aria-label=alt, data-testid=image-lightbox) holding an <img> capped to the viewport with object-contain; window keydown Escape closes; backdrop click closes; image click stops propagation. Optional close button with lucide X. Mount <ImageLightboxHost /> in main.tsx after <NewConversationDialogHost />. Follow pan-style-guide (no decorative color, no pills)."
+        },
+        "items": [
+          {
+            "id": "image-lightbox.ac1",
+            "title": "Given the store is empty, when ImageLightboxHost renders, then it renders nothing; after openImageLightbox('blob:x','a.png') it renders a role=dialog element with an img whose src is blob:x and alt a.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-lightbox.ac2",
+            "title": "Given the lightbox is open, when Escape is pressed, then the dialog is removed from the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-lightbox.ac3",
+            "title": "Given the lightbox is open, when the backdrop is clicked, then it closes, and when the image itself is clicked, then it stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "image-lightbox.ac4",
+            "title": "main.tsx renders <ImageLightboxHost /> alongside the other dialog hosts (grep finds it once)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-thumb-click",
+        "title": "Open the lightbox from a composer image thumbnail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes including the two new tests",
+            "ComposerFooter.tsx line count is 1000 or fewer",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Wrap the composer <img src={attachment.previewUrl}> (ComposerFooter.tsx ~line 704) in <button type=button className={styles.composerImageThumbButton} title={`View ${name}`} onClick={() => openImageLightbox(previewUrl, name)}>. Add .composerImageThumbButton (padding 0, border 0, background none, cursor zoom-in, inline-flex) to command-deck.module.css next to .composerImageThumb. Record the opened attachment {id, previewUrl} in a useRef on click. Add one effect on pendingAttachments: when the recorded id is gone from this composer's list and the lightbox still shows the recorded previewUrl, call close(); then clear the ref. Never close a lightbox this composer did not open (two composers can be mounted at once). The object URL is revoked on remove/send. Keep the ComposerFooter.tsx diff under 20 lines."
+        },
+        "items": [
+          {
+            "id": "composer-thumb-click.ac1",
+            "title": "Given a pending image attachment with a previewUrl, when its thumbnail button is clicked, then useImageLightboxStore holds {src: previewUrl, alt: file name} (test passes), before and after serverPath is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-thumb-click.ac2",
+            "title": "Given the lightbox is open on a composer attachment, when the attachment it was opened from is removed, then the lightbox closes (store resets to null); and when a different composer's or an unrelated attachment is removed, then the lightbox stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-thumb-click.ac3",
+            "title": "ComposerFooter.tsx stays at or under 1000 lines and lint-file-size passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attachment-ref-parser",
+        "title": "Parse image attachment references from user message text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/helpers.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "attachmentRefs.test.ts passes five tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add exported extractAttachmentImageRefs(text) and AttachmentImageRef {conversationName, file, url} to messagesTimeline/helpers.ts. Regex /\\/conversation-attachments\\/([A-Za-z0-9_-]{1,64})\\/([A-Za-z0-9._-]+\\.(?:png|jpe?g|gif|webp))(?![A-Za-z0-9._-])/gi; skip files starting with '.'; url = /api/conversations/<encodeURIComponent(name)>/attachments/<encodeURIComponent(file)>; de-duplicate by url, first-seen order. Matches both '@/abs/path' (claude-code) and bare '- /abs/path' (transformMessageForHarness form)."
+        },
+        "items": [
+          {
+            "id": "attachment-ref-parser.ac1",
+            "title": "Given '@/home/u/.overdeck/conversation-attachments/conv-a/x.png', when parsed, then it returns one ref with url /api/conversations/conv-a/attachments/x.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-ref-parser.ac2",
+            "title": "Given a bare '- /home/u/.overdeck/conversation-attachments/conv-a/y.jpg' line, when parsed, then it returns the ref for y.jpg",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-ref-parser.ac3",
+            "title": "Given two distinct references and one duplicate, when parsed, then it returns two refs in first-seen order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attachment-ref-parser.ac4",
+            "title": "Given a .pdf or .md attachment path, or an image path outside conversation-attachments, when parsed, then it returns no ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sent-message-thumbnails",
+        "title": "Render clickable thumbnails for image attachments in sent user messages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "UserMessageAttachments.test.tsx passes four tests",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In messageRows.tsx add an AttachmentThumbnails({text}) component: refs = useMemo(extractAttachmentImageRefs(text)); failed-url Set state; renders a div data-testid=user-message-attachments (Tailwind 'mt-1.5 flex flex-wrap gap-1.5') of <button type=button title={`View ${file}`} onClick={() => openImageLightbox(url, file)}> each holding <img src={url} alt={file} loading=lazy className='h-24 w-24 rounded border border-border object-cover' onError adds url to failed>; returns null when no visible refs. Render it right after the userMessageText div in the subagent, held, and default branches of UserMessageRow. Message text stays unchanged. Use Tailwind classes only (no command-deck.module.css edit)."
+        },
+        "items": [
+          {
+            "id": "sent-message-thumbnails.ac1",
+            "title": "Given a user message whose text references conversation-attachments/conv-a/x.png, when UserMessageRow renders, then an img with src /api/conversations/conv-a/attachments/x.png renders beneath the unchanged message text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sent-message-thumbnails.ac2",
+            "title": "Given that thumbnail, when its button is clicked, then useImageLightboxStore holds {src: the route URL, alt: x.png}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sent-message-thumbnails.ac3",
+            "title": "Given that thumbnail, when its img fires an error event, then the thumbnail strip is removed and the message text still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sent-message-thumbnails.ac4",
+            "title": "Given a user message with no image reference, when it renders, then no user-message-attachments element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-test-subset",
+        "title": "Add the new frontend tests to test:frontend-subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "test:frontend-subset exits 0 and its output lists ImageLightbox.test.tsx, attachmentRefs.test.ts and UserMessageAttachments.test.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Append src/components/chat/__tests__/ImageLightbox.test.tsx, src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts and src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx (space-separated) to the end of the file list in the root package.json test:frontend-subset script. This is the only item that edits package.json."
+        },
+        "items": [
+          {
+            "id": "ci-test-subset.ac1",
+            "title": "Given the updated package.json, when npm run test:frontend-subset runs, then it executes ImageLightbox.test.tsx, attachmentRefs.test.ts and UserMessageAttachments.test.tsx and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-subset.ac2",
+            "title": "Given git diff of package.json, when inspected, then it shows a change only on the test:frontend-subset line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-e2e",
+        "title": "Playwright check: paste, open from composer, send, open from sent message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4493-image-lightbox.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4493-image-lightbox.spec.ts"
+          ],
+          "expected_outputs": [
+            "playwright reports 1 passed and exits 0; screenshots saved to the test output dir"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New spec modeled on tests/composer-commands.spec.ts with a fixture conversation (id 4493, name image-lightbox-fixture) and every API mocked via page.route: upload-image returns a path under /home/op/.overdeck/conversation-attachments/image-lightbox-fixture/<uuid>.png; **/attachments/* returns a real 1x1 PNG; /message accepts the send; /messages returns a user message whose text is '@<path>' after send. Paste by dispatching a ClipboardEvent('paste') with a DataTransfer holding a PNG File on the contenteditable composer (implementation checkpoint; fallback setInputFiles on input[type=file], noted in a comment). Click 'View pasted.png', assert image-lightbox visible with naturalWidth > 0, Escape closes; reopen, backdrop click at (5,5) closes; send; click the thumbnail in user-message-attachments; assert lightbox img src ends with the attachment file name; Escape closes. Each test uses Playwright's fresh browser context (isolated profile); never attach to another agent's browser."
+        },
+        "items": [
+          {
+            "id": "playwright-e2e.ac1",
+            "title": "Given a fresh browser context with mocked APIs, when an image is pasted and its composer thumbnail clicked, then the image-lightbox dialog renders the image (naturalWidth > 0) and closes on Escape and on a backdrop click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-e2e.ac2",
+            "title": "Given the message is sent, when the thumbnail in user-message-attachments is clicked, then the lightbox renders an img whose src ends with /attachments/<uuid>.png and Escape closes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-e2e.ac3",
+            "title": "npx playwright test tests/pan-4493-image-lightbox.spec.ts exits 0 and saves screenshots of both open states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-attachments",
+        "title": "Document click-to-view images and the attachment read route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T17:21:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4493",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Viewing images' features/conversations.mdx",
+            "grep -c '@/attachments/conv' features/conversations.mdx",
+            "grep -n 'attachments/:file' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "first grep prints one line",
+            "second grep prints 0",
+            "third grep prints one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. features/conversations.mdx ## Attachments: replace the wrong '@/attachments/conv/<path>' sentence with the real folder (~/.overdeck/conversation-attachments/<conversation>/, referenced as @<absolute path>) and add a '### Viewing images' subsection (click composer thumbnail to open full size even while uploading; sent messages show a thumbnail under the text; Escape or outside click closes; missing file shows no thumbnail, path stays). docs/DASHBOARD-ARCHITECTURE.md: insert the PRD's 'Composer attachments (PAN-4493)' bullet immediately before the bullet starting '- The PTY supervisor reports what it observes about its harness'."
+        },
+        "items": [
+          {
+            "id": "docs-attachments.ac1",
+            "title": "features/conversations.mdx renders a '### Viewing images' subsection stating that clicking a composer or sent-message thumbnail opens the image full size and that Escape or an outside click closes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-attachments.ac2",
+            "title": "features/conversations.mdx no longer contains '@/attachments/conv' and names ~/.overdeck/conversation-attachments/<conversation>/ as the attachment folder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-attachments.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a bullet naming GET /api/conversations/:name/attachments/:file, stating it returns only png/jpg/jpeg/gif/webp files from that conversation's folder and 404 otherwise, and naming components/chat/ImageLightbox.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "image-lightbox",
+        "to": "composer-thumb-click",
+        "type": "blocks"
+      },
+      {
+        "from": "image-lightbox",
+        "to": "sent-message-thumbnails",
+        "type": "blocks"
+      },
+      {
+        "from": "attachment-ref-parser",
+        "to": "sent-message-thumbnails",
+        "type": "blocks"
+      },
+      {
+        "from": "image-lightbox",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "attachment-ref-parser",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "sent-message-thumbnails",
+        "to": "ci-test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-thumb-click",
+        "to": "playwright-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "sent-message-thumbnails",
+        "to": "playwright-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "attachment-read-route",
+        "to": "attachment-ref-parser",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "8 small items, 15 files, 3 subsystems (dashboard server route, dashboard frontend, docs).",
+      "canonicalFilename": "2026-10-03-PAN-4493-click-a-pasted-image-to-view-it-full-size-in-the-composer-and-in-sent-messages.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
