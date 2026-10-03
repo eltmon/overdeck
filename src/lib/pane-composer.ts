@@ -53,3 +53,33 @@ export function activeComposerPayloadPresence(
   if (composer === null) return 'unproven';
   return composer.includes(verify.slice(0, 40)) ? 'present' : 'absent';
 }
+
+const PASTE_PLACEHOLDER = /\[Pasted text #\d+/;
+
+/**
+ * PAN-4492: the composer of a screen read with no cursor row (Herdr `pane.read`).
+ * Two or more rule rows: the rows strictly between the last two. One rule row:
+ * the rows above it (a paste taller than the screen pushes the top rule off).
+ * None: null.
+ */
+export function ruleBoundedComposerRegion(screen: string): string | null {
+  const lines = screen.replace(PANE_ANSI_PATTERN, '').split('\n');
+  const rules: number[] = [];
+  lines.forEach((line, index) => { if (COMPOSER_TOP_BOUNDARY.test(line)) rules.push(index); });
+  if (rules.length === 0) return null;
+  const bottom = rules[rules.length - 1]!;
+  const top = rules.length >= 2 ? rules[rules.length - 2]! : -1;
+  return lines.slice(top + 1, bottom).join('\n');
+}
+
+const normalizeComposerText = (value: string): string => value.replace(/[─-╿\s ]/g, '');
+
+/** PAN-4492: payload presence in a cursor-less screen's composer. */
+export function screenComposerPayloadPresence(screen: string, content: string): ComposerPayloadPresence {
+  const region = ruleBoundedComposerRegion(screen);
+  if (region === null) return 'unproven';
+  if (PASTE_PLACEHOLDER.test(region)) return 'present';
+  const verify = normalizeComposerText(deliveryVerifyLine(content).slice(0, 40));
+  if (verify.length < 3) return 'unproven';
+  return normalizeComposerText(region).includes(verify) ? 'present' : 'absent';
+}

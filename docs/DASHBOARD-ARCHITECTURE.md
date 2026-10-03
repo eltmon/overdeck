@@ -411,10 +411,13 @@ door that does not exist; a real record read door would be a separate change.
   queued prompt with extra content) — the red "Not found in transcript" state now
   appears only when no landed or queued record matches or contains the bubble's text
   at all. Composer delivery still pastes the raw, unwrapped text: every delivery path
-  (tmux `paste-buffer -p`, Herdr `pane.send_text`, Herdr `agent.prompt`) submits with
-  bracketed paste because raw typed bytes submit a multi-line message at its first
-  newline, so the agent sees a long composer message inside `<pasted_content>` too —
-  a known, accepted side effect, not something delivery works around.
+  (tmux `paste-buffer -p`, Herdr `pane.send_text`, Herdr `agent.prompt` for non-Claude
+  harnesses) submits with bracketed paste because raw typed bytes submit a multi-line
+  message at its first newline, so the agent sees a long composer message inside
+  `<pasted_content>` too — a known, accepted side effect, not something delivery works
+  around. On Herdr a Claude Code composer send is submit-verified: Overdeck presses
+  Enter itself after the paste shows in the composer and resends Enter once if the
+  message is still there (PAN-4492).
 - Composer attachments (PAN-4493): `POST /api/conversations/:name/upload-image` stores
   a file in `~/.overdeck/conversation-attachments/<name>/`. `GET
   /api/conversations/:name/attachments/:file` (`routes/conversation-attachments.ts`)

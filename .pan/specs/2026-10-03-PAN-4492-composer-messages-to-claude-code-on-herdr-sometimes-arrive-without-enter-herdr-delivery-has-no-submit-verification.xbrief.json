@@ -1,0 +1,533 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T17:01:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4492: Composer messages to Claude Code on Herdr sometimes arrive without Enter: Herdr delivery has no submit verification",
+    "updated": "2026-10-03T17:08:51.949Z"
+  },
+  "plan": {
+    "id": "pan-4492",
+    "title": "Composer messages to Claude Code on Herdr sometimes arrive without Enter: Herdr delivery has no submit verification",
+    "status": "running",
+    "uid": "6784cbf6-d6ce-4b36-bd2c-3c9b7fe4e411",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-03T17:01:37Z",
+    "updated": "2026-10-03T17:08:51.949Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4492",
+        "label": "PAN-4492",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4492.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "delivery",
+      "claude-code",
+      "composer",
+      "terminal-backends"
+    ],
+    "narratives": {
+      "Problem": "On a Herdr host a composer message to a Claude Code conversation is delivered by Herdr's agent.prompt, which types the text and presses Enter in one breath. A large paste can still be ingesting when the Enter arrives, so the Enter is lost and the message sits in Claude Code's input box while the dashboard reports it delivered. The tmux path guards against this (paste-visible wait, size-scaled settle, post-Enter check with one resend); the Herdr path has none of these.",
+      "Proposal": "For Herdr-detected Claude Code agents (agent === 'claude', no wait option) and every steer, HerdrBackend.prompt stops calling agent.prompt and calls a new pasteAndSubmitHerdrPane (src/lib/terminal-backends/herdr-submit.ts): pane.send_text in bracketed paste, wait until the composer shows the payload (or a [Pasted text #N placeholder) and a 600 ms-3 s settle has passed, press Enter (or the steer chord) with pane.send_keys, watch the composer for 2 s, and press it exactly once more only when the payload is still there, the agent is not blocked and no menu/permission prompt is on screen. The composer is located on a cursor-less screen read by a new screenComposerPayloadPresence in pane-composer.ts (rows between the last two rule rows). A committed soak script reproduces the bug before the wiring lands and proves 20/20 after.",
+      "NonGoals": "- No change to the tmux path, PTY supervisor, app-server, ACP, Channels, or Kimi delivery\n- No change for non-Claude Herdr-detected harnesses; they keep agent.prompt\n- Prompts that pass options.wait keep agent.prompt\n- No transcript-based submit confirmation inside delivery; watchForEatenConversationMessage is unchanged\n- No re-paste when the paste never shows in the composer\n- No new fields on PromptResult or DeliveryResult; src/lib/agents/delivery.ts is not modified\n- Never more than one resubmit per delivery\n- Never press Enter or the steer chord while a menu, permission prompt, or blocked status is present\n- No raising of any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Replace agent.prompt with Overdeck's own paste -> verify -> submit -> verify for Claude Code panes, instead of only adding a check after agent.prompt",
+        "rationale": "The issue permits either. Only the in-place form restores the pre-Enter paste wait and settle that address the root cause; the steer path already proves pane.send_text + pane.send_keys in production; no production caller passes wait and delivery.ts ignores the returned state."
+      },
+      {
+        "summary": "Scope the new routine to Herdr agents whose agent field is 'claude' (and all steers); other harnesses and waited prompts keep agent.prompt",
+        "rationale": "The composer parser targets Claude Code's layout and every acceptance criterion is about Claude Code; leaving other harnesses untouched keeps blast radius small."
+      },
+      {
+        "summary": "Steer joins the same routine and resubmits with ctrl+x ctrl+s; steerHerdrPane is deleted",
+        "rationale": "Steer had the same missing guarantees and is Claude-only; the tmux steer chaser already resends with the chord, so this matches it."
+      },
+      {
+        "summary": "Pane presence is the only submit signal; no transcript check in the routine",
+        "rationale": "A queued message on a busy agent does not reach the transcript until the turn ends, and pan tell to work agents has no transcript offset; a busy Claude Code still clears its composer on Enter."
+      },
+      {
+        "summary": "Resubmit only on positive evidence (payload present, not blocked, no menu); unproven never resubmits; max one resubmit",
+        "rationale": "An extra Enter while a menu shows answers it (PAN-3212, PAN-4278); an Enter on an empty composer is a no-op, so positive-evidence-only is safe."
+      },
+      {
+        "summary": "Locate the composer without a cursor row by the last two rule rows (one-rule fallback: rows above it)",
+        "rationale": "Herdr pane.read has no cursor; the live capture shows the composer between two ─── rows; the one-rule fallback's worst case is one harmless Enter on an empty composer."
+      },
+      {
+        "summary": "Log resubmits with a [herdr-submit] console.warn line instead of new result fields",
+        "rationale": "delivery.ts has one line of file-size headroom and the AC only requires the log to record the resubmit."
+      },
+      {
+        "summary": "New module imports only pane-composer, pane-choice-menu and steer-keys, and takes the Herdr API structurally",
+        "rationale": "agent-pane-io.ts is in baselined import cycle 32 and reaches herdr.ts through launch.ts; importing it (or permission-prompt.ts, which imports it) would create a new cycle and fail lint:circular. paneHasBlockingChoiceMenu already reports permission menus."
+      },
+      {
+        "summary": "Commit scripts/herdr-submit-soak.ts for the reproduction and the 20-send acceptance run, with an explicit fallback when no Herdr host is reachable",
+        "rationale": "The issue asks to reproduce first and AC-1 needs 20 consecutive sends; a script makes both repeatable for the work and test roles."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-composer-presence",
+        "title": "Add cursor-free composer presence (screenComposerPayloadPresence) to pane-composer.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4492",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pane-composer.ts",
+            "tests/lib/pane-composer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/pane-composer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/pane-composer.test.ts passes including the new screenComposerPayloadPresence cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 (.pan/drafts/PAN-4492.md). Add exported ruleBoundedComposerRegion(screen) and screenComposerPayloadPresence(screen, content) below activeComposerPayloadPresence in src/lib/pane-composer.ts, exactly as the PRD snippet: rule rows match the existing COMPOSER_TOP_BOUNDARY; two or more rules -> rows strictly between the last two; one rule -> rows above it; none -> null/'unproven'. A '[Pasted text #<n>' placeholder in the region is 'present'. Normalise both sides by removing whitespace, U+00A0 and box-drawing chars [─-╿] before includes(); verify slice is deliveryVerifyLine(content).slice(0,40); verify shorter than 3 -> 'unproven'. Add the six PRD W1 fixture tests to tests/lib/pane-composer.test.ts."
+        },
+        "items": [
+          {
+            "id": "w1-composer-presence.ac1",
+            "title": "Given the live-capture screen (rule, '❯\\u00a0yes file it and fix it', rule, four footer rows), when screenComposerPayloadPresence runs with content 'yes file it and fix it', then it returns 'present'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-composer-presence.ac2",
+            "title": "Given a composer holding '❯ [Pasted text #1 +82 lines]' and 5 KB content, then it returns 'present'; given an empty composer with the same text only in scrollback above the top rule, then it returns 'absent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-composer-presence.ac3",
+            "title": "Given a screen with no rule rows, then it returns 'unproven'; given only one rule row with the wrapped verify line above it, then it returns 'present'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-composer-presence.ac4",
+            "title": "Given a labelled rule row such as '───── agent-pan-3422 ──', then ruleBoundedComposerRegion treats it as a rule boundary and returns the rows below it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-herdr-submit",
+        "title": "Create herdr-submit.ts: paste, verify paste, submit, verify submit, resubmit once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4492",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-submit.ts",
+            "tests/unit/lib/terminal-backends/herdr-submit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-submit.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "herdr-submit.test.ts passes all eight PRD W2 cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "w3-herdr-wiring",
+            "w5-live-verify"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. New module src/lib/terminal-backends/herdr-submit.ts exporting HerdrSubmitApi (structural {call}), HerdrSubmitDeps {sleep, now}, HerdrSubmitOutcome ('submitted'|'resubmitted'|'held'|'unconfirmed'|'blocked'), PASTE_VISIBLE_TIMEOUT_MS=3000, SUBMIT_CONFIRM_MS=2000, POLL_INTERVAL_MS=50, pasteSettleMs(text) (tmux formula: max(600, min(3000, lines*15 + floor(len/1000)*50))), and pasteAndSubmitHerdrPane(api, paneId, text, mode='enter', deps). Imports ONLY ../pane-composer.js, ../pane-choice-menu.js, ./steer-keys.js (never agent-pane-io or permission-prompt: import cycle). Algorithm per PRD W2 steps 1-6: pane.send_text bracketed; poll pane.read (source 'visible', lines 200, strip_ansi true) until 'present' or 3 s, then sleep out pasteSettleMs from start; never-visible + (agent.get blocked or paneHasBlockingChoiceMenu) -> log and return 'blocked' with no keys; press submit keys (['enter'] or [...STEER_HERDR_KEYS]); poll up to 2 s, first 'absent' -> 'submitted'; at deadline 'unproven' -> 'unconfirmed'; 'present' + blocked/menu -> log '[herdr-submit] ... not resending ... (PAN-4492)' and 'held'; else console.warn '[herdr-submit] <pane>: message still in Claude Code's input box 2000 ms after <label>; resubmitting once (PAN-4492)', press submit keys once more, 'resubmitted'. A pane.read throw counts as unproven (never rejects); a pane.send_text throw propagates. Write a 6-10 line module header (why agent.prompt's Enter races paste ingestion, never answer a menu, one-resubmit cap). Tests use injected sleep/now or vi.useFakeTimers (no real waits)."
+        },
+        "items": [
+          {
+            "id": "w2-herdr-submit.ac1",
+            "title": "Given the payload clears from the composer after the first Enter, when pasteAndSubmitHerdrPane runs, then exactly one pane.send_keys ['enter'] is recorded and the outcome is 'submitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-herdr-submit.ac2",
+            "title": "Given the payload stays in the composer for the whole 2000 ms window with agent.get 'idle' and no menu, then two pane.send_keys ['enter'] calls are recorded, the outcome is 'resubmitted', and console.warn emits a line containing 'resubmitting once (PAN-4492)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-herdr-submit.ac3",
+            "title": "Given the payload stays and agent.get answers 'blocked' or the screen's bottom rows are the permission-menu fixture, then exactly one pane.send_keys is recorded and the outcome is 'held'; given the paste is never visible and agent.get answers 'blocked', then zero pane.send_keys are recorded and the outcome is 'blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-herdr-submit.ac4",
+            "title": "Given mode 'steer' and a payload that stays, then both pane.send_keys calls carry ['ctrl+x','ctrl+s'] and none carries 'enter'; given every pane.read returns '' or throws, then one pane.send_keys is recorded, the promise resolves, and the outcome is 'unconfirmed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-herdr-wiring",
+        "title": "Route Claude Code and steer Herdr prompts through pasteAndSubmitHerdrPane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4492",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr.ts",
+            "src/lib/terminal-backends/steer-keys.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-adapter.test.ts tests/unit/lib/terminal-backends/herdr-pane-bound.test.ts src/lib/agents/__tests__/delivery-herdr-result.test.ts tests/unit/lib/agents/delivery-conversation-herdr.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors",
+            "lint:file-size passes with herdr.ts at or under 1008 lines",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In src/lib/terminal-backends/herdr.ts replace the import of steerHerdrPane (line 50) with `import { pasteAndSubmitHerdrPane } from './herdr-submit.js';` and replace the steer block (search `if (options.submit === 'steer') { // PAN-4292`) with the PRD's after-snippet: condition `options.submit === 'steer' || (info.agent?.agent === 'claude' && !options.wait)`, keep the unsupported and agent_blocked guards, call pasteAndSubmitHerdrPane(this.api, info.agent.pane_id, text, options.submit ?? 'enter'), map 'blocked' to { refused: true, reason: 'agent_blocked' } and everything else to { delivered: true, messageId }. The block must keep the same line count; herdr.ts must end at or under 1008 lines. Delete the now-unused steerHerdrPane (and STEER_SETTLE_MS if unreferenced) from steer-keys.ts and fix its header comment. Do not touch src/lib/agents/delivery.ts. Update the three PAN-4292 steer tests in herdr-adapter.test.ts to tolerate interleaved pane.read/agent.get calls (filter them out, advance fake timers past settle + confirm window) and add the three PRD W3 routing tests (claude -> no agent.prompt; codex -> agent.prompt; claude with wait -> agent.prompt)."
+        },
+        "items": [
+          {
+            "id": "w3-herdr-wiring.ac1",
+            "title": "Given agent.get returns agent 'claude' with status 'idle' and no wait option, when HerdrBackend.prompt runs, then agent.prompt is never called and pane.send_text followed by pane.send_keys ['enter'] are recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-herdr-wiring.ac2",
+            "title": "Given agent.get returns agent 'codex', or agent 'claude' with options.wait set, when HerdrBackend.prompt runs, then agent.prompt is called exactly once as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-herdr-wiring.ac3",
+            "title": "Given submit 'steer', when HerdrBackend.prompt runs, then pane.send_text carries the bracketed-paste text and pane.send_keys carries ['ctrl+x','ctrl+s']; given a blocked agent, then it returns { refused: true, reason: 'agent_blocked' } with zero sends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-herdr-wiring.ac4",
+            "title": "Given the finished change, when `wc -l src/lib/terminal-backends/herdr.ts` runs, then it prints a count at or under 1008, and `git diff origin/main -- src/lib/agents/delivery.ts` produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-soak-script",
+        "title": "Add scripts/herdr-submit-soak.ts and record the pre-fix baseline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4492",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/herdr-submit-soak.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx tsx scripts/herdr-submit-soak.ts --help",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "--help prints the usage line naming --conv, --cwd, --session, --count, --bytes and --tail",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Developer script run with `npx tsx scripts/herdr-submit-soak.ts --conv <name> --cwd <dir> --session <claudeSessionId> [--count 20] [--bytes 5120] [--tail \"<last line>\"]` (plus --help); --tail replaces the default last line 'Reply with exactly: ok'. Run it as a .ts file (planning verified delivery.ts, herdr.ts and transcript-landing.ts load under npx tsx from a file; `npx tsx -e` fails only on top-level await). Per send: message = first line `soak-<i>-<uuid>`, ~bytes of 64-char filler lines, last line `Reply with exactly: ok`; start offset from captureTranscriptUserRecordSnapshot(cwd, session) (readOffset ?? fileSize ?? 0); deliver via deliverAgentMessage(conv, message, 'herdr-submit-soak', undefined, { sender: { id: `conv-operator-${process.pid}` } }); poll probeTranscriptSince(cwd, session, offset, message) every 1 s up to 60 s; then Effect.runPromise(herdrBackend.wait({ agentName: conv }, ['idle','done'], 180_000)). Print `#i landed|NOT LANDED in <ms>` per send and `landed X/N`; exit 0 only when all landed. Implementation checkpoint: BEFORE w3 lands, run it with --count 10 against a scratch Claude Code conversation (create from the dashboard on the cheapest Claude model; get cwd and claudeSessionId from `curl -s localhost:3011/api/conversations/<name>`) and write the baseline `landed X/10` into the PR description. Fallback: if no Herdr host or dashboard is reachable, write 'baseline not measured: <reason>' in the PR description and continue."
+        },
+        "items": [
+          {
+            "id": "w4-soak-script.ac1",
+            "title": "Given `npx tsx scripts/herdr-submit-soak.ts --help`, when it runs, then it prints a usage line naming --conv, --cwd, --session, --count, --bytes and --tail and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-soak-script.ac2",
+            "title": "Given a reachable scratch conversation, when the script runs with --count N, then it prints one '#i landed' or '#i NOT LANDED' line per send and a final 'landed X/N' line, and exits non-zero when X < N",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-soak-script.ac3",
+            "title": "Given the PR description, when a reviewer reads it, then it contains either the pre-fix baseline 'landed X/10' line or the text 'baseline not measured:' with a reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-live-verify",
+        "title": "Live-verify 20 consecutive 5 KB sends and the menu hold on a Herdr host",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4492",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/herdr-submit-soak.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npx tsx scripts/herdr-submit-soak.ts --conv <scratch> --cwd <cwd> --session <id> --count 20 --bytes 5120"
+          ],
+          "expected_outputs": [
+            "the script prints 'landed 20/20' and exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. With w3 applied in the workspace: (1) run `npx tsx scripts/herdr-submit-soak.ts --conv <scratch> --cwd <cwd> --session <id> --count 20 --bytes 5120` against a scratch Claude Code conversation on Herdr and paste the summary plus any '[herdr-submit]' lines into the PR description. (2) A permission prompt cannot be staged (bypass permissions + auto-approve hook), so open Claude Code's /effort picker instead: `herdr --session overdeck pane send-text <pane> '/effort'` then `herdr --session overdeck pane send-keys <pane> enter`; confirm `herdr --session overdeck agent get <conv>` shows agent_status blocked; run the script with --count 1; expect '#1 NOT LANDED', no '[herdr-submit]' line, and the picker still on screen via `herdr --session overdeck pane read <pane> --source visible`; dismiss with `pane send-keys <pane> esc`. (3) Make the agent busy with `--count 1 --tail \"Count slowly from 1 to 200, one number per line.\"`, and while agent get shows working run `--count 1` again; expect no 'resubmitting once (PAN-4492)' line and the second message lands after the turn. If a resubmit line appears, record the screen in the PR description and treat it as a blocking W2 finding. (4) Close the scratch conversation. Fallback: if no Herdr host is reachable from the agent environment, write 'live verification deferred to the test role' in the PR description. No source changes are expected here; a script fix, if needed, is made here."
+        },
+        "items": [
+          {
+            "id": "w5-live-verify.ac1",
+            "title": "Given an idle Claude Code conversation on a Herdr host, when the soak script runs with --count 20 --bytes 5120 against the branch code, then it prints 'landed 20/20' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-live-verify.ac2",
+            "title": "Given the scratch agent is blocked on the /effort picker (agent get reports blocked), when the soak script sends one message, then it prints '#1 NOT LANDED', logs no '[herdr-submit]' line, and `herdr pane read --source visible` still renders the picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-live-verify.ac4",
+            "title": "Given the scratch agent is working on a long turn, when the soak script sends one more message, then no line containing 'resubmitting once (PAN-4492)' is logged and the message lands as a user record after the turn ends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-live-verify.ac3",
+            "title": "Given the PR description, when a reviewer reads it, then it contains the 'landed 20/20' summary or the text 'live verification deferred to the test role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-docs",
+        "title": "Document Herdr submit verification in TERMINAL-BACKENDS.md and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-03T17:01:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4492",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Submit verification on Claude Code panes (PAN-4492)' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'PAN-4492' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "both greps print at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In docs/TERMINAL-BACKENDS.md '## Message delivery routing' add a paragraph headed 'Submit verification on Claude Code panes (PAN-4492)' stating: for a Herdr-detected agent whose agent is 'claude' (and every steer) prompt skips agent.prompt; it types with pane.send_text in bracketed paste, waits for the composer to show the text or a '[Pasted text #N' placeholder plus the 600 ms-3 s settle, presses Enter with pane.send_keys, watches the composer for 2 s, and presses Enter once more only when the payload is still there, the agent is not blocked and no menu is on screen; name src/lib/terminal-backends/herdr-submit.ts and the '[herdr-submit]' log prefix; say other harnesses and prompts with wait still use agent.prompt. In '### Steer submit' change the Herdr table row: same routine, 600 ms-3 s settle instead of 300 ms, single resubmit uses ctrl+x ctrl+s. In docs/DASHBOARD-ARCHITECTURE.md composer delivery bullet (search 'every delivery path') change the list to '(tmux paste-buffer -p, Herdr pane.send_text, Herdr agent.prompt for non-Claude harnesses)' and add the PRD's one-sentence PAN-4492 note."
+        },
+        "items": [
+          {
+            "id": "w6-docs.ac1",
+            "title": "Given docs/TERMINAL-BACKENDS.md, when grepped, then it contains 'Submit verification on Claude Code panes (PAN-4492)' and names 'herdr-submit.ts' and the '[herdr-submit]' prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-docs.ac2",
+            "title": "Given the '### Steer submit' table in docs/TERMINAL-BACKENDS.md, then its Herdr row states the 600 ms-3 s settle and the single ctrl+x ctrl+s resubmit and no longer states a fixed 300 ms settle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-docs.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, then the composer delivery bullet lists 'Herdr agent.prompt for non-Claude harnesses' and contains a sentence mentioning PAN-4492 that says Enter is resent once if the message is still in the composer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-composer-presence",
+        "to": "w2-herdr-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-herdr-submit",
+        "to": "w3-herdr-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-soak-script",
+        "to": "w3-herdr-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-herdr-wiring",
+        "to": "w5-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-soak-script",
+        "to": "w5-live-verify",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-03-PAN-4492-composer-messages-to-claude-code-on-herdr-sometimes-arrive-without-enter-herdr-delivery-has-no-submit-verification.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
