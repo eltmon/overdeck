@@ -100,6 +100,22 @@ pan handoff self --pack mattpocock wire the Stripe webhook
 
 An unknown skill name, an unknown pack id, or a pack that is not cached (`pan skills pack sync <id>`) rejects the request before any conversation is created.
 
+## Hold the new conversation
+
+Use `--hold` to create and launch the successor without sending the kickoff — the operator inspects it before it starts working (useful on a recorded stream, or to edit the brief first):
+
+```bash
+pan handoff self --hold Read .pan/handoff-brief.md FIRST and follow it exactly.
+```
+
+The successor's session comes up and the dashboard composer shows a waiting notice with the kickoff text already in it; pressing Send there starts it. From the terminal, run `pan handoff start <conv>` (id or name) instead:
+
+```bash
+pan handoff start 371
+```
+
+This sends the held kickoff exactly once. A second `pan handoff start` on the same conversation — or any attempt on a conversation that was never held — exits 1 with "No held kickoff: the conversation was already started or was never held".
+
 ## When to use
 
 - A long-running conversation is near the context wall.

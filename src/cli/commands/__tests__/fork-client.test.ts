@@ -89,4 +89,9 @@ describe('forkConversationViaServer (PAN-4338)', () => {
     expect(body).not.toHaveProperty('packs');
     expect(body).not.toHaveProperty('hold');
   });
+
+  it('sends hold only when requested (PAN-4499)', async () => {
+    await forkConversationViaServer('source', { forkMode: 'handoff', hold: true }, { pollMs: 0, timeoutMs: 50 });
+    expect(postBody()).toMatchObject({ hold: true });
+  });
 });

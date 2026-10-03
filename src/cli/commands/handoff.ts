@@ -22,9 +22,10 @@ interface HandoffOptions {
   allowPrimary?: boolean;
   skill?: string[];
   pack?: string[];
+  hold?: boolean;
 }
 
-function resolveConversation(convRef: string) {
+export function resolveConversation(convRef: string) {
   if (/^\d+$/.test(convRef)) {
     return getConversationById(parseInt(convRef, 10));
   }
@@ -144,6 +145,7 @@ export async function handoffCommand(
       allowPrimary: options.allowPrimary,
       skills: options.skill,
       packs: options.pack,
+      hold: options.hold,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {
@@ -180,4 +182,7 @@ export async function handoffCommand(
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
   }
   console.log(chalk.gray(`  Dashboard: https://overdeck.localhost/conv/${newConv.id}`));
+  if (options.hold) {
+    console.log(chalk.yellow(`  Held: the kickoff was not sent. Press Send in the dashboard composer, or run: pan handoff start ${newConv.id}`));
+  }
 }

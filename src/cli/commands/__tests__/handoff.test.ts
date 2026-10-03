@@ -476,6 +476,34 @@ describe('handoffCommand', () => {
     expect(output).toContain('Packs: mattpocock');
   });
 
+  it('forwards --hold and prints the start hint', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { hold: true });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ hold: true }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Held: the kickoff was not sent.');
+    expect(output).toContain('pan handoff start 789');
+  });
+
   it('annotates an explicit --issue in the handoff output', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,
