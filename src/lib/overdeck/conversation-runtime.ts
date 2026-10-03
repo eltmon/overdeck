@@ -88,7 +88,7 @@ import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/sto
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
-import { ConversationCreateInputError, parseConversationLaunchContext, resolveProjectCwd } from './conversation-create-input.js';
+import { ConversationCreateInputError, parseConversationLaunchContext, resolveConversationCreateTarget } from './conversation-create-input.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1007,14 +1007,7 @@ export async function handleConversationCreate(
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (effort && !isValidConversationEffort(effort, harness)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     const launchEffort = effort ? resolveConversationEffort({ effort, model, harness, issueId }) : undefined;
-    let cwd = getDefaultCwd();
-    let canonicalProjectKey: string | undefined;
-    if (projectKey) {
-      const resolved = await resolveProjectCwd(projectKey);
-      if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
-      cwd = resolved.cwd;
-      canonicalProjectKey = resolved.key;
-    }
+    const { cwd, projectKey: canonicalProjectKey } = await resolveConversationCreateTarget({ projectKey, cwd: body['cwd'] }, getDefaultCwd());
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });
     }

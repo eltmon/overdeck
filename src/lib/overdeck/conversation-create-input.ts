@@ -1,8 +1,9 @@
 /** Request-body parsing for POST /api/conversations (PAN-4486): project/cwd resolution and launch-context flags. */
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { isCoreSkill } from '../skill-overrides/resolve.js';
 import type { ConversationLaunchContext } from './conversation-launch-context.js';
+import { validateCwdContainment } from './cwd-containment.js';
 
 /** A malformed create request; the route answers 400. */
 export class ConversationCreateInputError extends Error {}
@@ -70,4 +71,28 @@ export async function resolveProjectCwd(
     return { error: `Project path does not exist: ${projectPath} (project: ${projectIdentifier})` };
   }
   return { key: resolved.key, cwd: projectPath };
+}
+
+/**
+ * The create request's cwd and canonical project key. A `cwd` needs a project
+ * and must resolve inside it (the project root included, so a primary checkout
+ * stays allowed); the returned cwd is its realpath.
+ */
+export async function resolveConversationCreateTarget(
+  input: { projectKey?: string; cwd?: unknown },
+  defaultCwd: string,
+): Promise<{ cwd: string; projectKey?: string }> {
+  const cwd = typeof input.cwd === 'string' && input.cwd !== '' ? input.cwd : undefined;
+  if (!input.projectKey) {
+    if (cwd) throw new ConversationCreateInputError('cwd requires projectKey');
+    return { cwd: defaultCwd };
+  }
+  const resolved = await resolveProjectCwd(input.projectKey);
+  if ('error' in resolved) throw new ConversationCreateInputError(resolved.error);
+  if (!cwd) return { cwd: resolved.cwd, projectKey: resolved.key };
+  const outside = new ConversationCreateInputError(`Invalid cwd: must be inside project ${resolved.key}`);
+  if (!(await validateCwdContainment(cwd))) throw outside;
+  const [realCwd, realProject] = await Promise.all([realpath(cwd), realpath(resolved.cwd)]);
+  if (realCwd !== realProject && !realCwd.startsWith(`${realProject}/`)) throw outside;
+  return { cwd: realCwd, projectKey: resolved.key };
 }
