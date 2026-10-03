@@ -1188,8 +1188,10 @@ export async function handleConversationDelete(
   try {
     const conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    await stopConversationRuntime(conv, name);
-    markConversationEnded(name);
+    // PAN-4485: a superseded /clear row owns no runtime; deleting it must not
+    // stop the chain head's shared session.
+    if (!isSupersededConversation(conv)) await stopConversationRuntime(conv, name);
+    if (conv.status !== 'ended') markConversationEnded(name);
     archiveConversation(name);
     removeFavorite('conversation', name);
     deps.invalidateFavoritesCache();
