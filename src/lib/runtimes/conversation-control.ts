@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rename, writeFile, chmod } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { EffortLevel } from '@overdeck/contracts'
 import { ohmypiFifoPaths } from './ohmypi-fifo.js'
 
-export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+/** pi thinking levels: the canonical levels except max, plus pi's off/minimal. */
+export type ThinkingLevel = 'off' | 'minimal' | Exclude<EffortLevel, 'max'>
 
 export type ControlCommand =
   | {
