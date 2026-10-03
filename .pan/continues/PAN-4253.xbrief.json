@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:28:31.995Z",
+  "updated": "2026-10-03T02:28:43.669Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "restart-reapplies-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:28:31.995Z"
+    },
+    "recover-reapplies-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:43.669Z"
     }
   }
 }
