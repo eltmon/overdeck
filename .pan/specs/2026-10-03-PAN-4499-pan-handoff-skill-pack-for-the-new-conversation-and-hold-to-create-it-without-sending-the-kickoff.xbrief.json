@@ -4,17 +4,17 @@
     "created": "2026-10-03T21:37:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4499: pan handoff: --skill/--pack for the new conversation, and --hold to create it without sending the kickoff",
-    "updated": "2026-10-03T21:42:19.462Z"
+    "updated": "2026-10-03T21:43:07.920Z"
   },
   "plan": {
     "id": "pan-4499",
     "title": "pan handoff: --skill/--pack for the new conversation, and --hold to create it without sending the kickoff",
-    "status": "proposed",
+    "status": "running",
     "uid": "7f04b4bf-3a65-4f35-9ebe-51846aadb0af",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T21:37:24Z",
-    "updated": "2026-10-03T21:42:19.462Z",
+    "updated": "2026-10-03T21:43:07.920Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4499",
@@ -854,5 +854,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
