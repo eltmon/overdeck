@@ -2,7 +2,7 @@
  * Per-skill on/off resolution (PAN-3942).
  *
  * Pure, no I/O. A skill's effective state is the narrowest defined override:
- * issue > project > global > default (on). Core workflow skills that the
+ * conversation > issue > project > global > default (on). Core workflow skills that the
  * pipeline depends on are always on and ignore every override.
  *
  * Pack skills (PAN-4334) have ids `pack/skill` and resolve differently: at
@@ -17,7 +17,7 @@ export const CORE_SKILLS: readonly string[] = [
 ];
 
 export type SkillOverrideLevel = 'global' | 'project' | 'issue';
-export type SkillStateSource = 'core' | SkillOverrideLevel | 'default';
+export type SkillStateSource = 'core' | SkillOverrideLevel | 'conversation' | 'default';
 export type SkillOverrideMap = Readonly<Record<string, boolean>>;
 
 export interface PackToggleLayers {
@@ -30,11 +30,13 @@ export interface SkillOverrideLayers {
   global: SkillOverrideMap;
   project?: SkillOverrideMap;
   issue?: SkillOverrideMap;
+  /** Per-conversation values (PAN-4486); narrowest of all, set at creation only. */
+  conversation?: SkillOverrideMap;
   /** Pack toggles keyed by pack id (PAN-4334). */
   packs?: PackToggleLayers;
 }
 
-export type PackSkillSource = SkillOverrideLevel | 'issue-pack' | 'project-pack' | 'global-pack' | 'default';
+export type PackSkillSource = SkillOverrideLevel | 'conversation' | 'issue-pack' | 'project-pack' | 'global-pack' | 'default';
 
 export interface SkillState {
   name: string;
@@ -63,6 +65,8 @@ function overrideValue(map: SkillOverrideMap | undefined, name: string): boolean
 
 function resolveOne(name: string, layers: SkillOverrideLayers): { enabled: boolean; source: SkillStateSource } {
   if (isCoreSkill(name)) return { enabled: true, source: 'core' };
+  const conv = overrideValue(layers.conversation, name);
+  if (conv !== null) return { enabled: conv, source: 'conversation' };
   for (const level of ['issue', 'project', 'global'] as const) {
     const value = overrideValue(layers[level], name);
     if (value !== null) return { enabled: value, source: level };
@@ -89,6 +93,8 @@ export function resolvePackSkill(
   skip?: SkillOverrideLevel,
 ): { enabled: boolean; source: PackSkillSource } {
   const pack = id.slice(0, id.indexOf('/'));
+  const conv = overrideValue(layers.conversation, id);
+  if (conv !== null) return { enabled: conv, source: 'conversation' };
   for (const level of LEVELS_NARROWEST_FIRST) {
     const value = level === skip ? null : overrideValue(layers[level], id);
     if (value !== null) return { enabled: value, source: level };
@@ -142,6 +148,7 @@ export function disabledSkillNames(layers: SkillOverrideLayers): string[] {
     ...Object.keys(layers.global),
     ...Object.keys(layers.project ?? {}),
     ...Object.keys(layers.issue ?? {}),
+    ...Object.keys(layers.conversation ?? {}),
   ]);
   return [...names]
     .filter(name => !isPackSkillId(name) && !resolveOne(name, layers).enabled)

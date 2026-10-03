@@ -113,6 +113,7 @@ CREATE TABLE `conversations` (
 	`project_key` text,
 	`bare_context` integer NOT NULL DEFAULT 0,
 	`skip_claude_md` integer NOT NULL DEFAULT 0,
+	`skill_overrides` text,
 	`parent_conversation_id` text,
 	`gauntlet_run` text,
 	`lane_key` text,

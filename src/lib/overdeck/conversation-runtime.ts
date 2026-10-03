@@ -10,7 +10,6 @@ import { promisify } from 'node:util';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
-import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
@@ -89,6 +88,7 @@ import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/sto
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
+import { ConversationCreateInputError, parseConversationLaunchContext, resolveConversationCreateTarget } from './conversation-create-input.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -923,44 +923,7 @@ export async function spawnConversationSession(
   }
   await keepTmuxSessionOpen(pane);
 }
-export interface ResolvedRegisteredProject {
-  key: string;
-  config: ProjectConfig;
-}
-
-/** Resolve a project key or display name without blocking the dashboard event loop. */
-export async function resolveRegisteredProject(
-  input: string,
-): Promise<ResolvedRegisteredProject | { error: string }> {
-  const projects = await listProjectsAsync();
-  const project = projects.find((candidate) => candidate.key === input)
-    ?? projects.find((candidate) => candidate.config.name === input);
-  return project ?? { error: `Unknown project: ${input}` };
-}
-
-/**
- * Resolve a conversation's cwd from a project identifier.
- *
- * The Command Deck identifies projects by display name, not yaml key
- * (PAN-2590) — accept either, like GET /api/session-trees does.
- */
-export async function resolveProjectCwd(
-  projectIdentifier: string,
-): Promise<{ key: string; cwd: string } | { error: string }> {
-  const resolved = await resolveRegisteredProject(projectIdentifier);
-  if ('error' in resolved) return resolved;
-  const projectPath = resolved.config.path;
-  if (!projectPath) {
-    return { error: `Project path does not exist: (unset) (project: ${projectIdentifier})` };
-  }
-  try {
-    await stat(projectPath);
-  } catch {
-    return { error: `Project path does not exist: ${projectPath} (project: ${projectIdentifier})` };
-  }
-  return { key: resolved.key, cwd: projectPath };
-}
-
+export { resolveRegisteredProject, resolveProjectCwd, type ResolvedRegisteredProject } from './conversation-create-input.js';
 export interface ConversationCreateRequestBody { [key: string]: unknown }
 export interface StartConversationRuntimeInput {
   conv: Conversation;
@@ -1039,19 +1002,12 @@ export async function handleConversationCreate(
     const harness = await resolveAllowedHarness(body['harness'], model);
     const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
-    const launchContext: ConversationLaunchContext = { bareContext: body['bareContext'] === true, skipClaudeMd: body['skipClaudeMd'] === true };
+    const launchContext = parseConversationLaunchContext(body);
     if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (effort && !isValidConversationEffort(effort, harness)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     const launchEffort = effort ? resolveConversationEffort({ effort, model, harness, issueId }) : undefined;
-    let cwd = getDefaultCwd();
-    let canonicalProjectKey: string | undefined;
-    if (projectKey) {
-      const resolved = await resolveProjectCwd(projectKey);
-      if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
-      cwd = resolved.cwd;
-      canonicalProjectKey = resolved.key;
-    }
+    const { cwd, projectKey: canonicalProjectKey } = await resolveConversationCreateTarget({ projectKey, cwd: body['cwd'] }, getDefaultCwd());
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });
     }
@@ -1075,7 +1031,7 @@ export async function handleConversationCreate(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] create conversation failed:', msg);
-    return jsonResponse({ error: msg || 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
+    return jsonResponse({ error: msg || 'Internal server error' }, { status: error instanceof UnknownModelError || error instanceof ConversationCreateInputError ? 400 : 500 });
   }
 }
 export async function handleConversationStop(name: string, deps: { resolveSessionFileForCleanup?: (conv: Conversation) => string | null }): Promise<ReturnType<typeof jsonResponse>> {

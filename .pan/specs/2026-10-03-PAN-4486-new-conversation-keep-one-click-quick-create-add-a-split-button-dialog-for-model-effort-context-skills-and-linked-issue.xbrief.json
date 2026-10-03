@@ -1,0 +1,1163 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T03:27:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4486: New conversation: keep one-click quick create, add a split-button dialog for model, effort, context, skills and linked issue",
+    "updated": "2026-10-03T03:32:02.669Z"
+  },
+  "plan": {
+    "id": "pan-4486",
+    "title": "New conversation: keep one-click quick create, add a split-button dialog for model, effort, context, skills and linked issue",
+    "status": "running",
+    "uid": "a3629a32-fbe7-4b45-bdb6-df7ca0e98093",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-03T03:27:43Z",
+    "updated": "2026-10-03T03:32:02.669Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4486",
+        "label": "PAN-4486",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "command-deck",
+      "skills",
+      "effort"
+    ],
+    "metadata": {
+      "sizeJustification": "The issue's own acceptance criteria bind the dialog to backend behavior ('the row records each one', 'a per-conversation skill override survives resume'); the conversation skill layer has no operator-visible surface without the dialog, and the dialog cannot satisfy its ACs without the layer. Doc files each count as a subsystem under the surface lint, and the docs item is required. Work is decomposed into 14 vertical items with explicit DAG edges instead of sibling issues.",
+      "canonicalFilename": "2026-10-03-PAN-4486-new-conversation-keep-one-click-quick-create-add-a-split-button-dialog-for-model-effort-context-skills-and-linked-issue.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Command Deck sidebar sets new-conversation options in place: sticky 'No context' and 'Skip CLAUDE.md' checkboxes persist in localStorage and silently carry into the next conversation, and there is no UI for an effort default with its source, a linked issue, or per-conversation skills. PAN-3942 shipped global/project/issue skill layers but no conversation layer.",
+      "Proposal": "Turn the sidebar + into a split button: main click stays quick create (stored model/harness/effort, default context); a caret menu item and a command-palette action open a store-driven 'New conversation with options' dialog (project + working directory, model + harness, effort with resolved default and source, context opt-outs, per-conversation skill Inherit/On/Off, linked issue, first message) whose choices apply to that conversation only. Backend: a conversation skill layer stored on the row (conversations.skill_overrides) and applied by `pan skills launch-settings --conversation <tmuxSession>` on every launch; POST /api/conversations accepts skillOverrides and a cwd inside the chosen project; new GET /api/effort/default. The two checkboxes leave the sidebar.",
+      "NonGoals": "- Template conversations or curated skill sets (PAN-1357)\n- Changing the Home composer or the Stage PaneBar 'New conversation' item\n- Conversation-level pack toggles (conversation values are per-skill only)\n- Editing a live conversation's skill overrides after creation, or any PUT door for a conversation level; SkillOverrideLevel must not gain 'conversation'\n- Removing the orphaned overdeck.commandDeck.newConversationContext localStorage key\n- Changing the sidebar model/harness/effort pickers or quick create beyond dropping the context opt-outs\n- Applying conversation skill overrides to harnesses other than claude-code and codex\n- A server-side issue search endpoint\n- Changing the fork/handoff door's cwd rules\n- Raising any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Conversation skill overrides are stored on the row and read by the launch-settings step via a new --conversation <tmuxSession> flag emitted from launcher-lines.ts",
+        "rationale": "Every relaunch (create, resume, restart-all, fork) regenerates the launcher with spawnMode 'conversation' and managedStateKey, so the override survives resume with zero lines added to conversation-runtime.ts, which sits exactly at its 1252-line cap; an env var could leak into child launches."
+      },
+      {
+        "summary": "Do not widen SkillOverrideLevel; add a separate conversation map and a 'conversation' source",
+        "rationale": "The PUT /api/skills/overrides store door keys off SkillOverrideLevel and cannot persist a conversation level; conversation values are set only at creation."
+      },
+      {
+        "summary": "Working directory accepted only with projectKey, validated by validateCwdContainment plus realpath containment in the project path; primary checkout allowed",
+        "rationale": "Reuses the fork door's existing containment helper; the project root is today's default create cwd, so banning the primary checkout would break the default."
+      },
+      {
+        "summary": "The dialog always sends effort (resolved default when untouched) when the model supports effort",
+        "rationale": "Satisfies 'the row records each one' and matches PAN-4254's clamped-effort persistence."
+      },
+      {
+        "summary": "Dialog host mounted in main.tsx via a zustand store; opens the created conversation through /conv/<id>",
+        "rationale": "Follows the documented dialog-host convention (LinkPullRequestDialogHost) so the palette can open it anywhere; a window-event fallback is specified as an implementation checkpoint."
+      },
+      {
+        "summary": "Issue picker filters the dashboard store's issues client-side",
+        "rationale": "Smallest change; the palette already lists issues from the same store, and no search endpoint is needed."
+      },
+      {
+        "summary": "Keep a single issue with plan.metadata.sizeJustification rather than splitting into sibling issues",
+        "rationale": "The issue's ACs require the backend layer and dialog together; the backend slice has no operator-visible surface alone."
+      },
+      {
+        "summary": "Quick create stops sending context opt-outs; the old localStorage key is left orphaned",
+        "rationale": "The issue moves both checkboxes into the dialog and says quick create uses default context; deleting the key adds lines to a capped file for no behavior gain."
+      },
+      {
+        "summary": "Post-/clear sibling rows copy conversationLaunchContext(parent)",
+        "rationale": "getSupervisedConversationByTmuxSession prefers the sibling, so without the copy a /clear would drop the conversation's skill overrides (and today already drops bareContext)."
+      }
+    ],
+    "items": [
+      {
+        "id": "skill-layer-resolve",
+        "title": "Resolve a per-conversation skill layer ahead of the issue layer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/resolve.ts",
+            "src/lib/skill-overrides/__tests__/resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/resolve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolve.test.ts passes including the new conversation-layer cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "foundationFor": [
+            "launch-conversation-layer"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-1. Add `conversation?: SkillOverrideMap` to SkillOverrideLayers and 'conversation' to SkillStateSource and PackSkillSource only; do NOT add 'conversation' to SkillOverrideLevel (the PUT store door keys off it). resolveOne and resolvePackSkill check layers.conversation first (after the core check in resolveOne; before the level loop in resolvePackSkill, even for optIn skills). disabledSkillNames includes conversation keys."
+        },
+        "items": [
+          {
+            "id": "skill-layer-resolve.ac1",
+            "title": "Given layers {global:{}, issue:{grilling:true}, conversation:{grilling:false}}, When resolveSkillStates runs, Then grilling resolves enabled=false with source 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-layer-resolve.ac2",
+            "title": "Given a core skill set false in the conversation layer, When resolved, Then it stays enabled with source 'core'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-layer-resolve.ac3",
+            "title": "Given an opt-in pack skill 'p/s' set true only in the conversation layer, When resolvePackSkill runs, Then it returns enabled=true with source 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-layer-resolve.ac4",
+            "title": "Given a skill off only in the conversation layer, When disabledSkillNames runs, Then the returned list includes that skill name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-skill-overrides",
+        "title": "Persist skill overrides on the conversation row and carry them through fork and /clear",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-launch-context.ts",
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "tests/unit/lib/overdeck/conversation-bare-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-bare-context.test.ts",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bare-context.test.ts passes with the skill_overrides round-trip cases",
+            "lint:file-size passes with conversations.ts at or under 1222 lines",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "launch-conversation-layer",
+            "create-skill-overrides"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-2. Add nullable `skill_overrides` text column (init SQL + runSchemaTopUp in infra.ts), LegacyConversation.skillOverrides (Record<string,boolean>|null) via parseSkillOverridesColumn in conversation-launch-context.ts, createConversation opts.skillOverrides (empty map stores NULL), ConversationLaunchContext.skillOverrides carried by conversationLaunchContext(conv), and spread conversationLaunchContext(parent) into the post-/clear sibling createConversation call in conversation-lifecycle.ts. conversations.ts must stay <= 1222 lines."
+        },
+        "items": [
+          {
+            "id": "row-skill-overrides.ac1",
+            "title": "Given createConversation with skillOverrides {grilling:false}, When the row is read back by name, Then skillOverrides equals {grilling:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-skill-overrides.ac2",
+            "title": "Given createConversation with an empty skillOverrides map, When read back, Then the column persists NULL and skillOverrides returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-skill-overrides.ac3",
+            "title": "Given a stored value that is not valid JSON, When parseSkillOverridesColumn reads it, Then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-skill-overrides.ac4",
+            "title": "Given a parent conversation with bareContext and skillOverrides, When the post-/clear sibling is created, Then the sibling row preserves the parent's bareContext, skipClaudeMd and skillOverrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-input-extract",
+        "title": "Extract project/cwd resolution and launch-context parsing out of conversation-runtime.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-create-input.ts",
+            "src/lib/overdeck/conversation-runtime.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-project-key.test.ts src/lib/overdeck/__tests__/conversation-project-cwd.test.ts tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+            "npm run lint:file-size",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three existing test files pass unchanged",
+            "lint:file-size passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-3. Pure refactor, no behavior change. Move resolveRegisteredProject and resolveProjectCwd verbatim into new src/lib/overdeck/conversation-create-input.ts and re-export them from conversation-runtime.ts. Add ConversationCreateInputError and parseConversationLaunchContext(body) returning the existing bareContext/skipClaudeMd flags; handleConversationCreate uses it and its catch maps ConversationCreateInputError to 400."
+        },
+        "items": [
+          {
+            "id": "create-input-extract.ac1",
+            "title": "Given the extraction lands, When `wc -l src/lib/overdeck/conversation-runtime.ts` runs, Then it prints a count at least 20 lines under the 1252 cap (1232 or fewer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-input-extract.ac2",
+            "title": "Given existing callers import resolveProjectCwd from conversation-runtime.js, When conversation-project-cwd.test.ts runs, Then the test file passes with no edits to its imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-input-extract.ac3",
+            "title": "Given a POST body with bareContext true, When handleConversationCreate runs, Then the created row persists bareContext=true exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-skill-overrides",
+        "title": "POST /api/conversations accepts and stores skillOverrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-create-input.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-create-input.test.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-create-input.test.ts tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+            "npm run lint:file-size",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "lint:file-size passes with conversation-runtime.ts at or under 1252 lines",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-4. parseConversationLaunchContext validates body.skillOverrides: plain object, <=200 entries, keys match /^[A-Za-z0-9][A-Za-z0-9._-]*(\\/[A-Za-z0-9][A-Za-z0-9._-]*)?$/, boolean values, no core skill (isCoreSkill); invalid input throws ConversationCreateInputError (400). Non-empty map rides launchContext into createConversation."
+        },
+        "items": [
+          {
+            "id": "create-skill-overrides.ac1",
+            "title": "Given POST /api/conversations with skillOverrides {grilling:false}, When handleConversationCreate runs, Then it returns 201 and the row persists skillOverrides {grilling:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-skill-overrides.ac2",
+            "title": "Given skillOverrides {'pan-done':false}, When handleConversationCreate runs, Then it returns 400 with an error naming the core skill and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-skill-overrides.ac3",
+            "title": "Given skillOverrides {grilling:'no'} or an array, When parsed, Then it rejects the request with 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-skill-overrides.ac4",
+            "title": "Given 201 entries or a key '../x', When parsed, Then parseConversationLaunchContext throws ConversationCreateInputError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-cwd",
+        "title": "POST /api/conversations accepts a cwd inside the chosen project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/overdeck/conversation-create-input.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-create-input.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-create-input.test.ts src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
+            "npm run lint:file-size",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass including the containment cases",
+            "lint:file-size passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "options-dialog"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-5. Add resolveConversationCreateTarget({projectKey, cwd}, defaultCwd): cwd requires projectKey; cwd must pass validateCwdContainment (src/lib/overdeck/cwd-containment.ts) and its realpath must equal or start with realpath(projectPath)+'/'; returns the realpath. Replace the cwd/projectKey block in handleConversationCreate with it; errors are ConversationCreateInputError (400). Do not add the fork door's primary-checkout ban."
+        },
+        "items": [
+          {
+            "id": "create-cwd.ac1",
+            "title": "Given projectKey and a cwd under the project path, When handleConversationCreate runs, Then it returns 201 and row.cwd equals the cwd realpath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-cwd.ac2",
+            "title": "Given projectKey and cwd '/tmp/x' or the sibling dir '<projectPath>-evil', When handleConversationCreate runs, Then it returns 400 and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-cwd.ac3",
+            "title": "Given a cwd without projectKey, When handleConversationCreate runs, Then it rejects with 400 'cwd requires projectKey'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-cwd.ac4",
+            "title": "Given projectKey and no cwd, When handleConversationCreate runs, Then the row cwd defaults to the project path exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-conversation-layer",
+        "title": "Launch-settings step applies the conversation row's skill overrides on every launch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launcher-lines.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts src/cli/commands/__tests__/skills.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run lint:circular",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "lint:circular reports no new cycle",
+            "lint completes without errors",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-6. launcherSkillOverrideLines gains `conversation` and emits `--conversation <quoted>`; claudeSkillOverrideLaunch/codexSkillOverrideLines pass config.managedStateKey when spawnMode==='conversation'. launch.ts adds LaunchSkillContext.conversation and loadLaunchLayers that merges getSupervisedConversationByTmuxSession(ctx.conversation)?.skillOverrides (dynamic import, try/catch, stderr warning '[launcher] WARNING: conversation skill overrides not applied' on failure) into the layers used by resolveLaunchDisabledSkills and resolveLaunchPackSelection; the pack-not-cached check includes layers.conversation. skills.ts registers --conversation on the hidden launch-settings command."
+        },
+        "items": [
+          {
+            "id": "launch-conversation-layer.ac1",
+            "title": "Given a claude-code launcher config with spawnMode 'conversation' and managedStateKey 'conv-abc', When generateLauncherScript runs, Then the script contains `--conversation 'conv-abc'`; with spawnMode 'work' it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-conversation-layer.ac2",
+            "title": "Given a conversation row whose skillOverrides is {grilling:false}, When `pan skills launch-settings --harness claude-code --cwd /w --conversation conv-x` runs, Then stdout prints {\"skillOverrides\":{\"grilling\":\"off\"}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-conversation-layer.ac3",
+            "title": "Given the conversation lookup throws, When resolveLaunchDisabledSkills runs, Then it falls back to the global/project/issue result and emits the warning on stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-conversation-layer.ac4",
+            "title": "Given resume calls spawnConversationSession for the same tmux session, When the launcher is regenerated, Then it emits the same --conversation flag so the override survives resume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-default-route",
+        "title": "Add GET /api/effort/default returning the resolved effort and its source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/effort-default.ts",
+            "src/dashboard/server/routes/misc.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/effort-default-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/effort-default-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "effort-default-route.test.ts passes",
+            "no-loss-matrix.test.ts passes with the new row",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-7. New route file modelled on misc/skill-overrides.ts: GET /api/effort/default?model&harness&issue returns resolveEffort({model, harness (only if normalizeHarness is non-null), issueId (only if /^[A-Z0-9]+-[0-9]+$/)}). Register effortDefaultRouteLayer in misc.ts and add the no-loss-matrix row 'GET /api/effort/default' READ 'resolveEffort (PAN-4486)'."
+        },
+        "items": [
+          {
+            "id": "effort-default-route.ac1",
+            "title": "Given no query params and no configured effort, When GET /api/effort/default is called, Then it returns 200 with effort 'high', source 'default', clamped false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-default-route.ac2",
+            "title": "Given issue=PAN-1 whose project sets effort medium, When the route is called, Then it returns source 'project' and effort 'medium'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-default-route.ac3",
+            "title": "Given harness=bogus, When the route is called, Then it ignores the harness and returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-default-route.ac4",
+            "title": "Given the no-loss matrix test runs, When the route table is compared, Then it accepts GET /api/effort/default as a READ surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-field",
+        "title": "Skills field for the options dialog with per-skill Inherit/On/Off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/ConversationSkillsField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-8. ConversationSkillsField({projectKey?, issueId?, value, onChange}) fetches /api/skills/overrides (project/issue params only when set; on non-OK with issue, refetch without issue; on second failure show 'Skills unavailable'), lists non-core skills plus every packs[].skills[] id, shows inherited state text 'On · project', and a radiogroup Inherit/On/Off per skill; Inherit removes the key. Includes a 'Filter skills' input."
+        },
+        "items": [
+          {
+            "id": "skills-field.ac1",
+            "title": "Given a response with a core skill and a non-core skill, When the field renders, Then it shows only the non-core skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-field.ac2",
+            "title": "Given the operator clicks Off for grilling, When onChange fires, Then it emits {grilling:false}; clicking Inherit afterwards emits {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-field.ac3",
+            "title": "Given the request with issue returns 404, When the field loads, Then it falls back to a request without the issue param",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-field.ac4",
+            "title": "Given both requests fail, When the field renders, Then it shows 'Skills unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-picker-field",
+        "title": "Searchable issue picker field for the options dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/IssuePickerField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/IssuePickerField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/IssuePickerField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "IssuePickerField.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-9. IssuePickerField({value, onChange}) filters useDashboardStore(selectIssues) as Issue[] by case-insensitive substring of identifier or title, first 20, in a role=combobox ('Link to an issue') with a role=listbox; selection shows 'IDENTIFIER — title' and a 'Clear linked issue' button."
+        },
+        "items": [
+          {
+            "id": "issue-picker-field.ac1",
+            "title": "Given store issues including PAN-4486, When the operator types '4486', Then the listbox renders that issue among at most 20 options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-picker-field.ac2",
+            "title": "Given the operator selects PAN-4486, When onChange fires, Then it emits 'PAN-4486'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-picker-field.ac3",
+            "title": "Given an issue is linked, When the operator clicks 'Clear linked issue', Then onChange emits null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "options-dialog",
+        "title": "New conversation options dialog, store and host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/newConversationDialogStore.ts",
+            "src/dashboard/frontend/src/components/newConversation/newConversationApi.ts",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "src/dashboard/frontend/src/main.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "NewConversationDialog.test.tsx passes",
+            "typecheck:frontend completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-11",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-10. Zustand store (open, projectKey, openDialog, close) plus openNewConversationDialog helper; NewConversationDialogHost mounted in main.tsx beside LinkPullRequestDialogHost. Dialog fields in order: Project (registered projects, preset resolved key-then-name), Working directory, ModelSelect+HarnessSelect (initialised from loadStoredModel/loadStoredHarness, never saveStored*), Effort (supported levels; default from GET /api/effort/default with 'Default: <effort> (<source>)' note), No context and Skip CLAUDE.md (claude-code only) with PAN-4185 helper text, ConversationSkillsField, IssuePickerField, First message. Create POSTs via dashboardMutationJsonHeaders, always sends effort when supported, then closes, invalidates ['conversations'] and navigates to /conv/<id> via pushState+popstate. Implementation checkpoint D6: confirm in an isolated Playwright browser that the new conversation becomes selected; fallback is the 'overdeck:conversation-created' window event + CommandDeck listener described in the PRD."
+        },
+        "items": [
+          {
+            "id": "options-dialog.ac1",
+            "title": "Given openNewConversationDialog({projectKey:'Display Name'}) and a registered project with that name, When the dialog renders, Then the Project select defaults to that project's key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "options-dialog.ac2",
+            "title": "Given the operator picks effort xhigh, No context, Off for one skill, and issue PAN-1, When Create is clicked, Then the POST body includes effort 'xhigh', bareContext true, skillOverrides, issueId 'PAN-1', model, harness and projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "options-dialog.ac3",
+            "title": "Given the operator changes model, harness and effort in the dialog and submits, When localStorage is read, Then conv-composer-model, conv-composer-harness and conv-composer-effort are unchanged from before the dialog opened",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "options-dialog.ac4",
+            "title": "Given harness codex is selected, When the dialog renders, Then the Skip CLAUDE.md checkbox is absent and the effort note renders 'Default: <effort> (<source>)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "options-dialog.ac5",
+            "title": "Given the POST fails, When Create is clicked, Then the dialog shows a role=alert error and stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "split-button",
+        "title": "Split the sidebar + into quick create plus an options caret and remove the context checkboxes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationSplitButton.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/NewConversationContextOptions.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewConversationContextOptions.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:frontend completes without errors",
+            "lint:file-size passes with CommandDeck/index.tsx at or under 1612 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-11. NewConversationSplitButton keeps the main button (aria-label 'New conversation', Plus icon, calls onQuickCreate) and adds a caret ('New conversation options', aria-haspopup=menu) whose single menuitem 'New conversation with options…' calls openNewConversationDialog({projectKey}). In CommandDeck/index.tsx remove the NewConversationContextOptions import, state and mount; quick-create payload becomes {model, harness} (+effort/projectKey/message as today). Delete NewConversationContextOptions.tsx and its test in the same commit. Replace the PAN-4185 CommandDeck test with the quick-create-no-dialog and no-checkbox tests."
+        },
+        "items": [
+          {
+            "id": "split-button.ac1",
+            "title": "Given the Command Deck renders, When the operator clicks 'New conversation', Then it POSTs /api/conversations without bareContext or skipClaudeMd and renders no dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-button.ac2",
+            "title": "Given the caret is opened and 'New conversation with options…' is clicked, When the dialog store is read, Then open is true with the deck's selected project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-button.ac3",
+            "title": "Given the Command Deck renders, When the sidebar is queried, Then no 'No context' checkbox renders and both NewConversationContextOptions files no longer exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-button.ac4",
+            "title": "Given the caret menu is open, When Escape is pressed, Then the menu closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-action",
+        "title": "Command palette action 'New conversation with options…'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandPalette.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "CommandPalette.test.tsx passes",
+            "typecheck:frontend completes without errors",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-12. Add the static action {id:'new-conversation-with-options', label:'New conversation with options…', group:'Actions', icon: MessageSquarePlus, keywords [...], onSelect: () => openNewConversationDialog()} to staticActions."
+        },
+        "items": [
+          {
+            "id": "palette-action.ac1",
+            "title": "Given the palette is open, When the operator types 'conversation with options', Then it renders the 'New conversation with options…' action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-action.ac2",
+            "title": "Given the action is selected, When the dialog store is read, Then open is true with no projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-subset",
+        "title": "Register the new frontend tests in test:frontend-subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=require('./package.json').scripts['test:frontend-subset'];for (const f of ['ConversationSkillsField','IssuePickerField','NewConversationDialog','NewConversationSplitButton']) if(!s.includes('newConversation/__tests__/'+f+'.test.tsx')) process.exit(1)\""
+          ],
+          "expected_outputs": [
+            "the node check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-13. Append the four src/components/newConversation/__tests__/*.test.tsx paths (and src/components/CommandDeck/CommandDeck.test.tsx if absent) to the root package.json test:frontend-subset script."
+        },
+        "items": [
+          {
+            "id": "frontend-subset.ac1",
+            "title": "Given package.json, When the test:frontend-subset script is read, Then it includes all four newConversation test paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-subset.ac2",
+            "title": "Given CI runs test:frontend-subset, When the frontend job executes, Then it runs the new dialog, field and split-button tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the split button, options dialog, conversation skill level and effort default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T03:27:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4486",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "features/skills.mdx",
+            "configuration/effort.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q 'New conversation with options' features/conversations.mdx",
+            "grep -q 'conversation > issue > project > global' features/skills.mdx",
+            "grep -q 'New conversation with options' docs/CONTEXT-LAYERS.md"
+          ],
+          "expected_outputs": [
+            "each grep exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4486.md WI-14. Replace 'Starting a bare conversation' in features/conversations.mdx with 'New conversation with options' (split button, palette action, every field, one-launch-only semantics, context opt-out explanations); update CONTEXT-LAYERS.md 'Bare conversations' to name the dialog; add the conversation level, precedence and storage row to features/skills.mdx; mention the dialog and GET /api/effort/default in configuration/effort.mdx; add the conversation layer to the skills paragraph of .overdeck/context/codebase/architecture.md and refresh its last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given features/conversations.mdx, When read, Then it contains a 'New conversation with options' section stating that dialog choices do not change quick create",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given features/skills.mdx, When read, Then it shows precedence 'conversation > issue > project > global > default (on)' and a Conversation storage row naming conversations.skill_overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/CONTEXT-LAYERS.md, When read, Then the Bare conversations section names the 'New conversation with options' dialog instead of a header checkbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "skill-layer-resolve",
+        "to": "launch-conversation-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "row-skill-overrides",
+        "to": "launch-conversation-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "row-skill-overrides",
+        "to": "create-skill-overrides",
+        "type": "blocks"
+      },
+      {
+        "from": "create-input-extract",
+        "to": "create-skill-overrides",
+        "type": "blocks"
+      },
+      {
+        "from": "create-skill-overrides",
+        "to": "create-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "create-input-extract",
+        "to": "create-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-default-route",
+        "to": "options-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "create-skill-overrides",
+        "to": "options-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "create-cwd",
+        "to": "options-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-field",
+        "to": "options-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-picker-field",
+        "to": "options-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "options-dialog",
+        "to": "split-button",
+        "type": "blocks"
+      },
+      {
+        "from": "options-dialog",
+        "to": "palette-action",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-field",
+        "to": "frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-picker-field",
+        "to": "frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "options-dialog",
+        "to": "frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "split-button",
+        "to": "frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "split-button",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-conversation-layer",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-default-route",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

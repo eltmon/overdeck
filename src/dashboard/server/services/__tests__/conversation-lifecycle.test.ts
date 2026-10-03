@@ -694,6 +694,9 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       createdAt: '2026-05-24T19:00:00.000Z',
       endedAt: null,
       lastAttachedAt: '2026-05-24T19:48:00.000Z',
+      bareContext: true,
+      skipClaudeMd: true,
+      skillOverrides: { grilling: false },
     };
 
     mockListConversations.mockReturnValue([parent]);
@@ -719,6 +722,10 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
         titleSeed: '[post-/clear] Original work',
         model: 'claude-opus-4-7',
         harness: 'claude-code',
+        // PAN-4486: the sibling keeps the parent's launch context.
+        bareContext: true,
+        skipClaudeMd: true,
+        skillOverrides: { grilling: false },
       }),
     );
     expect(mockSetClearedToConvId).toHaveBeenCalledWith('parent-conv', 200);

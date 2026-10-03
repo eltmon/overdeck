@@ -2317,6 +2317,41 @@
   color: var(--primary);
 }
 
+/* New conversation split button: quick create + options menu (PAN-4486) */
+.conversationAddSplit {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.conversationAddSplit .conversationAddBtn {
+  margin-right: 0;
+}
+
+.conversationAddCaret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.conversationAddCaret:hover {
+  background: var(--accent);
+  color: var(--primary);
+}
+
+.conversationAddMenu {
+  white-space: nowrap;
+}
+
 /* Pipeline retrospective window menu (PAN-3841) */
 .retroMenuHost {
   position: relative;
@@ -6307,14 +6342,6 @@
   color: var(--muted-foreground);
   min-width: 36px;
   text-align: right;
-}
-
-/* PAN-4185: context opt-outs for new conversations, under the deck header row. */
-.newConversationOptions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 14px;
 }
 
 /* ─── Nested lanes and successors (PAN-4223 WI-10) ───────────────────────────

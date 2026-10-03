@@ -34,8 +34,10 @@ import {
   Loader2,
   MessageCircle,
   MessagesSquare,
+  MessageSquarePlus,
   Clock,
 } from 'lucide-react';
+import { openNewConversationDialog } from './newConversation/newConversationDialogStore';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
@@ -448,6 +450,15 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       alsoScopes: ['workspaces' as const],
       onSelect: onNewWorkspace,
     }] : []),
+    { // PAN-4486: one conversation's model, effort, context, skills and linked issue
+      id: 'new-conversation-with-options',
+      label: 'New conversation with options…',
+      description: 'Pick model, effort, context, skills and a linked issue for one conversation',
+      icon: MessageSquarePlus,
+      group: 'Actions',
+      keywords: ['new', 'conversation', 'chat', 'options', 'model', 'effort', 'skills', 'issue'],
+      onSelect: () => openNewConversationDialog(),
+    },
     { // PAN-3964: the Flywheel page
       id: 'pan-flywheel', label: 'Open Flywheel', icon: RefreshCw, group: 'Actions',
       description: 'The /pan-flywheel loop: status, controls, and its conversation',

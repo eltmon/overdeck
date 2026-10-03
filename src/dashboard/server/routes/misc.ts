@@ -49,6 +49,7 @@ import { planningRouteLayer } from './misc/planning.js';
 import { metaRouteLayer } from './misc/meta.js';
 import { updatesRouteLayer } from './misc/updates.js';
 import { skillOverridesRouteLayer } from './misc/skill-overrides.js';
+import { effortDefaultRouteLayer } from './misc/effort-default.js';
 
 export { readPackageVersion } from './misc/shared.js';
 
@@ -61,6 +62,7 @@ export const miscRouteLayer = Layer.mergeAll(
   metaRouteLayer,
   updatesRouteLayer,
   skillOverridesRouteLayer,
+  effortDefaultRouteLayer,
 );
 
 export default miscRouteLayer;

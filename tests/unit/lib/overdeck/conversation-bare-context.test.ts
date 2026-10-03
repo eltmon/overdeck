@@ -6,6 +6,7 @@ import { createConversation, getConversationByName } from '../../../../src/lib/o
 import {
   conversationContextEnvExports,
   conversationLaunchContext,
+  parseSkillOverridesColumn,
 } from '../../../../src/lib/overdeck/conversation-launch-context.js';
 
 let odb: OverdeckTestDb;
@@ -24,12 +25,33 @@ describe('conversation context opt-outs persistence (PAN-4185)', () => {
     const conv = getConversationByName('bare');
     expect(conv).toMatchObject({ bareContext: true, skipClaudeMd: true });
     // Resume, restart and fork all relaunch from the row.
-    expect(conversationLaunchContext(conv!)).toEqual({ bareContext: true, skipClaudeMd: true });
+    expect(conversationLaunchContext(conv!)).toEqual({ bareContext: true, skipClaudeMd: true, skillOverrides: null });
   });
 
   it('defaults both opt-outs off', () => {
     createConversation({ name: 'full', tmuxSession: 'conv-full', cwd: '/tmp' });
     expect(getConversationByName('full')).toMatchObject({ bareContext: false, skipClaudeMd: false });
+  });
+});
+
+describe('conversation skill overrides persistence (PAN-4486)', () => {
+  it('round-trips the skill map through the row and the launch context', () => {
+    createConversation({ name: 'skills', tmuxSession: 'conv-skills', cwd: '/tmp', skillOverrides: { grilling: false } });
+    const conv = getConversationByName('skills');
+    expect(conv?.skillOverrides).toEqual({ grilling: false });
+    expect(conversationLaunchContext(conv!)).toMatchObject({ skillOverrides: { grilling: false } });
+  });
+
+  it('stores an empty map as NULL', () => {
+    createConversation({ name: 'no-skills', tmuxSession: 'conv-no-skills', cwd: '/tmp', skillOverrides: {} });
+    expect(getConversationByName('no-skills')?.skillOverrides).toBeNull();
+  });
+
+  it('decodes only a JSON object and keeps boolean entries', () => {
+    expect(parseSkillOverridesColumn('not json')).toBeNull();
+    expect(parseSkillOverridesColumn(null)).toBeNull();
+    expect(parseSkillOverridesColumn('[true]')).toBeNull();
+    expect(parseSkillOverridesColumn('{"grilling":false,"bad":"x"}')).toEqual({ grilling: false });
   });
 });
 
