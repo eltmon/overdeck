@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4255",
   "created": "2026-10-03T17:38:14.408Z",
-  "updated": "2026-10-03T18:09:14.603Z",
+  "updated": "2026-10-03T18:16:01.742Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4255",
       "claimedAt": "2026-10-03T18:03:42.306Z",
       "doneAt": "2026-10-03T18:09:14.602Z"
+    },
+    "transcript-effort-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T18:16:01.742Z"
     }
   }
 }
