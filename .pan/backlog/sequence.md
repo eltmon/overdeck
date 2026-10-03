@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-03T03:33:17.656999Z · model: claude-opus-5-5 · open: 826_
+_Last sequenced: 2026-10-03T03:36:32.478151Z · model: claude-opus-5-5 · open: 826_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1161,7 +1161,7 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-03T03:33:17.656999Z",
+  "generatedAt": "2026-10-03T03:36:32.478151Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 826,
