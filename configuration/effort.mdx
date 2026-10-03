@@ -107,6 +107,25 @@ message — you have to fix the file. An explicit `--effort` flag or a
 resolved runtime value that turns out unsupported is clamped instead, with a
 warning printed to stderr — a spawn never hard-fails over it.
 
+## Relaunch keeps effort
+
+`state.json` stores the launched `effort` and its `effortSource` (PAN-4253).
+Every relaunch path — resume, restart, crash recovery, the messaging
+fresh-launch fallback, session rotation, crash respawn, and cloister model
+handoff — goes through one helper, `resolveRelaunchEffort()`
+(`src/lib/agents/relaunch-effort.ts`):
+
+- A persisted `effort` wins on relaunch whatever its source. A
+  `roles.<role>.effort` config change reaches new spawns only; it does not
+  retroactively change an agent that already has a pinned effort.
+- The persisted level is always re-clamped to the relaunch's model and
+  harness, so a model or harness switch (`max` on claude-code relaunched
+  under `ohmypi`) clamps down and the *clamped* level is what gets stored
+  back — never the original request.
+- A legacy or effort-less agent resolves through the normal
+  role → project → default chain on its first relaunch, and that resolved
+  value is then pinned for every relaunch after it.
+
 ## What honors it today
 
 - `pan start <id>` for work-agent spawns.
@@ -114,6 +133,10 @@ warning printed to stderr — a spawn never hard-fails over it.
   their codex/omp launcher fields (`getRoleRuntimeBaseCommand`,
   `getCodexLauncherFields`, `getOhmypiLauncherFields` in
   `src/lib/agents/runtime-command.ts`).
+- Every relaunch path: resume (`resumeAgent`), restart (`restartAgent`),
+  crash recovery (`recoverAgent`), the messaging fresh-launch fallback,
+  session rotation, crash respawn, and cloister model handoff — see
+  [Relaunch keeps effort](#relaunch-keeps-effort).
 
 Everything else — conversations, specialist/review-parent/test/worker
 launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
@@ -122,7 +145,6 @@ hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
-| Persisting effort across relaunch, resume, recovery, rotation, crash respawn | [#4253](https://github.com/eltmon/overdeck/issues/4253) |
 | Conversations (creation, switch-model, `pan handoff`/`fork`) | [#4254](https://github.com/eltmon/overdeck/issues/4254) |
 | Live effort change on claude-code sessions, "Effort unverified" display | [#4255](https://github.com/eltmon/overdeck/issues/4255) |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
