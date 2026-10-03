@@ -4,17 +4,17 @@
     "created": "2026-10-02T12:50:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4254: Conversations: accept all five effort levels, set effort at creation, keep it on switch-model, and add --effort to pan handoff/fork",
-    "updated": "2026-10-02T12:54:10.476Z"
+    "updated": "2026-10-03T01:29:16.580Z"
   },
   "plan": {
     "id": "pan-4254",
     "title": "Conversations: accept all five effort levels, set effort at creation, keep it on switch-model, and add --effort to pan handoff/fork",
-    "status": "proposed",
+    "status": "running",
     "uid": "86e6cfdb-7771-495d-a656-548c88f9669e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-10-02T12:50:08Z",
-    "updated": "2026-10-02T12:54:10.476Z",
+    "updated": "2026-10-03T01:29:16.580Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4254",
@@ -985,5 +985,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
