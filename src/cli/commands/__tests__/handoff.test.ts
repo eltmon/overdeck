@@ -22,6 +22,11 @@ vi.mock('../fork-client.js', () => ({
   isForkResultInProgress: forkMocks.isForkResultInProgress,
 }));
 
+const handoffStartMock = vi.fn();
+vi.mock('../handoff-start.js', () => ({
+  handoffStartCommand: (...args: unknown[]) => handoffStartMock(...args),
+}));
+
 // The shared per-harness resolver, not the claude-only sessionFilePath(): a
 // kimi-code/codex/pi conversation has no claudeSessionId to build a path from.
 const readsMocks = vi.hoisted(() => ({
@@ -64,6 +69,26 @@ describe('handoffCommand', () => {
     expect(output).toContain('If that was focus text for the current conversation');
     expect(output).toContain('pan handoff self "Implement PAN-1790"');
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('intercepts "start" and delegates to handoffStartCommand (D11 fallback)', async () => {
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('start', ['789'], {});
+
+    expect(handoffStartMock).toHaveBeenCalledWith('789');
+    expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+  });
+
+  it('rejects "start" with no conv id and does not call handoffStartCommand', async () => {
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('start', [], {})).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Usage: pan handoff start <conv>');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(handoffStartMock).not.toHaveBeenCalled();
   });
 
   it('hands off a kimi-code conversation, which has no claudeSessionId', async () => {
