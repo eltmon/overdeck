@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T03:41:03.857Z",
+  "updated": "2026-10-03T03:41:10.666Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4486",
       "claimedAt": "2026-10-03T03:39:40.568Z",
       "doneAt": "2026-10-03T03:41:03.857Z"
+    },
+    "create-skill-overrides": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4486",
+      "claimedAt": "2026-10-03T03:41:10.666Z"
     }
   }
 }
