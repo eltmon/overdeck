@@ -1,5 +1,6 @@
 import { open, readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
+import { observedEffortFromRecord } from '../../../../lib/claude-effort-transcript.js';
 import { calculateCost, getPricing } from '../../../../lib/cost.js';
 import { summarizeToolInputForWorkLog } from '../format-tool-input.js';
 import { findLastCompactBoundary } from './compact-boundary.js';
@@ -46,6 +47,7 @@ export async function parseConversationMessages(
       totalCost: 0,
       totalTokens: 0,
       latestAssistantUsage: null,
+      observedEffort: priorState?.observedEffort ?? null,
       contextBoundaryOffset: 0,
       contextActiveBytes: 0,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
@@ -69,6 +71,7 @@ export async function parseConversationMessages(
       totalCost: 0,
       totalTokens: 0,
       latestAssistantUsage: null,
+      observedEffort: null,
       contextBoundaryOffset: 0,
       contextActiveBytes: fileStats.size,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
@@ -141,6 +144,8 @@ export async function parseConversationMessages(
   let totalTokens = 0;
   let latestAssistantUsage = priorState?.latestAssistantUsage ?? null;
   let maxObservedInputTokens = latestAssistantUsage?.maxObservedInputTokens ?? 0;
+  // PAN-4255: effort survives compaction, so the compact boundary never resets it.
+  let observedEffort = priorState?.observedEffort ?? null;
   let contextBoundaryOffset = priorState?.contextBoundaryOffset ?? 0;
 
   // Pending assistant message being assembled from content blocks
@@ -191,6 +196,8 @@ export async function parseConversationMessages(
       continue;
     }
     const lineSequence = sequence++;
+    const seenEffort = observedEffortFromRecord(entry);
+    if (seenEffort) observedEffort = seenEffort;
 
     if (entry.type === 'user' && entry.message) {
       const msg = entry.message;
@@ -662,6 +669,7 @@ export async function parseConversationMessages(
     totalCost,
     totalTokens,
     latestAssistantUsage,
+    observedEffort,
     contextBoundaryOffset,
     contextActiveBytes: Math.max(0, fileStats.size - contextBoundaryOffset),
     pendingToolUse,
@@ -729,6 +737,7 @@ export async function parseEntireConversation(
       planToolUseIds: result.planToolUseIds,
       proposedPlan: result.proposedPlan,
       latestAssistantUsage: result.latestAssistantUsage,
+      observedEffort: result.observedEffort,
       contextBoundaryOffset: result.contextBoundaryOffset,
       permissionMode: result.permissionMode,
       fileEditsByAssistantId: result.fileEditsByAssistantId,

@@ -136,6 +136,8 @@ export const ContextUsage = Schema.Struct({
   maxObservedInputTokens: Schema.optional(Schema.Number),
   /** Model the most recent assistant turn ran under (from JSONL). */
   lastModel: Schema.optional(Schema.NullOr(Schema.String)),
+  /** PAN-4255: effort observed in the transcript (assistant `effort` or an /effort confirmation). Claude Code only. */
+  lastEffort: Schema.optional(Schema.NullOr(Schema.String)),
   /** ISO timestamp of the most recent assistant turn. */
   lastTurnAt: Schema.optional(Schema.NullOr(Schema.String)),
 })

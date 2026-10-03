@@ -1,5 +1,6 @@
 import { open, stat } from 'node:fs/promises';
-import type { ContextUsage } from '@overdeck/contracts';
+import type { ContextUsage, EffortLevel } from '@overdeck/contracts';
+import { observedEffortFromRecord } from '../../../../lib/claude-effort-transcript.js';
 import { MODEL_CAPABILITIES, resolveModelId } from '../../../../lib/model-capabilities.js';
 import { findLastCompactBoundary } from './compact-boundary.js';
 import type { JsonlEntry, LatestAssistantUsage, ParseResult } from './types.js';
@@ -43,6 +44,7 @@ function buildContextUsage(
   capability: ModelCapability,
   activeBytes: number,
   usageSummary: LatestAssistantUsage | null,
+  observedEffort: EffortLevel | null,
 ): ContextUsage {
   if (!usageSummary) {
     // No assistant message with usage yet — return zeros against the
@@ -52,6 +54,7 @@ function buildContextUsage(
       estimatedTokens: 0,
       contextWindow: capability.contextWindow,
       percentUsed: 0,
+      ...(observedEffort ? { lastEffort: observedEffort } : {}),
     };
   }
 
@@ -98,17 +101,18 @@ function buildContextUsage(
     lastCacheCreationTokens: usageSummary.lastCacheCreationTokens,
     maxObservedInputTokens: usageSummary.maxObservedInputTokens,
     lastModel: usageSummary.lastModel,
+    lastEffort: observedEffort,
     lastTurnAt: usageSummary.lastTimestamp,
   };
 }
 
 export function contextUsageFromParseResult(
-  result: Pick<ParseResult, 'contextActiveBytes' | 'latestAssistantUsage'>,
+  result: Pick<ParseResult, 'contextActiveBytes' | 'latestAssistantUsage' | 'observedEffort'>,
   model: string | null,
 ): ContextUsage | null {
   const capability = resolveContextCapability(model);
   if (!capability) return null;
-  return buildContextUsage(capability, result.contextActiveBytes, result.latestAssistantUsage);
+  return buildContextUsage(capability, result.contextActiveBytes, result.latestAssistantUsage, result.observedEffort ?? null);
 }
 
 const CONTEXT_USAGE_CACHE_MAX = 16;
@@ -132,8 +136,8 @@ export async function computeContextUsage(sessionFile: string, model: string | n
   const boundaryOffset = await findLastCompactBoundary(sessionFile);
   const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
 
-  const usageSummary = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
-  const usage = buildContextUsage(capability, activeBytes, usageSummary);
+  const { usage: usageSummary, observedEffort } = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
+  const usage = buildContextUsage(capability, activeBytes, usageSummary, observedEffort);
 
   contextUsageCache.set(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, usage });
   if (contextUsageCache.size > CONTEXT_USAGE_CACHE_MAX) {
@@ -150,7 +154,8 @@ export function __resetContextUsageCacheForTests(): void {
 /**
  * Stream the JSONL between `boundaryOffset` and EOF, returning usage data
  * from the most recent assistant message + the highest input_tokens ever
- * observed (used for 1M-context detection).
+ * observed (used for 1M-context detection), plus the latest observed effort
+ * (PAN-4255).
  *
  * Async, line-buffered. Skips malformed lines silently.
  */
@@ -158,8 +163,8 @@ async function readLatestAssistantUsage(
   sessionFile: string,
   boundaryOffset: number,
   activeBytes: number,
-): Promise<LatestAssistantUsage | null> {
-  if (activeBytes <= 0) return null;
+): Promise<{ usage: LatestAssistantUsage | null; observedEffort: EffortLevel | null }> {
+  if (activeBytes <= 0) return { usage: null, observedEffort: null };
   const fh = await open(sessionFile, 'r');
   try {
     const buffer = Buffer.alloc(activeBytes);
@@ -168,6 +173,7 @@ async function readLatestAssistantUsage(
 
     let result: LatestAssistantUsage | null = null;
     let maxObservedInputTokens = 0;
+    let observedEffort: EffortLevel | null = null;
 
     for (const line of lines) {
       if (!line.trim()) continue;
@@ -177,6 +183,8 @@ async function readLatestAssistantUsage(
       } catch {
         continue;
       }
+      const seenEffort = observedEffortFromRecord(entry);
+      if (seenEffort) observedEffort = seenEffort;
       if (entry.type !== 'assistant' || !entry.message?.usage) continue;
       const u = entry.message.usage;
       const input = u.input_tokens ?? 0;
@@ -198,7 +206,7 @@ async function readLatestAssistantUsage(
     }
 
     if (result) result.maxObservedInputTokens = maxObservedInputTokens;
-    return result;
+    return { usage: result, observedEffort };
   } finally {
     await fh.close();
   }
