@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:39:07.182Z",
+  "updated": "2026-10-03T02:39:19.018Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "spawn-resolves-effort.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T02:39:07.182Z"
+    },
+    "create-stores-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:39:19.017Z"
     }
   }
 }
