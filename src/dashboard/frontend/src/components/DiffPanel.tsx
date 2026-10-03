@@ -742,11 +742,7 @@ export function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
-      {orderedTurnDiffSummaries.length === 0 && !isVsMain ? (
-        <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          No completed turns yet.
-        </div>
-      ) : needsFilePicker ? (
+      {needsFilePicker ? (
         <DiffFilePickerList files={filePickerFiles ?? []} onSelectFile={selectFile} isLoading={isLoadingDiff && !filePickerFiles} />
       ) : (
         <div

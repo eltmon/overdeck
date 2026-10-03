@@ -115,7 +115,7 @@ export function StandaloneDiffPopoutRoute() {
       ) : data === undefined ? (
         // The summaries endpoint shells out to git per turn and can take seconds
         // on a long conversation — without this gate, DiffPanel mounts with an
-        // empty summary list and shows a misleading "No completed turns yet."
+        // empty summary list before the summaries load (PAN-4501).
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
           Loading diff…
         </div>
