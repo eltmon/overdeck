@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:43:45.709Z",
+  "updated": "2026-10-03T02:43:57.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "composer-pi-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-03T02:43:45.709Z"
+    },
+    "new-conversation-effort-picker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:43:57.620Z"
     }
   }
 }
