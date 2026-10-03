@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   capturePaneText: vi.fn(() => ''),
   reconcileClosedIssueAgents: vi.fn(async () => [] as string[]),
   isDeaconGloballyPaused: vi.fn(() => false),
+  recoverUndispatchedReviews: vi.fn(async () => [] as string[]),
+  recoverSilentReviewers: vi.fn(async () => [] as string[]),
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({
@@ -72,6 +74,14 @@ function inventory(agentIds: string[], backend: 'tmux' | 'herdr' = 'tmux') {
 
 vi.mock('../../../../src/lib/cloister/closed-issue-reaper.js', () => ({
   reconcileClosedIssueAgents: mocks.reconcileClosedIssueAgents,
+}));
+
+vi.mock('../../../../src/lib/cloister/undispatched-review-recovery.js', () => ({
+  recoverUndispatchedReviews: mocks.recoverUndispatchedReviews,
+}));
+
+vi.mock('../../../../src/lib/cloister/silent-reviewer-recovery.js', () => ({
+  recoverSilentReviewers: mocks.recoverSilentReviewers,
 }));
 
 const {
@@ -482,6 +492,18 @@ describe('deacon-lite', () => {
 
       await expect(runDeaconLite()).resolves.toBeUndefined();
       expect(mocks.reconcileClosedIssueAgents).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs recoverSilentReviewers right after recoverUndispatchedReviews (PAN-4433)', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+
+      await runDeaconLite();
+
+      expect(mocks.recoverUndispatchedReviews).toHaveBeenCalledTimes(1);
+      expect(mocks.recoverSilentReviewers).toHaveBeenCalledTimes(1);
+      expect(mocks.recoverUndispatchedReviews.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.recoverSilentReviewers.mock.invocationCallOrder[0]!);
     });
 
     it('runs none of the four routines while globally paused', async () => {

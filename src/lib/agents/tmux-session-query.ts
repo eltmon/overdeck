@@ -43,7 +43,9 @@ export function classifyHasSessionFailure(
   if (error?.killed) return 'error';
   if (error?.code === 'ENOENT') return options.noBinary ?? 'missing';
   const stderr = String(error?.stderr ?? '');
-  const noSuchSession = /can't find session:|no server running on|error connecting to .*\(No such file or directory\)/i;
+  // tmux 3.4 answers `has-session` on a running server with zero sessions with
+  // "no current target", not "can't find session" — still no such session.
+  const noSuchSession = /can't find session:|no current target|no server running on|error connecting to .*\(No such file or directory\)/i;
   return error?.code === 1 && noSuchSession.test(stderr) ? 'missing' : 'error';
 }
 

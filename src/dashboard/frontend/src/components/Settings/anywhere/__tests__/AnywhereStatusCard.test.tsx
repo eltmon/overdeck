@@ -17,6 +17,7 @@ function baseStatus(overrides: Partial<AnywhereStatus> = {}): AnywhereStatus {
     devices: { active: 2 },
     vault: { state: 'ready', backend: 'git@example.com:me/vault.git' },
     problems: [],
+    viewer: { kind: 'root-session' },
     ...overrides,
   };
 }

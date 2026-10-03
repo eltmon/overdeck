@@ -420,6 +420,26 @@ works the same way against the same on-disk vault.
   pure projection over the local index that reads each list-cache row's `parentVaultId` and
   `forkKind`; a version fork (`forkKind: 'version'`, from `forkRecordAtVersion`) shows no
   continued-on state.
+- **Hand off now** ([PAN-4455](https://github.com/eltmon/overdeck/issues/4455)).
+  `POST /api/vault/sessions/by-conversation/:name/settle` settles one managed conversation
+  immediately, with WIP mode `force`, instead of waiting for the poller's debounce and the
+  other machine's sync. The route calls `handOffConversation(name)`
+  (`services/vault-handoff.ts`), which calls `settleOnQueue(path, harness, 'force',
+  { readBack: true })` (`services/vault-service.ts`). `settleOnQueue` is the one dashboard
+  settle path: the poller's settles go through it too, so a hand-off never races a sync cycle,
+  and the settled record is read back inside the same queue slot. The response is
+  `{ result, … }`: `saved` (200, with `version`, `savedAt`, `title`, `machineLabel`,
+  `logLines`, `alreadySaved` for a `noop` settle, `forkedFrom` for a P-6 fork, and `wipProblem`
+  when the transcript saved but its code snapshot was skipped), `blocked` (422, with each hit
+  and a `pan vault allow-secret <path> <line>` fix), `offline` (422), `not-saved` (422,
+  `diverged`, `excluded` or `empty`), `unsupported-harness` (422), `vault-unavailable` (409) or
+  `not-found` (404). The same credential rule as setup, join and sync applies. It does not need
+  the sync loop, so it works on any dashboard. After a clean save of a live conversation, the
+  browser records the hand-off in `localStorage` (`overdeck:handoff-notices`) and the composer
+  shows "Handed off at <time>. New messages here will be saved as a separate copy." until the
+  operator dismisses it or the session stops; PAN-4447's continuity notice supersedes it. On
+  the receiving machine, a browse row's menu offers **Check for new conversations**, which runs
+  `POST /api/vault/sync`.
 
 ## Configuration
 

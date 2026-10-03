@@ -53,11 +53,21 @@ function conversationKinds(c: ConversationPendingInputRow): string[] {
   ];
 }
 
-/** PAN-4278 — "who asked · for what", shown as the row detail. */
+/** PAN-4278/PAN-4466 (D8) — "who asked · for what · next step", shown as the row detail. */
 function permissionSummary(c: ConversationPendingInputRow): string | undefined {
   const p = c.pendingPermission;
   if (!p) return undefined;
-  return p.toolName ? `${p.agentLabel} · ${p.toolName}` : p.agentLabel;
+  const nextStep = p.answerable ? 'click to answer' : 'answer in the terminal';
+  return p.toolName ? `${p.agentLabel} · ${p.toolName} · ${nextStep}` : `${p.agentLabel} · ${nextStep}`;
+}
+
+/** PAN-4466 (D9) — the command line a row shows: inputPreview's start, else the pane's first detail line. */
+function permissionCommand(c: ConversationPendingInputRow): string | undefined {
+  const p = c.pendingPermission;
+  if (!p) return undefined;
+  const previewLine = p.inputPreview?.split('\n').find((line) => line.trim() !== '')?.trim();
+  if (previewLine) return previewLine;
+  return p.detailLines[0]?.trim() || undefined;
 }
 
 function conversationSince(c: ConversationPendingInputRow): string {
@@ -80,8 +90,10 @@ export interface Decision {
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
   /** PAN-3113 — parsed pane choice menu, present on the paneChoice kind. */
   pendingPaneChoice?: PendingPaneChoice;
-  /** PAN-4278 — "<agent> · <tool>" for a pending terminal permission prompt. */
+  /** PAN-4278/PAN-4466 — "<agent> · <tool> · <next step>" for a pending terminal permission prompt. */
   permissionSummary?: string;
+  /** PAN-4466 (D9) — the command line to show under the summary. */
+  permissionCommand?: string;
   /** Oldest blocking timestamp — drives ordering and the age column. */
   since: string;
   /**
@@ -166,6 +178,9 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
         pendingProposedPlan: c.pendingProposedPlan,
         permissionRequestIds: [],
         permissionSummary: permissionSummary(c),
+        permissionCommand: permissionCommand(c),
+        permissionAnswerable: c.pendingPermission?.answerable,
+        conversationTitle: c.title ?? undefined,
         since: conversationSince(c),
       });
     }
@@ -231,6 +246,7 @@ export function useDecisions(): Decision[] {
         pendingProposedPlan: c.pendingProposedPlan,
         pendingPaneChoice: c.pendingPaneChoice,
         permissionSummary: permissionSummary(c),
+        permissionCommand: permissionCommand(c),
         since: conversationSince(c),
         blocking: isBlockingDecision(kinds),
       });

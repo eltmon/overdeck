@@ -30,6 +30,7 @@ import {
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
 import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
+import { conversationLaunchContext } from '../../../lib/overdeck/conversation-launch-context.js';
 import {
   getRuntimeCensus,
   refreshRuntimeCensus,
@@ -561,6 +562,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
           model: parent.model ?? undefined,
           effort: parent.effort ?? undefined,
           harness: 'claude-code',
+          ...conversationLaunchContext(parent),
         });
       } catch (err) {
         console.warn(`[conversation-lifecycle] Failed to create post-/clear sibling for ${sessionId}: ${(err as Error).message}`);

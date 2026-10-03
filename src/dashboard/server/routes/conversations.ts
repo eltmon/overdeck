@@ -18,7 +18,6 @@ import {
   handleConversationCreate,
   handleConversationClearForkState,
   handleConversationDelete,
-  handleConversationRestartAll,
   handleConversationResume,
   handleConversationStop,
   handleConversationSwitchModel,
@@ -32,6 +31,7 @@ import {
   waitForConversationRuntimeReady,
   waitForTmuxSession,
 } from '../../../lib/overdeck/conversation-runtime.js';
+import { handleConversationRestartAll } from '../../../lib/overdeck/conversation-restart-all.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import {
   archiveConversationByName,

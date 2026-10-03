@@ -33,6 +33,17 @@ const projectMocks = vi.hoisted(() => ({
 
 const issueIdMocks = vi.hoisted(() => ({
   resolveBareNumericId: vi.fn((id: string) => id.toUpperCase()),
+  // PAN-4465: inert until pan kill switches to the shared resolver — mirrors
+  // resolveBareNumericId's single-match answer as a one-element list.
+  listBareNumericIssueMatches: vi.fn((input: string) => {
+    const resolved = issueIdMocks.resolveBareNumericId(input) as string | null;
+    return /^\d+$/.test(input) && resolved ? [resolved] : [];
+  }),
+}));
+
+const conversationMocks = vi.hoisted(() => ({
+  getConversationById: vi.fn(() => null),
+  getConversationByName: vi.fn(() => null),
 }));
 
 const fsMocks = vi.hoisted(() => ({
@@ -92,6 +103,15 @@ vi.mock('../../../lib/projects.js', () => ({
 
 vi.mock('../../../lib/issue-id.js', () => ({
   resolveBareNumericId: issueIdMocks.resolveBareNumericId,
+  listBareNumericIssueMatches: issueIdMocks.listBareNumericIssueMatches,
+  // PAN-4465: killCommand's non-digit, non-qualified-agent-ID branch now
+  // reaches resolveIssueId through resolveCliAgentTarget.
+  resolveIssueId: (id: string) => id.replace(/^agent-/i, '').toUpperCase(),
+}));
+
+vi.mock('../../../lib/overdeck/conversations.js', () => ({
+  getConversationById: conversationMocks.getConversationById,
+  getConversationByName: conversationMocks.getConversationByName,
 }));
 
 vi.mock('fs', () => ({

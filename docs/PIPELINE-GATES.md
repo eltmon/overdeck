@@ -530,7 +530,7 @@ PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
 calls a PR *merge-ready but conflicting* when the forge reports
 `mergeable: false` and every other merge-gate condition holds under the same
 policy as `evaluateIssueMergeGate`, except CI: open, not a draft, no change
-request, no failed required UAT at the head, and approval proven at the head.
+request, no failed required UAT at the head, and an approval on the forge.
 A conflicting PR gets no `pull_request` CI, because GitHub builds no merge ref
 for it, so its head can never get a test result (PAN-4451). The predicate
 therefore accepts `pending` or `none` checks and a missing or skipped CI test
@@ -540,9 +540,21 @@ green CI and, in `verification.tests: ci` projects, a passed CI test job
 before anything merges. Before PAN-4451 the predicate demanded that CI too,
 and PR #4440 sat approved and CONFLICTING for about 19 hours. A verdict
 marker naming the head proves the approval; otherwise the GitHub reviews are
-read directly, because `withForgeApprovalAtHead` skips unmergeable PRs.
+read directly, because `withForgeApprovalAtHead` skips unmergeable PRs. An
+approval of an older head counts too (PAN-4467): when the head moved after the
+approving review, the predicate reports `staleApproval`, the repair prompt
+says the PR was approved at an older commit, and the journal entry carries
+`data.staleApproval: true`. The merge gate still needs an approval at the
+repaired head. A PR the forge does not call approved at any head (for example,
+an approval dismissed on push) is not repaired. Before PAN-4467 such a PR was
+skipped without a trace, and PR #4440 sat CONFLICTING for about 13 hours.
 Nothing is stored: the answer comes from `getPrFacts` at the moment it is
 asked.
+
+**Declined heads are logged.** When the gate declines a candidate whose open
+PR the forge calls `mergeable: false`, the patrol logs
+`[conflict-repair] <ISSUE>: conflicting head <head8> not repaired: <reason>`
+once per issue and head in each dashboard process.
 
 **The patrol.** `startConflictRepairPatrol`
 (`dashboard/server/services/conflict-repair-patrol.ts`) runs
@@ -1093,10 +1105,12 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
 | `review.verdict-deferred` | `pan admin specialists done review`, when recording the verdict hits a transient forge failure (PAN-4263) |
 | `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
+| `review.stalled` | deacon-lite's `recoverSilentReviewers`, before it re-dispatches a silent reviewer (`data.reviewer`, `runId`, `paneState`, `silentForMs`) |
+| `review.stall-escalated` | deacon-lite's `recoverSilentReviewers`, when a re-dispatched reviewer fails again or the re-dispatch itself fails; the issue needs you (`data.reviewer`, `runId`, `paneState`, `reason`) |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
-| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
+| `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
 | `blocked.woken` | `cloister/blocker-wake.ts` `tickBlockerWake`, once per declaration when all its blockers merged (`data.item`, `data.declaredAt`, `data.outcome`: `delivered` \| `unreachable`) |
@@ -1186,9 +1200,9 @@ Every surface reads that one rule:
 The journal dies with the workspace, so an issue whose workspace is gone has no
 open decision.
 
-## Deacon-lite: seven routines
+## Deacon-lite: eight routines
 
-`runDeaconLite()` runs on a 60s tick and holds seven routines, all of which only
+`runDeaconLite()` runs on a 60s tick and holds eight routines, all of which only
 observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
@@ -1215,9 +1229,12 @@ observe and nudge — none reconciles a stored copy of anything:
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
    PAN-4221) — re-requests a review a dashboard restart left undispatched.
+8. `recoverSilentReviewers` (`cloister/silent-reviewer-recovery.ts`,
+   PAN-4433) — re-dispatches, once per run, a reviewer that was dispatched but
+   never produced output, and escalates a second failure to the operator.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
-returns before any of the seven routines run — none of them fires at all
+returns before any of the eight routines run — none of them fires at all
 until it thaws (PAN-4210).
 
 `recoverStalledReviews` reads the journal and the issue pause gate
@@ -1301,7 +1318,9 @@ the journal's last, so the patrol leaves the issue to the operator.
 where some reviewers posted a verdict and one died is not recovered, because the
 last entry is then `review.verdict` — `review.dispatched.data.reviewers` carries
 enough to count verdicts later. A quick-mode review writes no `review.dispatched`
-entry, so a dead quick reviewer is not recovered either. A server death between
+entry, so a dead quick reviewer is not recovered either. A live-but-silent quick
+reviewer (dispatched, pane up, never started) is now recovered by
+`recoverSilentReviewers`, below. A server death between
 `verification.started` and its outcome still leaves `verification.started` or
 `verification.failed` last, and both are still skipped by `recoverStalledReviews`
 above (an agent that owes rework must not have verification re-run every hour).
@@ -1340,6 +1359,67 @@ door: the route re-verifies against current main and journals
 `review.requested` itself, which moves the tail and makes the recovery
 exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
 began before a restart is covered as soon as the process comes back up.
+
+`recoverSilentReviewers` (PAN-4433) covers a reviewer that was dispatched and
+never ran. `agent-pan-4383-review` (quick mode) was dispatched on 2026-09-29,
+wrote no transcript and no `review.md`, and sat idle for about 21 hours. Quick
+mode writes no `review.dispatched`, so the journal tail stayed
+`verification.passed`: `recoverStalledReviews` skips every `verification.*`
+tail, and `recoverUndispatchedReviews` skips any issue with a live review pane.
+Convoy lanes had the same hole. The routine reads each review agent's
+`state.json` and acts on a reviewer only when all of these hold:
+
+- Its `reviewDispatchedAt` is at least `roles.review.stallMinutes` old (default
+  15; see [CONFIGURATION.md](CONFIGURATION.md)). Every dispatch — the parent's
+  and each lane's warm resume or fresh spawn, and synthesis recovery — writes
+  this stamp immediately before the spawn or resume call. A reviewer dispatched
+  before the stamp existed is skipped.
+- It wrote no report for the run since the stamp: `review.md` or `synthesis.md`
+  for the parent, its `<lane>.md` for a lane. A report from an earlier dispatch
+  of the same run does not count.
+- Its transcript has not been written since the stamp. The clock is anchored to
+  the dispatch, not to idleness, so a convoy parent that read its prompt and now
+  waits for its lanes is not silent. A reviewer that started and later hung is
+  out of scope.
+- Its run is the current head's run, the issue is unpaused, the reviewer is not
+  operator-held (`decideResumeGate`), and the journal has no verdict for the run
+  and no `review.aborted` since the stamp.
+
+The pane rules come from the liveness oracle. An indeterminate answer is never
+acted on. A pane blocked on a prompt (Herdr's `blocked` state) is
+skipped: it is already surfaced as needs-you, and a re-dispatch would not
+answer it. There is no separate waiting-on-human check: a reviewer waiting on a
+human has already written its transcript, so it is active, not silent, and the
+runtime mirror is empty in the deacon child anyway. A reviewer confirmed dead on its first failure is left to
+`recoverStalledReviews` and `recoverUndispatchedReviews`.
+
+On the first failure the routine appends `review.stalled` **before** acting —
+that entry is the durable one-shot marker that survives a deacon restart — then
+closes the silent pane, stops the agent, and resets its state dir with
+`removeAgentStateDir` (transcripts survive), so the door fresh-spawns instead
+of resuming the suspect session. A lane is relaunched through
+`recoverMissingConvoyReviewers`; the parent through `spawnReviewRoleForIssue`
+with `force: true`, which in `full` mode also restarts live lanes. It calls
+these doors directly rather than the review-request route, because the run id
+proves the head is unchanged and the existing `verification.passed` still
+covers it. If anything after the `review.stalled` entry fails — the pane close,
+the reset, the door returning `success: false` (including a merge-conflict
+gate), a lane door that launched nothing (`recoverMissingConvoyReviewers` skips
+a lane whose report file exists at all), or the door throwing — the routine
+escalates in the same tick.
+
+The budget is one re-dispatch per (run, reviewer), counted from the journal. A
+new push is a new run and gets a fresh budget. When the re-dispatched reviewer
+is silent again, or is confirmed dead without a report, `stallMinutes` after
+its re-dispatch, the routine appends `review.stall-escalated` and surfaces
+needs-you (`surfaceIssueFeedbackNeedsYou`) with the reviewer id, the run and
+the pane state. It leaves that pane alone and never re-dispatches that reviewer
+for that run again.
+
+The routine never writes `review.redispatched`. That tail makes
+`recoverStalledReviews` call `recoverMissingConvoyReviewers`, which would launch
+four lanes on a quick-mode issue; neither `review.stalled` nor
+`review.stall-escalated` is a tail `recoverStalledReviews` acts on.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
 `handoff.deferred` or `handoff.retried`. Each of those entries carries the

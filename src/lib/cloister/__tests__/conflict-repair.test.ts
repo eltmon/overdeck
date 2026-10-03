@@ -20,7 +20,7 @@ import {
   tickConflictRepair,
   type ConflictRepairDeps,
 } from '../conflict-repair.js';
-import type { ConflictRepairGateResult } from '../merge-gate.js';
+import { evaluateConflictRepairGate, type ConflictRepairGateResult } from '../merge-gate.js';
 import type { GuardedReviewRequestOutcome } from '../request-review-pipeline.js';
 import { appendPipelineEntry, readPipelineJournal, type PipelineJournalEntry } from '../pipeline-journal.js';
 import { emptyPrFacts } from '../pr-facts.js';
@@ -130,6 +130,22 @@ describe('buildConflictRepairPrompt', () => {
   it('points at git merge-tree when the paths are unknown', () => {
     expect(buildConflictRepairPrompt({ issueId: ISSUE, head: 'aaaa1111', conflictPaths: [] }))
       .toContain('Conflicting paths: run git merge-tree to list them');
+  });
+
+  it('says the approval was at an older commit when stale', () => {
+    const prompt = buildConflictRepairPrompt({
+      issueId: ISSUE,
+      head: 'aaaa1111',
+      conflictPaths: ['a.txt'],
+      staleApproval: true,
+    });
+    expect(prompt).toContain('was approved at an older commit and now conflicts');
+    expect(prompt).toContain('5. Commit, push the branch, then run `pan review request PAN-1166`.');
+  });
+
+  it('still says "is approved but now conflicts" without the stale flag', () => {
+    expect(buildConflictRepairPrompt({ issueId: ISSUE, head: 'aaaa1111', conflictPaths: ['a.txt'] }))
+      .toContain('is approved but now conflicts');
   });
 });
 
@@ -440,5 +456,138 @@ describe('tickConflictRepair — review backstop after a repair', () => {
     await tickConflictRepair(deps);
 
     expect(requestReview).not.toHaveBeenCalled();
+  });
+});
+
+describe('tickConflictRepair — stale approval (PAN-4467)', () => {
+  it('routes PR #4440 (approved at an older head, conflicting) to one repair per head', async () => {
+    approve();
+    const facts = {
+      ...emptyPrFacts(ISSUE),
+      forge: 'github' as const,
+      url: 'https://github.com/eltmon/overdeck/pull/4317',
+      number: 4317,
+      exists: true,
+      open: true,
+      headSha: HEAD_A,
+      reviewDecision: 'APPROVED' as const,
+      approved: true,
+      mergeable: false,
+      checks: 'green' as const,
+      testChecks: 'none' as const,
+    };
+    const evaluateGate = (issueId: string) => evaluateConflictRepairGate(issueId, {
+      getFacts: async () => facts,
+      readReviews: async () => ({
+        headRefOid: HEAD_A,
+        reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD_B } }],
+      }),
+      overdeckLogins: async () => ['overdeck-agent[bot]'],
+      uatRequired: async () => true,
+    });
+    const { deps, deliver, surfaceNeedsYou } = makeDeps({ evaluateGate });
+
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: repair-requested']);
+    expect(deliver).toHaveBeenCalledWith('agent-pan-1166', expect.stringContaining('was approved at an older commit'), expect.any(String));
+    const entries = conflictEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ type: 'conflict.repair-requested', data: { staleApproval: true } });
+
+    vi.advanceTimersByTime(60_000);
+    expect(await tickConflictRepair(deps)).toEqual([]);
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_GRACE_MS);
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: escalated']);
+
+    expect(deliver).toHaveBeenCalledOnce();
+    expect(surfaceNeedsYou).toHaveBeenCalledOnce();
+  });
+});
+
+describe('tickConflictRepair — declined conflicting heads', () => {
+  function declinedGate(reason: string, headSha = HEAD_A, overrides: Partial<ConflictRepairGateResult['facts']> = {}): ConflictRepairGateResult {
+    return {
+      conflicting: false,
+      reason,
+      facts: { ...gate(false, headSha).facts, mergeable: false, ...overrides },
+    };
+  }
+
+  it('logs a declined conflicting head once per issue and head', async () => {
+    approve();
+    const log = vi.fn();
+    const { deps, deliver } = makeDeps({
+      log,
+      evaluateGate: async () => declinedGate('PR is not approved at PR HEAD aaaa1111… (needs a review approving that commit)'),
+    });
+
+    await tickConflictRepair(deps);
+    vi.advanceTimersByTime(60_000);
+    await tickConflictRepair(deps);
+
+    const notRepairedLines = log.mock.calls.map((call) => call[0]).filter((line) => line.includes('not repaired'));
+    expect(notRepairedLines).toEqual([
+      expect.stringContaining('PAN-1166: conflicting head aaaa1111 not repaired: PR is not approved at PR HEAD'),
+    ]);
+    expect(conflictEntries()).toEqual([]);
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('logs a second line when the declined head changes', async () => {
+    approve();
+    const log = vi.fn();
+    let headSha = HEAD_A;
+    const { deps } = makeDeps({ log, evaluateGate: async () => declinedGate('PR is not approved at PR HEAD', headSha) });
+
+    await tickConflictRepair(deps);
+    headSha = HEAD_B;
+    vi.advanceTimersByTime(60_000);
+    await tickConflictRepair(deps);
+
+    const notRepairedLines = log.mock.calls.map((call) => call[0]).filter((line) => line.includes('not repaired'));
+    expect(notRepairedLines).toEqual([
+      expect.stringContaining('conflicting head aaaa1111 not repaired'),
+      expect.stringContaining('conflicting head ffff6666 not repaired'),
+    ]);
+  });
+
+  it('does not log a decline for a mergeable PR', async () => {
+    approve();
+    const log = vi.fn();
+    const { deps } = makeDeps({ log, evaluateGate: async () => gate(false) });
+
+    await tickConflictRepair(deps);
+
+    expect(log.mock.calls.map((call) => call[0]).some((line) => line.includes('not repaired'))).toBe(false);
+  });
+
+  it('does not log a decline for a closed PR', async () => {
+    approve();
+    const log = vi.fn();
+    const { deps } = makeDeps({
+      log,
+      evaluateGate: async () => declinedGate('PR is closed', HEAD_A, { open: false }),
+    });
+
+    await tickConflictRepair(deps);
+
+    expect(log.mock.calls.map((call) => call[0]).some((line) => line.includes('not repaired'))).toBe(false);
+  });
+
+  it('logs the same head again once after a state reset', async () => {
+    approve();
+    const log = vi.fn();
+    const { deps } = makeDeps({
+      log,
+      evaluateGate: async () => declinedGate('PR is not approved at PR HEAD'),
+    });
+
+    await tickConflictRepair(deps);
+    __resetConflictRepairStateForTests();
+    vi.advanceTimersByTime(60_000);
+    await tickConflictRepair(deps);
+
+    const notRepairedLines = log.mock.calls.map((call) => call[0]).filter((line) => line.includes('not repaired'));
+    expect(notRepairedLines).toHaveLength(2);
   });
 });

@@ -1,0 +1,215 @@
+{
+  "version": "1",
+  "issueId": "PAN-4253",
+  "created": "2026-10-03T01:29:37.432Z",
+  "updated": "2026-10-03T02:51:01.839Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-03T02:37Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-03T02:37:09.818Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-03T02:40Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-03T02:40:44.746Z"
+    }
+  ],
+  "items": {
+    "agent-state-effort-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:29:37.432Z",
+      "doneAt": "2026-10-03T01:32:52.252Z"
+    },
+    "relaunch-effort-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:33:01.077Z",
+      "doneAt": "2026-10-03T01:35:20.054Z"
+    },
+    "spawn-persists-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:35:23.988Z",
+      "doneAt": "2026-10-03T01:39:44.974Z"
+    },
+    "start-passes-effort-source": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:39:48.905Z",
+      "doneAt": "2026-10-03T01:42:53.820Z"
+    },
+    "spawn-prep-resume-honors-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:42:57.935Z",
+      "doneAt": "2026-10-03T01:44:36.025Z"
+    },
+    "resume-reapplies-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:44:40.305Z",
+      "doneAt": "2026-10-03T01:48:00.883Z"
+    },
+    "restart-reapplies-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:48:05.023Z",
+      "doneAt": "2026-10-03T01:50:27.852Z"
+    },
+    "recover-reapplies-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:50:32.234Z",
+      "doneAt": "2026-10-03T01:53:48.620Z"
+    },
+    "messaging-fallback-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:53:52.809Z",
+      "doneAt": "2026-10-03T01:59:14.950Z"
+    },
+    "spawnconfig-effort-adapter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T01:59:28.940Z",
+      "doneAt": "2026-10-03T02:03:11.463Z"
+    },
+    "cloister-rotation-crash-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T02:03:16.912Z",
+      "doneAt": "2026-10-03T02:06:21.077Z"
+    },
+    "cloister-handoff-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T02:06:26.277Z",
+      "doneAt": "2026-10-03T02:09:19.912Z"
+    },
+    "effort-relaunch-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4253",
+      "claimedAt": "2026-10-03T02:09:23.804Z",
+      "doneAt": "2026-10-03T02:10:43.229Z"
+    },
+    "agent-state-effort-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:25:29.537Z"
+    },
+    "agent-state-effort-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:00.956Z"
+    },
+    "relaunch-effort-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:12.353Z"
+    },
+    "relaunch-effort-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:24.796Z"
+    },
+    "relaunch-effort-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:36.751Z"
+    },
+    "spawn-persists-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:49.060Z"
+    },
+    "spawn-persists-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:01.072Z"
+    },
+    "start-passes-effort-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:11.622Z"
+    },
+    "start-passes-effort-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:22.477Z"
+    },
+    "spawn-prep-resume-honors-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:32.943Z"
+    },
+    "spawn-prep-resume-honors-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:43.839Z"
+    },
+    "resume-reapplies-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:27:56.049Z"
+    },
+    "resume-reapplies-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:08.164Z"
+    },
+    "restart-reapplies-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:20.194Z"
+    },
+    "restart-reapplies-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:31.995Z"
+    },
+    "recover-reapplies-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:43.669Z"
+    },
+    "recover-reapplies-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:28:54.666Z"
+    },
+    "messaging-fallback-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:06.030Z"
+    },
+    "messaging-fallback-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:16.608Z"
+    },
+    "spawnconfig-effort-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:28.802Z"
+    },
+    "spawnconfig-effort-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:40.474Z"
+    },
+    "cloister-rotation-crash-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:29:52.255Z"
+    },
+    "cloister-rotation-crash-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:04.278Z"
+    },
+    "cloister-handoff-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:16.696Z"
+    },
+    "cloister-handoff-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:28.105Z"
+    },
+    "effort-relaunch-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:39.327Z"
+    },
+    "effort-relaunch-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:30:49.770Z"
+    },
+    "agent-state-effort-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:31:24.313Z"
+    }
+  },
+  "feedback": []
+}

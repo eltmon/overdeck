@@ -3,6 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const issueIdMocks = vi.hoisted(() => ({
   resolveBareNumericId: vi.fn(),
+  // PAN-4465: inert until the verb commands switch to the shared resolver —
+  // mirrors resolveBareNumericId's single-match answer as a one-element list.
+  listBareNumericIssueMatches: vi.fn((input: string) => {
+    const resolved = issueIdMocks.resolveBareNumericId(input) as string | null;
+    return /^\d+$/.test(input) && resolved ? [resolved] : [];
+  }),
+}));
+
+const conversationMocks = vi.hoisted(() => ({
+  getConversationById: vi.fn(() => null),
+  getConversationByName: vi.fn(() => null),
 }));
 
 const agentMocks = vi.hoisted(() => ({
@@ -61,6 +72,12 @@ const childProcessMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/issue-id.js', () => ({
   resolveBareNumericId: issueIdMocks.resolveBareNumericId,
+  listBareNumericIssueMatches: issueIdMocks.listBareNumericIssueMatches,
+}));
+
+vi.mock('../../../lib/overdeck/conversations.js', () => ({
+  getConversationById: conversationMocks.getConversationById,
+  getConversationByName: conversationMocks.getConversationByName,
 }));
 
 vi.mock('../../../lib/agents.js', () => {
@@ -404,13 +421,17 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Unexpected non-whitespace character'));
   });
 
-  it('prints the shared unresolved-ID error path for pan kill', async () => {
+  it('prints the shared unresolved-target error path for pan kill', async () => {
+    // PAN-4465: pan kill now routes through resolveCliAgentTarget, which calls
+    // listBareNumericIssueMatches directly rather than resolveBareNumericId —
+    // the derived mock above returns [] whenever resolveBareNumericId does.
     issueIdMocks.resolveBareNumericId.mockReturnValue(null);
     const { killCommand } = await import('../kill.js');
 
     await expect(killCommand('9999', {})).rejects.toThrow('process.exit:1');
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve issue ID "9999"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve agent target "9999"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('no issue agent or conversation matches 9999'));
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
   });
 

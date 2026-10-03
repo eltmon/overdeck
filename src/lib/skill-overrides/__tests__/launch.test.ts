@@ -5,17 +5,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loadSkillOverrideLayers, listPackCatalog, overdeckHome } = await vi.hoisted(async () => {
+const { loadSkillOverrideLayers, listPackCatalog, overdeckHome, getSupervisedConversationByTmuxSession } = await vi.hoisted(async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-launch-home-'));
   process.env.OVERDECK_HOME = home;
-  return { loadSkillOverrideLayers: vi.fn(), listPackCatalog: vi.fn(), overdeckHome: home };
+  return { loadSkillOverrideLayers: vi.fn(), listPackCatalog: vi.fn(), overdeckHome: home, getSupervisedConversationByTmuxSession: vi.fn() };
 });
 
 vi.mock('../store.js', () => ({ loadSkillOverrideLayers }));
 vi.mock('../catalog.js', () => ({ listPackCatalog }));
+vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByTmuxSession }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
 vi.mock('node:child_process', async importOriginal => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -150,12 +151,48 @@ describe('resolveLaunchDisabledSkills', () => {
   });
 });
 
+describe('resolveLaunchDisabledSkills conversation layer (PAN-4486)', () => {
+  beforeEach(() => {
+    loadSkillOverrideLayers.mockReset();
+    loadSkillOverrideLayers.mockResolvedValue({ global: { zeta: false }, issue: { codebase: true } });
+    getSupervisedConversationByTmuxSession.mockReset();
+  });
+
+  it('applies the conversation row skill map as the narrowest layer', async () => {
+    getSupervisedConversationByTmuxSession.mockReturnValue({ skillOverrides: { grilling: false, codebase: false } });
+    const disabled = await resolveLaunchDisabledSkills({ cwd: '/repo', conversation: 'conv-x' });
+    expect(getSupervisedConversationByTmuxSession).toHaveBeenCalledWith('conv-x');
+    expect(disabled).toEqual(['codebase', 'grilling', 'zeta']);
+  });
+
+  it('reads no row without a conversation', async () => {
+    expect(await resolveLaunchDisabledSkills({ cwd: '/repo' })).toEqual(['zeta']);
+    expect(getSupervisedConversationByTmuxSession).not.toHaveBeenCalled();
+  });
+
+  it('fails open with one warning when the row cannot be read', async () => {
+    getSupervisedConversationByTmuxSession.mockImplementation(() => { throw new Error('db locked'); });
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      expect(await resolveLaunchDisabledSkills({ cwd: '/repo', conversation: 'conv-x' })).toEqual(['zeta']);
+      expect(stderr).toHaveBeenCalledWith('[launcher] WARNING: conversation skill overrides not applied\n');
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+});
+
 describe('launcherSkillOverrideLines', () => {
   it('quotes a working dir with a space and omits --issue when none', () => {
     const [line] = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/tmp/my project' });
     expect(line).toContain(`--cwd '/tmp/my project'`);
     expect(line).not.toContain('--issue');
     expect(line).toContain('PAN_SKILL_SETTINGS=');
+  });
+
+  it('passes --conversation when given (PAN-4486)', () => {
+    const [line] = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/w', conversation: 'conv-abc' });
+    expect(line).toContain(`--conversation 'conv-abc'`);
   });
 
   it('passes --issue and the codex home for codex, then reads the Deft env file', () => {
@@ -289,6 +326,14 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(readlinkSync(link)).toMatch(/packs\/mounts\/[0-9a-f]{64}\/plugins$/);
     expect(existsSync(join(link, 'mattpocock', 'skills', 'grilling', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(link, 'mattpocock', 'skills', 'tdd'))).toBe(false);
+  });
+
+  it('mounts a pack skill the conversation layer turns on (PAN-4486)', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: {} });
+    getSupervisedConversationByTmuxSession.mockReturnValue({ skillOverrides: { 'mattpocock/tdd': true } });
+    expect(await applyClaudePacks({ ...ctx, conversation: 'conv-x' }, link)).toEqual([]);
+    expect(existsSync(join(link, 'mattpocock', 'skills', 'tdd', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(link, 'mattpocock', 'skills', 'grilling'))).toBe(false);
   });
 
   it('mounts a deft-readonly pack with the host notice transform (PAN-3943)', async () => {

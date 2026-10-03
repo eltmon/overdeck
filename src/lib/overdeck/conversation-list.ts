@@ -19,6 +19,7 @@ import {
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
+import { isSupersededConversation } from './conversation-clear-chain.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
 import { readConversationProviderError } from './conversation-provider-error.js';
@@ -30,6 +31,7 @@ import {
   listFavoritedIds,
   listLaneConversations,
   listVaultBrowseConversations,
+  markConversationEnded,
   markConversationRunning,
 } from './conversations.js';
 import {
@@ -201,11 +203,16 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
+      // PAN-4485: a superseded /clear parent never owns its session; repair a stale active row.
+      if (isSupersededConversation(row) && row.status === 'active') {
+        markConversationEnded(row.name);
+        row = { ...row, status: 'ended', endedAt: new Date().toISOString() };
+      }
       // Null: the backend did not answer, so liveness is unknown — keep the
       // row's stored status and repair nothing (PAN-3921).
-      const tmuxSessionAlive = liveSessionNames ? liveSessionNames.has(conv.tmuxSession) : row.status === 'active';
+      const tmuxSessionAlive = liveSessionNames ? liveSessionNames.has(row.tmuxSession) : row.status === 'active';
       let sessionAlive = conversationSessionAliveFromState(row, tmuxSessionAlive);
-      if (liveSessionNames && !sessionAlive && row.status === 'ended' && !row.forkStatus && tmuxSessionAlive) {
+      if (liveSessionNames && !sessionAlive && row.status === 'ended' && !row.forkStatus && !isSupersededConversation(row) && tmuxSessionAlive) {
         const harnessAlive = await conversationHarnessAlive(row.tmuxSession);
         if (conversationNeedsRunningRepair(row, tmuxSessionAlive, harnessAlive)) {
           markConversationRunning(row.name);

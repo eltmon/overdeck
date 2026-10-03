@@ -11,6 +11,7 @@ import {
   mergeConfigs,
   pickPercentModelRef,
   resolveModel,
+  reviewStallMs,
   stripProjectTtsEndpoint,
   type NormalizedConfig,
 } from '../config-yaml.js';
@@ -263,6 +264,25 @@ describe('role model configuration', () => {
         flywheel: { model: 'claude-opus-4-7', maxAgents: 0 },
       },
     })).toThrow('config.yaml: roles.flywheel.maxAgents must be a positive integer');
+  });
+
+  it('rejects a roles.review.stallMinutes that is not a positive integer (PAN-4433)', () => {
+    for (const stallMinutes of [0, -1, 1.5]) {
+      expect(() => mergeConfigs({
+        roles: { review: { model: 'workhorse:expensive', stallMinutes } },
+      })).toThrow('config.yaml: roles.review.stallMinutes must be a positive integer');
+    }
+  });
+
+  it('loads roles.review.stallMinutes and derives the silent-reviewer threshold (PAN-4433)', () => {
+    const { config } = mergeConfigs({
+      roles: { review: { model: 'workhorse:expensive', stallMinutes: 5 } },
+    });
+
+    expect(config.roles?.review?.stallMinutes).toBe(5);
+    expect(reviewStallMs(config)).toBe(300_000);
+    expect(reviewStallMs({})).toBe(900_000);
+    expect(reviewStallMs(mergeConfigs({}).config)).toBe(900_000);
   });
 
   it('accepts xhigh/max effort on an Opus 4.7 role', () => {

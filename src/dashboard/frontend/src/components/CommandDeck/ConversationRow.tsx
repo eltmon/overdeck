@@ -4,6 +4,8 @@ import { useDashboardStore } from '../../lib/store';
 import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
+import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
+import { VaultRowSyncMenuItem } from './VaultRowSyncMenuItem';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
@@ -762,6 +764,13 @@ export function ConversationRow({
             </MenuItemButton>
           )}
           <MenuSeparator />
+          {conv.origin === 'vault' && <VaultRowSyncMenuItem onDone={() => setMenuOpen(false)} />}
+          {conv.origin !== 'vault' && (
+            <MenuItemButton onClick={(e) => { e.stopPropagation(); openContinueOnDevice(continueTargetOf(conv)); setMenuOpen(false); }}>
+              <MonitorSmartphone size={14} />
+              Continue on another device
+            </MenuItemButton>
+          )}
           <MenuItemButton
             onClick={(e) => { handleCopyLink(e); setMenuOpen(false); }}
           >

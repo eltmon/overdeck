@@ -37,6 +37,8 @@ colleague.
 | **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
 
+A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
+
 The model picker spans the harness (Claude Code, Pi, Codex) and every routed
 provider, each with live per-million pricing — so a mid-conversation swap is one
 click:
@@ -47,11 +49,25 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
-### Starting a bare conversation
+### New conversation with options
 
-Two checkboxes sit under the `+` in the Command Deck header. Your browser
-remembers what you last chose.
+The `+` in the Command Deck header is a split button:
 
+- **The `+` itself** is quick create. It starts a conversation at once with the
+  sidebar's model, harness and effort. No dialog opens.
+- **The caret beside it** opens a menu with one item, **New conversation with
+  options…**. The command palette has the same action.
+
+The dialog sets options for one conversation. Nothing you choose in it changes
+what the next quick create uses. Its fields are:
+
+- **Project** and **Working directory.** The project starts as the deck's
+  project. The working directory starts as the project path, and you can point
+  it at any directory inside the project, such as a package in a monorepo.
+- **Model** and **Harness.**
+- **Effort.** It lists the levels the model supports and starts at the default
+  effort, with its source shown beside it. A model with no effort setting
+  shows "Not supported by this model".
 - **No context** starts the conversation without Overdeck's context: no
   bundled rules, no project or workspace layers, no session briefing, no memory
   injection on each prompt, and no resume message. It starts faster and costs
@@ -61,6 +77,14 @@ remembers what you last chose.
   memory: `~/.claude/CLAUDE.md`, project `CLAUDE.md` files and auto memory.
   Without it, a bare conversation still reads those files, because Claude Code
   loads them itself.
+- **Skills.** Each skill shows the state it would inherit and an Inherit / On /
+  Off choice. A choice applies to this conversation only, at every launch,
+  resume, restart and fork. See [Skills](/features/skills).
+- **Linked issue.** Search the issues the dashboard knows by identifier or
+  title.
+- **First message** (optional).
+
+After **Create**, the dialog closes and the new conversation opens.
 
 See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
 for the full list of what is skipped and what keeps running.
@@ -343,6 +367,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
 | `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 500 characters.** |
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
+| `--effort <level>` | Reasoning effort for the new conversation (`low`, `medium`, `high`, `xhigh`, `max`). Defaults to the source conversation's effort, clamped to the new model. |
 | `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
 | `--cwd <path>` | Working directory for the new conversation. |
 | `--project <key-or-name>` | Registered project for the successor. Defaults to inheriting the source conversation's project, even when `--cwd` points outside that project's directory. |

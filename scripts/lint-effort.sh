@@ -8,19 +8,21 @@
 # instance of either. Shrink-only: a baselined file's count may drop freely
 # but must never rise, and no new, unbaselined offender file may appear.
 #
-# Every current baseline row exists only because the code fixing it lives in a
-# sibling issue (#4253-#4260) outside PAN-4249's own scope; each row names
-# that issue. One row (ContextWindowMeter.tsx) is a false match on an
-# unrelated 'low'|'medium'|'high' tone enum and carries no sibling issue.
+# Every current baseline row exists because the code fixing it lives in a
+# sibling issue (#4253, #4255-#4260) outside PAN-4249's own scope, or — the
+# conversation-runtime.ts row — because it is the lane-door SAFE_EFFORT_PATTERN,
+# deliberately kept in scope (PAN-4223 D20, PAN-4254 D11); each row names its
+# issue. One row (ContextWindowMeter.tsx) is a false match on an unrelated
+# 'low'|'medium'|'high' tone enum and carries no sibling issue.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Excluded entirely: the canonical enum definition, and the per-model/
 # per-harness CAPABILITY DATA files (backend, not UI) whose 'low'..'max'
 # arrays are data, not copies of the enum — counting them would fail this
-# lint every time a model or harness is added or dropped. ModelPicker.tsx is
-# dashboard UI, not a data file, so it's baselined below instead — a new
-# match there (data row or otherwise) should still surface.
+# lint every time a model or harness is added or dropped. ModelPicker.tsx
+# (dashboard UI, not a data file) now derives its lists from EFFORT_LEVELS
+# (PAN-4254) and carries no baseline row — a new match there should surface.
 EXCLUDE_FILES=(
   "packages/contracts/src/effort.ts"
   "src/lib/model-capabilities.ts"
@@ -35,7 +37,7 @@ declare -A BASELINE=(
   ["src/lib/acp/host.ts"]=1                                      # PAN-4260
   ["src/lib/codex/app-server-host.ts"]=2                         # PAN-4260
   ["src/lib/launcher-generator.ts"]=3                            # PAN-4260
-  ["src/lib/overdeck/conversation-runtime.ts"]=4                 # PAN-4254
+  ["src/lib/overdeck/conversation-runtime.ts"]=1                 # lane door SAFE_EFFORT_PATTERN (PAN-4223 D20), kept by PAN-4254 D11
   ["src/lib/launcher-codex-command.ts"]=1                        # PAN-4260
   ["packages/pi-extension/src/index.ts"]=1                       # PAN-4260
   ["packages/ohmypi-extension/src/index.ts"]=1                   # PAN-4260
@@ -45,8 +47,6 @@ declare -A BASELINE=(
   ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
   ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
-  ["src/lib/overdeck/conversation-delivery.ts"]=1                # PAN-4254
-  ["src/dashboard/frontend/src/components/chat/ModelPicker.tsx"]=30  # PAN-4259, +2 PAN-4327 (Sonnet 5.5 rows)
 )
 
 PATTERNS=(

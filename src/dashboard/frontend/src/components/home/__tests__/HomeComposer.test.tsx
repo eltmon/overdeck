@@ -51,6 +51,22 @@ describe('HomeComposer', () => {
     const body = JSON.parse(String(call[1]!.body));
     expect(body.message).toBe('hello there');
     expect(body.projectKey).toBeUndefined();
+    expect(body.effort).toBe('high');
+  });
+
+  it('sends the chosen effort level in the create payload (PAN-4254)', async () => {
+    renderWithProviders(<HomeComposer mode="advanced" />);
+    fireEvent.click(screen.getByRole('button', { name: /High \(default\)/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Low' }));
+
+    const input = screen.getByTestId('home-composer-input');
+    fireEvent.change(input, { target: { value: 'hello there' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/conv/conv-e2e'));
+    const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url) === '/api/conversations')!;
+    const body = JSON.parse(String(call[1]!.body));
+    expect(body.effort).toBe('low');
   });
 
   it('shows a hint instead of silently no-opping when no model resolves', () => {

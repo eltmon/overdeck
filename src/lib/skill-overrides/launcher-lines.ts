@@ -30,9 +30,12 @@ export function launcherSkillOverrideLines(opts: {
   workingDir: string;
   issueId?: string;
   pluginLink?: string;
+  /** PAN-4486: conversation tmux session whose row skill map applies. */
+  conversation?: string;
 }): string[] {
   const args = [`--harness ${opts.harness}`, `--cwd ${shellQuote(opts.workingDir)}`];
   if (opts.issueId) args.push(`--issue ${shellQuote(opts.issueId)}`);
+  if (opts.conversation) args.push(`--conversation ${shellQuote(opts.conversation)}`);
   const link = opts.harness === 'claude-code' && opts.pluginLink ? shellQuote(opts.pluginLink) : undefined;
   if (link) args.push(`--plugin-link ${link}`);
   const command = `pan skills launch-settings ${args.join(' ')}`;
@@ -86,6 +89,11 @@ export function skillPackLinkPath(config: SkillOverrideLaunchConfig): string | u
   return join(getOverdeckHome(), 'launch', key, 'skill-packs');
 }
 
+/** A conversation launch keys its managed state by tmux session, which the step uses to reread the row. */
+function conversationKey(config: SkillOverrideLaunchConfig): string | undefined {
+  return config.spawnMode === 'conversation' ? config.managedStateKey : undefined;
+}
+
 /** Local launches of the harness apply overrides; remote (Fly) launches do not. */
 function appliesTo(config: SkillOverrideLaunchConfig, harness: 'claude-code' | 'codex'): boolean {
   return config.spawnMode !== 'remote' && (config.harness ?? 'claude-code') === harness;
@@ -108,6 +116,7 @@ export function claudeSkillOverrideLaunch<T extends SkillOverrideLaunchConfig & 
       workingDir: config.workingDir,
       issueId: config.overdeckEnv?.issueId,
       pluginLink: link,
+      conversation: conversationKey(config),
     }),
   };
 }
@@ -115,5 +124,10 @@ export function claudeSkillOverrideLaunch<T extends SkillOverrideLaunchConfig & 
 /** Codex: the step that writes the per-agent config block; it needs CODEX_HOME exported first. */
 export function codexSkillOverrideLines(config: SkillOverrideLaunchConfig): string[] {
   if (!appliesTo(config, 'codex') || !config.codexHome) return [];
-  return launcherSkillOverrideLines({ harness: 'codex', workingDir: config.workingDir, issueId: config.overdeckEnv?.issueId });
+  return launcherSkillOverrideLines({
+    harness: 'codex',
+    workingDir: config.workingDir,
+    issueId: config.overdeckEnv?.issueId,
+    conversation: conversationKey(config),
+  });
 }

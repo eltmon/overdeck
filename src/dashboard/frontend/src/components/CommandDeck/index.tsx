@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { type IssueCostBreakdown } from './ProjectOverview';
@@ -17,11 +17,14 @@ import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
-import { RetrospectiveButton } from './RetrospectiveButton';
+import { NewConversationPickers } from './NewConversationPickers';
+import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
-import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
+import { MODEL_EFFORT_SUPPORT, loadStoredHarness, loadStoredModel, onKnownModelsSync } from '../chat/ModelPicker';
+import { loadStoredEffort, type EffortLevel } from '../chat/EffortPicker';
+import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
-import { NewConversationContextOptions, loadStoredNewConversationContext, newConversationContextPayload, type NewConversationContext } from './NewConversationContextOptions';
+import { NewConversationSplitButton } from '../newConversation/NewConversationSplitButton';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
@@ -201,6 +204,7 @@ export function CommandDeck({
   onProjectPrefixChange,
   cockpitIssue = null,
   onCockpitChange,
+  conversationViewMode,
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
@@ -248,8 +252,8 @@ export function CommandDeck({
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
-  const [newConversationContext, setNewConversationContext] = useState<NewConversationContext>(loadStoredNewConversationContext);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
+  const [sidebarEffort, setSidebarEffort] = useState<EffortLevel>(loadStoredEffort);
 
   // The mount-time loadStoredModel above runs before the picker's catalog
   // fetch completes, when only FALLBACK ids are "known" — a stored
@@ -554,22 +558,7 @@ export function CommandDeck({
     messageIndex: number;
     nonce: number;
     subagentId?: string;
-  }, viewMode?: ViewMode) => {
-    const store = usePanesStore.getState();
-    store.ensureHome(projectKey);
-    const panes = store.panesByWorkspace[projectKey] ?? [];
-    const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(viewMode ? { viewMode } : {}) });
-    store.setActivePane(projectKey, paneId);
-    if (target) {
-      usePanesStore.getState().updatePane(projectKey, paneId, {
-        targetMessageId: target.messageId,
-        targetMessageIndex: target.messageIndex,
-        targetMessageNonce: target.nonce,
-        targetSubagentId: target.subagentId,
-      });
-    }
-  }, []);
+  }, viewMode?: ViewMode) => openConversationTab(projectKey, name, label, target, viewMode), []);
 
   const openTerminalTabIn = useCallback((projectKey: string, sessionId: string) => {
     const store = usePanesStore.getState();
@@ -593,7 +582,10 @@ export function CommandDeck({
   // the conversation's project and open it as an agent tab in that deck.
   useEffect(() => {
     if (!convId || !registeredProjectsFetched || registeredProjectsError) return;
-    if (convId === appliedConvId.current) return;
+    // The view mode is part of the deep link: switching ?view=terminal on an
+    // already-open conversation must re-apply, not be skipped as "unchanged".
+    const deepLinkKey = `${convId}::${conversationViewMode ?? 'conversation'}`;
+    if (deepLinkKey === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
     if (!conv) return;
     setSelectedConversation(conv.name);
@@ -610,10 +602,16 @@ export function CommandDeck({
     // Opening a conversation: the /conv/<id> route owns the URL, so switch the
     // deck's project without writing /command-deck/<project> over it.
     onSelectProject?.(projectName, { updateUrl: false });
-    openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+    openConversationTabIn(
+      projectName,
+      conv.name,
+      pendingConversationTarget?.label ?? conv.title ?? 'Agent',
+      target,
+      conversationViewMode === 'terminal' ? 'terminal' : undefined,
+    );
     if (target) onPendingConversationTargetConsumed?.();
-    appliedConvId.current = convId;
-  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+    appliedConvId.current = deepLinkKey;
+  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed, conversationViewMode]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
@@ -1134,7 +1132,9 @@ export function CommandDeck({
     async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
         const harness = harnessOverride ?? sidebarHarness;
-        const payload: Record<string, unknown> = { model: sidebarModel, harness, ...newConversationContextPayload(newConversationContext, harness) };
+        const payload: Record<string, unknown> = { model: sidebarModel, harness };
+        const sidebarEffortLevels = pickerEffortLevels(sidebarModel) ?? MODEL_EFFORT_SUPPORT[sidebarModel as keyof typeof MODEL_EFFORT_SUPPORT];
+        if (sidebarEffortLevels?.length !== 0) payload.effort = sidebarEffort;
         if (projectKey) payload.projectKey = projectKey;
         const trimmedMessage = message?.trim();
         if (trimmedMessage) payload.message = trimmedMessage;
@@ -1155,7 +1155,7 @@ export function CommandDeck({
         if (onConvIdChange) {
           const newId = String(conv.id);
           onConvIdChange(newId);
-          appliedConvId.current = newId;
+          appliedConvId.current = `${newId}::${conversationViewMode ?? 'conversation'}`;
           prevSelectedRef.current = conv.name;
         }
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -1166,7 +1166,7 @@ export function CommandDeck({
         return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
-    [sidebarModel, sidebarHarness, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
+    [sidebarModel, sidebarHarness, sidebarEffort, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn, conversationViewMode],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -1356,30 +1356,20 @@ export function CommandDeck({
             <div className={styles.sidebarHeaderRow}>
               <h2 className={styles.sidebarTitle}>Command Deck</h2>
               <div className={styles.sidebarHeaderGroup}>
-                <ModelPicker
-                  value={sidebarModel}
-                  onChange={(modelId) => {
-                    setSidebarModel(modelId);
-                    saveStoredModel(modelId);
-                  }}
-                  harness={sidebarHarness} followProviderDefault
-                  onHarnessChange={(harness) => {
-                    setSidebarHarness(harness);
-                    saveStoredHarness(harness);
-                  }}
+                <NewConversationPickers
+                  model={sidebarModel}
+                  onModelChange={setSidebarModel}
+                  harness={sidebarHarness}
+                  onHarnessChange={setSidebarHarness}
+                  effort={sidebarEffort}
+                  onEffortChange={setSidebarEffort}
                 />
-                <RetrospectiveButton model={sidebarModel} harness={sidebarHarness} />
-                <button
-                  className={styles.conversationAddBtn}
-                  onClick={handleNewConversation}
-                  title="New conversation"
-                  aria-label="New conversation"
-                >
-                  <Plus size={13} />
-                </button>
+                <NewConversationSplitButton
+                  onQuickCreate={handleNewConversation}
+                  projectKey={selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined}
+                />
               </div>
             </div>
-            <NewConversationContextOptions value={newConversationContext} harness={sidebarHarness} onChange={setNewConversationContext} />
           </div>
 
           <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>

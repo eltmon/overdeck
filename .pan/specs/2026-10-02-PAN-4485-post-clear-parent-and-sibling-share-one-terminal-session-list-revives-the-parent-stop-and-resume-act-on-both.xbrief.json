@@ -1,0 +1,739 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T12:37:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4485: Post-/clear parent and sibling share one terminal session: list revives the parent, stop and resume act on both",
+    "updated": "2026-10-03T01:28:02.999Z"
+  },
+  "plan": {
+    "id": "pan-4485",
+    "title": "Post-/clear parent and sibling share one terminal session: list revives the parent, stop and resume act on both",
+    "status": "running",
+    "uid": "29011f51-7648-425c-bec7-863851ac54e9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-10-02T12:37:54Z",
+    "updated": "2026-10-03T01:28:02.999Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4485",
+        "label": "PAN-4485",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4485.md",
+        "label": "PRD draft (.pan/drafts/PAN-4485.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "clear",
+      "lifecycle",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "After Claude Code /clear, the post-clear sibling row shares its parent's terminal session. The list's running repair revives the superseded parent, stop and delete on either row kill the shared process, resume on the parent respawns the pre-clear session into the shared session, restart-all restarts the session once per row, and input doors type into the sibling's pane through the parent.",
+      "Proposal": "Introduce conversation-clear-chain.ts: a row with clearedToConvId set is superseded and owns nothing; the chain head owns the session. Apply it to list repair (never revive, re-end active superseded rows), stop and resume (act on the chain head, 409 on a broken chain), restart-all (extracted to its own module, one restart per session owner), delete/archive (skip runtime stop), the pending-input feed (skip) and the plan/permission/pane-choice input doors (409). Document the rule in DASHBOARD-ARCHITECTURE.md.",
+      "NonGoals": "- Implementing the hasOtherActiveConversationOnTmuxSession stub in conversations.ts.\n- Changing CLI pan tell/kill/pause targeting by conversation name (src/cli/agent-target.ts).\n- Changing lane reap/launch stop behavior (src/lib/lanes/reap.ts, launch.ts).\n- Changing recoverStuckForks.\n- Frontend changes; the cleared banner already suppresses the resume bar.\n- Any schema change, migration or new column.\n- Changing /clear sibling detection or transcript resolution (#2672's fixed half).\n- Moving the active-superseded repair into the 10 s lifecycle poller.\n- Raising any scripts/file-size-allowlist.txt row or growing routes/conversations.ts past 1072 lines.\n- Re-exporting handleConversationRestartAll from conversation-runtime.ts (import cycle)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ownership resolver: new conversation-clear-chain.ts walks explicit clearedToConvId links; getSupervisedConversationByTmuxSession stays for inbound supervisor events.",
+        "rationale": "Stop/resume/input doors start from a known row and need that row's chain head; both lookups prefer the row with clearedToConvId null, so they agree. A broken chain resolves to null, never to the superseded parent."
+      },
+      {
+        "summary": "Stop on a superseded row stops the chain head (not a no-op); the parent's ended_at is preserved.",
+        "rationale": "The issue's Fix section says stop acts on the chain head; agent-projection compares launch time with ended_at, so moving it could drop events."
+      },
+      {
+        "summary": "Resume on a superseded row resumes the chain head and returns its row with redirectedFrom; a broken chain returns 409 conversation-cleared.",
+        "rationale": "Issue AC requires the head's session id and that only the head is active; frontend callers only invalidate the list query, so the response shape change is safe."
+      },
+      {
+        "summary": "Delete and archive of a superseded row skip the runtime stop.",
+        "rationale": "Audit found both kill the sibling's live process; a superseded row owns no runtime."
+      },
+      {
+        "summary": "Plan-action, permission and pane-choice answers on a superseded row return 409 conversation-cleared; the pending-input feed skips superseded rows.",
+        "rationale": "The issue asks to audit every row-to-session caller; these are the audited callers that type into the sibling's pane through the parent."
+      },
+      {
+        "summary": "Do not implement the hasOtherActiveConversationOnTmuxSession stub.",
+        "rationale": "With it live, stop on a parent would silently do nothing because the sibling is active, contradicting the issue's fix."
+      },
+      {
+        "summary": "Extract handleConversationRestartAll into conversation-restart-all.ts.",
+        "rationale": "conversation-runtime.ts has 10 lines of headroom under its allowlist cap; extraction frees room for the stop/resume/delete changes without raising the allowlist."
+      },
+      {
+        "summary": "CLI agent-target, lane reap/launch and recoverStuckForks are non-goals; no boot-time conversation auto-resume exists to fix.",
+        "rationale": "Audit: CLI naming means 'that terminal', lane stops are meant to stop the session, stuck-fork recovery needs a stale forkStatus on a superseded row; boot auto-resume covers agents only."
+      }
+    ],
+    "items": [
+      {
+        "id": "clear-chain-module",
+        "title": "Add the conversation-clear-chain ownership module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-clear-chain.ts",
+            "src/lib/overdeck/__tests__/conversation-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-clear-chain.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes including lint:circular"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "list-running-repair",
+            "restart-all-once",
+            "stop-redirect-head",
+            "resume-redirect-head",
+            "delete-archive-skip-stop",
+            "pending-feed-skip",
+            "input-doors-refuse"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4485.md). Create src/lib/overdeck/conversation-clear-chain.ts exporting isSupersededConversation(conv) (clearedToConvId != null), resolveClearChainHead(conv, lookup = getConversationById) which follows clearedToConvId links and returns the newest row, or null when a link target is missing, archived, on a different tmuxSession, a cycle, or the chain exceeds 64 rows, and sessionOwners(rows) which drops superseded rows and keeps the first row per tmuxSession in input order. Module header comment states the PAN-4485 ownership rule. Import only from ./conversations.js. Unit-test with an injected lookup."
+        },
+        "items": [
+          {
+            "id": "clear-chain-module.ac1",
+            "title": "Given a row whose clearedToConvId is null, when resolveClearChainHead runs, then it returns that same row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-chain-module.ac2",
+            "title": "Given parent -> sibling -> sibling-2 links on one tmuxSession, when resolveClearChainHead(parent) runs, then it returns sibling-2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-chain-module.ac3",
+            "title": "Given a link target that is missing, archived, on a different tmuxSession, or a cycle, when resolveClearChainHead runs, then it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-chain-module.ac4",
+            "title": "Given a superseded parent and its sibling on one session plus a row on another session, when sessionOwners runs, then it returns the sibling and the other row only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-running-repair",
+        "title": "List path never revives a superseded row and re-ends an active one",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/__tests__/conversation-list-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-clear-chain.test.ts src/lib/overdeck/__tests__/conversation-list-input-target.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all three list test files pass",
+            "typecheck completes without errors",
+            "lint passes; conversation-runtime.ts line count unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (.pan/drafts/PAN-4485.md). Add `& { clearedToConvId?: number | null }` to conversationNeedsRunningRepair's conv parameter and return false when clearedToConvId != null (net 0 lines in conversation-runtime.ts). In enrichConversationList (conversation-list.ts ~line 203), before tmuxSessionAlive is computed: if isSupersededConversation(row) && row.status === 'active', call markConversationEnded(row.name) and set row to status 'ended', endedAt now; compute tmuxSessionAlive from row. New test file mocks listConversations, listLiveConversationSessions and conversationHarnessAlive like conversation-list-input-target.test.ts. The `let row = conv;` line already exists at line 203; insert after it. Also add !isSupersededConversation(row) to the outer running-repair condition at line 208 so no harness probe runs for a superseded row."
+        },
+        "items": [
+          {
+            "id": "list-running-repair.ac1",
+            "title": "Given a superseded ended parent and an active sibling on one live session with a live harness, when the list is fetched, then the parent returns status 'ended' with sessionAlive false and markConversationRunning is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-running-repair.ac2",
+            "title": "Given a superseded parent stored as 'active', when the list is fetched, then markConversationEnded is called with the parent's name and the parent returns status 'ended' with sessionAlive false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-running-repair.ac3",
+            "title": "Given { status: 'ended', forkStatus: null, clearedToConvId: 7 } with session and harness alive, when conversationNeedsRunningRepair runs, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-running-repair.ac4",
+            "title": "Given the sibling row in the same fetch, when the list is fetched, then the sibling returns sessionAlive true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-running-repair.ac5",
+            "title": "Given a superseded parent on a live session, when the list is fetched, then conversationHarnessAlive is never called with the parent row's session on its behalf (the outer condition refuses it before the probe).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-all-once",
+        "title": "Extract restart-all to its own module and restart each live session once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-restart-all.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/__tests__/conversation-restart-all.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-restart-all.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/server/routes/conversations.ts"
+          ],
+          "expected_outputs": [
+            "conversation-restart-all.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes (file-size and circular)",
+            "wc prints 1072"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (.pan/drafts/PAN-4485.md). Move handleConversationRestartAll verbatim from conversation-runtime.ts (lines 1192-1242) into new src/lib/overdeck/conversation-restart-all.ts, importing each collaborator from its real home (listed in the PRD). Change the selection to sessionOwners(allConvs.filter((c) => liveSessionNames.has(c.tmuxSession))). Remove imports the move left unused in conversation-runtime.ts. In routes/conversations.ts, move the import to a single new line from conversation-restart-all.js with net-zero line change (file is at its 1072-line cap). Never re-export from conversation-runtime.ts (import cycle). Never raise scripts/file-size-allowlist.txt. A live session whose only row is a superseded parent is skipped with one console.warn naming it."
+        },
+        "items": [
+          {
+            "id": "restart-all-once.ac1",
+            "title": "Given a superseded parent and its sibling on one live session, when restart-all runs, then spawnConversationSession is called exactly once, with that session name and the sibling's claudeSessionId.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-all-once.ac2",
+            "title": "Given the same input, when restart-all runs, then closeConversationPane is called once and the response reports restarted 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-all-once.ac3",
+            "title": "Given the refactor, when `wc -l src/dashboard/server/routes/conversations.ts` runs, then it prints 1072 and `npm run lint` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-redirect-head",
+        "title": "Stop on a superseded row stops the chain head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-stop-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-stop-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-stop-clear-chain.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (.pan/drafts/PAN-4485.md). In handleConversationStop: resolve conv = isSupersededConversation(requested) ? resolveClearChainHead(requested) : requested. Mark the superseded row ended only if it is not already ended (preserve ended_at). Broken chain (null) returns success and stops nothing. Otherwise stop the head's runtime, mark the head ended, run attachment cleanup keyed on the head, and add stoppedConversation: head.name to the response when redirected. Non-superseded rows keep today's path. Use fake timers or a mocked cleanup for the 500 ms timer. Test mechanics: mock collaborators in other modules (closeConversationPane in ./conversation-liveness.js, closeCompanionTerminalForOwner, attachment cleanup), since vi.mock cannot intercept the same-module stopConversationRuntime call; terminatePids([]) short-circuits."
+        },
+        "items": [
+          {
+            "id": "stop-redirect-head.ac1",
+            "title": "Given a live post-clear sibling, when the operator stops it, then the shared pane is closed once, the sibling becomes 'ended', and the parent's ended_at is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-redirect-head.ac2",
+            "title": "Given a live chain, when the operator stops the superseded parent, then the chain head's pane is closed once, the head becomes 'ended', and the parent's ended_at is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-redirect-head.ac3",
+            "title": "Given a broken chain (head archived), when the operator stops the parent, then no pane is closed and the response returns success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-redirect-head",
+        "title": "Resume on a superseded row resumes the chain head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-resume-clear-chain.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (.pan/drafts/PAN-4485.md). In handleConversationResume, right after the vault-browse check: if the row is superseded, resolve the chain head; null returns 409 { error: 'Conversation was cleared and its continuation is unavailable', code: 'conversation-cleared' }; otherwise continue the whole handler with the head (its name, claudeSessionId, model, harness). Success responses add redirectedFrom: <requested name> when redirected. Copy the mock set from conversation-runtime-start.test.ts / conversation-runtime-launch.test.ts."
+        },
+        "items": [
+          {
+            "id": "resume-redirect-head.ac1",
+            "title": "Given a stopped /clear chain, when the operator resumes the parent, then spawnConversationSession is called once with the chain head's claudeSessionId and the response returns the head's name with redirectedFrom set to the parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-redirect-head.ac2",
+            "title": "Given the same resume, when it completes, then the parent row stays 'ended' and only the chain head is marked active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-redirect-head.ac3",
+            "title": "Given a broken chain, when the operator resumes the parent, then the response is 409 with code 'conversation-cleared' and no session is spawned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-archive-skip-stop",
+        "title": "Delete and archive of a superseded row stop no runtime",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-archive.ts",
+            "src/lib/overdeck/__tests__/conversation-archive-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-archive-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-archive-clear-chain.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (.pan/drafts/PAN-4485.md). In handleConversationDelete and archiveConversationByName, call the runtime stop only when !isSupersededConversation(conv), and call markConversationEnded only when conv.status !== 'ended'. Archive, favorite removal and attachment cleanup are unchanged."
+        },
+        "items": [
+          {
+            "id": "delete-archive-skip-stop.ac1",
+            "title": "Given a superseded parent, when it is archived, then deps.stopConversationRuntime is never called and the result is { success: true }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-archive-skip-stop.ac2",
+            "title": "Given a chain head, when it is archived, then deps.stopConversationRuntime is called once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-archive-skip-stop.ac3",
+            "title": "Given a superseded parent, when it is deleted, then no pane is closed and the sibling's session stays live.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-feed-skip",
+        "title": "Pending-input feed skips superseded rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-pending-feed-clear-chain.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-pending-feed-clear-chain.test.ts passes",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (.pan/drafts/PAN-4485.md). In getConversationsPendingInputFeed, add !isSupersededConversation(conv) to the alive filter."
+        },
+        "items": [
+          {
+            "id": "pending-feed-skip.ac1",
+            "title": "Given a superseded parent and its sibling on one live session, when the pending-input feed is built, then deps.resolveSessionFile is called for the sibling and never for the parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-feed-skip.ac2",
+            "title": "Given the same input, when the feed returns, then no row in it has the parent's name.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "input-doors-refuse",
+        "title": "Plan-action, permission and pane-choice answers refuse a superseded row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-clear-chain.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/conversation-permission.ts",
+            "src/lib/overdeck/conversation-pane-choice.ts",
+            "src/lib/overdeck/__tests__/conversation-input-doors-clear-chain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-input-doors-clear-chain.test.ts src/lib/overdeck/__tests__/conversation-permission-answer.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (.pan/drafts/PAN-4485.md). Add clearedConversationRefusal(conv) to conversation-clear-chain.ts returning { error, code: 'conversation-cleared', clearedToConvId }. handleConversationPlanAction returns jsonResponse(refusal, 409) before deliverPlanActionToSession; the permission answer and handleConversationPaneChoiceAnswer return { body: refusal, status: 409 } after the isClaudeCodeConversation check and before any pane IO."
+        },
+        "items": [
+          {
+            "id": "input-doors-refuse.ac1",
+            "title": "Given a superseded parent, when a permission answer is posted to it, then the response is 409 with code 'conversation-cleared' and the injected pane IO is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "input-doors-refuse.ac2",
+            "title": "Given a superseded parent, when a pane-choice answer is posted to it, then the response is 409 with code 'conversation-cleared' and no keystroke is sent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "input-doors-refuse.ac3",
+            "title": "Given a superseded parent, when a plan action is posted to it, then the response is 409 with code 'conversation-cleared' and nothing is delivered to the session.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-clear-chain-ownership",
+        "title": "Document the /clear chain ownership rule in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-02T12:37:54Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4485",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'conversation-clear-chain.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'conversation-cleared' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new bullet's line",
+            "grep prints the 409 code mention"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (.pan/drafts/PAN-4485.md). Add one bullet after the PTY-supervisor lifecycle bullet ending '...or whose harness a fresh probe finds gone.' (~line 437) covering every point listed in the PRD's WI-9 bullet content."
+        },
+        "items": [
+          {
+            "id": "docs-clear-chain-ownership.ac1",
+            "title": "Given the edited doc, when `grep -n conversation-clear-chain.ts docs/DASHBOARD-ARCHITECTURE.md` runs, then it prints a bullet stating that the chain head (cleared_to_conv_id null) owns the shared terminal session and a superseded row owns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-clear-chain-ownership.ac2",
+            "title": "Given the same bullet, when read, then it states that stop and resume on a superseded row act on the chain head, resume returns 409 conversation-cleared on a broken chain, and delete/archive of a superseded row stop nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-clear-chain-ownership.ac3",
+            "title": "Given the same bullet, when read, then it states that restart-all restarts each live session once and that no boot-time conversation auto-resume exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "clear-chain-module",
+        "to": "list-running-repair",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "restart-all-once",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "stop-redirect-head",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "resume-redirect-head",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "delete-archive-skip-stop",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "pending-feed-skip",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-chain-module",
+        "to": "input-doors-refuse",
+        "type": "blocks"
+      },
+      {
+        "from": "list-running-repair",
+        "to": "restart-all-once",
+        "type": "blocks"
+      },
+      {
+        "from": "restart-all-once",
+        "to": "stop-redirect-head",
+        "type": "blocks"
+      },
+      {
+        "from": "stop-redirect-head",
+        "to": "resume-redirect-head",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-redirect-head",
+        "to": "delete-archive-skip-stop",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4485-post-clear-parent-and-sibling-share-one-terminal-session-list-revives-the-parent-stop-and-resume-act-on-both.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

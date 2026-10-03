@@ -541,11 +541,63 @@ describe('SessionFeedSidebar', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
     const older = await screen.findByTestId('needs-you-row-conv-older');
-    expect(within(older).getByText('Subagent: Orca study · Bash')).toBeInTheDocument();
+    expect(within(older).getByText('Subagent: Orca study · Bash · click to answer')).toBeInTheDocument();
     expect(within(older).getByText('waiting 7h ago')).toBeInTheDocument();
     expect(within(screen.getByTestId('needs-you-row-conv-newer')).getByText('waiting 5m ago')).toBeInTheDocument();
     const rows = screen.getAllByTestId(/^needs-you-row-/).map((el) => el.getAttribute('data-testid'));
     expect(rows).toEqual(['needs-you-row-conv-older', 'needs-you-row-conv-newer']);
+  });
+
+  it('Needs-you permission row shows the command and the conversation title', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([{
+          name: 'conv-clipped',
+          title: 'Find better Overdeck screenshots',
+          pendingPermission: {
+            signature: 'sig-clipped', answerable: true, agentLabel: 'Unknown agent', agentKey: null, toolName: null,
+            header: null, clipped: true, inputPreview: 'S=/tmp/x; O=$S/od-cands; cd $S;', detailLines: ['sleep 20'],
+            reason: null, options: [{ choice: 'allow-once', label: 'Yes' }, { choice: 'deny', label: 'No' }],
+            since: '2026-05-23T01:00:00.000Z',
+          },
+        }]);
+      }
+      return undefined;
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    const row = await screen.findByTestId('needs-you-row-conv-clipped');
+    expect(within(row).getByText('Find better Overdeck screenshots')).toBeInTheDocument();
+    expect(within(row).getByText('S=/tmp/x; O=$S/od-cands; cd $S;')).toBeInTheDocument();
+  });
+
+  it('clicking a non-answerable permission row opens the conversation terminal', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([{
+          name: 'conv-stuck',
+          title: 'Stuck conversation',
+          pendingPermission: {
+            signature: 'sig-stuck', answerable: false, agentLabel: 'Main agent', agentKey: 'main', toolName: 'Bash',
+            header: null, clipped: false, inputPreview: null, detailLines: ['npm install'],
+            reason: null, options: [], since: '2026-05-23T01:00:00.000Z',
+          },
+        }]);
+      }
+      return undefined;
+    });
+
+    const reopenIdBefore = useAskUserQuestionUiStore.getState().reopenId;
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    const row = await screen.findByTestId('needs-you-row-conv-stuck');
+    await act(async () => {
+      fireEvent.click(row);
+    });
+
+    expect(window.location.pathname + window.location.search).toBe('/conv/conv-stuck?view=terminal');
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBe(reopenIdBefore);
   });
 
   it('still requests the dialog reopen so a payload-carrying question keeps answering in place', async () => {

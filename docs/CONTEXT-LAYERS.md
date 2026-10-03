@@ -136,8 +136,10 @@ context:
 
 ## Bare conversations (no Overdeck context)
 
-The Command Deck header has a **No context** checkbox under the `+`
-new-conversation button (PAN-4185). The choice is stored on the conversation
+The **New conversation with options…** dialog (the caret beside the Command
+Deck `+`, or the command palette; PAN-4486) has a **No context** field
+(PAN-4185). Quick create from the `+` itself never starts a bare conversation.
+The choice is stored on the conversation
 row (`conversations.bare_context`), so resume, restart and fork launch it bare
 again. A bare conversation skips every layer that adds Overdeck text to the
 model's context:

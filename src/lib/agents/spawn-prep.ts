@@ -19,7 +19,7 @@ import { generateLauncherScript } from '../launcher-generator.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
-import type { MemoryIdentity } from '@overdeck/contracts';
+import type { EffortSource, MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
@@ -95,6 +95,8 @@ export interface SpawnOptions {
   autoSpawnConsentRequired?: boolean;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
+  /** Precedence layer that produced {@link SpawnOptions.effort}; persisted on AgentState. Defaults to 'explicit'. */
+  effortSource?: EffortSource;
 }
 
 export interface SpawnRunOptions {
@@ -121,9 +123,12 @@ export interface SpawnRunOptions {
   /** Run-scoped reviewer metadata persisted before the tmux session launches. */
   reviewRunId?: string;
   reviewDeadlineAt?: string;
+  reviewDispatchedAt?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;
+  /** Precedence layer that produced {@link SpawnRunOptions.effort}; persisted on AgentState. Defaults to 'explicit'. */
+  effortSource?: EffortSource;
   extraEnvExports?: string[];
   resumeSessionId?: string;
   startedBy: string;
@@ -778,10 +783,11 @@ export async function buildAgentLaunchConfig(opts: {
       // appended system prompt instead of `--agent <file>` (Claude Code 2.1.195
       // dropped --agent file support); permission flags come from the global
       // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
-      // which short-circuits to the omp/codex form.
+      // which short-circuits to the omp/codex form. The injected effort is
+      // opts.effort when set, else the role frontmatter's.
       baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))}`,
+        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole), opts.effort)}`,
       resumeSessionId: opts.resumeSessionId,
       // PAN-3189: the git guard is emitted for launchers that carry an agent
       // id. Work/strike/review agents — the ones the stash/rebase rules exist

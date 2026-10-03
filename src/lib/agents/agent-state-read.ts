@@ -21,6 +21,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { isEffortLevel, type EffortLevel, type EffortSource } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getOverdeckHome } from '../paths.js';
@@ -69,6 +70,14 @@ export interface AgentState {
    * Undefined for scalar-role agents and for agents spawned before PAN-2053.
    */
   modelSpawnKey?: string;
+  /**
+   * Effort the current session launched with (PAN-4253), already clamped to
+   * its model and harness. Relaunch paths re-apply it via
+   * resolveRelaunchEffort (relaunch-effort.ts). Undefined on legacy state.
+   */
+  effort?: EffortLevel;
+  /** Precedence layer that produced {@link AgentState.effort}. */
+  effortSource?: EffortSource;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
@@ -196,6 +205,8 @@ export interface AgentState {
   reviewOutputPath?: string;
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
+  /** PAN-4433: when the reviewer was last dispatched (spawned or warm-resumed), taken before the call. */
+  reviewDispatchedAt?: string;
   /**
    * #3853: the operator asked for the review parent's current run (a forced
    * re-review). Rewritten on every dispatch, so an automatic cycle clears it.
@@ -247,6 +258,8 @@ export function cleanAgentState(raw: AgentState): AgentState {
     harness: raw.harness,
     role: raw.role,
     model: raw.model,
+    effort: isEffortLevel(raw.effort) ? raw.effort : undefined,
+    effortSource: isEffortLevel(raw.effort) ? raw.effortSource : undefined,
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
@@ -287,6 +300,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     reviewOutputPath: raw.reviewOutputPath,
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewDispatchedAt: raw.reviewDispatchedAt,
     reviewOperatorRequested: raw.reviewOperatorRequested,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,

@@ -21,6 +21,7 @@ import {
   getConversationByName,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
 import {
   parsePermissionPrompt,
   permissionKeystrokes,
@@ -45,6 +46,12 @@ export interface PendingPermission {
   agentKey: string | null;
   toolName: string | null;           // registry tool, else parsed header
   header: string | null;
+  // PAN-4466: true when the on-screen prompt's rule and title scrolled off
+  // the top of the pane; the asking thread is then unknown.
+  clipped: boolean;
+  // PAN-4466: the hook's input preview (start of the command), when a
+  // registry entry matched; a clipped screen shows only the command's tail.
+  inputPreview: string | null;
   detailLines: string[];
   reason: string | null;
   options: Array<{ choice: PermissionChoice; label: string }>;
@@ -85,6 +92,9 @@ function entryLabel(entry: ConversationPermissionEntry): string {
  * apart by their input preview appearing in the prompt's detail lines.
  */
 function threadCandidates(prompt: PermissionPrompt, entries: ConversationPermissionEntry[]): ConversationPermissionEntry[] {
+  // A clipped prompt's title is gone, so the asking thread is unknown — every
+  // registry entry is a candidate.
+  if (prompt.clipped) return entries;
   return entries.filter((entry) => (prompt.fromAgent === null) === (entry.agentKey === 'main'));
 }
 
@@ -106,7 +116,7 @@ function entryForPrompt(prompt: PermissionPrompt, entries: ConversationPermissio
  * thread asked: " · from the <type> agent", or the main thread.
  */
 function unmatchedLabel(prompt: PermissionPrompt, candidates: number): string {
-  if (candidates > 1) return 'Unknown agent';
+  if (prompt.clipped || candidates > 1) return 'Unknown agent';
   return prompt.fromAgent !== null ? `Subagent: ${prompt.fromAgent}` : 'Main agent';
 }
 
@@ -128,9 +138,11 @@ export function pendingPermissionFromPane(
       signature: prompt.signature,
       answerable: true,
       agentLabel: entry ? entryLabel(entry) : unmatchedLabel(prompt, threadCandidates(prompt, entries).length),
-      agentKey: entry?.agentKey ?? (prompt.fromAgent === null ? 'main' : null),
+      agentKey: entry?.agentKey ?? (prompt.clipped ? null : prompt.fromAgent === null ? 'main' : null),
       toolName: entry?.toolName || prompt.header,
       header: prompt.header,
+      clipped: prompt.clipped,
+      inputPreview: entry?.toolInputPreview || null,
       detailLines: [...prompt.detailLines],
       reason: prompt.reason,
       options: prompt.options.map((option) => ({ choice: option.choice, label: option.label })),
@@ -146,6 +158,8 @@ export function pendingPermissionFromPane(
     agentKey: oldest.agentKey,
     toolName: oldest.toolName || null,
     header: null,
+    clipped: false,
+    inputPreview: oldest.toolInputPreview || null,
     detailLines: oldest.toolInputPreview ? [oldest.toolInputPreview] : [],
     reason: null,
     options: [],
@@ -223,6 +237,8 @@ export async function handleConversationPermissionAnswer(
     if (!isClaudeCodeConversation(conv)) {
       return { body: { error: 'Not a Claude Code conversation' }, status: 400 };
     }
+    // PAN-4485: a superseded /clear row answers nothing; its chain head does.
+    if (isSupersededConversation(conv)) return { body: clearedConversationRefusal(conv), status: 409 };
 
     const io = deps.io ?? await resolveAgentPaneIo(conv.tmuxSession);
     const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));

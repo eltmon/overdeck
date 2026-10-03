@@ -34,6 +34,10 @@ export interface LinearMcpAuthBlockedAgent {
    * conversations read door: the canonical /conv/<rowid> dashboard URL for
    * conv-* agents; never persisted in lifecycle events. */
   conversationUrl?: string | null;
+  /** Projection-only enrichment attached by the GET route from the
+   * conversations read door: the conversation's title for conv-* agents;
+   * never persisted in lifecycle events. */
+  conversationTitle?: string | null;
 }
 
 export interface LinearMcpAuthIntervention {

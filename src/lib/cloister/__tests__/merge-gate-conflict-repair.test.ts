@@ -59,6 +59,7 @@ describe('evaluateConflictRepairGate', () => {
     const result = await evaluateConflictRepairGate('PAN-1', deps);
     expect(result.conflicting).toBe(true);
     expect(result.facts.headSha).toBe(HEAD);
+    expect(result.staleApproval).toBeUndefined();
     expect(readReviews).not.toHaveBeenCalled();
   });
 
@@ -101,12 +102,39 @@ describe('evaluateConflictRepairGate', () => {
     expect((await evaluateConflictRepairGate('PAN-1', deps)).conflicting).toBe(false);
   });
 
-  it('is not conflicting when the only approving review names an older commit', async () => {
+  it('is conflicting with a stale approval when the only approving review names an older commit', async () => {
     const { deps, readReviews } = gateDeps(conflictingFacts({ approvedAtHead: undefined }), reviewOf(OLD));
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(true);
+    expect(result.staleApproval).toBe(true);
+    expect(readReviews).toHaveBeenCalled();
+  });
+
+  it('is not conflicting when the forge reports no approval at any head', async () => {
+    const { deps } = gateDeps(
+      conflictingFacts({ reviewDecision: 'REVIEW_REQUIRED', approved: false, approvedAtHead: undefined }),
+      reviewOf(OLD),
+    );
     const result = await evaluateConflictRepairGate('PAN-1', deps);
     expect(result.conflicting).toBe(false);
     expect(result.reason).toContain('not approved at PR HEAD');
-    expect(readReviews).toHaveBeenCalled();
+  });
+
+  it('never marks a GitLab MR stale', async () => {
+    const { deps } = gateDeps(conflictingFacts({ forge: 'gitlab', approvedAtHead: undefined }));
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(true);
+    expect(result.staleApproval).toBeUndefined();
+  });
+
+  it('matches PR #4440 after its head moved past the approval', async () => {
+    const { deps } = gateDeps(
+      conflictingFacts({ approvedAtHead: undefined, testChecks: 'none', testJobSucceeded: false }),
+      reviewOf(OLD),
+    );
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(true);
+    expect(result.staleApproval).toBe(true);
   });
 
   it('waives the CI test job on a conflicting head', async () => {

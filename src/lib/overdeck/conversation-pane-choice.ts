@@ -18,6 +18,7 @@ import {
   getConversationByName,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { clearedConversationRefusal, isSupersededConversation } from './conversation-clear-chain.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import {
   answerSessionPaneChoice,
@@ -70,6 +71,8 @@ export async function handleConversationPaneChoiceAnswer(
     if (!isClaudeCodeConversation(conv)) {
       return { body: { error: 'Not a Claude Code conversation' }, status: 400 };
     }
+    // PAN-4485: a superseded /clear row answers nothing; its chain head does.
+    if (isSupersededConversation(conv)) return { body: clearedConversationRefusal(conv), status: 409 };
 
     return answerSessionPaneChoice(conv.tmuxSession, { selectedIndex, signature }, {
       ...deps,

@@ -1,0 +1,891 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-02T12:53:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4253: Effort survives relaunch: persist effort on AgentState and re-apply it on resume, recovery, rotation and crash respawn",
+    "updated": "2026-10-03T01:28:39.454Z"
+  },
+  "plan": {
+    "id": "pan-4253",
+    "title": "Effort survives relaunch: persist effort on AgentState and re-apply it on resume, recovery, rotation and crash respawn",
+    "status": "running",
+    "uid": "0aa167af-f3c6-4357-b6bd-fd595f2e73bd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-10-02T12:53:00Z",
+    "updated": "2026-10-03T01:28:39.454Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4253",
+        "label": "PAN-4253",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (program)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4487",
+        "label": "PAN-4487 (cleanAgentState drops fields)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "agent-state",
+      "relaunch",
+      "resume",
+      "recovery",
+      "pan-4249-sibling"
+    ],
+    "narratives": {
+      "Problem": "AgentState has no effort field, so `pan start --effort max` launches the first session at max but every relaunch (resume, restart, recovery, messaging fallback, session rotation, crash respawn, cloister model handoff) rebuilds the launcher without an effort and the agent comes back at the role-file frontmatter value (high). The claude-code runtime adapter also ignores SpawnConfig.effort.",
+      "Proposal": "Persist effort and effortSource on AgentState (whitelisted in cleanAgentState) at spawn from what the caller supplied. Add one helper, resolveRelaunchEffort (src/lib/agents/relaunch-effort.ts): a persisted effort wins and is re-clamped through resolveEffort; legacy state resolves through resolveEffort's role/project/default chain. Every relaunch path calls it, passes the effort to the launcher, and writes it back. Fix the claude-code resume branch of buildAgentLaunchConfig to emit opts.effort, narrow SpawnConfig.effort to EffortLevel with an effortSource, and have the claude-code adapter forward both. Document the behavior in configuration/effort.mdx. Full detail: .pan/drafts/PAN-4253.md.",
+      "NonGoals": "- No change to what effort a fresh spawnRun/spawnAgent launches with when the caller passes none (S4 PAN-4256, S5 PAN-4257)\n- No config re-read at relaunch for agents with a persisted effort; config changes reach new spawns only\n- No restoration of a pre-clamp request after a model switch\n- No effort display in dashboard, pan status/show, cost ledger or sessions.json (S7 PAN-4259)\n- No conversation-runtime or live /effort changes (S2 PAN-4254, S3 PAN-4255)\n- No removal of per-harness adapter fallbacks (S8 PAN-4260)\n- No fix for cleanAgentState dropping foreman/modelSpawnKey/workspaceId (PAN-4487)\n- No subRole threading into recoverAgent's getRoleRuntimeBaseCommand call\n- No xhigh or max default anywhere"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pin rule: a persisted state.effort wins at every relaunch whatever its source; config is not re-read for that agent.",
+        "rationale": "Mirrors restartAgent keeping agentState.model unless told otherwise; the issue asks to re-launch 'with it'. Config changes reach new spawns only (recorded as a NonGoal)."
+      },
+      {
+        "summary": "Re-clamp the persisted level to the relaunch model/harness and store the clamped level; carry effortSource forward unchanged.",
+        "rationale": "resolveEffort clamps explicit values already; storing what actually launched keeps state truthful for S7 display."
+      },
+      {
+        "summary": "Legacy state without effort resolves through resolveEffort({role, subRole, issueId, model, harness}) and is written back after the first relaunch.",
+        "rationale": "Issue AC: legacy state resolves through resolveEffort as before; write-back makes state describe the most recent launch."
+      },
+      {
+        "summary": "spawnAgent/spawnRun persist only the effort the caller supplied (source defaults to 'explicit'); they do not start resolving effort themselves.",
+        "rationale": "Making role, slot and dashboard callers resolve effort is S4 (PAN-4256) and S5 (PAN-4257); avoids overlapping their diffs."
+      },
+      {
+        "summary": "Narrow SpawnConfig.effort from string to EffortLevel and add effortSource.",
+        "rationale": "Only two producers exist and all consumers accept string, so the narrowing compiles and removes the need for a runtime guard."
+      },
+      {
+        "summary": "Include cloister model handoff (handoff.ts:145) although the §2 audit omitted it.",
+        "rationale": "It is a kill-and-respawn of the same agent id that drops effort the same way; one call site, fits the 25-file surface budget."
+      },
+      {
+        "summary": "Clamp warnings on relaunch go to logAgentLifecycle, not stderr.",
+        "rationale": "Relaunch paths are dashboard-reachable server code."
+      },
+      {
+        "summary": "Do not fix cleanAgentState dropping foreman/modelSpawnKey/workspaceId; filed as #4487.",
+        "rationale": "Pre-existing and orthogonal; surgical-change rule."
+      }
+    ],
+    "items": [
+      {
+        "id": "agent-state-effort-fields",
+        "title": "AgentState persists effort and effortSource through cleanAgentState",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": true,
+          "files_scope": [
+            "src/lib/agents/agent-state-read.ts",
+            "src/lib/agents/__tests__/agent-state-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/agent-state-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-state-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "relaunch-effort-helper",
+            "spawn-persists-effort",
+            "resume-reapplies-effort",
+            "restart-reapplies-effort",
+            "recover-reapplies-effort",
+            "messaging-fallback-effort",
+            "cloister-rotation-crash-effort",
+            "cloister-handoff-effort"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 (.pan/drafts/PAN-4253.md). Add `effort?: EffortLevel` and `effortSource?: EffortSource` to `export interface AgentState` after `modelSpawnKey` and add both fields to `cleanAgentState`, each guarded by `isEffortLevel(raw.effort)` (D8; no EffortSource list copy). Without the cleanAgentState entries the fields are silently dropped on every save and read. Write the three round-trip tests listed in W1."
+        },
+        "items": [
+          {
+            "id": "agent-state-effort-fields.ac1",
+            "title": "Given a state saved with effort 'max' and effortSource 'role', when getAgentState reads it back, then it returns effort 'max' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-state-effort-fields.ac2",
+            "title": "Given a state.json with effort 'ultra', when getAgentState reads it, then effort and effortSource are undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-state-effort-fields.ac3",
+            "title": "Given a legacy state.json with no effort fields, when getAgentState reads it, then effort is undefined and every other field is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relaunch-effort-helper",
+        "title": "Add resolveRelaunchEffort and spawnEffortFields in relaunch-effort.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": true,
+          "files_scope": [
+            "src/lib/agents/relaunch-effort.ts",
+            "src/lib/agents/__tests__/relaunch-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/relaunch-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "relaunch-effort.test.ts passes",
+            "typecheck completes without errors",
+            "lint:effort passed",
+            "lint:circular passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "spawn-persists-effort",
+            "resume-reapplies-effort",
+            "restart-reapplies-effort",
+            "recover-reapplies-effort",
+            "messaging-fallback-effort",
+            "cloister-rotation-crash-effort",
+            "cloister-handoff-effort"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Create src/lib/agents/relaunch-effort.ts with the exact code in W2: resolveRelaunchEffort(state, {model, harness, config}) applies the pin rule (persisted effort wins, re-clamped via resolveEffort explicit, source carried forward, defaulting to 'explicit'), and legacy state falls back to resolveEffort({role, subRole: reviewSubRole, issueId, model, harness}). spawnEffortFields(effort, source) returns {} when effort is undefined. Import AgentState as `import type` from ./agent-state-read.js. Never write `effort ?? 'high'`. Write the six W2 test cases with an explicit EffortConfigSlice."
+        },
+        "items": [
+          {
+            "id": "relaunch-effort-helper.ac1",
+            "title": "Given persisted effort 'max' with source 'role' on claude-opus-5-5/claude-code, when resolveRelaunchEffort runs, then it returns effort 'max' and source 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relaunch-effort-helper.ac2",
+            "title": "Given persisted effort 'max' and harness 'ohmypi', when resolveRelaunchEffort runs, then it returns effort 'xhigh' with a warning and the persisted source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relaunch-effort-helper.ac3",
+            "title": "Given legacy state for role 'work' with roles.work.effort 'medium', when resolveRelaunchEffort runs, then it returns effort 'medium' and source 'role'; with no role effort it defaults to 'high' with source 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-persists-effort",
+        "title": "spawnAgent and spawnRun persist the caller-supplied effort and source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "agents-spawn-supervisor.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W3. Add `effortSource?: EffortSource` to SpawnOptions and SpawnRunOptions in spawn-prep.ts (interfaces only). In spawn.ts spread `...spawnEffortFields(options.effort, options.effortSource)` into both state literals after `modelSpawnKey,` and forward `effortSource: options.effortSource` in the slot branch next to `effort: options.effort`. Do not resolve effort in spawn (D5). spawn.ts must stay at or under 1089 lines. Add the two W3 test cases to agents-spawn-supervisor.test.ts."
+        },
+        "items": [
+          {
+            "id": "spawn-persists-effort.ac1",
+            "title": "Given spawnAgent is called with effort 'max' and effortSource 'role', when the spawn completes, then state.json persists effort 'max' and effortSource 'role' and launcher.sh contains '--effort max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-persists-effort.ac2",
+            "title": "Given spawnAgent is called without effort, when the spawn completes, then state.json has no effort key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-passes-effort-source",
+        "title": "pan start passes the resolved effort source to spawnAgent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/start.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W4. In start.ts keep `resolved.source` from the existing resolveEffort call in a `resolvedEffortSource` variable and pass `effortSource: resolvedEffortSource,` next to `effort: resolvedEffort,` in the spawnAgent call (~line 1215). Add `type EffortSource` to the existing @overdeck/contracts import. start.ts is at 1278 lines with a cap of 1283: add at most 4 lines."
+        },
+        "items": [
+          {
+            "id": "start-passes-effort-source.ac1",
+            "title": "Given start.ts after the change, when `rg -n \"effortSource: resolvedEffortSource\" src/cli/commands/start.ts` runs, then it prints exactly one line and `wc -l < src/cli/commands/start.ts` returns at most 1283",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-passes-effort-source.ac2",
+            "title": "Given `pan start <id> --effort bogus`, when effort resolution runs, then it still exits 1 with 'Invalid --effort value' and spawns no agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-prep-resume-honors-effort",
+        "title": "Claude-code resume branch of buildAgentLaunchConfig emits opts.effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/__tests__/spawn-prep-resume-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/spawn-prep-resume-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-prep-resume-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W5. At spawn-prep.ts:785 change `roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))` to `roleSystemPromptInjection(roleAgentDefinitionPath(launchRole), opts.effort)` and update the PAN-2087 comment. Change nothing else in the resume branch (D11: non-claude resumes already receive opts.effort through launcher fields). Test with the mock set from spawn-prep-git-guard.test.ts."
+        },
+        "items": [
+          {
+            "id": "spawn-prep-resume-honors-effort.ac1",
+            "title": "Given buildAgentLaunchConfig with spawnMode 'resume', harness 'claude-code' and effort 'max', when the launcher is built, then launcherContent contains '--effort max' and not '--effort high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-prep-resume-honors-effort.ac2",
+            "title": "Given the same call without effort, when the launcher is built, then launcherContent contains '--effort high' from role frontmatter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-reapplies-effort",
+        "title": "resumeAgent re-applies and writes back the persisted effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/resume.ts",
+            "src/lib/agents/__tests__/resume-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/resume-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resume-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W6. Before `buildAgentLaunchConfig({` at resume.ts:434 call resolveRelaunchEffort(agentState, {model, harness: effectiveHarness}), log any warning via logAgentLifecycle, assign agentState.effort/effortSource, and pass `effort: relaunchEffort.effort`. The existing saveAgentStateSync after status='starting' persists it. Test end to end: seed state.json, run resumeAgent with pane/harness/delivery mocked (templates resume-kimi-code.test.ts, resume-terminal-backend.test.ts), read launcher.sh. Do not mock buildAgentLaunchConfig."
+        },
+        "items": [
+          {
+            "id": "resume-reapplies-effort.ac1",
+            "title": "Given a saved claude-code agent with persisted effort 'max' on claude-opus-5-5, when resumeAgent relaunches it, then launcher.sh contains '--effort max' and state.json preserves effort 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-reapplies-effort.ac2",
+            "title": "Given a legacy agent with no persisted effort, when resumeAgent relaunches it, then launcher.sh contains '--effort high' and state.json persists effort 'high' with effortSource 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-reapplies-effort",
+        "title": "restartAgent re-applies and writes back the persisted effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/__tests__/restart-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/restart-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W7. In restartAgent (recovery.ts) after `agentState.harness = effectiveHarness;` compute resolveRelaunchEffort(agentState, {model: effectiveModel, harness: effectiveHarness}), log any warning, assign both fields before the existing save, and pass `effort: relaunchEffort.effort` to buildAgentLaunchConfig at recovery.ts:316. Test with the restart-kimi-code.test.ts mock set (builder runs for real) and resolveHarness returning 'claude-code'."
+        },
+        "items": [
+          {
+            "id": "restart-reapplies-effort.ac1",
+            "title": "Given an agent with persisted effort 'max' on claude-opus-5-5/claude-code, when restartAgent runs, then launcher.sh contains '--effort max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-reapplies-effort.ac2",
+            "title": "Given a legacy agent, when restartAgent runs, then launcher.sh contains '--effort high' and state.json persists effort 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recover-reapplies-effort",
+        "title": "recoverAgent re-applies the persisted effort on every harness branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/__tests__/recover-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/recover-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "recover-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W8. In recoverAgent before `saveAgentStateSync(state)` (~recovery.ts:590) compute resolveRelaunchEffort(state, {model: state.model, harness: recoveryHarness}), log any warning, assign both fields. Pass `effort` to the three buildAgentLaunchConfig calls (ohmypi :595, ACP :637, kimi-code :696), pass it as the 5th argument of getCodexLauncherFields (:797) and as the 6th argument (subRole undefined) of getRoleRuntimeBaseCommand (:806). Test with the recover-kimi-code.test.ts mock set."
+        },
+        "items": [
+          {
+            "id": "recover-reapplies-effort.ac1",
+            "title": "Given an agent with persisted effort 'max' on claude-code, when recoverAgent respawns it, then the written launcher.sh contains '--effort max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-reapplies-effort.ac2",
+            "title": "Given a legacy claude-code agent, when recoverAgent respawns it, then launcher.sh contains '--effort high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "messaging-fallback-effort",
+        "title": "Messaging fresh-launch fallback re-applies the persisted effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/__tests__/message-fallback-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/message-fallback-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "message-fallback-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W9. After `const fallbackHarness = ...` in messaging.ts compute resolveRelaunchEffort(agentState, {model: resumeModel, harness: fallbackHarness}), assign both fields (the existing markAgentRunning + saveAgentStateSync persists them), and pass the effort to getOhmypiLauncherFields (:495), getCodexLauncherFields (:498, 5th arg) and getRoleRuntimeBaseCommand (:508, args 5-6 = undefined, effort). Test by mocking session-rotation.js with ALLOW_SESSION_ROTATION_ON_RESUME true and a failing resumeAgent; read tests/unit/lib/agents/message-agent.test.ts first."
+        },
+        "items": [
+          {
+            "id": "messaging-fallback-effort.ac1",
+            "title": "Given rotation-on-resume is enabled, resumeAgent fails and the agent has persisted effort 'max', when messageAgent falls back to a fresh launch, then the fallback launcher.sh contains '--effort max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messaging-fallback-effort.ac2",
+            "title": "Given rotation-on-resume is enabled, resume fails and the agent state has no effort, when messageAgent falls back to a fresh launch, then the fallback launcher.sh contains '--effort high' and state.json persists effort 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawnconfig-effort-adapter",
+        "title": "SpawnConfig carries EffortLevel and effortSource; claude-code adapter forwards them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/runtimes/types.ts",
+            "src/lib/runtimes/claude-code.ts",
+            "src/lib/runtimes/__tests__/claude-code-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/claude-code-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "claude-code-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W10. In runtimes/types.ts change SpawnConfig `effort?: string;` to `effort?: EffortLevel;` and add `effortSource?: EffortSource;` (D7). In ClaudeCodeRuntimeSync.spawnAgent (claude-code.ts:358) add `effort: config.effort, effortSource: config.effortSource` to the spawnAgentImpl call. Test by mocking ../../agents.js spawnAgent."
+        },
+        "items": [
+          {
+            "id": "spawnconfig-effort-adapter.ac1",
+            "title": "Given ClaudeCodeRuntimeSync.spawnAgent is called with effort 'max' and effortSource 'role', when it delegates, then spawnAgentImpl receives effort 'max' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawnconfig-effort-adapter.ac2",
+            "title": "Given types.ts after the change, when `rg -n \"effort\\?: string\" src/lib/runtimes/types.ts` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-rotation-crash-effort",
+        "title": "Session rotation and crash respawn pass the persisted effort to runtime.spawnAgent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/session-rotation.ts",
+            "src/lib/cloister/service-crash.ts",
+            "src/lib/cloister/__tests__/relaunch-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/relaunch-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "relaunch-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W11. In rotateSpecialistSession (session-rotation.ts:247) and service-crash restartAgent (service-crash.ts:422) compute resolveRelaunchEffort(agentState, {harness: runtime.name}) and add `effort` and `effortSource` to the runtime.spawnAgent config. Test with getRuntimeForAgent mocked to a runtime whose spawnAgent is vi.fn (templates tests/cloister/session-rotation.test.ts, tests/unit/lib/cloister/service-crash-liveness.test.ts)."
+        },
+        "items": [
+          {
+            "id": "cloister-rotation-crash-effort.ac1",
+            "title": "Given a specialist with persisted effort 'max' and source 'explicit', when rotateSpecialistSession rotates it, then runtime.spawnAgent receives effort 'max' and effortSource 'explicit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-rotation-crash-effort.ac2",
+            "title": "Given an agent with persisted effort 'max', when the crash handler restartAgent respawns it, then runtime.spawnAgent receives effort 'max' and effortSource 'explicit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-handoff-effort",
+        "title": "Cloister model handoff respawns at the persisted effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/handoff.ts",
+            "src/lib/cloister/__tests__/relaunch-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/relaunch-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "relaunch-effort.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W12. In performHandoff before `const newState = await spawnAgent({` (handoff.ts:145) compute resolveRelaunchEffort(state, {model: options.targetModel, harness: state.harness}) and pass `effort` and `effortSource` to spawnAgent. Add a describe block to the W11 test file with spawnAgent/stopAgent/captureHandoffContext mocked and waitForIdle false."
+        },
+        "items": [
+          {
+            "id": "cloister-handoff-effort.ac1",
+            "title": "Given an agent with persisted effort 'max' and source 'explicit', when performHandoff respawns it on claude-opus-5-5, then spawnAgent receives effort 'max' and effortSource 'explicit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-handoff-effort.ac2",
+            "title": "Given an agent with no persisted effort, when performHandoff respawns it, then spawnAgent receives effort 'high' and effortSource 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-relaunch-docs",
+        "title": "Document relaunch effort behavior in effort.mdx and MODEL-CONTEXT-AUDIT.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-02T12:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4253",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/effort.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rg -n \"## Relaunch keeps effort\" configuration/effort.mdx",
+            "rg -c \"issues/4253\" configuration/effort.mdx || true",
+            "rg -n \"re-applies\" docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "one heading match in effort.mdx",
+            "zero issues/4253 matches",
+            "one re-applies match in MODEL-CONTEXT-AUDIT.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ],
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PRD W13. In configuration/effort.mdx add a 'What honors it today' bullet for every relaunch path and remove the #4253 sibling-table row; add a '## Relaunch keeps effort' section after '## Clamping' stating: state.json stores effort and effortSource; relaunch reuses the stored value whatever its source (config changes reach new spawns only); a model/harness change re-clamps and stores the clamped level; legacy or effort-less agents resolve role → project → default at first relaunch and keep that value. In docs/MODEL-CONTEXT-AUDIT.md:37 add the relaunch clause from W13."
+        },
+        "items": [
+          {
+            "id": "effort-relaunch-docs.ac1",
+            "title": "Given configuration/effort.mdx after the change, when a reader opens it, then it renders a '## Relaunch keeps effort' section describing the pin rule, re-clamping and the legacy fallback, and contains no issues/4253 link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-relaunch-docs.ac2",
+            "title": "Given docs/MODEL-CONTEXT-AUDIT.md after the change, when `rg -n \"re-applies\" docs/MODEL-CONTEXT-AUDIT.md` runs, then it prints the effort sentence naming resume, restart, recovery, rotation and crash respawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "agent-state-effort-fields",
+        "to": "relaunch-effort-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "relaunch-effort-helper",
+        "to": "spawn-persists-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-persists-effort",
+        "to": "start-passes-effort-source",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-persists-effort",
+        "to": "spawn-prep-resume-honors-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "relaunch-effort-helper",
+        "to": "resume-reapplies-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-prep-resume-honors-effort",
+        "to": "resume-reapplies-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "relaunch-effort-helper",
+        "to": "restart-reapplies-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "restart-reapplies-effort",
+        "to": "recover-reapplies-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "relaunch-effort-helper",
+        "to": "messaging-fallback-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-persists-effort",
+        "to": "spawnconfig-effort-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "relaunch-effort-helper",
+        "to": "cloister-rotation-crash-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawnconfig-effort-adapter",
+        "to": "cloister-rotation-crash-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "cloister-rotation-crash-effort",
+        "to": "cloister-handoff-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-persists-effort",
+        "to": "cloister-handoff-effort",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-02-PAN-4253-effort-survives-relaunch-persist-effort-on-agentstate-and-re-apply-it-on-resume-recovery-rotation-and-crash-respawn.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

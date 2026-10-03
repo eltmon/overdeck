@@ -19,6 +19,8 @@ export interface TerminalPendingPermission {
   agentKey: string | null;
   toolName: string | null;
   header: string | null;
+  clipped: boolean;
+  inputPreview: string | null;
   detailLines: string[];
   reason: string | null;
   options: Array<{ choice: TerminalPermissionChoice; label: string }>;
@@ -100,8 +102,16 @@ export function TerminalPermissionDialog({
             </Field>
           </div>
 
+          {permission.clipped && permission.inputPreview && (
+            <Field label="Command (start)">
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-background/80 p-3 font-mono text-xs text-foreground">
+                {permission.inputPreview}
+              </pre>
+            </Field>
+          )}
+
           {permission.detailLines.length > 0 && (
-            <Field label="Command">
+            <Field label={permission.clipped ? 'On screen' : 'Command'}>
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-background/80 p-3 font-mono text-xs text-foreground">
                 {permission.detailLines.join('\n')}
               </pre>
@@ -116,9 +126,15 @@ export function TerminalPermissionDialog({
             </Field>
           )}
 
+          {permission.clipped && (
+            <p className="text-sm text-muted-foreground">
+              The top of this prompt is scrolled off the agent&apos;s screen; the visible part is shown.
+            </p>
+          )}
+
           {!permission.answerable && (
             <p className="text-sm text-muted-foreground">
-              The prompt is not visible on the agent&apos;s screen — answer it in the terminal.
+              This prompt can&apos;t be answered from here — open the terminal and answer it there.
             </p>
           )}
           {confirming && (
@@ -133,7 +149,7 @@ export function TerminalPermissionDialog({
           <button type="button" onClick={onDismiss} disabled={busy} className={SECONDARY_BUTTON}>
             Dismiss
           </button>
-          <button type="button" onClick={onOpenTerminal} className={SECONDARY_BUTTON}>
+          <button type="button" onClick={onOpenTerminal} className={permission.answerable ? SECONDARY_BUTTON : PRIMARY_BUTTON}>
             Open terminal
           </button>
           {permission.answerable && permission.options.map((option) => (

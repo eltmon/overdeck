@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../lib/store';
+import { useNewConversationDialogStore } from './newConversation/newConversationDialogStore';
 import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import type { Agent, Issue } from '../types';
 import { CommandPalette, PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY } from './CommandPalette';
@@ -712,6 +713,27 @@ describe('CommandPalette new-workspace action (PAN-3330 FR-6b)', () => {
 
     expect(getOptionByValue('start-cloister')).toBeDefined();
     expect(document.querySelector('[role="option"][data-value="new-workspace"]')).toBeNull();
+  });
+});
+
+describe('CommandPalette new-conversation-with-options action (PAN-4486)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+    useNewConversationDialogStore.setState({ open: false, projectKey: undefined });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('lists the action for a matching query and opens the dialog with no project preset', () => {
+    renderCommandPalette();
+
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'conversation with options' } });
+    selectPaletteResult(getOptionByValue('new-conversation-with-options'));
+
+    expect(useNewConversationDialogStore.getState()).toMatchObject({ open: true, projectKey: undefined });
   });
 });
 

@@ -1,0 +1,183 @@
+{
+  "version": "1",
+  "issueId": "PAN-4485",
+  "created": "2026-10-03T01:28:53.863Z",
+  "updated": "2026-10-03T03:12:33.687Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "clear-chain-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T01:28:53.863Z",
+      "doneAt": "2026-10-03T01:36:28.210Z"
+    },
+    "list-running-repair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T01:36:37.323Z",
+      "doneAt": "2026-10-03T01:46:33.072Z"
+    },
+    "restart-all-once": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T01:46:45.372Z",
+      "doneAt": "2026-10-03T01:57:25.590Z"
+    },
+    "stop-redirect-head": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T01:57:32.380Z",
+      "doneAt": "2026-10-03T02:07:05.482Z"
+    },
+    "resume-redirect-head": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:07:17.455Z",
+      "doneAt": "2026-10-03T02:26:12.658Z"
+    },
+    "delete-archive-skip-stop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:26:20.925Z",
+      "doneAt": "2026-10-03T02:34:43.678Z"
+    },
+    "pending-feed-skip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:34:52.654Z",
+      "doneAt": "2026-10-03T02:47:52.847Z"
+    },
+    "input-doors-refuse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:48:01.899Z",
+      "doneAt": "2026-10-03T02:58:08.745Z"
+    },
+    "docs-clear-chain-ownership": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4485",
+      "claimedAt": "2026-10-03T02:58:17.736Z",
+      "doneAt": "2026-10-03T03:05:32.504Z"
+    },
+    "clear-chain-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:07:44.321Z"
+    },
+    "clear-chain-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:07:54.539Z"
+    },
+    "clear-chain-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:04.786Z"
+    },
+    "clear-chain-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:15.062Z"
+    },
+    "list-running-repair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:25.506Z"
+    },
+    "list-running-repair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:35.820Z"
+    },
+    "list-running-repair.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:45.897Z"
+    },
+    "list-running-repair.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:08:55.953Z"
+    },
+    "list-running-repair.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:05.987Z"
+    },
+    "restart-all-once.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:15.957Z"
+    },
+    "restart-all-once.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:25.824Z"
+    },
+    "restart-all-once.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:35.734Z"
+    },
+    "stop-redirect-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:45.710Z"
+    },
+    "stop-redirect-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:09:55.684Z"
+    },
+    "stop-redirect-head.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:06.557Z"
+    },
+    "resume-redirect-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:19.110Z"
+    },
+    "resume-redirect-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:30.142Z"
+    },
+    "resume-redirect-head.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:40.030Z"
+    },
+    "delete-archive-skip-stop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:10:50.506Z"
+    },
+    "delete-archive-skip-stop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:00.688Z"
+    },
+    "delete-archive-skip-stop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:11.080Z"
+    },
+    "pending-feed-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:21.673Z"
+    },
+    "pending-feed-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:32.018Z"
+    },
+    "input-doors-refuse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:42.319Z"
+    },
+    "input-doors-refuse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:11:52.628Z"
+    },
+    "input-doors-refuse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:12:02.757Z"
+    },
+    "docs-clear-chain-ownership.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:12:12.907Z"
+    },
+    "docs-clear-chain-ownership.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:12:23.300Z"
+    },
+    "docs-clear-chain-ownership.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T03:12:33.687Z"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@overdeck/account-service",
+  "version": "0.0.0",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "description": "overdeck.ai account service: Cloudflare Worker (D1) for GitHub sign-in, device tokens and the invite-only allowlist (PAN-4293)",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "migrate:local": "wrangler d1 migrations apply overdeck-account --local",
+    "build:dry": "wrangler deploy --dry-run --outdir dist"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261002.1",
+    "miniflare": "5.20261001.0-alpha",
+    "wrangler": "4.146.0"
+  }
+}

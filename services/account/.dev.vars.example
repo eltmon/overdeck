@@ -1,0 +1,5 @@
+# Copy to services/account/.dev.vars (gitignored) for `wrangler dev --local`.
+# PUBLIC_BASE_URL comes from wrangler.jsonc vars; override it here for local URLs if needed.
+GITHUB_CLIENT_ID=your-github-oauth-app-client-id
+GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
+OWNER_GITHUB_ID=123456

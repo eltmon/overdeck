@@ -126,6 +126,46 @@ export function resolveIssueId(input: string): string {
 }
 
 /**
+ * Every issueId whose agent state dir matches a bare numeric input (PAN-4465).
+ * Scans ~/.overdeck/agents/ for state dirs matching `agent-<prefix>-<num>`
+ * whose state.json issueId ends in `-<num>`. Deduplicated with a Set.
+ * Empty for non-digit input or an unreadable agents dir.
+ */
+export function listBareNumericIssueMatches(input: string, overdeckHome?: string): string[] {
+  if (!/^\d+$/.test(input)) return [];
+  const home = overdeckHome ?? `${process.env.HOME}/.overdeck`;
+  const agentsDir = `${home}/agents`;
+  try {
+    // Sync FS is acceptable in CLI entry points (server code uses fs/promises).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs');
+    if (!fs.existsSync(agentsDir)) return [];
+    const dirents = fs.readdirSync(agentsDir);
+    const matches: string[] = [];
+    const suffix = `-${input}`;
+    for (const name of dirents) {
+      if (!name.startsWith('agent-')) continue;
+      if (!name.endsWith(suffix)) continue;
+      const stateJson = `${agentsDir}/${name}/state.json`;
+      if (!fs.existsSync(stateJson)) continue;
+      // Extract the issueId from inside state.json — authoritative.
+      try {
+        const raw = fs.readFileSync(stateJson, 'utf-8');
+        const parsed = JSON.parse(raw) as { issueId?: string };
+        if (parsed.issueId && parsed.issueId.endsWith(`-${input}`)) {
+          matches.push(parsed.issueId);
+        }
+      } catch {
+        // Skip unreadable state files.
+      }
+    }
+    return [...new Set(matches)];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolve a possibly-bare numeric ID (e.g., "1148") to a fully-prefixed
  * canonical ID (e.g., "PAN-1148") by probing the local agent state directory.
  *
@@ -142,38 +182,8 @@ export function resolveIssueId(input: string): string {
  */
 export function resolveBareNumericId(input: string, overdeckHome?: string): string | null {
   if (/^\d+$/.test(input)) {
-    const home = overdeckHome ?? `${process.env.HOME}/.overdeck`;
-    const agentsDir = `${home}/agents`;
-    let dirents: string[];
-    try {
-      // Sync FS is acceptable in CLI entry points (server code uses fs/promises).
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('node:fs') as typeof import('node:fs');
-      if (!fs.existsSync(agentsDir)) return null;
-      dirents = fs.readdirSync(agentsDir);
-      const matches: string[] = [];
-      const suffix = `-${input}`;
-      for (const name of dirents) {
-        if (!name.startsWith('agent-')) continue;
-        if (!name.endsWith(suffix)) continue;
-        const stateJson = `${agentsDir}/${name}/state.json`;
-        if (!fs.existsSync(stateJson)) continue;
-        // Extract the issueId from inside state.json — authoritative.
-        try {
-          const raw = fs.readFileSync(stateJson, 'utf-8');
-          const parsed = JSON.parse(raw) as { issueId?: string };
-          if (parsed.issueId && parsed.issueId.endsWith(`-${input}`)) {
-            matches.push(parsed.issueId);
-          }
-        } catch {
-          // Skip unreadable state files.
-        }
-      }
-      if (matches.length === 1) return matches[0];
-      return null;
-    } catch {
-      return null;
-    }
+    const matches = listBareNumericIssueMatches(input, overdeckHome);
+    return matches.length === 1 ? matches[0] : null;
   }
   return resolveIssueId(input);
 }

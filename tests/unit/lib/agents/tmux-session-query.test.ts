@@ -12,6 +12,12 @@ describe('classifyHasSessionFailure', () => {
     expect(classifyHasSessionFailure({ code: 1, stderr: "can't find session: agent-x\n" })).toBe('missing');
   });
 
+  it('reads a running tmux server with zero sessions as missing', () => {
+    // tmux 3.4 `has-session -t =agent-x` on an empty server; read as error, it
+    // made every fresh start on a Herdr host look live and refused it.
+    expect(classifyHasSessionFailure({ code: 1, stderr: 'no current target\n' })).toBe('missing');
+  });
+
   it('reads a tmux server that is not running as missing — a Herdr host usually has none', () => {
     expect(classifyHasSessionFailure({ code: 1, stderr: 'no server running on /tmp/tmux-1000/overdeck\n' })).toBe('missing');
     expect(classifyHasSessionFailure({

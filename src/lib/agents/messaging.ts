@@ -8,6 +8,7 @@ import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
+import { resolveRelaunchEffort } from './relaunch-effort.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostTransportFor } from '../runtimes/host-transport.js';
@@ -164,6 +165,8 @@ function claimCodexIdleTurn(agentId: string): boolean {
 
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
+  // Conversations never carry an issueId; interventions are per issue (PAN-4465).
+  if (normalizedId.startsWith('conv-')) return;
 
   const agentState = getAgentState(normalizedId);
   if (!agentState?.issueId) {
@@ -481,6 +484,9 @@ export async function messageAgent(
     // buildPiCommand throws on missing piSessionDir, so the previous fallback
     // emitted a launcher that would crash on resume for any Pi role agent.
     const fallbackHarness = agentState.harness ?? 'claude-code';
+    const relaunchEffort = resolveRelaunchEffort(agentState, { model: resumeModel, harness: fallbackHarness });
+    agentState.effort = relaunchEffort.effort;
+    agentState.effortSource = relaunchEffort.source;
     const harnessLaunch = await prepareHarnessLaunch(fallbackHarness, { model: resumeModel });
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
     await assertWorkspaceStackHealthyForSpawn(
@@ -490,10 +496,10 @@ export async function messageAgent(
       agentState.workspace,
     );
     const fallbackPiFields = fallbackHarness === 'ohmypi'
-      ? await getOhmypiLauncherFields(normalizedId, resumeModel)
+      ? await getOhmypiLauncherFields(normalizedId, resumeModel, relaunchEffort.effort)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     const fallbackContent = generateLauncherScript({
@@ -508,6 +514,8 @@ export async function messageAgent(
         normalizedId,
         resumeRole,
         fallbackHarness,
+        undefined,
+        relaunchEffort.effort,
       ),
       appendSystemPromptFiles: await claudeSystemPromptFiles(agentState.workspace, fallbackHarness),
       managedStateKey: normalizedId,

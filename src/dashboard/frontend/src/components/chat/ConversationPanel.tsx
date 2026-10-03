@@ -7,9 +7,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, Archive, Sparkles, Info, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square, MonitorSmartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConversationTerminalView } from './ConversationTerminalView';
+import { ConversationAboutDrawer } from './ConversationAboutDrawer';
+import { continueTargetOf, openContinueOnDevice } from './continueOnDevice/continueOnDeviceStore';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
@@ -912,6 +914,12 @@ export function ConversationPanel({
                         <Download size={14} />
                         Export transcript
                       </MenuItemButton>
+                      {conversation.origin !== 'vault' && (
+                        <MenuItemButton onClick={() => { openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')); setMenuOpen(false); }}>
+                          <MonitorSmartphone size={14} />
+                          Continue on another device
+                        </MenuItemButton>
+                      )}
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
                         <MenuSeparator />
@@ -999,41 +1007,14 @@ export function ConversationPanel({
 
       {/* "About this conversation" drawer — collapsible summary beneath the header */}
       {!embedded && aboutOpen && (
-        <div className={styles.conversationAboutDrawer}>
-          {aboutQuery.isLoading || refreshAboutMutation.isPending ? (
-            <span className={styles.conversationAboutMuted}>
-              <Loader2 size={12} className={styles.spinnerIcon} />
-              Summarizing conversation…
-            </span>
-          ) : aboutQuery.isError ? (
-            <span className={styles.conversationAboutMuted}>
-              Couldn&apos;t load the conversation summary.
-            </span>
-          ) : aboutQuery.data?.summary ? (
-            <>
-              <p className={styles.conversationAboutText}>{aboutQuery.data.summary}</p>
-              <div className={styles.conversationAboutMeta}>
-                <span>
-                  Summary of {aboutQuery.data.messageCount}{' '}
-                  {aboutQuery.data.messageCount === 1 ? 'message' : 'messages'}
-                </span>
-                <button
-                  className={styles.copyLinkButton}
-                  onClick={() => refreshAboutMutation.mutate()}
-                  disabled={refreshAboutMutation.isPending}
-                  title="Regenerate summary"
-                  aria-label="Regenerate conversation summary"
-                >
-                  <RefreshCw size={12} />
-                </button>
-              </div>
-            </>
-          ) : (
-            <span className={styles.conversationAboutMuted}>
-              Not enough conversation yet to summarize.
-            </span>
-          )}
-        </div>
+        <ConversationAboutDrawer
+          loading={aboutQuery.isLoading || refreshAboutMutation.isPending}
+          error={aboutQuery.isError}
+          summary={aboutQuery.data?.summary ?? null}
+          messageCount={aboutQuery.data?.messageCount ?? 0}
+          refreshing={refreshAboutMutation.isPending}
+          onRefresh={() => refreshAboutMutation.mutate()}
+        />
       )}
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">

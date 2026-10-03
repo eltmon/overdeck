@@ -1,6 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getAgentState, messageAgent, resolveAgentTarget } from '../../lib/agents.js';
+import { printAgentTargetFailure, resolveCliSingleAgentId } from '../agent-target.js';
+import { getAgentState, messageAgent } from '../../lib/agents.js';
 import { issueOwesRework } from '../../lib/work-agent-lifecycle.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
 import { closeOpenDecisionOnOperatorMessage } from '../../lib/cloister/operator-decision.js';
@@ -30,16 +31,15 @@ async function laneVerdictRefusal(agentId: string): Promise<string | null> {
 }
 
 export async function tellCommand(id: string, message: string, options: TellOptions = {}): Promise<void> {
-  // Resolve through the same target path as lifecycle commands so issue IDs can
-  // address non-work agents such as strike-pan-* when that is the registered run.
-  const agentId = resolveAgentTarget(id);
-  if (!agentId) {
-    console.error(chalk.red(`Could not resolve agent target "${id}"`));
-    console.error(chalk.dim(
-      'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
-    ));
+  // Resolve through the shared resolver so issue IDs can address non-work
+  // agents such as strike-pan-* when that is the registered run, and so
+  // conversation numbers/names/URLs work too (PAN-4465).
+  const target = await resolveCliSingleAgentId(id);
+  if (!target.ok) {
+    printAgentTargetFailure(target.failure, 'tell');
     return exitCli(1);
   }
+  const agentId = target.agentId;
 
   try {
     if (!options.force) {

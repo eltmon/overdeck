@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../lib/agents.js', () => ({
+  // PAN-4465: tellCommand routes through the shared agent-target resolver,
+  // which calls isQualifiedAgentId directly on every input here (conv-*).
+  isQualifiedAgentId: (id: string) => id.toLowerCase().startsWith('conv-'),
   resolveAgentTarget: (id: string) => id.toLowerCase(),
   getAgentState: () => null,
   messageAgent: mocks.messageAgent,

@@ -159,6 +159,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/linear-mcp-auth',                  kind: 'http', disposition: 'READ',        door: 'linear-mcp-auth event fold (resolveLinearMcpAuthIntervention)' },
   { surface: 'POST /api/linear-mcp-auth/callback',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events + messageAgent delivery door' },
   { surface: 'POST /api/linear-mcp-auth/complete',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events (appendLinearMcpAuthHealthyEvent)' },
+  { surface: 'POST /api/linear-mcp-auth/connect',         kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth-connect (messageAgent delivery door)' },
+  { surface: 'POST /api/linear-mcp-auth/verify',          kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth-verify (messageAgent delivery door)' },
 
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },
@@ -431,6 +433,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/skills',                           kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Skills index; outside 8 remodel domains' },
   { surface: 'GET /api/skills/overrides',                 kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG + projects.yaml + .pan/skill-overrides (PAN-3942)' },
   { surface: 'PUT /api/skills/overrides',                 kind: 'http', disposition: 'WRITE',       door: 'skill-overrides store (PAN-3942)' },
+  { surface: 'GET /api/effort/default',                   kind: 'http', disposition: 'READ',        door: 'resolveEffort (PAN-4486)' },
   { surface: 'GET /api/planning/:issueId/status',         kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (planning status)' },
   { surface: 'POST /api/planning/:issueId/message',       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver (planning session)' },
   { surface: 'DELETE /api/planning/:issueId',             kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
@@ -559,6 +562,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/vault/setup',                                 kind: 'http', disposition: 'WRITE',       door: 'FILE via src/lib/vault/setup-core.ts setupVault through the vault-service queue (PAN-4446)' },
   { surface: 'POST /api/vault/join',                                  kind: 'http', disposition: 'WRITE',       door: 'FILE via src/lib/vault/join-core.ts joinVault through the vault-service queue (PAN-4446)' },
   { surface: 'POST /api/vault/sync',                                  kind: 'http', disposition: 'WRITE',       door: 'FILE via vault-service syncVaultNow → syncOnce (PAN-4446)' },
+  { surface: 'POST /api/vault/sessions/by-conversation/:name/settle',  kind: 'http', disposition: 'WRITE',       door: 'FILE via vault-handoff handOffConversation → vault-service settleOnQueue → settle (PAN-4455)' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },

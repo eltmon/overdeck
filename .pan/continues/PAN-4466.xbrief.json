@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-4466",
+  "created": "2026-10-02T02:46:23.902Z",
+  "updated": "2026-10-02T03:56:52.791Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "parser-clipped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T02:46:23.902Z",
+      "doneAt": "2026-10-02T02:55:40.704Z"
+    },
+    "feed-clipped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T02:55:54.360Z",
+      "doneAt": "2026-10-02T03:06:17.525Z"
+    },
+    "hold-clipped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:06:27.980Z",
+      "doneAt": "2026-10-02T03:10:08.724Z"
+    },
+    "dialog-clipped-and-next-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:10:14.576Z",
+      "doneAt": "2026-10-02T03:13:47.777Z"
+    },
+    "open-terminal-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:13:54.344Z",
+      "doneAt": "2026-10-02T03:24:43.589Z"
+    },
+    "deck-terminal-deeplink": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:24:48.964Z",
+      "doneAt": "2026-10-02T03:33:10.262Z"
+    },
+    "needs-you-row-detail": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:33:16.921Z",
+      "doneAt": "2026-10-02T03:37:15.268Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4466",
+      "claimedAt": "2026-10-02T03:37:20.595Z",
+      "doneAt": "2026-10-02T03:39:09.190Z"
+    },
+    "open-terminal-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:40.557Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:51:56.347Z"
+    },
+    "parser-clipped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:42.780Z"
+    },
+    "parser-clipped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:52:55.833Z"
+    },
+    "parser-clipped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:08.488Z"
+    },
+    "parser-clipped.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:20.788Z"
+    },
+    "feed-clipped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:36.867Z"
+    },
+    "feed-clipped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:53:49.713Z"
+    },
+    "feed-clipped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:01.271Z"
+    },
+    "hold-clipped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:12.990Z"
+    },
+    "dialog-clipped-and-next-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:28.204Z"
+    },
+    "dialog-clipped-and-next-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:39.612Z"
+    },
+    "open-terminal-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:54:51.081Z"
+    },
+    "open-terminal-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:03.164Z"
+    },
+    "deck-terminal-deeplink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:20.244Z"
+    },
+    "deck-terminal-deeplink.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:34.276Z"
+    },
+    "deck-terminal-deeplink.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:46.732Z"
+    },
+    "needs-you-row-detail.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:55:58.765Z"
+    },
+    "needs-you-row-detail.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:56:15.294Z"
+    },
+    "needs-you-row-detail.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:56:27.437Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:56:40.313Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-02T03:56:52.791Z"
+    }
+  }
+}
