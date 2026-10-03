@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:54:41.033Z",
+  "updated": "2026-10-03T17:54:56.436Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "w4-soak-script.ac3": {
       "status": "completed",
       "doneAt": "2026-10-03T17:54:41.032Z"
+    },
+    "w5-live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:56.436Z"
     }
   }
 }
