@@ -39,3 +39,8 @@ export function sessionOwners<T extends Pick<LegacyConversation, 'tmuxSession' |
   }
   return [...owners.values()];
 }
+
+/** 409 body for an input door reached through a superseded /clear row (PAN-4485). */
+export function clearedConversationRefusal(conv: Pick<LegacyConversation, 'clearedToConvId'>) {
+  return { error: `Conversation was cleared; answer in conv/${conv.clearedToConvId}`, code: 'conversation-cleared' as const, clearedToConvId: conv.clearedToConvId };
+}
