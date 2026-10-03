@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:54:01.766Z",
+  "updated": "2026-10-03T17:54:17.033Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "w3-herdr-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-10-03T17:54:01.766Z"
+    },
+    "w4-soak-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T17:54:17.033Z"
     }
   }
 }
