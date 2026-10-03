@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4486",
   "created": "2026-10-03T03:32:15.243Z",
-  "updated": "2026-10-03T04:01:51.379Z",
+  "updated": "2026-10-03T04:12:54.587Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4486",
       "claimedAt": "2026-10-03T04:00:43.374Z",
       "doneAt": "2026-10-03T04:01:51.379Z"
+    },
+    "skill-layer-resolve.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T04:12:54.587Z"
     }
   }
 }
