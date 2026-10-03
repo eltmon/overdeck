@@ -31,6 +31,7 @@ import {
   CODEX_SKILL_BLOCK_END,
   claudeSkillSettingsJson,
   resolveLaunchDisabledSkills,
+  resolveLaunchPackSelection,
   writeCodexSkillOverrides,
 } from '../launch.js';
 import { DEFT_CLI_DENY } from '../../deft/launch.js';
@@ -334,6 +335,15 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(await applyClaudePacks({ ...ctx, conversation: 'conv-x' }, link)).toEqual([]);
     expect(existsSync(join(link, 'mattpocock', 'skills', 'tdd', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(link, 'mattpocock', 'skills', 'grilling'))).toBe(false);
+  });
+
+  it('mounts a pack from conversation entries while the global pack toggle is off (PAN-4499)', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: false } } });
+    getSupervisedConversationByTmuxSession.mockReturnValue({ skillOverrides: { 'mattpocock/grilling': true } });
+    const { selection, warnings } = await resolveLaunchPackSelection({ ...ctx, conversation: 'conv-x' });
+    expect(warnings).toEqual([]);
+    expect(selection.packs).toHaveLength(1);
+    expect(selection.packs[0]).toMatchObject({ id: 'mattpocock', skills: [{ name: 'grilling', dir: 'skills/productivity/grilling' }] });
   });
 
   it('mounts a deft-readonly pack with the host notice transform (PAN-3943)', async () => {

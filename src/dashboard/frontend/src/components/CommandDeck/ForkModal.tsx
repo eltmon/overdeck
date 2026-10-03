@@ -14,6 +14,7 @@ import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/M
 import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 import { NO_PROJECT_LABEL, resolveConversationProject, type RegisteredProjectLite } from './projectsData';
+import { parseHandoffComposerArgs } from './handoffComposerArgs';
 
 const FORK_HELP_CONTENT = `## Ways to continue
 
@@ -136,6 +137,7 @@ interface ForkModalProps {
     handoffAuthorModel?: string,
     handoffAuthorHarness?: Harness,
     projectKey?: string,
+    handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean },
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -175,7 +177,13 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
-  const [handoffFocus, setHandoffFocus] = useState(initialFocus ?? '');
+  // PAN-4499 D13: --skill/--pack/--hold tokens are parsed out of the composer
+  // text wherever they appear and never reach the Focus field.
+  const parsedComposerArgs = parseHandoffComposerArgs(initialFocus);
+  const [handoffFocus, setHandoffFocus] = useState(parsedComposerArgs.focus ?? '');
+  const [handoffSkills, setHandoffSkills] = useState(parsedComposerArgs.skills);
+  const [handoffPacks, setHandoffPacks] = useState(parsedComposerArgs.packs);
+  const [handoffHold, setHandoffHold] = useState(parsedComposerArgs.hold);
   const [handoffAuthor, setHandoffAuthor] = useState<HandoffAuthor>('external');
   // Source-authored handoff requires the harness to support delivering a
   // prompt to the live agent and watching for a sentinel file. Today only
@@ -384,6 +392,38 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               </div>
             )}
 
+            {/* PAN-4499 D13: skills/packs/hold parsed from the composer text. */}
+            {isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                {handoffSkills.map((skill) => (
+                  <span key={`skill-${skill}`} className={styles.forkCheckboxRow} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    Skill: {skill}
+                    <button type="button" aria-label={`Remove skill ${skill}`} onClick={() => setHandoffSkills((prev) => prev.filter((s) => s !== skill))}>
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+                {handoffPacks.map((pack) => (
+                  <span key={`pack-${pack}`} className={styles.forkCheckboxRow} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    Pack: {pack}
+                    <button type="button" aria-label={`Remove pack ${pack}`} onClick={() => setHandoffPacks((prev) => prev.filter((p) => p !== pack))}>
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {isHandoffFork && (
+              <label className={styles.forkCheckboxRow}>
+                <input
+                  type="checkbox"
+                  checked={handoffHold}
+                  onChange={(e) => setHandoffHold(e.target.checked)}
+                />
+                <span>Hold — start it myself</span>
+              </label>
+            )}
+
             {/* Inline warnings — safety, not advanced. */}
             {showModelSwitchWarning && (
               <div className={styles.forkWarning}>
@@ -548,6 +588,13 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
                 undefined,
                 projectKey || undefined,
+                isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0 || handoffHold)
+                  ? {
+                      ...(handoffSkills.length > 0 ? { skills: handoffSkills } : {}),
+                      ...(handoffPacks.length > 0 ? { packs: handoffPacks } : {}),
+                      ...(handoffHold ? { hold: true } : {}),
+                    }
+                  : undefined,
               );
             }}
           >

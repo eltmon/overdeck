@@ -103,6 +103,7 @@ describe('ForkModal ACP source capabilities', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     );
   });
 
@@ -178,5 +179,31 @@ describe('ForkModal ACP source capabilities', () => {
 
     expect(onConfirm).toHaveBeenCalledOnce();
     expect(onConfirm.mock.calls[0][13]).toBe('target-key');
+  });
+
+  it('submits parsed skills, packs and hold for a handoff (PAN-4499 WI-9)', () => {
+    const onConfirm = vi.fn();
+
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        initialMode="handoff"
+        initialFocus="continue the work --skill grilling --pack mattpocock --hold"
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.getByLabelText('Focus (optional)')).toHaveValue('continue the work');
+    expect(screen.getByText('Skill: grilling')).toBeInTheDocument();
+    expect(screen.getByText('Pack: mattpocock')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Hold — start it myself' })).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm.mock.calls[0][9]).toBe('continue the work');
+    expect(onConfirm.mock.calls[0][14]).toEqual({ skills: ['grilling'], packs: ['mattpocock'], hold: true });
   });
 });
