@@ -1,0 +1,240 @@
+{
+  "version": "1",
+  "issueId": "PAN-4499",
+  "created": "2026-10-03T21:43:21.945Z",
+  "updated": "2026-10-03T23:17:04.450Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-03T23:14Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-03T23:14:50.472Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-03T23:17Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-03T23:17:04.450Z"
+    }
+  ],
+  "items": {
+    "skill-flags-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T21:43:21.945Z",
+      "doneAt": "2026-10-03T21:49:29.336Z"
+    },
+    "fork-route-skills": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T21:49:37.469Z",
+      "doneAt": "2026-10-03T21:54:55.155Z"
+    },
+    "kickoff-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T21:54:59.919Z",
+      "doneAt": "2026-10-03T21:59:53.818Z"
+    },
+    "fork-route-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:00:19.648Z",
+      "doneAt": "2026-10-03T22:05:07.208Z"
+    },
+    "kickoff-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:05:12.254Z",
+      "doneAt": "2026-10-03T22:09:38.073Z"
+    },
+    "cli-skill-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:09:43.540Z",
+      "doneAt": "2026-10-03T22:14:49.735Z"
+    },
+    "cli-hold-start": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:14:54.502Z",
+      "doneAt": "2026-10-03T22:25:59.642Z"
+    },
+    "dashboard-held-composer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:30:53.560Z",
+      "doneAt": "2026-10-03T22:43:31.579Z"
+    },
+    "fork-modal-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:43:36.891Z",
+      "doneAt": "2026-10-03T22:50:43.950Z"
+    },
+    "docs-handoff-skills-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4499",
+      "claimedAt": "2026-10-03T22:50:48.974Z",
+      "doneAt": "2026-10-03T22:53:04.147Z"
+    },
+    "skill-flags-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:01:56.189Z"
+    },
+    "skill-flags-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:02:08.008Z"
+    },
+    "skill-flags-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:02:21.422Z"
+    },
+    "skill-flags-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:02:34.535Z"
+    },
+    "fork-route-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:02:47.628Z"
+    },
+    "fork-route-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:02:59.268Z"
+    },
+    "fork-route-skills.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:03:10.687Z"
+    },
+    "fork-route-skills.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:03:22.538Z"
+    },
+    "kickoff-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:03:39.414Z"
+    },
+    "kickoff-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:03:51.084Z"
+    },
+    "kickoff-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:04:04.208Z"
+    },
+    "fork-route-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:04:17.487Z"
+    },
+    "fork-route-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:04:31.252Z"
+    },
+    "fork-route-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:04:44.520Z"
+    },
+    "fork-route-hold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:05:02.960Z"
+    },
+    "kickoff-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:05:20.422Z"
+    },
+    "kickoff-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:05:33.324Z"
+    },
+    "kickoff-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:05:48.433Z"
+    },
+    "kickoff-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:04.505Z"
+    },
+    "kickoff-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:21.004Z"
+    },
+    "cli-skill-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:31.545Z"
+    },
+    "cli-skill-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:41.755Z"
+    },
+    "cli-skill-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:06:52.230Z"
+    },
+    "cli-hold-start.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:02.304Z"
+    },
+    "cli-hold-start.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:12.693Z"
+    },
+    "cli-hold-start.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:22.808Z"
+    },
+    "cli-hold-start.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:33.067Z"
+    },
+    "dashboard-held-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:43.174Z"
+    },
+    "dashboard-held-composer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:07:53.614Z"
+    },
+    "dashboard-held-composer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:03.886Z"
+    },
+    "fork-modal-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:13.980Z"
+    },
+    "fork-modal-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:24.148Z"
+    },
+    "fork-modal-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:34.225Z"
+    },
+    "docs-handoff-skills-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:44.460Z"
+    },
+    "docs-handoff-skills-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:08:54.654Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-03T23:14:50Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4499\n\nPull request: https://github.com/eltmon/overdeck/pull/4502 (head `f40422a4`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-03T23:17:04Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4499 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (0ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4499/.overdeck/verification/2026-10-03T23-09-43-481Z-f40422a4.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4499/.overdeck/verification/2026-10-03T23-09-43-481Z-f40422a4.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4499 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4499 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

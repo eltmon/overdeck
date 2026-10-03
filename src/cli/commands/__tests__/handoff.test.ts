@@ -22,6 +22,11 @@ vi.mock('../fork-client.js', () => ({
   isForkResultInProgress: forkMocks.isForkResultInProgress,
 }));
 
+const handoffStartMock = vi.fn();
+vi.mock('../handoff-start.js', () => ({
+  handoffStartCommand: (...args: unknown[]) => handoffStartMock(...args),
+}));
+
 // The shared per-harness resolver, not the claude-only sessionFilePath(): a
 // kimi-code/codex/pi conversation has no claudeSessionId to build a path from.
 const readsMocks = vi.hoisted(() => ({
@@ -64,6 +69,26 @@ describe('handoffCommand', () => {
     expect(output).toContain('If that was focus text for the current conversation');
     expect(output).toContain('pan handoff self "Implement PAN-1790"');
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('intercepts "start" and delegates to handoffStartCommand (D11 fallback)', async () => {
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('start', ['789'], {});
+
+    expect(handoffStartMock).toHaveBeenCalledWith('789');
+    expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+  });
+
+  it('rejects "start" with no conv id and does not call handoffStartCommand', async () => {
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('start', [], {})).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Usage: pan handoff start <conv>');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(handoffStartMock).not.toHaveBeenCalled();
   });
 
   it('hands off a kimi-code conversation, which has no claudeSessionId', async () => {
@@ -447,6 +472,61 @@ describe('handoffCommand', () => {
 
     const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
     expect(output).toContain('Issue: PAN-9005');
+  });
+
+  it('forwards --skill and --pack to the server', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { model: 'claude-opus-5-5', effort: 'high', skill: ['grilling'], pack: ['mattpocock'] });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ model: 'claude-opus-5-5', effort: 'high', skills: ['grilling'], packs: ['mattpocock'] }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Skills: grilling');
+    expect(output).toContain('Packs: mattpocock');
+  });
+
+  it('forwards --hold and prints the start hint', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      forkStatus: null,
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { hold: true });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ hold: true }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Held: the kickoff was not sent.');
+    expect(output).toContain('pan handoff start 789');
   });
 
   it('annotates an explicit --issue in the handoff output', async () => {

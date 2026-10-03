@@ -387,7 +387,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | Option | Description |
 |:-------|:------------|
 | `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
-| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 500 characters.** |
+| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 10,000 characters.** |
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
 | `--effort <level>` | Reasoning effort for the new conversation (`low`, `medium`, `high`, `xhigh`, `max`). Defaults to the source conversation's effort, clamped to the new model. |
 | `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
@@ -396,14 +396,33 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--author <who>` | Who authors the handoff doc: `external` (default) or `source`. |
 | `--author-model <model>` | Model for the external authoring session (only when `--author=external`). Falls back to `conversations.handoff_author_model` in `config.yaml` when omitted — there is no built-in default, so set one of the two or the handoff fails with a clear error. |
 | `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
+| `--skill <name>` | Turn this skill on for the new conversation only (repeatable). `<name>` is a native skill name or a pack skill id `<pack>/<skill>`. |
+| `--pack <id>` | Turn on every non-opt-in skill of this cached skill pack, for the new conversation only (repeatable). |
+| `--hold` | Create and launch the new conversation without sending the kickoff. Start it with Send in the dashboard composer, or `pan handoff start <conv>`. |
 
 <Note>
-**Focus is hard-capped at 500 characters.** A longer focus is rejected with
-`Fork request rejected: focus must be 500 characters or fewer` and no
+**Focus is hard-capped at 10,000 characters** (PAN-3737; multi-line is fine). A longer focus is rejected with
+`focus must be 10000 characters or fewer` and no
 conversation is created. Keep it short and task-oriented — the detail belongs in
 the transcript the author reads; the focus only steers what the author
 emphasizes.
 </Note>
+
+### Holding a handoff
+
+`--hold` creates and launches the successor's session without sending the
+kickoff, so you can inspect it before it starts working:
+
+```bash
+pan handoff self --hold Read .pan/handoff-brief.md FIRST and follow it exactly.
+```
+
+The successor's dashboard composer shows a waiting notice with the kickoff
+text already filled in; pressing Send there starts it. From the terminal, run
+`pan handoff start <conv>` (id or name) instead — it sends the held kickoff
+exactly once. A second `pan handoff start` on the same conversation, or one on
+a conversation that was never held, exits 1 with "No held kickoff: the
+conversation was already started or was never held".
 
 ### Fallback behavior
 

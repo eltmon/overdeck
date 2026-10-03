@@ -228,6 +228,8 @@ export interface ForkRequest {
    * pipeline must re-apply it after authoring instead of the focus-derived
    * fallback (PAN-3774). */
   title?: string;
+  /** PAN-4499: launch without sending the kickoff. */
+  hold?: boolean;
 }
 
 /** Gauntlet lane roles (PAN-4223 glossary). Stored verbatim in `conversations.lane_role`. */
