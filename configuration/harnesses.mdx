@@ -66,11 +66,11 @@ A steer never falls back silently to a queued message. A harness without steer a
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 - The model picker includes Claude Opus 5.5 (`claude-opus-5-5`): 1M context,
   128K maximum output, always-on adaptive thinking, and low through max effort.
-  API pricing is $4/M input and $20/M output; subscription availability depends
+  API pricing is \$4/M input and \$20/M output; subscription availability depends
   on the Anthropic account.
 - The model picker includes Claude Sonnet 5.5 (`claude-sonnet-5-5`): 1M
   context, 128K maximum output, adaptive thinking, and low through max
-  effort. API pricing is $2/M input and $10/M output. It requires Claude
+  effort. API pricing is \$2/M input and \$10/M output. It requires Claude
   Code 2.1.284 or newer; older versions treat it as an unrecognized model
   with a 200K window. It is the default for the Sonnet tier
   (`workhorses.mid`, the default conversation model, status review, fork
@@ -153,8 +153,8 @@ the model picker. Both use a 1,048,576-token context window:
 
 | Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
 | --- | --- | --- | --- |
-| `muse-spark-1.3` | $1.25 | $0.15 | $4.25 |
-| `muse-spark-1.3-contributor` | $0.10 | $0.002 | $0.20 |
+| `muse-spark-1.3` | \$1.25 | \$0.15 | \$4.25 |
+| `muse-spark-1.3-contributor` | \$0.10 | \$0.002 | \$0.20 |
 
 The Contributor tier requires contributing prompts and completions for model
 training. Choose it explicitly when that data use fits your work. Standard
@@ -207,7 +207,7 @@ internal configuration records are excluded from the chat feed.
   newer — OpenAI answers HTTP 400 below that version
   ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
   `gpt-6.1-sol` (September 29, 2026) is the GPT-6.1 successor to GPT-6 Sol at
-  the same $2/$10 price with $0.10 cached input; it is opt-in. Under ChatGPT
+  the same \$2/\$10 price with \$0.10 cached input; it is opt-in. Under ChatGPT
   sign-in it needs Codex CLI `0.159.0` or newer.
   `gpt-6-astra` and API-key auth have no floor. Overdeck refuses such a
   launch before it starts (`pan start`, the dashboard, conversations, and
