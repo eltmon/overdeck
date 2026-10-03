@@ -32,7 +32,7 @@ const {
   copySessionFromCompactBoundary,
   generateSummaryForFork,
 } = await import('../../conversations/summary-fork.js');
-const { createConversation, getConversationByName, listConversations, listLaneConversations } = await import('../conversations.js');
+const { createConversation, getConversationByName, listConversations, listLaneConversations, setConversationEffort } = await import('../conversations.js');
 
 let testHome: string;
 let originalHome: string | undefined;
@@ -144,5 +144,32 @@ describe('fork successors carry the parent link (PAN-4223 WI-14)', () => {
     const second = (await fork(first.name, { forkMode: 'summary' })).body['conversation'] as ForkedConversation;
     expect(first).toMatchObject({ parentConversationId: root?.id, parentConversationName: 'parent-conv' });
     expect(second).toMatchObject({ parentConversationId: first.id, parentConversationName: first.name });
+  });
+});
+
+describe('fork effort precedence (PAN-4254)', () => {
+  it('inherits the parent effort when the request omits one', async () => {
+    setConversationEffort('parent-conv', 'xhigh');
+    const { status, body } = await fork('parent-conv', { forkMode: 'summary' });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as ForkedConversation & { effort?: string | null };
+    expect(conversation.effort).toBe('xhigh');
+    expect(getConversationByName(conversation.name)?.effort).toBe('xhigh');
+  });
+
+  it('a request effort overrides the parent effort', async () => {
+    setConversationEffort('parent-conv', 'xhigh');
+    const { status, body } = await fork('parent-conv', { forkMode: 'summary', effort: 'low' });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as ForkedConversation & { effort?: string | null };
+    expect(conversation.effort).toBe('low');
+  });
+
+  it('rejects an invalid request effort with 400 and creates no successor row', async () => {
+    const before = listConversations().length;
+    const { status, body } = await fork('parent-conv', { forkMode: 'summary', effort: 'bogus' });
+    expect(status).toBe(400);
+    expect(body['error']).toBe('Invalid effort');
+    expect(listConversations().length).toBe(before);
   });
 });
