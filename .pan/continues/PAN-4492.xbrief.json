@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4492",
   "created": "2026-10-03T17:09:07.431Z",
-  "updated": "2026-10-03T17:19:38.944Z",
+  "updated": "2026-10-03T17:23:54.127Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-03T17:19:20.511Z"
     },
     "w3-herdr-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4492",
-      "claimedAt": "2026-10-03T17:19:38.944Z"
+      "claimedAt": "2026-10-03T17:19:38.944Z",
+      "doneAt": "2026-10-03T17:23:54.127Z"
     }
   }
 }
