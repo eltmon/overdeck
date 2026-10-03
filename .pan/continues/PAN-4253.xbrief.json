@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4253",
   "created": "2026-10-03T01:29:37.432Z",
-  "updated": "2026-10-03T02:25:29.538Z",
+  "updated": "2026-10-03T02:26:00.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "agent-state-effort-fields.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T02:25:29.537Z"
+    },
+    "agent-state-effort-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:26:00.956Z"
     }
   }
 }
