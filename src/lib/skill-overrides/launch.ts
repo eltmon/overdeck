@@ -16,6 +16,10 @@
  * pointer skills to the hidden list and its CLI deny list to the Claude
  * settings. `../deft/*` loads lazily.
  *
+ * A conversation launch (PAN-4486) passes `conversation`: the step rereads that
+ * row's skill map and applies it as the narrowest layer, so every relaunch
+ * (resume, restart, fork) keeps it. A failed read drops only that layer.
+ *
  * The bash the launcher runs is built in `./launcher-lines.ts`, a leaf module,
  * so launcher-generator.ts never reaches this module or the store. The store
  * and project resolution load lazily inside resolveLaunchDisabledSkills.
@@ -23,10 +27,13 @@
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { MountSelection } from '../skill-packs/mount.js';
+import type { SkillOverrideLayers } from './resolve.js';
 
 export interface LaunchSkillContext {
   cwd: string;
   issueId?: string;
+  /** Conversation tmux session whose row carries a per-conversation skill map (PAN-4486). */
+  conversation?: string;
 }
 
 export const CODEX_SKILL_BLOCK_BEGIN = '# overdeck:skill-overrides:begin';
@@ -43,13 +50,34 @@ export async function resolveLaunchScope(ctx: LaunchSkillContext): Promise<{ pro
   return { projectKey, issueId };
 }
 
+let conversationWarned = false;
+
+/** The conversation row's skill map; undefined, with one stderr warning, when the row cannot be read (NFR-2). */
+async function loadConversationSkillLayer(tmuxSession: string): Promise<SkillOverrideLayers['conversation']> {
+  try {
+    const { getSupervisedConversationByTmuxSession } = await import('../overdeck/conversations.js');
+    return getSupervisedConversationByTmuxSession(tmuxSession)?.skillOverrides ?? undefined;
+  } catch {
+    if (!conversationWarned) process.stderr.write('[launcher] WARNING: conversation skill overrides not applied\n');
+    conversationWarned = true;
+    return undefined;
+  }
+}
+
+/** The stored global/project/issue layers plus the conversation layer when ctx names one. */
+async function loadLaunchLayers(ctx: LaunchSkillContext): Promise<SkillOverrideLayers> {
+  const { loadSkillOverrideLayers } = await import('./store.js');
+  const [layers, conversation] = await Promise.all([
+    loadSkillOverrideLayers(await resolveLaunchScope(ctx)),
+    ctx.conversation ? loadConversationSkillLayer(ctx.conversation) : undefined,
+  ]);
+  return conversation ? { ...layers, conversation } : layers;
+}
+
 /** Skill names the launch should hide. */
 export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Promise<string[]> {
-  const [{ loadSkillOverrideLayers }, { disabledSkillNames }] = await Promise.all([
-    import('./store.js'),
-    import('./resolve.js'),
-  ]);
-  return disabledSkillNames(await loadSkillOverrideLayers(await resolveLaunchScope(ctx)));
+  const { disabledSkillNames } = await import('./resolve.js');
+  return disabledSkillNames(await loadLaunchLayers(ctx));
 }
 
 /**
@@ -61,20 +89,19 @@ export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
   exclude: ReadonlySet<string> = new Set(),
 ): Promise<{ selection: MountSelection; warnings: string[] }> {
-  const [{ loadSkillOverrideLayers }, { resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir }] =
+  const [{ resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir }] =
     await Promise.all([
-      import('./store.js'),
       import('./resolve.js'),
       import('./catalog.js'),
       import('../skill-packs/sources.js'),
     ]);
-  const [layers, packs] = await Promise.all([loadSkillOverrideLayers(await resolveLaunchScope(ctx)), listPackCatalog()]);
+  const [layers, packs] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog()]);
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
   for (const pack of packs) {
     if (exclude.has(pack.id)) continue;
     if (!pack.manifest) {
-      const perSkillOn = [layers.global, layers.project, layers.issue].some(map =>
+      const perSkillOn = [layers.conversation, layers.global, layers.project, layers.issue].some(map =>
         Object.entries(map ?? {}).some(([id, enabled]) => enabled && id.startsWith(`${pack.id}/`)));
       if (perSkillOn || resolvePackToggle(pack.id, layers).enabled) {
         warnings.push(`[launcher] WARNING: skill pack ${pack.id} not cached; run pan skills pack sync ${pack.id}`);

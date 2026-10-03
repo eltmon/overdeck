@@ -277,6 +277,13 @@ describe('pan skills launch-settings', () => {
     expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
   });
 
+  it('passes --conversation through to the launch resolution (PAN-4486)', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--conversation', 'conv-x');
+    expect(mocks.resolveLaunchDisabledSkills).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined, conversation: 'conv-x' });
+    expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+  });
+
   it('prints nothing when no skill is disabled', async () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
     await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');

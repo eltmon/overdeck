@@ -5,7 +5,7 @@
  *   pan skills [list] [--project <key>] [--issue <id>] [--json]
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
- *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
+ *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
  *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
@@ -23,7 +23,7 @@ import { registerSkillsDeftCommands } from './skills-deft.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
-interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; codexHome?: string; pluginLink?: string }
+interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; conversation?: string; codexHome?: string; pluginLink?: string }
 interface PackAddOptions { ref: string; adapter?: string; yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
@@ -151,7 +151,7 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     import('../../lib/sageox/launch.js'),
     import('node:path'),
   ]);
-  const ctx = { cwd: options.cwd, issueId: options.issue };
+  const ctx = { cwd: options.cwd, issueId: options.issue, conversation: options.conversation };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
   // PAN-2444: SageOx wiring fails closed; when it is off, its skills are not mounted either.
   const sageox = await resolveSageoxLaunch(ctx, options.harness);
@@ -487,6 +487,7 @@ export function registerSkillsCommands(program: Command): void {
   skills.command('launch-settings', { hidden: true }).description('Resolve skill overrides for a managed launch (used by launchers)')
     .requiredOption('--harness <harness>', 'claude-code or codex').requiredOption('--cwd <dir>', 'Launch working directory')
     .option('--issue <id>', 'Issue id').option('--codex-home <dir>', 'CODEX_HOME to write (codex)')
+    .option('--conversation <tmuxSession>', 'Conversation whose skill overrides apply (used by conversation launchers)')
     .option('--plugin-link <path>', 'Per-launch skill pack plugin link to point at the mount (claude-code)')
     .action(skillsLaunchSettingsCommand);
 

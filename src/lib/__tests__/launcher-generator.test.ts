@@ -175,6 +175,19 @@ describe('generateLauncherScript', () => {
     expect(conversationScript).not.toContain('git-guard');
   });
 
+  it('passes the conversation session to the skill launch step (PAN-4486)', () => {
+    const conversationScript = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      spawnMode: 'conversation',
+      managedStateKey: 'conv-abc',
+      baseCommand: 'claude',
+    });
+    expect(conversationScript).toContain(`--conversation 'conv-abc'`);
+    const workScript = generateLauncherScript({ ...DEFAULT_CONFIG, spawnMode: 'work', managedStateKey: 'conv-abc', baseCommand: 'claude' });
+    expect(workScript).toContain('pan skills launch-settings');
+    expect(workScript).not.toContain('--conversation');
+  });
+
   it('gives conversations a gh-only shim when ghShim is set (PAN-4343)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
