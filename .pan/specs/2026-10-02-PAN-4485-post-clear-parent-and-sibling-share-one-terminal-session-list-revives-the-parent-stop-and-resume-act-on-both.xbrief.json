@@ -4,17 +4,17 @@
     "created": "2026-10-02T12:37:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4485: Post-/clear parent and sibling share one terminal session: list revives the parent, stop and resume act on both",
-    "updated": "2026-10-02T12:41:36.849Z"
+    "updated": "2026-10-03T01:28:02.999Z"
   },
   "plan": {
     "id": "pan-4485",
     "title": "Post-/clear parent and sibling share one terminal session: list revives the parent, stop and resume act on both",
-    "status": "proposed",
+    "status": "running",
     "uid": "29011f51-7648-425c-bec7-863851ac54e9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-10-02T12:37:54Z",
-    "updated": "2026-10-02T12:41:36.849Z",
+    "updated": "2026-10-03T01:28:02.999Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4485",
@@ -735,5 +735,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
