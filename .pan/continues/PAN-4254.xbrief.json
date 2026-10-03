@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4254",
   "created": "2026-10-03T01:29:43.536Z",
-  "updated": "2026-10-03T02:42:59.013Z",
+  "updated": "2026-10-03T02:43:10.560Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "frontend-effort-enum.ac1": {
       "status": "completed",
       "doneAt": "2026-10-03T02:42:59.012Z"
+    },
+    "frontend-effort-enum.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T02:43:10.559Z"
     }
   }
 }
