@@ -402,6 +402,8 @@ export interface PendingInputsScan {
   readonly exitPlanModePending: boolean
   /** Payload for the outstanding ExitPlanMode, when its plan text is available. */
   readonly pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
+  /** PAN-4515 — timestamp of the last `user`/`assistant` record in the scanned tail; absent when none parses. */
+  readonly lastRecordAt?: string
 }
 
 /**
@@ -513,6 +515,17 @@ function scanPiEntry(entry: unknown, state: AskScanState): void {
   }
 }
 
+// PAN-4515 — a turn record's timestamp. Claude Code's housekeeping touches a
+// running transcript hourly without writing a record, so the mtime is not activity.
+function turnRecordTimestamp(entry: unknown): string | undefined {
+  if (!entry || typeof entry !== 'object') return undefined
+  const e = entry as { type?: unknown; timestamp?: unknown }
+  if (e.type !== 'user' && e.type !== 'assistant') return undefined
+  if (typeof e.timestamp !== 'string') return undefined
+  const ms = Date.parse(e.timestamp)
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined
+}
+
 /**
  * Scan a session transcript for inputs waiting on the operator: outstanding
  * AskUserQuestion tool calls (claude) or `ask` tool calls (ohmypi, PAN-3766),
@@ -538,10 +551,12 @@ export async function scanPendingInputs(jsonlPath: string): Promise<PendingInput
     let pendingExitPlanId: string | undefined
     const enterPlanModeIds = new Set<string>()
     const exitPlanModeFiredAfterEnter = new Set<string>() // tracks any ExitPlanMode (signals plan-mode session ended)
+    let lastRecordAt: string | undefined
 
     for (const line of lines) {
       try {
         const entry = JSON.parse(line)
+        lastRecordAt = turnRecordTimestamp(entry) ?? lastRecordAt
 
         // PAN-3766 — ohmypi transcript line; pi's `ask` tool feeds the same
         // pending-question bookkeeping as claude's AskUserQuestion.
@@ -618,7 +633,11 @@ export async function scanPendingInputs(jsonlPath: string): Promise<PendingInput
     // ExitPlanMode has fired, we're still in plan mode.
     const enterPlanModeOpen = enterPlanModeIds.size > 0 && exitPlanModeFiredAfterEnter.size === 0
 
-    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending, ...(pendingProposedPlan ? { pendingProposedPlan } : {}) }
+    return {
+      askUserQuestions, enterPlanModeOpen, exitPlanModePending,
+      ...(pendingProposedPlan ? { pendingProposedPlan } : {}),
+      ...(lastRecordAt ? { lastRecordAt } : {}),
+    }
   } catch {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }

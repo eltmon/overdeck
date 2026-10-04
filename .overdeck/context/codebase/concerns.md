@@ -392,6 +392,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3
   translation (`src/lib/kimi-effort.ts`), so a Kimi model row must list canonical
   levels, not native ones, or `medium`/`xhigh` clamp wrongly (PAN-4260).
+- A Claude Code transcript's modified time is not activity: Claude's
+  `touchSessionTranscript` touches every running session's transcript at
+  startup and then hourly, adding no record. PAN-4515 makes conversation `lastActivityAt`
+  (`overdeck/conversation-list.ts`) take the last `user`/`assistant` record's
+  timestamp for live rows, with the modified time only as a fallback.
+  Never date conversation activity by transcript modified time.
 - AskUserQuestion modal = deny-reason markers: `scanPendingInputs`
   (`src/lib/agent-enrichment.ts`) treats an `is_error` AUQ tool_result as pending
   only if it contains `PAN-1520` or `surfaced to the operator`. Any hook deny that
