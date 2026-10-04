@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:39:59.930Z",
+  "updated": "2026-10-04T03:40:18.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,11 @@
       "claimedBy": "agent-pan-4498",
       "claimedAt": "2026-10-04T03:38:50.443Z",
       "doneAt": "2026-10-04T03:39:59.930Z"
+    },
+    "bookmark-jump.ac1": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4498",
+      "claimedAt": "2026-10-04T03:40:18.076Z"
     }
   }
 }
