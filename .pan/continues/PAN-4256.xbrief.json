@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:19:23.997Z",
+  "updated": "2026-10-04T05:19:50.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "docs-effort-surfaces.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:19:23.996Z"
+    },
+    "review-parent-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:50.353Z"
     }
   }
 }
