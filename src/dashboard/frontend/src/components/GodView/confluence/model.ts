@@ -277,6 +277,38 @@ export function positionOrb<T extends PositionableOrb>(
   return orb;
 }
 
+/** Margin subtracted from the raw neighbour spacing when sizing a text slot. */
+export const SLOT_MARGIN = 12;
+
+/**
+ * Longest prefix of `text` (plus '…' when cut) whose measured width fits
+ * `maxWidth`. Returns `text` unchanged when it already fits, and '' when even
+ * '…' alone does not fit.
+ */
+export function fitText(text: string, maxWidth: number, measure: (value: string) => number): string {
+  if (measure(text) <= maxWidth) return text;
+  if (measure('…') > maxWidth) return '';
+
+  let prefix = text;
+  while (prefix.length > 0 && measure(`${prefix}…`) > maxWidth) {
+    prefix = prefix.slice(0, -1);
+  }
+  return `${prefix}…`;
+}
+
+/** Text width allotted to one shelf orb: neighbour spacing minus SLOT_MARGIN. */
+export function shelfSlotWidth(layout: LayoutRect, shelfCount: number): number {
+  const width = layoutWidth(layout);
+  const spacing = shelfCount <= 1 ? width * 0.7 : (width * 0.7) / (shelfCount - 1);
+  return spacing - SLOT_MARGIN;
+}
+
+/** Text width allotted to one stale orb: same-row neighbour spacing (two stale steps) minus SLOT_MARGIN. */
+export function staleSlotWidth(layout: LayoutRect, staleCount: number): number {
+  const width = layoutWidth(layout);
+  return (2 * (width * 0.72 - layout.padX)) / Math.max(1, staleCount) - SLOT_MARGIN;
+}
+
 export interface PickableOrb {
   x: number;
   y: number;
