@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T09:48:33.851Z",
+  "updated": "2026-10-04T09:50:40.191Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4543",
       "claimedAt": "2026-10-04T09:47:59.605Z",
       "doneAt": "2026-10-04T09:48:33.850Z"
+    },
+    "close-out-stall-profile": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:50:40.191Z"
     }
   }
 }
