@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T02:09:32.742Z",
+  "updated": "2026-10-04T02:09:56.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4506",
       "claimedAt": "2026-10-04T02:08:07.398Z",
       "doneAt": "2026-10-04T02:09:32.742Z"
+    },
+    "tier1-preview-truncation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:09:56.592Z"
     }
   }
 }
