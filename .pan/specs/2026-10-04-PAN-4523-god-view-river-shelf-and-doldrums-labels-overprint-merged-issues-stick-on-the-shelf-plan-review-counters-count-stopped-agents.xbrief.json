@@ -1,0 +1,638 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T03:54:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4523: God View river: shelf and doldrums labels overprint, merged issues stick on the shelf, PLAN/REVIEW counters count stopped agents",
+    "updated": "2026-10-04T04:07:33.202Z"
+  },
+  "plan": {
+    "id": "pan-4523",
+    "title": "God View river: shelf and doldrums labels overprint, merged issues stick on the shelf, PLAN/REVIEW counters count stopped agents",
+    "status": "proposed",
+    "uid": "4b9553ab-e5d4-4c55-bcf2-60bcde9115b7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T03:54:42Z",
+    "updated": "2026-10-04T04:07:33.202Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4523",
+        "label": "PAN-4523",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "god-view",
+      "dashboard-frontend",
+      "canvas",
+      "bugfix"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4523.md",
+      "canonicalFilename": "2026-10-04-PAN-4523-god-view-river-shelf-and-doldrums-labels-overprint-merged-issues-stick-on-the-shelf-plan-review-counters-count-stopped-agents.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The God View river misdraws three things. (1) The shelf band [H-108,H-74] and the doldrums band [H-76,H-12] overlap in RiverCanvas.tsx canvasLayout; stale-orb labels, the doldrums header and shelf reasons land on one ~25 px strip, and shelf reasons rise above riverBottom; nothing measures text and nothing caps shelf orbs. model.ts computeLayout is a second, dead layout that only the tests use. (2) classifyOrb returns 'shelf' for any paused orb first, so merged issues whose agents carry merge-agent.ts's close-out pause ('awaiting close-out (verify on main)') sit on the shelf and never take the MERGE exit (which runs only for state 'active'); bypassing only the shelf branch would drop them into the Doldrums via the stale branch. (3) orbStage in useConfluenceData.ts counts stopped plan/review/test agents, so a finished planner makes a working issue count as PLAN.",
+      "Proposal": "Frontend-only fix, per the PRD at .pan/drafts/PAN-4523.md. W1 moves the live layout into model.ts computeLayout with disjoint shelf/doldrums bands (gap 10 px) and fixed text baselines per band row, deletes canvasLayout, and rewires positionOrb and drawZones. W2 adds pure fitText/shelfSlotWidth/staleSlotWidth helpers and truncates shelf labels, shelf reasons and stale labels with ctx.measureText. W3 caps shelf orbs at 8 (longest-idle first). W4 adds CLOSE_OUT_PAUSE_REASON and a classifyOrb branch that returns 'active' for a merged issue whose only pauses are the close-out pause. W5 requires activeStatus() on the plan/review/test stage overrides. W6 renames the shelf header to '⏸ SHELF — paused / parked / yielded' and updates the field guide. W7 updates docs/GOD-VIEW.md. W8 adds an isolated Playwright spec that seeds five shelf and five stale orbs and commits a screenshot.",
+      "NonGoals": "- Changing src/lib/cloister/merge-agent.ts, the close-out reason string, the stall resolver, /api/parked, or any server code\n- Adding a shelf census (shelfTotal) to the shelf header\n- Collision culling for active-river orb labels, tickers, or convoy satellites\n- Changing the stale threshold, frost timings, or merge-dwell timing\n- Moving the close-out reason into @overdeck/contracts as a shared constant\n- Raising scripts/file-size-allowlist.txt for any file"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep one layout function: replace model.ts computeLayout's body with the live band layout and delete RiverCanvas.tsx canvasLayout (rather than deleting computeLayout).",
+        "rationale": "The issue's band-disjointness AC needs a testable exported layout; canvasLayout is private. Deleting the duplicate satisfies 'delete the unused computeLayout' while making the tested function the drawn one."
+      },
+      {
+        "summary": "Band geometry: doldrums [H-128,H-32] (96 px) above a 32 px HUD gutter, shelf [H-208,H-138] (70 px), gap 10 px, riverBottom H-220; text baselines fixed per band row; shelf reason drawn below the orb; stale labels above upper-row orbs and below lower-row orbs.",
+        "rationale": "Every text row must sit inside its band regardless of orb wobble; fixed baselines make FR-2 a pure, testable property. River still spans 312 px at H=600. The 32 px gutter keeps the bottom HUD (.confluence-tag/.confluence-hint at bottom: 8px) off the lower label row (plan critique round 1)."
+      },
+      {
+        "summary": "Truncate with measured text via a pure fitText(text, maxWidth, measure) helper instead of moving reasons to the tooltip only.",
+        "rationale": "The issue lists truncation first; the hover tooltip already shows the full yield reason; the vitest canvas stub returns width 0, so an injected measure is the only way to unit-test the width property."
+      },
+      {
+        "summary": "Widen the shelf spread from width*0.5 to width*0.7.",
+        "rationale": "The header now has its own row, so the right half is free; wider spacing gives each reason ~116 px instead of ~79 px at 8 orbs and 1280 px."
+      },
+      {
+        "summary": "SHELF_ORB_LIMIT = 8, keep the largest idleMin first; no shelf census in the header.",
+        "rationale": "Mirrors STALE_ORB_LIMIT's oldest-first rule; 8 leaves room for the 5-orb screenshot AC; no pause timestamp exists on the orb; a census needs a new prop and is out of scope."
+      },
+      {
+        "summary": "classifyOrb returns 'active' (not merely 'not shelf') for derivedState 'merged' when not scheduler-yielded and either unpaused or paused only with CLOSE_OUT_PAUSE_REASON.",
+        "rationale": "Close-out-paused agents go idle, so the stale branch would catch the orb and drop it into the Doldrums; only 'active' triggers the MERGE exit. Exact-reason match keeps operator holds on merged issues shelved."
+      },
+      {
+        "summary": "Duplicate the close-out reason as a frontend constant CLOSE_OUT_PAUSE_REASON in model.ts.",
+        "rationale": "The frontend cannot import src/lib and the issue forbids changing merge-agent.ts; the drift risk is recorded as a hazard."
+      },
+      {
+        "summary": "Apply the live-agent guard to line 310 (test → TEST) as well as lines 311-312.",
+        "rationale": "Same defect in the same function; the code comment already says the review lane splits only when a test agent is live."
+      },
+      {
+        "summary": "Shelf and stale orbs that leave the cast are dropped from the canvas at once (evictionFor returns 'drop') instead of fading for one second.",
+        "rationale": "The fade let a replaced shelf orb draw a ninth orb for a second, breaking the cap on screen (plan critique round 1). Active orbs keep their fade; MERGE orbs keep their exit."
+      },
+      {
+        "summary": "The bottom tag text changes from 'shelf = yielded' to 'shelf = paused / yielded'.",
+        "rationale": "Keeps the HUD legend consistent with the renamed shelf header."
+      }
+    ],
+    "items": [
+      {
+        "id": "layout-bands",
+        "title": "Move the river layout into model.ts computeLayout with disjoint shelf/doldrums bands and fixed text rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fit-text",
+            "shelf-rename",
+            "uat-screenshot"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx",
+            "npm run typecheck:frontend",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "model.test.ts and confluence-smoke.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W1 and decisions D1-D3. In model.ts: extend LayoutRect with shelfTop, shelfBottom, shelfHeaderY, shelfLabelY, shelfReasonY, doldrumsTop, doldrumsBottom, doldrumsHeaderY, doldrumsUpperY, doldrumsLowerY, doldrumsUpperLabelY, doldrumsLowerLabelY; remove spectrumH; rewrite computeLayout to the D2 table (HUD_GUTTER 32: doldrums [H-128,H-32], shelf [H-208,H-138], shelfReasonY = shelfTop+68, riverBottom = shelfTop-12). In positionOrb: stale ty = index % 2 ? doldrumsLowerY : doldrumsUpperY; shelf spread width*0.7 from padX+140. In RiverCanvas.tsx: delete canvasLayout (lines 170-189), import computeLayout and use it at lines 242 and 438; drawZones draws band rects/lines/headers from the new fields; shelf orb label at shelfLabelY and reason at shelfReasonY (below the orb); stale label at doldrumsUpperLabelY when orb.ty < layout.doldrumsY (upper row) and doldrumsLowerLabelY otherwise; drawLabel gains an optional y parameter defaulting to orb.y - orb.radius - 8. Rewrite the model.test.ts layout tests as listed in W1."
+        },
+        "items": [
+          {
+            "id": "layout-bands.ac1",
+            "title": "Given computeLayout(1280, H) for H in 600, 800 and 1000, when model.test.ts runs, then it asserts shelfBottom + 8 <= doldrumsTop, shelfTop > riverBottom and doldrumsBottom <= H - 30 (bottom HUD gutter), and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "layout-bands.ac2",
+            "title": "Given the same heights, model.test.ts asserts every shelf text row (header, label, reason) lies within [shelfTop+9, shelfBottom-2] and every doldrums text row lies within [doldrumsTop+9, doldrumsBottom-2], and that labels clear the orb row by more than 14 px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "layout-bands.ac3",
+            "title": "grep -n 'function canvasLayout' RiverCanvas.tsx returns nothing and RiverCanvas.tsx imports computeLayout from ./model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "layout-bands.ac4",
+            "title": "Given eight stale orbs, positionOrb returns alternating ty values doldrumsUpperY, doldrumsLowerY, …; given three shelf orbs, it returns ty === shelfY with monotonic distinct x starting at padX + 140 (model.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fit-text",
+        "title": "Truncate shelf labels, shelf reasons and stale labels to their slot width with measured text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/fit-text.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/fit-text.test.ts src/components/GodView/confluence/__tests__/model.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "fit-text.test.ts and model.test.ts pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W2 and decision D4. Add to model.ts: SLOT_MARGIN = 12; fitText(text, maxWidth, measure) returning text unchanged when it fits, else the longest prefix p with measure(p + '…') <= maxWidth as p + '…', else ''; shelfSlotWidth(layout, count) = (count <= 1 ? width*0.7 : width*0.7/(count-1)) - SLOT_MARGIN; staleSlotWidth(layout, count) = 2*(width*0.72 - padX)/max(1,count) - SLOT_MARGIN, where width = colW*STAGES.length + padX*2. In RiverCanvas drawOrbs, count shelf and stale orbs once per frame, set the draw font first, then draw fitText(..., slot, (v) => fx.measureText(v).width) for the shelf id label, the shelf reason (remove the length > 58 slice at line 574), and the stale label. Write the new fit-text.test.ts with a fake measure of 6 px per character."
+        },
+        "items": [
+          {
+            "id": "fit-text.ac1",
+            "title": "fitText returns short text unchanged, returns a string ending in '…' whose measured width is <= maxWidth for a 58-character reason, and returns '' when maxWidth is narrower than '…' (fit-text.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fit-text.ac2",
+            "title": "Given computeLayout(1280, 800), for every shelf count 1..8 and every stale count 1..14 the measured width of fitText(longText, slot, measure) is <= shelfSlotWidth / staleSlotWidth, and each slot equals neighbour spacing minus SLOT_MARGIN (fit-text.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fit-text.ac3",
+            "title": "grep -n 'yieldReason.length > 58' RiverCanvas.tsx returns nothing and RiverCanvas.tsx calls fitText for the shelf label, the shelf reason and the stale label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-live",
+        "title": "Count only live plan, review and test agents when choosing an orb's stage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useConfluenceData.test.ts passes including the new 'orb stage counts only live agents (PAN-4523)' cases",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W5 and decision D8. In orbStage (useConfluenceData.ts lines 310-312) add '&& activeStatus(agent.status)' inside each agents.some(...) predicate for the test, plan and review overrides (wrap the review role/id test in parentheses). Add a describe('orb stage counts only live agents (PAN-4523)') block with the four cases listed in W5."
+        },
+        "items": [
+          {
+            "id": "stage-live.ac1",
+            "title": "Given a stopped plan-role agent and a running work agent on one issue, useConfluenceOrbs returns that orb with stage 'WORK', not 'PLAN'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-live.ac2",
+            "title": "Given a stopped review agent and a running work agent, the orb's stage is 'WORK'; given a stopped test agent and a running work agent on an in-review issue, the orb's stage is 'REVIEW'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-live.ac3",
+            "title": "Given a running plan-role agent, the orb's stage is still 'PLAN' (regression case in useConfluenceData.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shelf-cap",
+        "title": "Cap shelf orbs at eight, longest-idle first, and drop evicted shelf/stale orbs from the canvas at once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/useConfluenceData.test.ts src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "useConfluenceData.test.ts and choreography.test.ts pass including the shelf-cap and evictionFor cases",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W3 and decision D5. Add const SHELF_ORB_LIMIT = 8 beside STALE_ORB_LIMIT (useConfluenceData.ts line 241) with a one-line comment. In the final filter (lines 758-764) also keep only the 8 shelf orbs with the largest idleMin, using the exact before/after snippet in W3. Add the ten-issue test from W3. Also (W3 'Render-layer eviction'): export evictionFor(state, stage) from RiverCanvas.tsx returning 'merge' for MERGE, 'drop' for shelf/stale, 'fade' otherwise, and rewrite the removal loop (RiverCanvas.tsx lines 418-422) so 'drop' calls renderOrbs.delete(orb.id) immediately. Add the evictionFor and eight-to-eight replacement tests to choreography.test.ts and the replacement case to the hook test."
+        },
+        "items": [
+          {
+            "id": "shelf-cap.ac1",
+            "title": "Given ten open issues each with one stopped, paused agent and distinct lastActivity, useConfluenceOrbs returns exactly 8 orbs with state 'shelf'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shelf-cap.ac2",
+            "title": "Given the same ten issues, the returned orbs omit the two issues with the freshest lastActivity, and the hook still returns every active and failed orb unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shelf-cap.ac3",
+            "title": "evictionFor returns 'drop' for shelf and stale orbs, 'fade' for active non-MERGE orbs and 'merge' for MERGE orbs, and an eight-to-eight shelf replacement retains exactly 8 shelf orbs (choreography.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-exit",
+        "title": "Classify a merged issue paused only for close-out as active so it exits through MERGE",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "model.test.ts and useConfluenceData.test.ts pass including the merged close-out cases",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W4 and decisions D6, D7, D10. In model.ts export CLOSE_OUT_PAUSE_REASON = 'awaiting close-out (verify on main)' with a comment pointing at src/lib/cloister/merge-agent.ts; add issueState?: DerivedIssueStateName | null and pausedReason?: string | null to RiverOrbInput (import DerivedIssueStateName from '../../../types'); add the D6 branch as the first line of classifyOrb returning 'active'. In useConfluenceOrbs compute pausedReason from the paused voters exactly as D7 shows (a non-close-out pause wins) and pass issueState: derived?.state ?? null and pausedReason into classifyOrb. Do not touch merge-agent.ts. Add the model.test.ts and useConfluenceData.test.ts cases listed in W4."
+        },
+        "items": [
+          {
+            "id": "merged-exit.ac1",
+            "title": "Given issueState 'merged', paused true, pausedReason CLOSE_OUT_PAUSE_REASON and lastActivity 30+ minutes old, classifyOrb returns 'active' (not 'shelf' and not 'stale')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-exit.ac2",
+            "title": "Given issueState 'merged' with any other pause reason or yieldedByScheduler true, classifyOrb returns 'shelf'; given issueState 'working' with the close-out reason, classifyOrb returns 'shelf'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-exit.ac3",
+            "title": "Given an issue with derived state 'merged' whose agent-* and planning-* rows are stopped and paused with 'awaiting close-out (verify on main)', useConfluenceOrbs renders it as { stage: 'MERGE', state: 'active' }; with one agent paused 'operator hold' it renders state 'shelf'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-exit.ac4",
+            "title": "git diff origin/main -- src/lib/cloister/merge-agent.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shelf-rename",
+        "title": "Rename the shelf header to name paused, parked and yielded work",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/ConfluenceHelp.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "GodViewConfluence.test.tsx and confluence-smoke.test.tsx pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W6 and decision D9. Change the drawZones shelf header string in RiverCanvas.tsx from '⏸ SHELF — parked / yielded by governor' to '⏸ SHELF — paused / parked / yielded'. In ConfluenceHelp.tsx (line 82, 'The Shelf & Governor Tides' paragraph) append: 'Operator holds and paused agents wait on the shelf too, with the pause reason beside the orb (the full reason is in the hover card).' Update any test that asserts the old copy. In GodViewConfluence.tsx line 168 change the .confluence-tag text 'shelf = yielded' to 'shelf = paused / yielded'."
+        },
+        "items": [
+          {
+            "id": "shelf-rename.ac1",
+            "title": "grep -rn 'parked / yielded by governor' src/dashboard/frontend/src returns nothing, RiverCanvas.tsx draws '⏸ SHELF — paused / parked / yielded', and the bottom tag renders 'shelf = paused / yielded'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shelf-rename.ac2",
+            "title": "The rendered field guide (ConfluenceHelp) shelf paragraph contains the text 'Operator holds and paused agents wait on the shelf too'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-god-view",
+        "title": "Document the shelf and doldrums rows and the merged exit in docs/GOD-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/GOD-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'paused / parked / yielded' docs/GOD-VIEW.md",
+            "grep -n 'awaiting close-out' docs/GOD-VIEW.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "both greps print at least one matching line",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W7. In docs/GOD-VIEW.md replace the 'The shelf and Doldrums' bullet (lines 20-23) with the shelf/doldrums description from W7 (shelf header text, who lands there, cap 8 longest-idle first, truncated reason with the full reason in the hover card; Doldrums holds stale and parked orbs in two rows, cap 14; bands never overlap and keep their text inside). Add the merged-exit sentence (close-out pause 'awaiting close-out (verify on main)' does not shelve a merged issue; any other pause still does) and the live-agent column-count sentence. Update the glyph table 'Shelf' row (line 68) to the W7 wording."
+        },
+        "items": [
+          {
+            "id": "docs-god-view.ac1",
+            "title": "docs/GOD-VIEW.md contains a shelf description (paused, parked, operator holds and scheduler yields; at most 8), a Doldrums description (stale and parked orbs; two rows; at most 14) and the sentence that the two bands never overlap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac2",
+            "title": "docs/GOD-VIEW.md contains the rule that a merged issue whose agents carry only the 'awaiting close-out (verify on main)' pause stays active in MERGE and exits through the portal, and that PLAN/REVIEW/TEST counts include only issues with a live agent of that role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-screenshot",
+        "title": "Add an isolated Playwright spec that renders five shelf and five stale orbs and commit its screenshot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T03:54:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4523",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4523-river-bands.spec.ts",
+            "docs/screenshots/pan-4523/god-view-bands.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4523-river-bands.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-4523-river-bands.spec.ts passes and writes docs/screenshots/pan-4523/god-view-bands.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W8. Model the spec on tests/pan-4497-timeline-overlap.spec.ts using startIsolatedDashboard (never :3011, own browser context). Seed localStorage 'pan-snapshot-cache-v1' via addInitScript with { data: DashboardSnapshot, timestamp } holding five open issues PAN-99101..99105, each with one agent { role: 'work', status: 'stopped', paused: true, pausedReason: a >= 58-character reason }; route **/api/parked to five zombie-session rows for PAN-99201..99205; route /api/costs/summary, /api/conversations, /api/velocity to empty JSON; close /ws/rpc with routeWebSocket. Viewport 1280x720. Go to /god-view, wait until window.__orbs has >= 5 shelf and >= 5 stale orbs, wait ~2.5 s, screenshot to docs/screenshots/pan-4523/god-view-bands.png (path resolved from repo root). Inspect the PNG yourself and confirm no overprint. The closed /ws/rpc also blocks the EventRouter fallback poller (bootstrap() calls getSnapshot over the WebSocket), so the seeded cache survives; follow the PRD checkpoint if window.__orbs lacks the seeded orbs after 10 s. Commit the PNG and link it in the PR body. Also assert that the bounding boxes of .confluence-tag and .confluence-hint (when visible) lie entirely below the canvas row at canvas height - 32."
+        },
+        "items": [
+          {
+            "id": "uat-screenshot.ac1",
+            "title": "Given the isolated dashboard and seeded fixtures, when the spec opens /god-view, then window.__orbs contains at least 5 orbs with state 'shelf' and at least 5 with state 'stale' and the spec passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshot.ac4",
+            "title": "Given the 1280x720 viewport, the spec asserts the .confluence-tag and .confluence-hint boxes lie below the Doldrums band (canvas bottom - 32 px) and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshot.ac2",
+            "title": "docs/screenshots/pan-4523/god-view-bands.png exists in the branch and shows both band headers on their own rows with every shelf/stale label and reason inside its band and no overprinted text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshot.ac3",
+            "title": "The PR body contains a link to docs/screenshots/pan-4523/god-view-bands.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "layout-bands",
+        "to": "fit-text",
+        "type": "blocks"
+      },
+      {
+        "from": "fit-text",
+        "to": "merged-exit",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-live",
+        "to": "shelf-cap",
+        "type": "blocks"
+      },
+      {
+        "from": "shelf-cap",
+        "to": "merged-exit",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-exit",
+        "to": "uat-screenshot",
+        "type": "blocks"
+      },
+      {
+        "from": "shelf-rename",
+        "to": "uat-screenshot",
+        "type": "blocks"
+      },
+      {
+        "from": "fit-text",
+        "to": "shelf-cap",
+        "type": "blocks"
+      },
+      {
+        "from": "shelf-cap",
+        "to": "shelf-rename",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
