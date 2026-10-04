@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:01:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4506: Review kickoff rejected by Herdr ('unexpected end of hex escape at column 4021'): reviewer never starts, stall detector re-dispatches forever",
-    "updated": "2026-10-04T02:07:10.258Z"
+    "updated": "2026-10-04T02:07:45.825Z"
   },
   "plan": {
     "id": "pan-4506",
     "title": "Review kickoff rejected by Herdr ('unexpected end of hex escape at column 4021'): reviewer never starts, stall detector re-dispatches forever",
-    "status": "proposed",
+    "status": "running",
     "uid": "4f311a62-f51e-4b2d-b4d5-ef52e299821f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:01:22Z",
-    "updated": "2026-10-04T02:07:10.258Z",
+    "updated": "2026-10-04T02:07:45.825Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4506",
@@ -591,5 +591,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
