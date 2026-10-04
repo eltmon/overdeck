@@ -15,6 +15,7 @@ import {
   pickOrb,
   positionOrb,
   pruneTraceEvents,
+  shelfSlotWidth,
   toolToFamily,
   traceTimeToX,
   type OrbState,
@@ -104,8 +105,26 @@ describe('Confluence model', () => {
 
       for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, orbs.length);
 
-      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 754, 1342]);
+      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 880, 1594]);
       expect(orbs.every((candidate) => candidate.ty === layout.shelfY)).toBe(true);
+    });
+
+    it('keeps the last shelf orb and its fitted label inside the canvas at realistic canvas widths (PAN-4523 review)', () => {
+      // 577: the river canvas's own width at a 1280px browser viewport once
+      // the hook-bus panel and sidebar take their share (the committed
+      // screenshot's measured width); 1280: a full-width synthetic canvas.
+      for (const canvasWidth of [577, 1280]) {
+        const layout = computeLayout(canvasWidth, 800);
+        for (const shelfCount of [1, 2, 5, 8]) {
+          const orbs = Array.from({ length: shelfCount }, (_, index) => orb(`PAN-${index}`, 'shelf'));
+          for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, shelfCount);
+
+          const lastTx = orbs[orbs.length - 1]!.tx;
+          const slot = shelfSlotWidth(layout, shelfCount);
+          expect(lastTx + slot / 2).toBeLessThanOrEqual(canvasWidth - layout.padX);
+          expect(lastTx).toBeLessThanOrEqual(layout.portalX);
+        }
+      }
     });
   });
 

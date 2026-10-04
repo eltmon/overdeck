@@ -28,12 +28,19 @@ describe('shelfSlotWidth / staleSlotWidth', () => {
   const longReason = 'yield: freeing a slot for an urgent higher-priority issue that needs the lane now';
   const longStaleLabel = '❄ PAN-4507 · zombie-session 3h';
 
-  it('sizes the shelf slot to the neighbour spacing minus SLOT_MARGIN and keeps fitted text inside it', () => {
+  it('sizes the shelf slot positively, non-increasing as population grows, and keeps fitted text inside it', () => {
+    // PAN-4523 review: shelfSlotWidth no longer derives purely from
+    // width*0.7/(count-1) — it's capped (SHELF_SLOT_MAX_WIDTH) so a sparse
+    // shelf can't hand the last orb's centred label a budget wide enough to
+    // clip the canvas edge (see model.test.ts "keeps the last shelf orb…").
+    // This test asserts the properties that matter here: always positive,
+    // never grows as the shelf fills up, and fitText always honours it.
+    let previousSlot = Number.POSITIVE_INFINITY;
     for (let count = 1; count <= 8; count++) {
-      const spacing = count <= 1 ? width * 0.7 : (width * 0.7) / (count - 1);
       const slot = shelfSlotWidth(layout, count);
-      expect(slot).toBeCloseTo(spacing - SLOT_MARGIN);
       expect(slot).toBeGreaterThan(0);
+      expect(slot).toBeLessThanOrEqual(previousSlot);
+      previousSlot = slot;
       expect(measure(fitText(longReason, slot, measure))).toBeLessThanOrEqual(slot);
     }
   });

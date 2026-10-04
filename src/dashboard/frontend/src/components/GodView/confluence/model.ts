@@ -258,6 +258,31 @@ function layoutWidth(layout: LayoutRect): number {
   return layout.colW * STAGES.length + layout.padX * 2;
 }
 
+/** x where the shelf/needs-you row's spread begins. */
+const SHELF_SPREAD_START_X = 140;
+/**
+ * Right margin reserved for the shelf spread (PAN-4523 review: a fixed
+ * 0.7×width spread pushed the last shelf orb's centred label past the
+ * canvas edge — `.confluence-river-canvas` has `overflow: hidden` — once the
+ * river shared a narrower-than-viewport canvas with the hook-bus panel and
+ * the sidebar, e.g. ~577px at a 1280px browser width). Clamping the spread's
+ * end to the canvas's own drawable width, minus this margin, keeps the last
+ * orb inside the band at any canvas width. Paired with SHELF_SLOT_MAX_WIDTH
+ * below (2× this margin) so its *label*, sized up to that cap and centred on
+ * the orb, also can't clip the edge — a bare endpoint clamp alone still fails
+ * for a sparse shelf (few orbs ⇒ wide neighbour spacing ⇒ an oversized slot).
+ */
+const SHELF_SPREAD_END_MARGIN = 60;
+
+/** The x-range shelf/needs-you orbs spread across, shared by positionOrb
+ * (orb placement) and shelfSlotWidth (text sizing) so they cannot drift apart. */
+function shelfSpreadRange(layout: LayoutRect): { startX: number; endX: number } {
+  const width = layoutWidth(layout);
+  const startX = layout.padX + SHELF_SPREAD_START_X;
+  const endX = Math.max(startX, width - layout.padX - SHELF_SPREAD_END_MARGIN);
+  return { startX, endX };
+}
+
 export function positionOrb<T extends PositionableOrb>(
   orb: T,
   orbs: readonly T[],
@@ -283,8 +308,8 @@ export function positionOrb<T extends PositionableOrb>(
 
   if (orb.state === 'shelf' || orb.state === 'needs-you') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').indexOf(orb));
-    orb.tx = layout.padX + 140
-      + (index / Math.max(1, expectedShelf - 1 || 1)) * (width * 0.7);
+    const { startX, endX } = shelfSpreadRange(layout);
+    orb.tx = startX + (index / Math.max(1, expectedShelf - 1 || 1)) * (endX - startX);
     orb.ty = layout.shelfY;
     return orb;
   }
@@ -319,11 +344,25 @@ export function fitText(text: string, maxWidth: number, measure: (value: string)
   return `${prefix}…`;
 }
 
-/** Text width allotted to one shelf orb: neighbour spacing minus SLOT_MARGIN. */
+/**
+ * Upper bound on a shelf text slot (PAN-4523 review). Without it, a sparse
+ * shelf — few orbs spread across the whole shelfSpreadRange — hands the last
+ * orb's centred, fitted label a budget wide enough that half of it clips the
+ * canvas edge even though the orb's own position (shelfSpreadRange) is
+ * clamped: e.g. 2 orbs on a 577px-wide canvas get a ~300px slot each. Sized
+ * at 2× SHELF_SPREAD_END_MARGIN so the worst case (this cap, centred on the
+ * clamped endpoint) still lands inside the canvas.
+ */
+const SHELF_SLOT_MAX_WIDTH = SHELF_SPREAD_END_MARGIN * 2;
+
+/** Text width allotted to one shelf orb: neighbour spacing (the same
+ * shelfSpreadRange positionOrb places orbs across), capped at
+ * SHELF_SLOT_MAX_WIDTH, minus SLOT_MARGIN. */
 export function shelfSlotWidth(layout: LayoutRect, shelfCount: number): number {
-  const width = layoutWidth(layout);
-  const spacing = shelfCount <= 1 ? width * 0.7 : (width * 0.7) / (shelfCount - 1);
-  return spacing - SLOT_MARGIN;
+  const { startX, endX } = shelfSpreadRange(layout);
+  const spread = endX - startX;
+  const spacing = shelfCount <= 1 ? spread : spread / (shelfCount - 1);
+  return Math.max(0, Math.min(spacing, SHELF_SLOT_MAX_WIDTH) - SLOT_MARGIN);
 }
 
 /** Text width allotted to one stale orb: same-row neighbour spacing (two stale steps) minus SLOT_MARGIN. */

@@ -11,7 +11,7 @@
     "test": "vitest run --configLoader runner",
     "test:ui": "vitest --configLoader runner --ui",
     "test:watch": "vitest --configLoader runner",
-    "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts"
+    "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts tests/pan-4523-river-bands.spec.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

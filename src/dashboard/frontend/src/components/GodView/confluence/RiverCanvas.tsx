@@ -157,8 +157,12 @@ export function resolveMergeReconciliation(
 /** How the canvas removes an orb that left the cast. Shelf and Doldrums orbs drop
  * at once so the band caps (SHELF_ORB_LIMIT, STALE_ORB_LIMIT) hold on every frame. */
 export function evictionFor(state: ConfluenceOrb['state'], stage: Stage): 'merge' | 'drop' | 'fade' {
-  if (stage === 'MERGE') return 'merge';
+  // State wins over stage: an operator-held merged issue (state 'shelf', stage
+  // 'MERGE') must drop with the rest of the shelf cap, not animate through the
+  // portal as a completed merge (PAN-4523 review) — only an active MERGE orb
+  // merges.
   if (state === 'shelf' || state === 'stale') return 'drop';
+  if (stage === 'MERGE') return 'merge';
   return 'fade';
 }
 
@@ -584,7 +588,7 @@ function createEngine(
         const shelfSlot = shelfSlotWidth(layout, shelfCount);
         fx.font = '600 10px "JetBrains Mono"';
         drawLabel(orb, fitText(`⏸ ${orb.id}`, shelfSlot, measureText), 'rgba(255,184,0,.75)', layout.shelfLabelY);
-        if (orb.yieldReason) { fx.font = '500 8.5px "JetBrains Mono"'; const reason = fitText(orb.yieldReason, shelfSlot, measureText); fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(reason, orb.x, layout.shelfReasonY); }
+        if (orb.yieldReason) { fx.font = '500 8.5px "JetBrains Mono"'; fx.textAlign = 'center'; const reason = fitText(orb.yieldReason, shelfSlot, measureText); fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(reason, orb.x, layout.shelfReasonY); }
         fx.textAlign = 'left'; fx.globalAlpha = 1; continue;
       }
       const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 3); glow.addColorStop(0, hexA(baseRole, 0.45 * (0.3 + orb.heat) * (1 - orb.frost * 0.6))); glow.addColorStop(1, hexA(baseRole, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 3, 0, 7); fx.fill();

@@ -297,11 +297,15 @@ describe('planSweepCommands', () => {
 });
 
 describe('evictionFor (PAN-4523 render-layer eviction)', () => {
-  it('drops shelf and stale orbs, fades other active orbs, and merges MERGE orbs', () => {
+  it('drops shelf and stale orbs, fades other active orbs, and merges only an active MERGE orb', () => {
     expect(evictionFor('shelf', 'WORK')).toBe('drop');
     expect(evictionFor('stale', 'REVIEW')).toBe('drop');
     expect(evictionFor('active', 'WORK')).toBe('fade');
-    expect(evictionFor('shelf', 'MERGE')).toBe('merge');
+    expect(evictionFor('active', 'MERGE')).toBe('merge');
+    // An operator-held merged issue (state 'shelf') must drop with the shelf
+    // cap, not animate through the portal as a completed merge (PAN-4523 review).
+    expect(evictionFor('shelf', 'MERGE')).toBe('drop');
+    expect(evictionFor('stale', 'MERGE')).toBe('drop');
   });
 
   it('keeps exactly eight shelf orbs through an eight-to-eight replacement', () => {
