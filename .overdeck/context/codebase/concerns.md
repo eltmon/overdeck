@@ -143,6 +143,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   read and write passes through it, so a field added only to `interface AgentState` is silently
   dropped on save. `foreman`, `modelSpawnKey` and `workspaceId` are dropped today (PAN-4487). Add
   new fields to `cleanAgentState` and cover them with a save→read round-trip test.
+- **`spawnRun`/`spawnAgent` never resolve effort** (`src/lib/agents/spawn.ts`) — they persist and
+  thread a caller-supplied `effort`/`effortSource` only (PAN-4253 D5). A new launch path must call
+  `resolveEffort()` (`src/lib/agents/resolve-effort.ts`) itself or it silently launches at the role
+  file's `effort: high` and ignores `roles.<role>.effort`. `pan spawn` builds its pane argv without a
+  harness binary (#4511).
 - **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
   `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
   `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker

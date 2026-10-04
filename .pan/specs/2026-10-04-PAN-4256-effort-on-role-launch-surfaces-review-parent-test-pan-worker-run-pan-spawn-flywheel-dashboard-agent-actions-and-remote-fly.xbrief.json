@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:14:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4256: Effort on role launch surfaces: review parent, test, pan worker run, pan spawn, flywheel, dashboard agent actions, and remote Fly",
-    "updated": "2026-10-04T02:22:15.688Z"
+    "updated": "2026-10-04T02:22:58.390Z"
   },
   "plan": {
     "id": "pan-4256",
     "title": "Effort on role launch surfaces: review parent, test, pan worker run, pan spawn, flywheel, dashboard agent actions, and remote Fly",
-    "status": "proposed",
+    "status": "running",
     "uid": "aaf0be78-260d-481d-afbf-3cbdb4e16a2c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:14:06Z",
-    "updated": "2026-10-04T02:22:15.688Z",
+    "updated": "2026-10-04T02:22:58.390Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4256",
@@ -919,5 +919,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
