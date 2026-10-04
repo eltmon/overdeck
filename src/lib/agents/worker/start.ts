@@ -15,12 +15,14 @@
  */
 import { access, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
+import type { EffortLevel, EffortSource } from '@overdeck/contracts';
 
 import type { RuntimeName } from '../../runtimes/types.js';
 import type { PrimaryCheckoutMatch } from '../../projects/primary-checkout.js';
 import { createItemWorktree, worktreeBranch } from '../../workspaces/item-worktree.js';
 import type { AgentState } from '../agent-state-read.js';
 import { removeAgentStateDir } from '../state-dir-removal.js';
+import { resolveEffort, type EffortConfigSlice } from '../resolve-effort.js';
 import { writeWorkerFacts as writeFacts, type WorkerFacts } from './facts.js';
 import { agentsRoot, allocateWorkerId, workerDir, workerNumber } from './ids.js';
 
@@ -38,6 +40,7 @@ export interface StartWorkerOptions {
   cwd?: string;
   /** Optional label, stored in worker.json. */
   name?: string;
+  effort?: string;
 }
 
 export interface StartedWorker {
@@ -61,6 +64,8 @@ export type SpawnRunForWorker = (
     startedBy: string;
     registerConversation: false;
     extraEnvExports: string[];
+    effort?: EffortLevel;
+    effortSource?: EffortSource;
   },
 ) => Promise<AgentState>;
 
@@ -72,6 +77,7 @@ export interface StartWorkerDeps {
   allocateWorkerId?: (issueId: string) => Promise<string>;
   findPrimaryCheckout?: (path: string) => Promise<PrimaryCheckoutMatch | null>;
   now?: () => Date;
+  effortConfig?: EffortConfigSlice;
 }
 
 /** An agent id, a conversation tmux session, or `claude-session:<uuid>` (NFR-8). */
@@ -142,6 +148,16 @@ export async function startWorker(options: StartWorkerOptions, deps: StartWorker
     }
   }
 
+  const workerEffort = resolveEffort({
+    explicit: options.effort,
+    role: 'worker',
+    issueId,
+    model: options.model,
+    harness: options.harness,
+    config: deps.effortConfig,
+  });
+  if (workerEffort.warning) console.warn(`[worker] ${workerEffort.warning}`);
+
   const id = await (deps.allocateWorkerId ?? allocateWorkerId)(issueId);
   const readOnly = options.readOnly === true;
   const facts = (cwd: string, branch: string | null): WorkerFacts => ({
@@ -175,6 +191,8 @@ export async function startWorker(options: StartWorkerOptions, deps: StartWorker
       startedBy: 'pan-worker',
       registerConversation: false,
       extraEnvExports: [`export OVERDECK_WORKER_PARENT=${JSON.stringify(options.parentId ?? '')}`],
+      effort: workerEffort.effort,
+      effortSource: workerEffort.source,
     });
   } catch (error) {
     if (await exists(join(workerDir(id), 'state.json'))) {

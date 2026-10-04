@@ -67,7 +67,7 @@ function deps(overrides: Partial<DispatchDeps> = {}): DispatchDeps & { spawnRun:
   return {
     spawnRun,
     startWorker: vi.fn(startWorker),
-    startWorkerDeps: { spawnRun },
+    startWorkerDeps: { spawnRun, effortConfig: { roles: {}, tieredExecution: { tiers: {} } } },
     listWorkers: vi.fn(async () => []),
     isAlive: vi.fn(async () => ({ alive: false as const, reason: 'no-session' as const })),
     getAgentState: vi.fn(() => ({ harness: 'codex', model: 'gpt-5.6-sol' }) as AgentState),
