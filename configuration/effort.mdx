@@ -186,15 +186,27 @@ assistant turn).
   claude-code agents through `/effort`, and codex, ACP, OpenCode, and pi
   conversations through their control channels — see
   [Changing effort on a running session](#changing-effort-on-a-running-session).
+- The review parent's fresh spawn — `roles.review.effort` (the resumed-session
+  branch keeps the saved session's effort unchanged) (PAN-4256).
+- The test role's dispatch — both the automatic post-review queue and the
+  manual re-dispatch route — `roles.test.effort` (PAN-4256).
+- `pan worker run --effort <level>` (PAN-4256).
+- `pan spawn --effort <level>` — item `metadata.effort` → plan
+  `metadata.effort` → `roles.worker.effort` → `high`; only claude-code and
+  codex panes get a mapped `--effort`/`model_reasoning_effort` flag, every
+  other harness launches with no effort flag (PAN-4256).
+- `pan flywheel start` — `roles.flywheel.effort` at the next start; a paused
+  Flywheel resumed keeps the effort it started with (PAN-4256).
+- `POST /api/agents` (an explicit `effort` field in the body) and
+  `POST /api/agents/:id/restart` (ditto, pinning the relaunch as `explicit`)
+  (PAN-4256).
+- `pan start --remote` work agents on Fly — `roles.work.effort` (PAN-4256).
 
-Everything else — specialist/review-parent/test/worker
-launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
-staffing, planning, and dashboard-wide display — still resolves effort ad
-hoc and is tracked in sibling issues:
+Everything else — per-slot tier staffing, planning, and dashboard-wide
+display — still resolves effort ad hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
-| Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
 | Planning (`pan plan`, PlanDialog) | [#4258](https://github.com/eltmon/overdeck/issues/4258) |
 | Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
