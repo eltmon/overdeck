@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:27:01.669Z",
+  "updated": "2026-10-04T03:27:14.744Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "staffing-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:27:01.669Z"
+    },
+    "staffing-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:27:14.744Z"
     }
   }
 }
