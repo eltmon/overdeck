@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4514",
   "created": "2026-10-04T02:58:32.050Z",
-  "updated": "2026-10-04T03:05:24.690Z",
+  "updated": "2026-10-04T03:07:56.941Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-04T03:05:15.938Z"
     },
     "detector-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4514",
-      "claimedAt": "2026-10-04T03:05:24.690Z"
+      "claimedAt": "2026-10-04T03:05:24.690Z",
+      "doneAt": "2026-10-04T03:07:56.941Z"
     }
   }
 }
