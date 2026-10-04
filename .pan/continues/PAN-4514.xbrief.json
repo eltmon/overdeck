@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4514",
   "created": "2026-10-04T02:58:32.050Z",
-  "updated": "2026-10-04T03:16:01.799Z",
+  "updated": "2026-10-04T03:16:07.368Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4514",
       "claimedAt": "2026-10-04T03:15:14.817Z",
       "doneAt": "2026-10-04T03:16:01.799Z"
+    },
+    "docs-context-layers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4514",
+      "claimedAt": "2026-10-04T03:16:07.368Z"
     }
   }
 }
