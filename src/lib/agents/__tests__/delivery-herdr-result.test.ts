@@ -24,11 +24,12 @@ const home = vi.hoisted(() => {
   return dir;
 });
 
-const mocks = vi.hoisted(() => ({ findHerdrAgent: vi.fn(), prompt: vi.fn() }));
+const mocks = vi.hoisted(() => ({ findHerdrAgent: vi.fn(), prompt: vi.fn(), readPane: vi.fn() }));
 
 vi.mock('../../terminal-backends/herdr.js', () => ({
   findHerdrAgent: mocks.findHerdrAgent,
   herdrBackend: { prompt: (...args: unknown[]) => mocks.prompt(...args) },
+  readHerdrPaneText: (...args: unknown[]) => mocks.readPane(...args),
 }));
 vi.mock('../../../dashboard/server/http-helpers.js', () => ({
   jsonResponse: vi.fn((body: unknown, options?: number | { status?: number }) => {
@@ -39,6 +40,7 @@ vi.mock('../../../dashboard/server/http-helpers.js', () => ({
 
 const { deliverAgentMessage, resetDeliveryBackendSelection } = await import('../delivery.js');
 const { resetPromptGuard } = await import('../../terminal-backends/prompt-guard.js');
+const { describeHerdrRefusal } = await import('../../terminal-backends/agent-pane-io.js');
 const { createConversation } = await import('../../overdeck/conversations.js');
 const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
 const { handleConversationMessage } = await import('../../overdeck/conversation-message.js');
@@ -63,6 +65,8 @@ beforeEach(() => {
   resetDeliveryBackendSelection();
   mocks.findHerdrAgent.mockReset();
   mocks.prompt.mockReset();
+  mocks.readPane.mockReset();
+  mocks.readPane.mockResolvedValue('');
   mocks.findHerdrAgent.mockResolvedValue({
     paneId: 'wA:p1', terminalId: 'term_65c6f40babca233b', workspaceId: 'wA', state: 'working', tokens: {}, paneBound: false,
   });
@@ -79,7 +83,69 @@ describe('Herdr delivery results for the 15:24 candidates', () => {
   it('candidate 1b: a Herdr refusal (agent_blocked / guard) returns ok:false herdr', async () => {
     mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'agent_blocked' }));
     const result = await deliverAgentMessage(CONV, 'BTW How can I launch Orca?', 'conversation-message', 'auto');
-    expect(result).toEqual({ ok: false, path: 'herdr', failure: 'refused: agent_blocked' });
+    expect(result).toEqual({
+      ok: false,
+      path: 'herdr',
+      failure: 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it',
+    });
+  });
+
+  it('an agent_blocked refusal quotes the last lines of the dialog on screen', async () => {
+    mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'agent_blocked' }));
+    mocks.readPane.mockResolvedValue([
+      '╭──────────────────────────────────────╮',
+      '│ \u001b[1mDo you trust the files in this folder?\u001b[0m │',
+      '│                                      │',
+      '│ ❯ 1. Yes, proceed                    │',
+      '│   2. No, exit                        │',
+      '╰──────────────────────────────────────╯',
+      '   Enter to confirm · Esc to cancel',
+      '',
+    ].join('\n'));
+    const result = await deliverAgentMessage(CONV, 'hello', 'conversation-message', 'auto');
+    expect(mocks.readPane).toHaveBeenCalledWith('wA:p1', 40, 'visible');
+    expect(result).toEqual({
+      ok: false,
+      path: 'herdr',
+      failure: 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it: '
+        + '"Do you trust the files in this folder? / ❯ 1. Yes, proceed / 2. No, exit / Enter to confirm · Esc to cancel"',
+    });
+  });
+
+  it('an agent_blocked refusal keeps the tail of a long screen, bounded', async () => {
+    mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'agent_blocked' }));
+    mocks.readPane.mockResolvedValue(`${'x'.repeat(500)}\nEnter to confirm`);
+    const result = await deliverAgentMessage(CONV, 'hello', 'conversation-message', 'auto');
+    const excerpt = /: "(.*)"$/.exec(result.failure ?? '')?.[1] ?? '';
+    expect(excerpt.length).toBe(240);
+    expect(excerpt.startsWith('…')).toBe(true);
+    expect(excerpt.endsWith(' / Enter to confirm')).toBe(true);
+  });
+
+  it('an agent_blocked refusal still names the dialog when the screen cannot be read', async () => {
+    mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'agent_blocked' }));
+    mocks.readPane.mockRejectedValue(new Error('herdr api: pane not found'));
+    const result = await deliverAgentMessage(CONV, 'hello', 'conversation-message', 'auto');
+    expect(result.failure).toBe('refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it');
+  });
+
+  it('an agent_blocked refusal stops waiting for a screen that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.readPane.mockReturnValue(new Promise<string>(() => {}));
+      const pending = describeHerdrRefusal('agent_blocked', 'wA:p1');
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expect(pending).resolves.toBe('refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a refusal other than agent_blocked stays bare and reads no screen', async () => {
+    mocks.prompt.mockReturnValue(Effect.succeed({ refused: true, reason: 'role-not-allowed' }));
+    const result = await deliverAgentMessage(CONV, 'hello', 'conversation-message', 'auto');
+    expect(result).toEqual({ ok: false, path: 'herdr', failure: 'refused: role-not-allowed' });
+    expect(mocks.readPane).not.toHaveBeenCalled();
   });
 
   it('candidate 2 (ruled out, documented contract): a settled-wait stall reports delivered', async () => {

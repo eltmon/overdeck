@@ -351,8 +351,10 @@ export function copyProjectTemplateDirs(
  */
 export async function preTrustDirectory(dirPath: string): Promise<void> {
   const claudeJsonPath = join(homedir(), '.claude.json');
-  if (!existsSync(claudeJsonPath)) return;
-  if (isTrustCached(claudeJsonPath, dirPath)) return;
+  // A host where Claude Code never ran has no ~/.claude.json yet; it is
+  // created below. Claude Code reads it as `{ ...defaults, ...file }`, so a
+  // file holding only these keys reads exactly as a missing one plus them.
+  if (existsSync(claudeJsonPath) && isTrustCached(claudeJsonPath, dirPath)) return;
 
   const lockDir = `${claudeJsonPath}.lock`;
   for (let attempt = 0; !tryAcquireClaudeJsonLock(lockDir); attempt++) {
@@ -468,9 +470,9 @@ function rememberTrust(claudeJsonPath: string, data: ClaudeJsonTrust): void {
 
 /** Read-modify-write of ~/.claude.json. Call it only while holding the lock. */
 function writeTrustUnderLock(claudeJsonPath: string, dirPath: string): void {
-  if (!existsSync(claudeJsonPath)) return;
-  const data = JSON.parse(readFileSync(claudeJsonPath, 'utf8'));
-  let dirty = false;
+  const created = !existsSync(claudeJsonPath);
+  const data = JSON.parse(created ? '{}' : readFileSync(claudeJsonPath, 'utf8'));
+  let dirty = created;
 
   if (data.bypassPermissionsModeAccepted !== true) {
     data.bypassPermissionsModeAccepted = true;
@@ -505,10 +507,12 @@ function writeTrustUnderLock(claudeJsonPath: string, dirPath: string): void {
     // the real one (resolved through a symlink, keeping its mode), so no
     // reader ever sees a half-written file. A failed write or rename removes
     // the temp file, which is a full copy of the config.
-    const target = realpathSync(claudeJsonPath);
+    // A file created here gets 0600: Claude Code later stores its account in it.
+    const target = created ? claudeJsonPath : realpathSync(claudeJsonPath);
+    const mode = created ? 0o600 : statSync(target).mode & 0o777;
     const tmpPath = `${target}.tmp-${process.pid}`;
     try {
-      writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: statSync(target).mode & 0o777 });
+      writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode });
       renameSync(tmpPath, target);
     } catch (error) {
       rmSync(tmpPath, { force: true });

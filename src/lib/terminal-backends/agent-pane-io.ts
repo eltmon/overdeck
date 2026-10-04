@@ -11,6 +11,8 @@
  * conversation pane-choice route keeps its own tmux reads.
  */
 
+import { stripVTControlCharacters } from 'node:util';
+
 import { Effect } from 'effect';
 
 import { getHerdrApiClient, type HerdrApiClient } from './herdr-api.js';
@@ -133,4 +135,50 @@ export async function resolveAgentPaneIo(agentId: string, backend?: TerminalBack
     read: (lines) => capturePane(agentId, lines),
     sendKey: (key) => sendKeysAsync(agentId, key, 'input-target'),
   };
+}
+
+/** How long a refusal waits for the screen before it reports without it. */
+const BLOCKED_SCREEN_READ_MS = 3_000;
+const BLOCKED_EXCERPT_LINES = 6;
+const BLOCKED_EXCERPT_CHARS = 240;
+
+/**
+ * The last few non-empty lines of a blocked agent's screen, flattened to one
+ * bounded line: control sequences and box-drawing borders removed, lines joined
+ * with ` / `, and the TAIL kept when it is too long (a dialog's options and
+ * footer are at the bottom). Empty when nothing readable is left.
+ */
+export function blockedDialogExcerpt(screen: string): string {
+  const lines = stripVTControlCharacters(screen)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[\u2500-\u257F]/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0);
+  const excerpt = lines.slice(-BLOCKED_EXCERPT_LINES).join(' / ');
+  return excerpt.length > BLOCKED_EXCERPT_CHARS ? `…${excerpt.slice(-(BLOCKED_EXCERPT_CHARS - 1))}` : excerpt;
+}
+
+/**
+ * The failure text for a Herdr prompt refusal. `agent_blocked` means the agent
+ * sits at an approval or question dialog, which only keys can answer, so the
+ * text says so and quotes the screen. The instruction comes first: the
+ * composer shows one ellipsized line with the whole text on hover. Reading the
+ * screen is bounded and best-effort; a failed read still names the dialog.
+ */
+export async function describeHerdrRefusal(reason: string, paneId: string): Promise<string> {
+  if (reason !== 'agent_blocked') return `refused: ${reason}`;
+  const hint = 'refused: agent_blocked — the agent is waiting at a dialog; open the Terminal tab to answer it';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const { readHerdrPaneText } = await import('./herdr.js');
+    const screen = await Promise.race([
+      readHerdrPaneText(paneId, 40, 'visible'),
+      new Promise<string>((resolve) => { timer = setTimeout(() => resolve(''), BLOCKED_SCREEN_READ_MS); }),
+    ]);
+    const excerpt = blockedDialogExcerpt(screen);
+    return excerpt ? `${hint}: "${excerpt}"` : hint;
+  } catch {
+    return hint;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

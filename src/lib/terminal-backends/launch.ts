@@ -120,15 +120,18 @@ export interface LaunchPaneRequest {
 }
 
 /**
- * Mark an issue pane's cwd trusted in Claude Code before the launch (PAN-3905).
+ * Mark a Claude Code pane's cwd trusted before the launch (PAN-3905).
  * Only workspace creation used to do this, so an agent launched into a
  * workspace some other path made (the planner, a slot or item worktree, a
  * resume into an older workspace) stopped at Claude Code's trust dialog and
- * died with `ready-signal-timeout`. Idempotent; a failure is non-fatal, as it
- * is in `createWorkspace`: the agent still starts and the prompt is visible.
+ * died with `ready-signal-timeout`. Conversations are included: their cwd is
+ * the operator's explicit choice, and an untrusted one left the pane at the
+ * dialog, where Herdr refuses the first message with `agent_blocked`.
+ * Idempotent; a failure is non-fatal, as it is in `createWorkspace`: the agent
+ * still starts and the prompt is visible.
  */
 async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> {
-  if (!request.issueId || request.tokens.harness !== 'claude-code') return;
+  if (request.tokens.harness !== 'claude-code') return;
   try {
     // Lazy: this module is imported almost everywhere; keep workspace-manager
     // out of its static import graph.

@@ -22,6 +22,7 @@ import {
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
 import { selectTerminalBackend } from '../terminal-backends/select.js';
+import { describeHerdrRefusal } from '../terminal-backends/agent-pane-io.js';
 import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
@@ -450,7 +451,7 @@ export async function deliverAgentMessage(
     } catch (err: unknown) {
       return { ok: false, path: 'herdr', failure: err instanceof Error ? err.message : String(err) };
     }
-    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
+    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: await describeHerdrRefusal(result.reason, herdrAgent.paneId) };
     if (isPromptDropped(result)) {
       return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
     }

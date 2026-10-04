@@ -129,6 +129,18 @@ describe('preTrustDirectory (PAN-3905)', () => {
     expect(readFileSync(claudeJsonPath, 'utf8')).toBe(before);
   });
 
+  it('creates ~/.claude.json when Claude Code has never run on the host', async () => {
+    rmSync(claudeJsonPath);
+
+    await preTrustDirectory('/work/a');
+
+    const data = readClaudeJson();
+    expect(data.bypassPermissionsModeAccepted).toBe(true);
+    expect(data.projects['/work/a']).toMatchObject({ hasTrustDialogAccepted: true });
+    expect(statSync(claudeJsonPath).mode & 0o777).toBe(0o600);
+    expect(readdirSync(tempHome).sort()).toEqual(['.claude.json']);
+  });
+
   it('skips the parse when the file is unchanged and the cwd is already trusted', async () => {
     await preTrustDirectory('/work/a');
     const { mtimeMs } = statSync(claudeJsonPath);

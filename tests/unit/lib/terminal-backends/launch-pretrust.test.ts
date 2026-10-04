@@ -80,6 +80,20 @@ describe('launchAgentPane pre-trusts the cwd (PAN-3905)', () => {
     expect(trustedAtStart).toBe(true);
   });
 
+  it('pre-trusts a conversation pane, which has no issue', async () => {
+    const convCwd = '/home/operator/scratch';
+    let trustedAtStart: boolean | undefined;
+    await launchAgentPane({
+      cwd: convCwd,
+      agentId: 'conv-20261004-1',
+      argv: ['bash', 'launcher.sh'],
+      env: {},
+      tokens: { role: 'conversation', harness: 'claude-code', model: 'opus' },
+    }, fakeBackend(() => { trustedAtStart = readProjects()[convCwd]?.hasTrustDialogAccepted; }));
+
+    expect(trustedAtStart).toBe(true);
+  });
+
   it('leaves ~/.claude.json alone for a harness that is not Claude Code', async () => {
     await launchAgentPane({
       issueId: 'PAN-1',
