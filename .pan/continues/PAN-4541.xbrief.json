@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4541",
   "created": "2026-10-04T08:22:14.052Z",
-  "updated": "2026-10-04T08:35:52.600Z",
+  "updated": "2026-10-04T08:35:56.924Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4541",
       "claimedAt": "2026-10-04T08:24:28.387Z",
       "doneAt": "2026-10-04T08:35:52.600Z"
+    },
+    "docs-boot-preflight": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4541",
+      "claimedAt": "2026-10-04T08:35:56.924Z"
     }
   }
 }
