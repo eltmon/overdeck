@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:25:33.252Z",
+  "updated": "2026-10-04T02:25:46.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "wire-unchanged-backoff.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T02:25:33.251Z"
+    },
+    "wire-unchanged-backoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:25:46.630Z"
     }
   }
 }
