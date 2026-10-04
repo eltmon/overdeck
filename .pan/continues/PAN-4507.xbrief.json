@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:28:08.133Z",
+  "updated": "2026-10-04T02:28:20.109Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "cache-status-reason.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T02:28:08.132Z"
+    },
+    "reset-poll-cadence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:28:20.109Z"
     }
   }
 }
