@@ -10,6 +10,16 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.66.0" description="2026-10-04">
+  #### Fixed
+
+  - **Projects find their GitHub tracker themselves:** a project registered without `tracker`, `github_repo` or `issue_prefix` used to show "No tracker configured … set tracker: or issue_prefix: in projects.yaml" and an empty Issues panel. When the project's origin remote is on GitHub, the dashboard (at startup), `pan sync` and project setup now write `github_repo: owner/repo` into `~/.overdeck/projects.yaml` and log what they set. Projects with no GitHub origin still show the message, which now names `github_repo:` or `tracker:` instead of `issue_prefix:`.
+  - **First message to a new conversation is no longer refused:** a Claude Code conversation started in a directory Claude Code had never trusted stopped at the "Do you trust the files in this folder?" dialog, and Herdr refused the first message with `agent_blocked`. Conversation launches are now pre-trusted like issue agents, and `~/.claude.json` is created if it does not exist yet. When an agent is waiting at a dialog for any other reason, the delivery error now quotes the dialog and tells you to answer it in the Terminal tab.
+  - **The Codex authentication banner clears after `codex login`:** signing in with `codex login` in your own terminal refreshed `~/.codex/auth.json`, but the banner kept showing "expired" from CLIProxy's stale copy until the dashboard restarted. The status check now re-copies the newer credentials first. An access token that has lapsed but still has a refresh token no longer counts as expired, because Codex and CLIProxy refresh it on next use, so it no longer blocks Codex spawns either. The banner now names which copy (`~/.codex` or the CLIProxy copy) is bad.
+
+  [Compare v0.65.0...v0.66.0](https://github.com/eltmon/overdeck/compare/v0.65.0...v0.66.0)
+</Update>
+
 <Update label="v0.65.0" description="2026-10-04">
   #### New
 
