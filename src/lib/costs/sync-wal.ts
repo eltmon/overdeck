@@ -106,6 +106,7 @@ function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCost
     cost: event.cost ?? 0,
     requestId: event.requestId ?? null,
     sourceFile,
+    effort: event.effort ?? null,
   };
 }
 
