@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:11:12.751Z",
+  "updated": "2026-10-04T10:11:24.188Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "deploy-probe-retry.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T10:11:12.751Z"
+    },
+    "close-out-stall-profile.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:24.188Z"
     }
   }
 }
