@@ -345,6 +345,26 @@ export class IssueDataService {
       this.pollRally(),
     ]);
     this.pushSnapshot();
+    for (const tracker of ['github', 'linear', 'rally']) this.resetPollCadence(tracker);
+  }
+
+  /**
+   * PAN-4507: return a tracker to its default cadence. Zeroes the unchanged streak and
+   * re-arms the timer only when the armed poll is further away than the default
+   * interval, so repeated resets never postpone a due poll. Never polls and never
+   * touches the cache, so stored ETags keep conditional requests free.
+   */
+  resetPollCadence(tracker: string): void {
+    const state = this.trackers[tracker];
+    const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
+    if (!state || !intervals) return;
+    state.unchangedStreak = 0;
+    state.cadenceGeneration++;
+    if (this.started && state.timer && state.nextPollAt !== null && state.nextPollAt - Date.now() > intervals.default) {
+      clearTimeout(state.timer);
+      state.timer = null;
+      this.scheduleNext(tracker);
+    }
   }
 
   /**

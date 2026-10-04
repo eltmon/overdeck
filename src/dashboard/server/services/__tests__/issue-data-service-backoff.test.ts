@@ -149,6 +149,66 @@ describe('IssueDataService GitHub unchanged backoff (PAN-4507)', () => {
     expect(github().intervalReason).toBe('rate-limit-backoff');
   });
 
+  describe('resetPollCadence', () => {
+    it('re-arms a backed-off poll at the default interval without polling', async () => {
+      await grow(4);
+      expect(github().currentInterval).toBe(300_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      const callsBefore = paginateMock.mock.calls.length;
+
+      svc.resetPollCadence('github');
+
+      expect(github().unchangedStreak).toBe(0);
+      expect(github().currentInterval).toBe(30_000);
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(paginateMock.mock.calls.length).toBe(callsBefore);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(paginateMock.mock.calls.length).toBe(callsBefore + 2);
+    });
+
+    it('leaves a poll that is already due within the default interval alone', async () => {
+      await grow(4);
+      svc.resetPollCadence('github');
+      await vi.advanceTimersByTimeAsync(10_000);
+      const due = github().nextPollAt;
+
+      svc.resetPollCadence('github');
+
+      expect(github().nextPollAt).toBe(due);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('keeps an in-flight unchanged poll from advancing the streak after a reset', async () => {
+      await grow(0);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      paginateMock.mockImplementationOnce(async (fn: unknown, params: unknown, mapFn?: (response: unknown) => unknown[]) => {
+        await gate;
+        return pageOf([])(fn, params, mapFn);
+      });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(github().timer).toBeNull();
+
+      svc.resetPollCadence('github');
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(github().unchangedStreak).toBe(0);
+      expect(github().currentInterval).toBe(30_000);
+    });
+
+    it('ends clearCacheAndRefresh at the default interval', async () => {
+      await grow(3);
+      expect(github().currentInterval).toBe(240_000);
+
+      await svc.clearCacheAndRefresh();
+
+      expect(github().currentInterval).toBe(30_000);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+  });
+
   describe('getDiagnostics', () => {
     it('reports the default cadence before any poll is scheduled', () => {
       expect(svc.getDiagnostics().github).toMatchObject({
