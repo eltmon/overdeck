@@ -79,7 +79,7 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-amber)' }}>The Shelf &amp; Governor Tides</h4>
-            <p>When the preemptive scheduler or memory governor needs a slot, an <b>amber tide sweeps the river</b> and the yielded orb sinks onto the ⏸ SHELF with its reason attached. A green flash marks an agent resumed into the freed slot.</p>
+            <p>When the preemptive scheduler or memory governor needs a slot, an <b>amber tide sweeps the river</b> and the yielded orb sinks onto the ⏸ SHELF with its reason attached. A green flash marks an agent resumed into the freed slot. Operator holds and paused agents wait on the shelf too, with the pause reason beside the orb (the full reason is in the hover card).</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: '#9fc7ff' }}>Frost &amp; The Doldrums</h4>

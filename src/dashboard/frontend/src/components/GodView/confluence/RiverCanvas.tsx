@@ -478,7 +478,7 @@ function createEngine(
   const drawZones = () => {
     fx.fillStyle = 'rgba(255,184,0,0.04)'; fx.fillRect(layout.padX, layout.shelfTop, width - layout.padX * 2, layout.shelfH);
     fx.strokeStyle = 'rgba(255,184,0,0.16)'; fx.setLineDash([4, 6]); fx.beginPath(); fx.moveTo(layout.padX, layout.shelfTop); fx.lineTo(width - layout.padX, layout.shelfTop); fx.stroke(); fx.setLineDash([]);
-    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,0.5)'; fx.textAlign = 'right'; fx.fillText('⏸ SHELF — parked / yielded by governor', width - layout.padX - 8, layout.shelfHeaderY);
+    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,0.5)'; fx.textAlign = 'right'; fx.fillText('⏸ SHELF — paused / parked / yielded', width - layout.padX - 8, layout.shelfHeaderY);
     const frost = fx.createLinearGradient(0, layout.doldrumsTop, 0, layout.doldrumsBottom);
     frost.addColorStop(0, 'rgba(120,170,255,0.02)'); frost.addColorStop(1, 'rgba(120,170,255,0.08)'); fx.fillStyle = frost;
     fx.fillRect(layout.padX, layout.doldrumsTop, width - layout.padX * 2, layout.doldrumsH);
