@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T02:26:23.996Z",
+  "updated": "2026-10-04T02:26:34.172Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4506",
       "claimedAt": "2026-10-04T02:17:50.499Z",
       "doneAt": "2026-10-04T02:26:23.996Z"
+    },
+    "journal-dispatch-failed-type": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:26:34.172Z"
     }
   }
 }
