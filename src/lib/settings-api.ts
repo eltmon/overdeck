@@ -33,6 +33,7 @@ import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
 import { telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
+import { jevToggleProblems } from './jev/settings-validation.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
@@ -1230,6 +1231,14 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   }
 
   validateWorkhorsesAndRoles(settings, errors, warnings);
+
+  const currentJevConfig = loadConfigSync()?.config;
+  for (const problem of jevToggleProblems(settings.background_ai?.features ?? {}, currentJevConfig && {
+    model: currentJevConfig.jev?.model,
+    features: currentJevConfig.backgroundAi?.features,
+  })) {
+    (problem.level === 'error' ? errors : warnings).push(problem.message);
+  }
 
   // Validate gemini thinking level
   if (settings.models?.gemini_thinking_level !== undefined) {

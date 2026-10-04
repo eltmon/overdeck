@@ -64,6 +64,8 @@ tiered_execution:
       harness: claude-code
       difficulties: [expert]
       effort: xhigh
+  escalation:
+    effort_first: true
 ```
 
 ```yaml
@@ -106,6 +108,54 @@ fails config load with `effortConfigErrors()`'s `is not supported by <model>`
 message — you have to fix the file. An explicit `--effort` flag or a
 resolved runtime value that turns out unsupported is clamped instead, with a
 warning printed to stderr — a spawn never hard-fails over it.
+
+## Tier escalation
+
+`tiered_execution.escalation.effort_first` raises an item's effort one level
+before promoting it to the next tier's model:
+
+```yaml
+tiered_execution:
+  escalation:
+    enabled: true
+    retries_at_tier: 1
+    max_promotions: 2
+    effort_first: true
+```
+
+For an item that has exhausted its retries at the current tier,
+`decideEscalation()` (`src/lib/agents/tier-escalation.ts`) walks this order
+(D9):
+
+1. No effective difficulty → `block`.
+2. Promotions already at `max_promotions` → `block`.
+3. Already at `expert` → `block`.
+4. Attempts below `retries_at_tier` → `retry`.
+5. `effort_first` is on and this item has not raised effort yet → `raise-effort`
+   one level above its current staffed effort (via `supportedEffortLevels()`,
+   so the raise never exceeds what the model/harness pair accepts) instead of
+   promoting to the next tier's model.
+6. Otherwise → `promote` to the next tier's model, exactly as before
+   `effort_first` existed.
+
+Only one effort raise happens per tier — once `effectiveEffort` is set on the
+item's override, the next escalation falls through to step 6 and promotes.
+A raise does not count toward `max_promotions`: `applyEscalationAction()`
+leaves `promotions` unchanged for a `raise-effort` action, only incrementing
+it for a `promote`. When there is no supported level above the current
+effort (already at `max`, or the model/harness pair caps below the next
+level), `decideEscalation()` promotes instead of raising.
+
+`decideEscalation()` and `applyEscalationAction()` are pure functions with no
+caller yet — no supervisor-blocked or verification-failed event wires a real
+escalation trigger. That connection is tracked in
+[#4512](https://github.com/eltmon/overdeck/issues/4512).
+
+In Settings, each tiered-execution crew has its own Effort select
+(`aria-label="Crew effort"`, inherit or one of the five levels), the
+Escalation panel has a "Raise effort before promoting the model" switch for
+`effort_first`, and each review sub-role under Roles Models has its own
+Effort select.
 
 ## Relaunch keeps effort
 
@@ -186,6 +236,17 @@ assistant turn).
   claude-code agents through `/effort`, and codex, ACP, OpenCode, and pi
   conversations through their control channels — see
   [Changing effort on a running session](#changing-effort-on-a-running-session).
+- Tiered-execution work spawns — a registered swarm slot
+  (`resolveSlotTierSpawnParams`) and the single work agent
+  (`resolveSingleWorkTierSpawnParams`) both staff through `resolveStaffing()`,
+  which resolves effort via the same precedence chain with the item's tier as
+  layer 4, and `pickLaunchEffort()` (`src/lib/agents/launch-effort.ts`) lets
+  that staffed value win over `pan start`'s non-explicit default while still
+  letting an explicit `--effort` outrank it.
+- The standing tier supervisor (`spawnTierSupervisor`) and the merge-train's
+  re-review dispatch (`reDispatchVerification` in
+  `src/lib/cloister/merge-train-deps.ts`), both via `resolveEffort({ role:
+  'review', ... })`.
 - Planning — `pan plan --effort`, the dashboard Plan dialog (default `high`,
   all five levels), and the planning half of `pan start` on an unplanned
   issue. The start-planning API rejects an unknown level with 400; the
@@ -197,13 +258,12 @@ assistant turn).
   prints the resolved level and its source.
 
 Everything else — specialist/review-parent/test/worker
-launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
-staffing, and dashboard-wide display — still resolves effort ad
-hoc and is tracked in sibling issues:
+launches, the Flywheel orchestrator, remote Fly workspaces, and
+dashboard-wide display — still resolves effort ad hoc and is tracked in
+sibling issues:
 
 | Surface | Issue |
 | --- | --- |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
-| Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
 | Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
 | Per-harness mapping/clamping correctness | [#4260](https://github.com/eltmon/overdeck/issues/4260) |

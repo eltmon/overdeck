@@ -1,3 +1,4 @@
+import { EFFORT_LEVELS, type EffortLevel } from '@overdeck/contracts';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
 import type { Harness, SettingsConfig, WorkhorsesConfig } from '../types';
@@ -35,6 +36,14 @@ function HarnessSelect({ model, value, settings, onChange, label = 'Harness' }: 
   return <label className="space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span><select aria-label={label} value={value} onChange={(event) => onChange(event.target.value === 'auto' ? automatic : event.target.value as Harness)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground">
     <option value="auto">auto ({automatic})</option>
     {HARNESSES.map((harness) => <option key={harness} value={harness}>{harness}</option>)}
+  </select></label>;
+}
+
+/** PAN-4257: the effort a crew launches its agents at. Empty = inherit the role/default chain. */
+function EffortSelect({ value, onChange }: { value: EffortLevel | undefined; onChange: (value: EffortLevel | undefined) => void }) {
+  return <label className="space-y-1.5"><span className="text-xs font-medium text-foreground">Effort</span><select aria-label="Crew effort" value={value ?? ''} onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value as EffortLevel)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground">
+    <option value="">inherit</option>
+    {EFFORT_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
   </select></label>;
 }
 
@@ -102,6 +111,9 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
         </div>)}
         <button type="button" onClick={() => updateEntries([...entries, { model: DEFAULT_CREW_MODEL, harness: providerDefaultHarness(DEFAULT_CREW_MODEL, settings), weight: 0 }])} className="rounded-md border border-border px-2.5 py-1.5 text-xs">Add model</button>
       </>}
+      <div className="grid gap-3 @xl:grid-cols-2">
+        <EffortSelect value={crew.effort} onChange={(effort) => onChange({ ...crew, effort })} />
+      </div>
       <div className="flex justify-between gap-2">
         <button type="button" onClick={() => entries ? onChange({ ...crew, distribution: undefined }) : onChange({ ...crew, distribution: [{ model: crew.model, harness: crew.harness, weight: 100 }] })} className="rounded-md border border-border px-2.5 py-1.5 text-xs">{entries ? 'Use one model' : 'Use a weighted mix'}</button>
         <button type="button" onClick={onRequestRemove} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground">Remove crew</button>

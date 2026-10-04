@@ -32,9 +32,11 @@ interface RowProps {
   onOpenTerminal?: () => void;
   /** PAN-3113 — record a dashboard-answered pane choice. */
   onPaneChoiceAnswered?: (signature: string, label: string) => void;
+  /** PAN-4498 — main conversation timeline only: role icons bookmark messages. */
+  bookmarkable?: boolean;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -71,7 +73,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
     return <SessionPermissionsRow message={row.message} />;
   }
   if (row.message.role === 'user') {
-    return <UserMessageRow message={row.message} cwd={cwd} issueId={issueId} />;
+    return <UserMessageRow message={row.message} cwd={cwd} issueId={issueId} bookmarkable={bookmarkable} />;
   }
   return (
     <AssistantMessageRow
@@ -83,6 +85,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
       turnDiffSummary={turnDiffSummary}
       onOpenTurnDiff={onOpenTurnDiff}
       resolvedTheme={resolvedTheme}
+      bookmarkable={bookmarkable}
     />
   );
 });

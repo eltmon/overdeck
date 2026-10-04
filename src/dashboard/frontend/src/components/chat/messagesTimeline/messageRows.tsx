@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bot, ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
 import type { ChatMessage, TurnDiffSummary } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
 import { ChangedFilesTree } from '../ChangedFilesTree';
@@ -10,6 +10,7 @@ import { useComposerStore } from '../../../lib/composerStore';
 import { openImageLightbox } from '../ImageLightbox';
 import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
+import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
 
 /** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
 function AttachmentThumbnails({ text }: { text: string }) {
@@ -57,7 +58,7 @@ function parseSlashCommandMessage(text: string): { command: string } | null {
   return match ? { command: match[1] } : null;
 }
 
-export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage; cwd?: string; issueId?: string | null }) {
+export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean }) {
   const slashCommand = parseSlashCommandMessage(message.text);
   if (slashCommand) {
     return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
@@ -81,6 +82,7 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
           <AttachmentThumbnails text={message.text} />
           <span className={styles.messageTimestamp}>{`Delivered to subagent · ${description}`}</span>
         </div>
+        <MessageRoleIcon message={message} role="user" bookmarkable={false} className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70" />
       </div>
     );
   }
@@ -106,6 +108,7 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
             </button>
           </span>
         </div>
+        <MessageRoleIcon message={message} role="user" bookmarkable={false} className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70" />
       </div>
     );
   }
@@ -133,6 +136,12 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
           )}
         </span>
       </div>
+      <MessageRoleIcon
+        message={message}
+        role="user"
+        bookmarkable={!!bookmarkable && !isPending && !message.id.startsWith('optimistic-')}
+        className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70"
+      />
     </div>
   );
 }
@@ -199,6 +208,7 @@ export function AssistantMessageRow({
   resolvedTheme,
   cwd,
   issueId,
+  bookmarkable,
 }: {
   message: ChatMessage;
   durationStart: string;
@@ -208,6 +218,7 @@ export function AssistantMessageRow({
   turnDiffSummary?: TurnDiffSummary;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
+  bookmarkable?: boolean;
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
@@ -217,7 +228,12 @@ export function AssistantMessageRow({
 
   return (
     <div className={styles.assistantMessageRow}>
-      <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
+      <MessageRoleIcon
+        message={message}
+        role="assistant"
+        bookmarkable={!!bookmarkable && !(isStreaming && !message.completedAt)}
+        className={styles.assistantMessageAvatar}
+      />
       <div className={styles.assistantMessageContent}>
         <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (

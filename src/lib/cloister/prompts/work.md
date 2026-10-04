@@ -267,6 +267,7 @@ writes.
 - Declare infrastructure "complete" when tests still fail
 - Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
 - Use `sleep` to wait for reviews, tests, or any external process
+- Call `AskUserQuestion` to pause, wait, or report status. It is only for real operator decisions; each call reaches the operator as a modal. To wait for a background task or Monitor, end your turn. To report status, write it as text.
 - **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between xBRIEF tasks.
 - **End your turn with a multi-paragraph "what I just did" summary and idle.** Complete the item with `pan task done {{ISSUE_ID}} <item>`, then immediately call `pan task next {{ISSUE_ID}}` and start the next one.
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
@@ -283,7 +284,7 @@ writes.
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
-**CRITICAL: NEVER stop working without calling `pan done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan done` is a failure state that blocks the entire pipeline.
+**CRITICAL: NEVER stop working without calling `pan done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan done` is a failure state that blocks the entire pipeline — with one exception: while a Monitor or background task you started is still running, ending your turn is the correct way to wait. Its notification wakes you; that is not parking.
 
 ## CRITICAL: Work Completion Requirements
 

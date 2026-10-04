@@ -5,8 +5,12 @@ import type { TieredExecutionSupervisorConfig } from '../tier-table.js';
 vi.mock('../spawn.js', () => ({
   spawnRun: vi.fn(),
 }));
+vi.mock('../resolve-effort.js', () => ({
+  resolveEffort: vi.fn(),
+}));
 
 import { spawnRun } from '../spawn.js';
+import { resolveEffort } from '../resolve-effort.js';
 import {
   DEFAULT_SUPERVISOR_SAMPLE_RATE,
   buildSupervisorReviewMessage,
@@ -104,6 +108,31 @@ describe('spawnTierSupervisor', () => {
   beforeEach(() => {
     vi.mocked(spawnRun).mockReset();
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-9999-review-supervisor' } as AgentState);
+    vi.mocked(resolveEffort).mockReset();
+    vi.mocked(resolveEffort).mockReturnValue({ effort: 'high', source: 'role', requested: 'high', clamped: false });
+  });
+
+  // PAN-4257 (review-callsite-effort)
+  it('resolves effort for role review, sub-role supervisor, the issue, and the tier-table model/harness', async () => {
+    await spawnTierSupervisor('PAN-9999', supervisor);
+
+    expect(resolveEffort).toHaveBeenCalledTimes(1);
+    expect(resolveEffort).toHaveBeenCalledWith({
+      role: 'review',
+      subRole: SUPERVISOR_SUB_ROLE,
+      issueId: 'PAN-9999',
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+    });
+  });
+
+  it('passes the resolved effort and its source through to spawnRun', async () => {
+    vi.mocked(resolveEffort).mockReturnValue({ effort: 'medium', source: 'sub-role', requested: 'medium', clamped: false });
+
+    await spawnTierSupervisor('PAN-9999', supervisor);
+
+    const [, , options] = vi.mocked(spawnRun).mock.calls[0];
+    expect(options).toMatchObject({ effort: 'medium', effortSource: 'sub-role' });
   });
 
   it('spawns a registered review run using the tier-table supervisor model and harness', async () => {

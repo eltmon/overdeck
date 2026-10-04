@@ -1,14 +1,40 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Gauge } from 'lucide-react';
 import {
   BACKGROUND_AI_FEATURE_META,
   type BackgroundAiConfig,
   type BackgroundAiFeature,
+  type JevFeatureUsage,
+  type JevSettingsInput,
+  type JevSettingsView,
+  type JevUsageView,
   type ModelId,
   type SettingsConfig,
 } from '../types';
 import { EMBEDDING_MODELS_BY_PROVIDER } from '../embeddingModels';
+import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { BG_FEATURE_COST_SOURCE } from '../settingsPageConstants';
+import { JevSettingsPanel } from './JevSettingsPanel';
+
+const JEV_FEATURE_KEYS = ['jevTurnEndAssessment', 'jevAcceptanceCriteriaReview', 'jevMemoryRelevance'] as const;
+
+type JevFeatureKey = (typeof JEV_FEATURE_KEYS)[number];
+
+function isJevFeatureKey(key: BackgroundAiFeature): key is JevFeatureKey {
+  return (JEV_FEATURE_KEYS as readonly string[]).includes(key);
+}
+
+/** 'No calls yet', or '<n> call(s) in 24h · last call <relative>[ · last error: <reason>[ (<status>)] <relative>]'. */
+function jevUsageText(usage: JevFeatureUsage, now: Date): string {
+  if (usage.lastCallAt === null) return 'No calls yet';
+  const callWord = usage.calls24h === 1 ? 'call' : 'calls';
+  let text = `${usage.calls24h} ${callWord} in 24h · last call ${formatRelativeTime(usage.lastCallAt, now)}`;
+  if (usage.lastError) {
+    const statusSuffix = usage.lastError.status !== undefined ? ` (${usage.lastError.status})` : '';
+    text += ` · last error: ${usage.lastError.reason}${statusSuffix} ${formatRelativeTime(usage.lastError.at, now)}`;
+  }
+  return text;
+}
 
 interface BackgroundAiSectionProps {
   backgroundCost?: {
@@ -17,6 +43,12 @@ interface BackgroundAiSectionProps {
   chatModelOptionEls: ReactNode;
   formData: SettingsConfig;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
+  jev?: {
+    settings?: JevSettingsView;
+    usage?: JevUsageView | null;
+    serverError: string | null;
+    onSave: (next: JevSettingsInput, opts?: { debounce?: boolean }) => void;
+  };
 }
 
 export function BackgroundAiSection({
@@ -24,7 +56,14 @@ export function BackgroundAiSection({
   chatModelOptionEls,
   formData,
   onSettingsChange,
+  jev,
 }: BackgroundAiSectionProps) {
+  // PAN-4508: a Jev feature toggle makes no request with jev.model blank, so turning one on
+  // (never off) is blocked client-side with an inline error under that row.
+  const [jevToggleError, setJevToggleError] = useState<{ key: BackgroundAiFeature; message: string } | null>(null);
+  // Taken once per render so every row's relative-time readout agrees.
+  const now = new Date();
+
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
     onSettingsChange({
@@ -186,9 +225,19 @@ export function BackgroundAiSection({
                   </span>
                 )}
                 <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+                {isJevFeatureKey(feature.key) && jev?.usage && (
+                  <p data-testid={`jev-usage-${feature.key}`} className="text-[11px] text-muted-foreground mt-0.5">
+                    {jevUsageText(jev.usage.features[feature.key], now)}
+                  </p>
+                )}
                 <div className="mt-1.5 flex items-center gap-2">
                   {backgroundModelControl(feature.key)}
                 </div>
+                {jevToggleError?.key === feature.key && (
+                  <p data-testid="jev-toggle-error" role="alert" className="text-xs text-destructive mt-1">
+                    {jevToggleError.message}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span
@@ -204,7 +253,15 @@ export function BackgroundAiSection({
                   aria-checked={effectiveOn}
                   aria-label={`Toggle ${feature.label}`}
                   disabled={cheapMode}
-                  onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
+                  onClick={() => {
+                    const turningOn = !featureOn;
+                    if (feature.key.startsWith('jev') && turningOn && jev && !(jev.settings?.model ?? '').trim()) {
+                      setJevToggleError({ key: feature.key, message: 'Set a Jev model below before turning on a Jev feature.' });
+                      return;
+                    }
+                    setJevToggleError(null);
+                    updateBackgroundAi({ features: { [feature.key]: turningOn } });
+                  }}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
                     effectiveOn ? 'bg-primary' : 'bg-muted'
                   }`}
@@ -218,15 +275,15 @@ export function BackgroundAiSection({
           );
         })}
 
-        {/* PAN-4369: key for the optional Jev toggles. TypeSafe is not a model provider, so the
-            slot lives here rather than in Providers. Model and endpoint stay config.yaml-only. */}
+        {/* PAN-4508: key for the optional Jev toggles. TypeSafe is not a model provider, so the
+            slot lives here rather than in Providers. Route, model and timeout are editable
+            below (jev: in config.yaml) via the dedicated settings door; api_key_ref stays
+            config.yaml-only. */}
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg">
           <div className="min-w-0">
             <span className="text-sm font-medium text-foreground">TypeSafe API key (Jev)</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Used by the Jev toggles above. Accepts a TypeSafe console key or an OpenCode Zen key. The
-              model and endpoint are set under <code className="font-mono">jev:</code> in config.yaml — see
-              the Jev configuration docs.
+              Used by the Jev toggles above. Accepts a TypeSafe console key or an OpenCode Zen key.
             </p>
           </div>
           <input
@@ -244,6 +301,17 @@ export function BackgroundAiSection({
           />
         </div>
       </div>
+      {jev?.settings && (
+        <JevSettingsPanel
+          settings={jev.settings}
+          anyJevToggleOn={
+            !(formData.background_ai?.cheap_mode ?? false) &&
+            JEV_FEATURE_KEYS.some((key) => formData.background_ai?.features?.[key] ?? true)
+          }
+          serverError={jev.serverError}
+          onSave={jev.onSave}
+        />
+      )}
       <p className="text-[11px] text-muted-foreground mt-3 px-4">
         You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the
         choice is saved and takes effect when the feature runs, but a model shown under a

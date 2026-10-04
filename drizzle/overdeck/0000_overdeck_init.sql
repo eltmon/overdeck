@@ -80,6 +80,17 @@ CREATE TABLE `conversation_pull_requests` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`);--> statement-breakpoint
+CREATE TABLE `conversation_bookmarks` (
+	`conversation_id` text NOT NULL,
+	`message_id` text NOT NULL,
+	`label` text NOT NULL,
+	`message_created_at` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	PRIMARY KEY(`conversation_id`, `message_id`),
+	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `conversations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,

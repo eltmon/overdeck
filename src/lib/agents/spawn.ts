@@ -44,6 +44,7 @@ import {
 import { saveAgentRuntimeState } from './runtime-state.js';
 import { clearReadySignal } from './identity.js';
 import { spawnEffortFields } from './relaunch-effort.js';
+import { pickLaunchEffort, type LaunchEffort } from './launch-effort.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry } from './delivery.js';
 import { determineModel, getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import {
@@ -143,6 +144,7 @@ async function spawnRunWithoutConsentClaim(
     // above, unchanged.
     let slotModel = selectedModel;
     let slotHarness = options.harness;
+    let slotEffort: LaunchEffort = { effort: options.effort, effortSource: options.effortSource };
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
       const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model, modelSpawnKey);
@@ -152,6 +154,7 @@ async function spawnRunWithoutConsentClaim(
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
+      slotEffort = pickLaunchEffort(slotEffort, tierParams);
       // PAN-3842: build fitness payload through the production helper (FINAL selected model).
       const fitness = resolveSlotSpawnFitness(role, modelSpawnKey, tierParams, options.model, slotHarness, slot.slotItemId);
       logTierFitnessAtSpawn(slot.agentId, fitness.staffing, fitness.difficulties, fitness.items);
@@ -171,8 +174,8 @@ async function spawnRunWithoutConsentClaim(
       allowHost: options.allowHost,
       startedBy: options.startedBy,
       autoSpawnConsentRequired: options.autoSpawnConsentRequired,
-      effort: options.effort,
-      effortSource: options.effortSource,
+      effort: slotEffort.effort,
+      effortSource: slotEffort.effortSource,
       slotIndex: slot?.slotIndex,
       slotItemId: slot?.slotItemId, foreman: options.foreman,
     }, acceptConsent);
@@ -663,6 +666,7 @@ async function spawnAgentWithoutConsentClaim(
   const singleTierParams = role === 'work' && options.slotItemId === undefined && options.slotIndex === undefined
     ? resolveSingleWorkTierSpawnParams(options.workspace, options.model, modelSpawnKey)
     : {};
+  const launchEffort = pickLaunchEffort({ effort: options.effort, effortSource: options.effortSource }, singleTierParams);
   const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
   // PAN-3842: plan-max fitness; log against the FINAL selected model so explicit overrides still warn.
@@ -706,7 +710,7 @@ async function spawnAgentWithoutConsentClaim(
     role, foreman: options.foreman || undefined,
     model: selectedModel,
     modelSpawnKey,
-    ...spawnEffortFields(options.effort, options.effortSource),
+    ...spawnEffortFields(launchEffort.effort, launchEffort.effortSource),
     status: 'starting',
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
@@ -811,7 +815,7 @@ async function spawnAgentWithoutConsentClaim(
     harnessBinaryPath: harnessLaunch.binaryPath,
     sessionId: state.sessionId,
     extraEnvExports: [harnessLaunch.pathExport],
-    effort: options.effort,
+    effort: launchEffort.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

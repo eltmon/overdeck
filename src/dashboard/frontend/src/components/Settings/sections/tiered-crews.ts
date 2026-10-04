@@ -1,3 +1,4 @@
+import type { EffortLevel } from '@overdeck/contracts';
 import { MODELS_BY_PROVIDER, type ModelDef } from '../modelCatalog';
 import { checkTierFitness, type TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
 import { capabilityClassOf } from '../../../../../../lib/model-capability-class.js';
@@ -72,6 +73,8 @@ export interface Crew {
   model: ModelId;
   harness: Harness;
   distribution?: CrewEntry[];
+  /** PAN-4257: reasoning effort this crew launches its agents at. Unset = inherit. */
+  effort?: EffortLevel;
 }
 
 export type CrewAssignments = Partial<Record<XBriefDifficulty, string>>;
@@ -94,8 +97,9 @@ function sortedDistribution(entries: readonly CrewEntry[]): CrewEntry[] {
 }
 
 function staffingKey(crew: Omit<Crew, 'id'>): string {
-  if (!crew.distribution) return `single:${crew.model}:${crew.harness}`;
-  return `mix:${JSON.stringify(sortedDistribution(crew.distribution))}`;
+  const effortPart = crew.effort ?? '';
+  if (!crew.distribution) return `single:${crew.model}:${crew.harness}:${effortPart}`;
+  return `mix:${effortPart}:${JSON.stringify(sortedDistribution(crew.distribution))}`;
 }
 
 export function deriveTierName(difficulties: readonly XBriefDifficulty[]): string {
@@ -117,6 +121,7 @@ export function importCrews(config: TieredExecutionConfig): {
       model: tier.model,
       harness: tier.harness,
       distribution: tier.distribution ? sortedDistribution(tier.distribution) : undefined,
+      effort: tier.effort,
     };
     const key = staffingKey(staffing);
     let crew = crewByStaffing.get(key);
@@ -176,6 +181,7 @@ export function serializeCrews(
       harness: representative?.harness ?? crew.harness,
       difficulties,
       ...(distribution ? { distribution } : {}),
+      ...(crew.effort ? { effort: crew.effort } : {}),
     };
   }
 

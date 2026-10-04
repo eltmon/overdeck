@@ -1,0 +1,756 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:11:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4498: Conversation bookmarks: mark a message by clicking its role icon and jump back to it later",
+    "updated": "2026-10-04T02:14:39.047Z"
+  },
+  "plan": {
+    "id": "pan-4498",
+    "title": "Conversation bookmarks: mark a message by clicking its role icon and jump back to it later",
+    "status": "running",
+    "uid": "3baab8e8-7c0a-4f4a-b1e2-9974e90e99fe",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:11:35Z",
+    "updated": "2026-10-04T02:14:39.047Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4498",
+        "label": "PAN-4498",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "frontend",
+      "overdeck-db"
+    ],
+    "narratives": {
+      "Problem": "Long conversations bury the messages worth returning to (findings, decisions, drafts). The timeline offers search but no way to mark a message and come back to it after a reload.",
+      "Proposal": "Store operator bookmarks in a new conversation_bookmarks table in overdeck.db (door src/lib/overdeck/conversation-bookmarks.ts) keyed by conversation and the transcript's stable message id, exposed through GET/PUT/DELETE /api/conversations/:name/bookmarks. In the dashboard, a ConversationBookmarksProvider (react-query) wraps ConversationPanel; the role icon of each message in the main timeline becomes a button (assistant Bot, new user User icon) that bookmarks with a first-line default label and turns into a filled Bookmark marker; clicking it again opens a rename/remove popover; a header Bookmarks toggle opens a drawer listing label and time with rename/remove, and clicking an entry scrolls the virtualized timeline to the message and flashes it for 1600 ms. Full detail: .pan/drafts/PAN-4498.md.",
+      "NonGoals": "- Bookmarks across conversations (a global list)\n- Offering bookmarked messages as handoff context\n- Copying bookmarks to a fork or handoff successor conversation\n- Bookmarking work-log/tool rows, slash-command dividers, fork-summary or review-context blocks, command results, system rows, optimistic/held/subagent-routed user messages, or streaming messages\n- Bookmarking in SubagentTranscript, SessionTranscript, DirectoryTranscript or TerminalPanel timelines\n- Live cross-tab or cross-device sync (no event emission)\n- A pan CLI verb for bookmarks\n- Writing anything into the harness transcript or changing any transcript parser or message id derivation\n- Server-side checks that a message id exists in the transcript\n- Auto-switching from terminal view or a subagent transcript to the main timeline when a bookmark is clicked\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Store bookmarks in a new conversation_bookmarks table in overdeck.db behind a door module",
+        "rationale": "The issue requires Overdeck-side storage that survives reloads; bookmarks are operator-authored facts that cannot be derived, and conversation_pull_requests (PAN-3822) is the established per-conversation table + door precedent. localStorage would not survive another browser."
+      },
+      {
+        "summary": "First click on a role icon bookmarks; a second click opens a rename/remove popover",
+        "rationale": "Satisfies both issue phrases ('clicking its role icon bookmarks' and 'remove or rename ... by clicking the icon again') without making removal a single accidental click."
+      },
+      {
+        "summary": "The bookmarked marker is the role icon itself rendered as a filled primary Bookmark glyph",
+        "rationale": "Smallest visual change that meets 'a marker appears on it'; primary color is used only for an active state per the style guide."
+      },
+      {
+        "summary": "Add a User role icon right of user message bubbles in every MessagesTimeline mount; it is a button only in the main conversation timeline",
+        "rationale": "The issue refers to a user marker that does not exist today; mirroring the existing Bot icon (rendered everywhere) keeps the timelines consistent."
+      },
+      {
+        "summary": "Default label = first non-empty line, markdown prefix and emphasis stripped, 80 chars with ellipsis; computed client-side",
+        "rationale": "The issue's example shows a first-line excerpt; the client already holds the message text, so the server only validates length."
+      },
+      {
+        "summary": "Bookmarks list is a drawer under the header opened by a Bookmarks toggle next to About/Tools, not shown in embedded panels",
+        "rationale": "Reuses the existing About drawer pattern and toggle styling; embedded panels hide the header by contract."
+      },
+      {
+        "summary": "Jump flashes a 2px primary outline for 1600 ms and reports a missing message in the drawer",
+        "rationale": "Reuses the outline style the palette-target path already uses; 'highlights it briefly' needs a bounded duration."
+      },
+      {
+        "summary": "GET route scoped read:conversations; PUT/DELETE left unlisted (admin) in ROUTE_SCOPES",
+        "rationale": "Matches the kickoff GET precedent; the scope table grows minimally and fails closed for writes."
+      },
+      {
+        "summary": "Limit 500 bookmarks per conversation and 200-char labels",
+        "rationale": "Bounds an operator-annotation table without affecting realistic use."
+      },
+      {
+        "summary": "Style new UI with Tailwind utilities; do not edit command-deck.module.css",
+        "rationale": "messageRows.tsx already uses Tailwind utilities; avoiding the shared CSS module removes a shared-file edge between items and keeps the plan under the 25-file surface limit."
+      },
+      {
+        "summary": "Do not add the new frontend tests to package.json test:frontend-subset",
+        "rationale": "Matches PAN-4499's chat tests; each item's verify_commands run them explicitly, and the root package.json line is a frequent merge-conflict point."
+      }
+    ],
+    "items": [
+      {
+        "id": "bookmark-store",
+        "title": "Add the conversation_bookmarks table and its door module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-bookmarks.ts",
+            "src/lib/overdeck/__tests__/conversation-bookmarks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-bookmarks.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bookmarks.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-4",
+            "NFR-6",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "bookmark-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly (.pan/drafts/PAN-4498.md): add the conversation_bookmarks CREATE TABLE to drizzle/overdeck/0000_overdeck_init.sql after the idx_conversation_pull_requests_key line, add the matching runSchemaTopUp CREATE TABLE IF NOT EXISTS after line 124 of src/lib/overdeck/infra.ts, and create the door src/lib/overdeck/conversation-bookmarks.ts exporting ConversationBookmark, the three limit constants, validateBookmarkInput, listConversationBookmarks, upsertConversationBookmark (transaction; not-found/limit/saved) and removeConversationBookmark. Resolve conversations.id by name in SQL; never use LegacyConversation.id. Write the named tests in src/lib/overdeck/__tests__/conversation-bookmarks.test.ts using the temp OVERDECK_HOME pattern of conversation-kickoff-store.test.ts."
+        },
+        "items": [
+          {
+            "id": "bookmark-store.ac1",
+            "title": "Given a conversation, when upsertConversationBookmark is called twice for the same messageId with different labels, then listConversationBookmarks returns one bookmark with the second label and the original createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-store.ac2",
+            "title": "Given 500 bookmarks on a conversation, when a new messageId is upserted, then the door returns status 'limit', and renaming an existing bookmark still returns 'saved'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-store.ac3",
+            "title": "Given an unknown conversation name, when upsertConversationBookmark is called, then it returns status 'not-found' and writes no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-store.ac4",
+            "title": "validateBookmarkInput rejects a messageId starting with 'optimistic-', an empty trimmed label, a label over 200 chars, and a messageCreatedAt that Date.parse cannot parse, each with the PRD error string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-store.ac5",
+            "title": "A database created from the init SQL and a database upgraded through the infra.ts top-up both contain a conversation_bookmarks table with the FR-1 columns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmark-routes",
+        "title": "Expose GET/PUT/DELETE bookmark routes under /api/conversations/:name/bookmarks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-bookmarks.ts",
+            "src/dashboard/server/routes/__tests__/conversation-bookmarks-route.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-bookmarks-route.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bookmarks-route.test.ts passes",
+            "tests/unit/lib/overdeck no-loss tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: new route file src/dashboard/server/routes/conversation-bookmarks.ts modeled on routes/conversation-kickoff.ts (validateOrigin, decodeURIComponent of :name and :messageId, 404 via getConversationByName, door calls), exporting conversationBookmarksRouteLayer; register it in server.ts next to conversationKickoffRouteLayer (import ~line 71, layer ~line 312); add only the GET row to ROUTE_SCOPES as read:conversations (PUT/DELETE stay unlisted = admin, decision D9); add the three no-loss-matrix rows from the PRD after the kickoff rows. Write the named route tests."
+        },
+        "items": [
+          {
+            "id": "bookmark-routes.ac1",
+            "title": "GET /api/conversations/:name/bookmarks returns 200 { bookmarks: [] } for a conversation with none, then returns the saved bookmark after a PUT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-routes.ac2",
+            "title": "PUT /api/conversations/:name/bookmarks/:messageId returns 200 { bookmark } on create and on rename, 400 for an empty label or an optimistic- id, and 409 { error: 'Bookmark limit reached (500)' } at the limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-routes.ac3",
+            "title": "DELETE /api/conversations/:name/bookmarks/:messageId returns { removed: true } once and { removed: false } after",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-routes.ac4",
+            "title": "All three routes return 404 { error: 'Conversation not found' } for an unknown conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-routes.ac5",
+            "title": "ROUTE_SCOPES maps GET /api/conversations/:name/bookmarks to read:conversations and the no-loss matrix contains rows for all three routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmark-provider",
+        "title": "Add the ConversationBookmarksProvider context and mount it in ConversationPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/bookmarks/ConversationBookmarks.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/ConversationBookmarks.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/bookmarks/__tests__/ConversationBookmarks.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationAboutDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationBookmarks.test.tsx passes",
+            "ConversationPanel.test.tsx and ConversationAboutDrawer.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "role-icon-toggle",
+            "bookmark-edit-popover",
+            "bookmarks-drawer",
+            "bookmark-jump"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: create src/dashboard/frontend/src/components/chat/bookmarks/ConversationBookmarks.tsx exporting the ConversationBookmark type, defaultBookmarkLabel (decision D3), BookmarkJumpRequest, ConversationBookmarksValue, ConversationBookmarksProvider and useConversationBookmarks (null outside a provider), using react-query key ['conversation-bookmarks', name], fetchWithTimeout from src/lib/apiFetch, an empty list on any GET failure, PUT/DELETE with encodeURIComponent on both name and messageId, setQueryData + invalidate on success, toast.error on mutation failure, and jumpTo/resolveJump/missingMessageId per decision D8. Wrap ConversationPanel's root right inside ConversationPullRequestProvider (line ~698) with ConversationBookmarksProvider conversationName={conversation.name}. If a test that mounts ConversationPanel fails with an unexpected GET .../bookmarks request, add a handler returning { bookmarks: [] } to that test's mock (do not weaken installStrictFetchMock)."
+        },
+        "items": [
+          {
+            "id": "bookmark-provider.ac1",
+            "title": "defaultBookmarkLabel returns the first non-empty line with a leading markdown prefix, backticks and ** removed, cut to 80 chars plus '…', and returns 'Bookmarked message' for blank text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-provider.ac2",
+            "title": "Given GET .../bookmarks returns two bookmarks, when the provider mounts, then useConversationBookmarks().byMessageId contains both message ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-provider.ac3",
+            "title": "Given GET .../bookmarks responds 500 or the fetch rejects, when ConversationPanel renders, then it renders with zero bookmarks and shows no toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-provider.ac4",
+            "title": "Given the provider is mounted, when jumpTo('m1') is called, then jumpRequest returns { messageId: 'm1' } with a nonce one higher than before, and when resolveJump(thatNonce, false) is called, then missingMessageId returns 'm1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-provider.ac5",
+            "title": "useConversationBookmarks() returns null when rendered outside ConversationBookmarksProvider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-icon-toggle",
+        "title": "Make the message role icon a bookmark button with a bookmarked marker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/bookmarks/MessageRoleIcon.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/MessageRoleIcon.test.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/bookmarks/__tests__/MessageRoleIcon.test.tsx src/components/chat/messagesTimeline/messageRows.test.tsx src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MessageRoleIcon.test.tsx, messageRows.test.tsx and MessagesTimeline.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: new MessageRoleIcon component (reads useConversationBookmarks(); plain aria-hidden icon when not bookmarkable or outside a provider; otherwise a button that adds a bookmark with defaultBookmarkLabel(message.text) and message.createdAt, and renders a filled lucide Bookmark with text-primary and aria-pressed=true when bookmarked). Replace the Bot icon at messageRows.tsx line ~220 with it; add a User role icon right of the normal user bubble (plain icon in the held and subagent branches). Thread a bookmarkable boolean through TimelineRowRenderer RowProps, add bookmarksEnabled?: boolean to MessagesTimelineProps (types.ts), pass bookmarkable={bookmarksEnabled} from both MessagesTimeline row mounts, and set bookmarksEnabled only on ConversationView's MessagesTimeline in ConversationPanel.tsx (never in SubagentTranscript). Apply decision D11 (no optimistic, held, subagent-routed, command-result, system or streaming rows). Tailwind utilities only; do not edit command-deck.module.css. Clicking a bookmarked icon does nothing in this item (popover comes in bookmark-edit-popover)."
+        },
+        "items": [
+          {
+            "id": "role-icon-toggle.ac1",
+            "title": "Given an assistant message in a bookmarks-enabled timeline, when its role icon is clicked, then a PUT to /api/conversations/<name>/bookmarks/<encoded id> is sent with label equal to defaultBookmarkLabel(message.text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-icon-toggle.ac2",
+            "title": "Given a user message in a bookmarks-enabled timeline, when the User icon right of the bubble is clicked, then the user message is bookmarked the same way",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-icon-toggle.ac3",
+            "title": "Given a bookmarked message, then its role icon renders a filled Bookmark icon with aria-pressed='true' and title 'Bookmarked: <label>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-icon-toggle.ac4",
+            "title": "Given bookmarksEnabled is false, or no provider, or an optimistic-/held/streaming message, then the role icon renders as a non-button icon and no request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-icon-toggle.ac5",
+            "title": "Given a bookmarked message, when the bookmark list refetches and new messages are appended to the timeline, then the marker stays on the same message id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmark-edit-popover",
+        "title": "Open a rename/remove popover when a bookmarked role icon is clicked",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/bookmarks/MessageRoleIcon.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/MessageRoleIcon.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/bookmarks/__tests__/MessageRoleIcon.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MessageRoleIcon.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 inside MessageRoleIcon.tsx: a BookmarkEditPopover anchored under the icon (relative wrapper; absolute left-0 top-full z-30 w-64 rounded-lg border border-border bg-popover p-2 shadow-lg) with an input aria-label 'Bookmark label' (maxLength 200) pre-filled with the label, Save and Remove buttons. Enter or Save renames via ctx.rename when the trimmed value is non-empty and changed; an empty value closes without a request; Escape and an outside mousedown close it; Remove calls ctx.remove. Clicking a bookmarked icon toggles the popover."
+        },
+        "items": [
+          {
+            "id": "bookmark-edit-popover.ac1",
+            "title": "Given a bookmarked message, when its role icon is clicked, then a popover opens with an input labelled 'Bookmark label' containing the current label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-edit-popover.ac2",
+            "title": "Given the popover is open, when the operator types a new label and presses Enter, then a PUT with the new label is sent and the popover closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-edit-popover.ac3",
+            "title": "Given the popover is open, when Remove is clicked, then a DELETE is sent and the icon renders the role icon with aria-pressed='false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-edit-popover.ac4",
+            "title": "Given the popover is open, when Escape is pressed or the label is cleared and Enter pressed, then the popover closes and no request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmarks-drawer",
+        "title": "Add the Bookmarks header toggle and the bookmarks drawer list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/bookmarks/BookmarksDrawer.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "BookmarksDrawer.test.tsx and ConversationPanel.test.tsx pass",
+            "typecheck completes without errors",
+            "lint-file-size.sh prints the passed line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: new BookmarksDrawer.tsx exporting BookmarksToggle (conversationAboutToggle classes, lucide Bookmark 14px, text 'Bookmarks' plus count when > 0, aria-pressed, aria-label 'Show bookmarks'/'Hide bookmarks') and BookmarksDrawer (only when listOpen; role='list' aria-label='Bookmarks'; per row a label button calling ctx.jumpTo, the time formatTimestamp(messageCreatedAt ?? createdAt), a pencil 'Rename bookmark' inline editor (Enter saves via rename, Escape cancels), a '×' 'Remove bookmark' button; empty-state text from FR-11). Both return null outside a provider. In ConversationPanel.tsx add one import, <BookmarksToggle /> after the Tools toggle, and {!embedded && <BookmarksDrawer />} after the About drawer block. Checkpoint: ConversationPanel.tsx must stay within its allowlist cap (bash scripts/lint-file-size.sh passes); if not, extract the About/Tools toggles into components/chat/ConversationHeaderToggles.tsx. Never raise the allowlist."
+        },
+        "items": [
+          {
+            "id": "bookmarks-drawer.ac1",
+            "title": "Given a conversation with 2 bookmarks, then the header toggle renders 'Bookmarks 2', and clicking it renders a list labelled 'Bookmarks' with each bookmark's label and formatted time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmarks-drawer.ac2",
+            "title": "Given the drawer is open, when 'Rename bookmark' is clicked and a new label entered with Enter, then a PUT with the new label is sent and the row shows it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmarks-drawer.ac3",
+            "title": "Given the drawer is open, when 'Remove bookmark' is clicked, then a DELETE is sent and the row disappears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmarks-drawer.ac4",
+            "title": "Given no bookmarks, when the drawer opens, then it renders 'No bookmarks yet. Click the icon beside a message to bookmark it.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmarks-drawer.ac5",
+            "title": "bash scripts/lint-file-size.sh passes with ConversationPanel.tsx at or under its allowlist cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmark-jump",
+        "title": "Scroll to and flash a bookmarked message when its drawer entry is clicked",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/BookmarksDrawer.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/MessagesTimeline.test.tsx src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx and BookmarksDrawer.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "FR-14",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: in MessagesTimeline.tsx read useConversationBookmarks() only when bookmarksEnabled; handle each jumpRequest nonce once (handledJumpNonceRef), look the row up by message id, call scrollToRow(index, row.id) and set flashRowId, report resolveJump(nonce, found); clear flashRowId after 1600 ms via setTimeout with cleanup; add `|| flashRowId === row.id` to the outline condition of both row wrappers. In BookmarksDrawer.tsx show 'This message is not in the loaded transcript.' under the row whose messageId equals missingMessageId. Tests use vi.useFakeTimers()/vi.advanceTimersByTimeAsync, never real waits."
+        },
+        "items": [
+          {
+            "id": "bookmark-jump.ac1",
+            "title": "Given a bookmark on a message inside the virtualized region of a long timeline, when jumpTo is called, then the virtualizer scrolls to that row and its wrapper renders a 2px solid var(--color-primary) outline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-jump.ac2",
+            "title": "Given a flashed row, when 1600 ms of fake time advance, then the outline is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-jump.ac3",
+            "title": "Given a jump request for a message id not in the rows, then resolveJump(nonce, false) is called and the drawer renders 'This message is not in the loaded transcript.' under that bookmark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-jump.ac4",
+            "title": "Given the same nonce is delivered twice, or bookmarksEnabled is false, then no scroll occurs for the repeat or disabled case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bookmark-docs",
+        "title": "Document conversation bookmarks for operators and developers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4498",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Bookmarks' features/conversations.mdx",
+            "grep -n 'conversation_bookmarks' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the ## Bookmarks heading line",
+            "grep prints the architecture bullet naming conversation_bookmarks"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: in features/conversations.mdx add the **Bookmarks** row to the control table under '## The conversation surface' and a new '## Bookmarks' section before '## Why hand off?' covering every point listed in WI-8 step 1. In docs/DASHBOARD-ARCHITECTURE.md add one bullet right after the 'Companion terminals (PAN-3974, PAN-3835)' bullet naming the conversation_bookmarks table, the door path, the three routes and route file, components/chat/bookmarks/, and the bookmarksEnabled opt-in rule."
+        },
+        "items": [
+          {
+            "id": "bookmark-docs.ac1",
+            "title": "features/conversations.mdx contains a '## Bookmarks' section stating that clicking the icon beside a message bookmarks it, that the header Bookmarks button lists bookmarks and jumps to them, and that bookmarks are never written into the agent's transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-docs.ac2",
+            "title": "features/conversations.mdx control table contains a row whose first cell is '**Bookmarks**'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bookmark-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a bullet naming conversation_bookmarks, src/lib/overdeck/conversation-bookmarks.ts, GET /api/conversations/:name/bookmarks and PUT|DELETE /api/conversations/:name/bookmarks/:messageId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bookmark-store",
+        "to": "bookmark-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "bookmark-provider",
+        "to": "role-icon-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "bookmark-provider",
+        "to": "bookmarks-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "role-icon-toggle",
+        "to": "bookmark-edit-popover",
+        "type": "blocks"
+      },
+      {
+        "from": "role-icon-toggle",
+        "to": "bookmarks-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "role-icon-toggle",
+        "to": "bookmark-jump",
+        "type": "blocks"
+      },
+      {
+        "from": "bookmarks-drawer",
+        "to": "bookmark-jump",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4498-conversation-bookmarks-mark-a-message-by-clicking-its-role-icon-and-jump-back-to-it-later.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -50,7 +50,11 @@
 - **Optional judgment model:** TypeSafe Jev via `@typesafe-ai/sdk`, wrapped by
   `src/lib/jev/` (`assess()` never throws; gated per background-AI toggle, off
   by default; model only from `jev.model`). Questions and thresholds live in
-  `src/lib/jev/questions.ts`. See `configuration/jev.mdx`.
+  `src/lib/jev/questions.ts`. Route/model/timeout are editable in Settings →
+  Background AI through the path-scoped `jev:` write door
+  (`src/lib/jev/settings.ts`, `GET`/`PUT /api/jev/settings`); every real
+  request also appends to the usage log read by `GET /api/jev/usage`
+  (`src/lib/jev/usage-log.ts`). See `configuration/jev.mdx`.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
@@ -61,4 +65,4 @@
   `wrangler dev --local`, `--dry-run` bundles, real-workerd tests); deploying is
   operator-only. See `docs/ACCOUNT-SERVICE.md`.
 
-<!-- last-verified: 2026-10-02 -->
+<!-- last-verified: 2026-10-04 -->
