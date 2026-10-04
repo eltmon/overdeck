@@ -6,8 +6,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import {
   captureCheckpoint,
-  diffAgainstMain,
-  diffAgainstMainFiles,
+  diffAgainstBase,
+  diffAgainstBaseFiles,
   diffCheckpointFiles,
   diffCheckpoints,
 } from '../checkpoint-manager.js';
@@ -72,11 +72,11 @@ describe('ignoreWhitespace in the agent diff helpers (PAN-4503)', () => {
     git(repo, 'checkout', '-q', '-b', 'feature');
     git(repo, 'commit', '-q', '-am', 'change');
 
-    const files = await diffAgainstMainFiles(repo, { ignoreWhitespace: true });
+    const files = await diffAgainstBaseFiles(repo, 'main', { ignoreWhitespace: true });
     expect(files.map((f) => f.path)).toEqual(['b.txt']);
-    expect(await diffAgainstMain(repo, 'a.js', { ignoreWhitespace: true })).toBe('');
+    expect(await diffAgainstBase(repo, 'main', 'a.js', { ignoreWhitespace: true })).toBe('');
 
-    expect((await diffAgainstMainFiles(repo)).map((f) => f.path)).toEqual(['a.js', 'b.txt']);
-    expect(await diffAgainstMain(repo, 'a.js')).toContain('a.js');
+    expect((await diffAgainstBaseFiles(repo, 'main')).map((f) => f.path)).toEqual(['a.js', 'b.txt']);
+    expect(await diffAgainstBase(repo, 'main', 'a.js')).toContain('a.js');
   });
 });

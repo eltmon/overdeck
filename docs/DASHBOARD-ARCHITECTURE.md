@@ -288,6 +288,13 @@ door that does not exist; a real record read door would be a separate change.
     instead of one pair per turn, and caches its result for 30 seconds keyed by the
     transcript's size and mtime (repo `HEAD` is not part of the key, since `git diff
     <base> -- <paths>` compares against the working tree either way).
+  - `/diffs/vs-main` (conversations and agents) diffs the repository three-dot
+    (`<base>...HEAD`, committed changes only) against the project's configured default
+    branch (`workspace.repos[].default_branch`, then `workspace.default_branch`, then
+    `main`; `pr_target` is not used), resolving the local branch before `origin/<branch>`;
+    a missing branch yields `baseRef: null` and an empty file list. `/diffs/full` returns
+    `files` and honors `?file=`. The conversation diff routes live in
+    `routes/conversation-diffs.ts`.
 - Global issue updates use `issues.delta`: complete changed rows at their original
   array positions plus the resulting length. Initial/reconnect snapshots retain all
   rows and descriptions. Shared reducers preserve order, removal, and arbitrary tracker

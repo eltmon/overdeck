@@ -1,0 +1,192 @@
+{
+  "version": "1",
+  "issueId": "PAN-4501",
+  "created": "2026-10-03T23:11:20.651Z",
+  "updated": "2026-10-03T23:55:04.264Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "default-branch-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:11:20.651Z",
+      "doneAt": "2026-10-03T23:16:59.063Z"
+    },
+    "checkpoint-diff-against-base": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:17:06.217Z",
+      "doneAt": "2026-10-03T23:18:51.357Z"
+    },
+    "vs-default-branch-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:18:59.094Z",
+      "doneAt": "2026-10-03T23:20:26.001Z"
+    },
+    "agent-vs-main-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:20:33.298Z",
+      "doneAt": "2026-10-03T23:22:25.705Z"
+    },
+    "extract-conversation-diff-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:22:33.270Z",
+      "doneAt": "2026-10-03T23:26:39.389Z"
+    },
+    "conversation-vs-main-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:26:46.507Z",
+      "doneAt": "2026-10-03T23:31:50.240Z"
+    },
+    "conversation-full-files": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:31:56.984Z",
+      "doneAt": "2026-10-03T23:35:44.366Z"
+    },
+    "diffpanel-zero-turns": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:35:52.502Z",
+      "doneAt": "2026-10-03T23:39:44.480Z"
+    },
+    "docs-vs-main-default-branch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4501",
+      "claimedAt": "2026-10-03T23:39:52.341Z",
+      "doneAt": "2026-10-03T23:40:45.060Z"
+    },
+    "default-branch-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:01.042Z"
+    },
+    "default-branch-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:11.266Z"
+    },
+    "default-branch-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:21.643Z"
+    },
+    "default-branch-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:31.721Z"
+    },
+    "checkpoint-diff-against-base.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:46.434Z"
+    },
+    "checkpoint-diff-against-base.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:42:56.528Z"
+    },
+    "checkpoint-diff-against-base.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:06.849Z"
+    },
+    "checkpoint-diff-against-base.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:17.278Z"
+    },
+    "vs-default-branch-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:27.553Z"
+    },
+    "vs-default-branch-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:37.642Z"
+    },
+    "vs-default-branch-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:47.673Z"
+    },
+    "vs-default-branch-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:43:57.685Z"
+    },
+    "agent-vs-main-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:44:11.618Z"
+    },
+    "agent-vs-main-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:44:21.779Z"
+    },
+    "agent-vs-main-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:44:31.953Z"
+    },
+    "extract-conversation-diff-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:44:41.939Z"
+    },
+    "extract-conversation-diff-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:44:52.154Z"
+    },
+    "extract-conversation-diff-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:02.384Z"
+    },
+    "conversation-vs-main-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:17.063Z"
+    },
+    "conversation-vs-main-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:27.338Z"
+    },
+    "conversation-vs-main-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:37.502Z"
+    },
+    "conversation-vs-main-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:47.659Z"
+    },
+    "conversation-full-files.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:45:57.657Z"
+    },
+    "conversation-full-files.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:46:07.787Z"
+    },
+    "conversation-full-files.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:46:18.082Z"
+    },
+    "diffpanel-zero-turns.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:46:31.933Z"
+    },
+    "diffpanel-zero-turns.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:46:42.109Z"
+    },
+    "diffpanel-zero-turns.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:46:52.669Z"
+    },
+    "diffpanel-zero-turns.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:47:02.855Z"
+    },
+    "docs-vs-main-default-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:47:13.353Z"
+    },
+    "docs-vs-main-default-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-03T23:47:23.711Z"
+    }
+  },
+  "feedback": []
+}

@@ -349,52 +349,44 @@ export async function deleteLegacyCheckpointRefs(cwd: string): Promise<number> {
   }
 }
 
-/** Compute unified diff of the workspace against the main branch. */
-export async function diffAgainstMain(cwd: string, filePath?: string, options: DiffOptions = {}): Promise<string> {
-  const args = ['diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), 'main...HEAD']
+/**
+ * Compute unified diff of the workspace against an arbitrary base ref (PAN-4501),
+ * optionally ignoring whitespace-only changes (PAN-4503).
+ */
+export async function diffAgainstBase(cwd: string, baseRef: string, filePath?: string, options: DiffOptions = {}): Promise<string> {
+  const args = ['diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), `${baseRef}...HEAD`]
   if (filePath) args.push('--', filePath)
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }
 
-/** Get file change summary of the workspace against the main branch. */
-export async function diffAgainstMainFiles(cwd: string, options: DiffOptions = {}): Promise<TurnDiffFileChange[]> {
-  // Get additions/deletions per file
-  const { stdout: numstat } = await execFileAsync('git', [
-    'diff', '--numstat', '--no-color', ...diffOptionArgs(options), 'main...HEAD',
-  ], { cwd, encoding: 'utf-8' })
+/**
+ * Get file change summary of the workspace against an arbitrary base ref (PAN-4501),
+ * optionally ignoring whitespace-only changes (PAN-4503).
+ */
+export async function diffAgainstBaseFiles(cwd: string, baseRef: string, options: DiffOptions = {}): Promise<TurnDiffFileChange[]> {
+  const [numstatResult, nameStatusResult] = await Promise.all([
+    execFileAsync('git', ['diff', '--numstat', '--no-color', ...diffOptionArgs(options), `${baseRef}...HEAD`], { cwd, encoding: 'utf-8' }),
+    execFileAsync('git', ['diff', '--name-status', '--no-color', `${baseRef}...HEAD`], { cwd, encoding: 'utf-8' }),
+  ])
 
-  // Get file status (A/M/D/R) per file
-  const { stdout: nameStatus } = await execFileAsync('git', [
-    'diff', '--name-status', '--no-color', 'main...HEAD',
-  ], { cwd, encoding: 'utf-8' })
+  return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
+}
 
-  // Parse name-status into a map
-  const statusMap = new Map<string, string>()
-  for (const line of nameStatus.split('\n')) {
-    if (!line.trim()) continue
-    const parts = line.split('\t')
-    if (parts.length >= 2) {
-      statusMap.set(parts[parts.length - 1], parts[0])
+/**
+ * The ref naming `branch` in the repository at `cwd`: the local branch when it
+ * exists, else origin's remote-tracking branch, else null (PAN-4501).
+ */
+export async function resolveBaseRef(cwd: string, branch: string): Promise<string | null> {
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
+    try {
+      await execFileAsync('git', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { cwd, encoding: 'utf-8' })
+      return ref.startsWith('refs/heads/') ? branch : `origin/${branch}`
+    } catch {
+      // try the next candidate
     }
   }
-
-  // Parse numstat and combine with status
-  const files: TurnDiffFileChange[] = []
-  for (const line of numstat.split('\n')) {
-    if (!line.trim()) continue
-    const [addStr, delStr, ...pathParts] = line.split('\t')
-    const path = pathParts.join('\t')
-    if (!path) continue
-    files.push({
-      path,
-      kind: statusMap.get(path),
-      additions: parseInt(addStr, 10) || 0,
-      deletions: parseInt(delStr, 10) || 0,
-    })
-  }
-
-  return files.sort((a, b) => a.path.localeCompare(b.path))
+  return null
 }
 
 /** Find the commit SHA at the given timestamp (rev-list --before). */

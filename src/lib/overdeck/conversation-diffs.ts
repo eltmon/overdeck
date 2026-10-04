@@ -13,6 +13,7 @@ import {
   diffPatchFilesAgainstHead,
   type TurnDiffFileChange,
 } from '../checkpoint/checkpoint-manager.js';
+import { diffVsDefaultBranch } from '../checkpoint/vs-default-branch.js';
 import { diffOptionArgs, type DiffOptions } from '../diffs/diff-output.js';
 import {
   getConversationById,
@@ -61,22 +62,32 @@ function lookupConversation(name: string): Conversation | null {
   return getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
 }
 
-async function repoRootForFile(filePath: string, repoRootCache: Map<string, string | null>): Promise<string | null> {
-  const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
-  let repoRoot = repoRootCache.get(dir);
-  if (repoRoot !== undefined) return repoRoot;
-
+/** The git top-level of `dir`, or null when `dir` is not inside a repository (PAN-4501). */
+async function repoRootForDir(dir: string): Promise<string | null> {
   try {
     const { stdout } = await promisify(exec)(
       'git rev-parse --show-toplevel',
       { cwd: dir, encoding: 'utf-8' },
     );
-    repoRoot = stdout.trim();
+    return stdout.trim();
   } catch {
-    repoRoot = null;
+    return null;
   }
+}
+
+async function repoRootForFile(filePath: string, repoRootCache: Map<string, string | null>): Promise<string | null> {
+  const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
+  let repoRoot = repoRootCache.get(dir);
+  if (repoRoot !== undefined) return repoRoot;
+
+  repoRoot = await repoRootForDir(dir);
   repoRootCache.set(dir, repoRoot);
   return repoRoot;
+}
+
+/** Files de-duplicated by path (first wins) and sorted by path (PAN-4501). */
+function sortedFiles(filesByPath: Map<string, TurnDiffFileChange>): TurnDiffFileChange[] {
+  return [...filesByPath.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function repoRelativePath(filePath: string, repoRoot: string): string {
@@ -116,16 +127,18 @@ async function diffFilesSinceBase(
   baseCommit: string,
   filePaths: string[],
 ): Promise<TurnDiffFileChange[]> {
-  const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
+  // An empty pathspec means "the whole repository" explicitly (PAN-4501) — omit
+  // `-- ""` so that intent is not an accident of joining zero paths.
+  const pathspec = filePaths.length > 0 ? ` -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}` : '';
   // --no-renames: a per-turn lookup keyed by the input path would otherwise drop a
   // file entirely when git's rename detection folds "a.ts => b.ts" into one line.
   // -c core.quotePath=false: keep non-ASCII paths unquoted so the lookup key matches.
   const { stdout: numstat } = await promisify(exec)(
-    `git -c core.quotePath=false diff --no-renames --numstat --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --numstat --no-color ${baseCommit}${pathspec}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const { stdout: nameStatus } = await promisify(exec)(
-    `git -c core.quotePath=false diff --no-renames --name-status --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --name-status --no-color ${baseCommit}${pathspec}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const statusMap = new Map<string, string>();
@@ -293,39 +306,50 @@ export async function getConversationDiffs(
 
 export async function getConversationDiffFull(
   name: string,
+  fileFilter: string | undefined,
   deps: ConversationDiffDependencies,
   options: DiffOptions = {},
 ): Promise<ConversationDiffResult> {
   try {
-    const conv = getConversationByName(name);
+    const conv = lookupConversation(name);
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const cwd = conv.cwd;
-    const cwdRepoRoot = existsSync(join(cwd, '.git')) ? cwd : null;
+    const cwdRepoRoot = await repoRootForDir(cwd);
     const patches: string[] = [];
+    const filesByPath = new Map<string, TurnDiffFileChange>();
+    const addFiles = (files: TurnDiffFileChange[]): void => {
+      for (const file of files) {
+        if (!filesByPath.has(file.path)) filesByPath.set(file.path, file);
+      }
+    };
 
     if (cwdRepoRoot) {
       const baseCommit = await findCommitAtTime(cwdRepoRoot, conv.createdAt);
       if (baseCommit) {
-        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, undefined, options);
+        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter, options);
         if (patch) patches.push(patch);
+        addFiles(await diffFilesSinceBase(cwdRepoRoot, baseCommit, []));
       }
     }
 
     const sessionFile = await deps.resolveSessionFile(conv);
-    if (!sessionFile || !existsSync(sessionFile)) return result({ diff: patches.join('\n') });
+    if (!sessionFile || !existsSync(sessionFile)) {
+      return result({ diff: patches.join('\n'), files: sortedFiles(filesByPath) });
+    }
 
     const parsed = await deps.getCachedMessages(sessionFile, false);
     const { fileEditsByAssistantId } = parsed;
     if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
-      return result({ diff: patches.join('\n') });
+      return result({ diff: patches.join('\n'), files: sortedFiles(filesByPath) });
     }
 
     const repoRootCache = new Map<string, string | null>();
     const allEdits = [...fileEditsByAssistantId.values()].flat();
-    const filesByRepo = await groupFilesByRepo(allEdits, repoRootCache);
+    const filteredFilesByRepo = await groupFilesByRepo(allEdits, repoRootCache, fileFilter);
+    const unfilteredFilesByRepo = await groupFilesByRepo(allEdits, repoRootCache);
 
-    for (const [repoRoot, filePaths] of filesByRepo) {
+    for (const [repoRoot, filePaths] of filteredFilesByRepo) {
       if (repoRoot === cwdRepoRoot) continue;
       try {
         const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths, options);
@@ -335,7 +359,20 @@ export async function getConversationDiffFull(
       }
     }
 
-    return result({ diff: patches.join('\n') });
+    for (const [repoRoot, filePaths] of unfilteredFilesByRepo) {
+      if (repoRoot === cwdRepoRoot) continue;
+      try {
+        const baseCommit = await findCommitAtTime(repoRoot, conv.createdAt);
+        const diffs = baseCommit
+          ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
+          : await diffFilesAgainstHead(repoRoot, filePaths);
+        addFiles(diffs);
+      } catch {
+        // file may have been committed or repo unavailable
+      }
+    }
+
+    return result({ diff: patches.join('\n'), files: sortedFiles(filesByPath) });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] diff full failed:', msg);
@@ -391,6 +428,33 @@ export async function getConversationDiffTurn(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] diff turn failed:', msg);
+    return result({ error: 'Internal server error' }, 500);
+  }
+}
+
+/**
+ * "vs main" for a conversation (PAN-4501): the conversation's repository
+ * (git top-level of its cwd) diffed three-dot against the project's default
+ * branch. Before this route existed, `/diffs/vs-main` fell through to
+ * `/diffs/:turnId` and returned "conversation start vs working tree".
+ */
+export async function getConversationDiffVsMain(
+  name: string,
+  fileFilter: string | undefined,
+  options: DiffOptions = {},
+): Promise<ConversationDiffResult> {
+  try {
+    const conv = lookupConversation(name);
+    if (!conv) return result({ error: 'Conversation not found' }, 404);
+    const repoRoot = await repoRootForDir(conv.cwd);
+    if (!repoRoot) {
+      return result({ repoRoot: null, baseBranch: null, baseRef: null, files: [], ...(fileFilter !== undefined && { diff: '' }) });
+    }
+    const diff = await diffVsDefaultBranch(repoRoot, { projectKey: conv.projectKey, ...(fileFilter !== undefined && { filePath: fileFilter }), ...options });
+    return result({ repoRoot, ...diff });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] diff vs-main failed:', msg);
     return result({ error: 'Internal server error' }, 500);
   }
 }

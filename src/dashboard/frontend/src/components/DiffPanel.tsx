@@ -814,10 +814,6 @@ export function DiffPanel({
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           {!repoPath ? 'Compare needs a repository path.' : compareError ? '' : 'Pick a base and head to compare.'}
         </div>
-      ) : orderedTurnDiffSummaries.length === 0 && !isVsMain && !isCompare ? (
-        <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          No completed turns yet.
-        </div>
       ) : needsFilePicker ? (
         <DiffFilePickerList files={filePickerFiles ?? []} onSelectFile={selectFile} isLoading={isLoadingDiff && !filePickerFiles} />
       ) : (
