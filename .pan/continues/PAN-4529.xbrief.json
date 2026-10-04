@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:15:28.710Z",
+  "updated": "2026-10-04T05:15:40.770Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "candidate-1-operator-state-band.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:15:28.710Z"
+    },
+    "candidate-2-message-delivery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:40.770Z"
     }
   }
 }
