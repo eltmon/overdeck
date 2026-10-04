@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T02:47:32.118Z",
+  "updated": "2026-10-04T02:50:28.730Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-04T02:47:18.160Z"
     },
     "jev-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4508",
-      "claimedAt": "2026-10-04T02:47:32.118Z"
+      "claimedAt": "2026-10-04T02:47:32.118Z",
+      "doneAt": "2026-10-04T02:50:28.730Z"
     }
   }
 }
