@@ -83,12 +83,15 @@ export interface TieredEscalationConfig {
   enabled?: boolean;
   retries_at_tier?: number;
   max_promotions?: number;
+  /** PAN-4257: raise effort a step before promoting to the next tier's model. */
+  effort_first?: boolean;
 }
 
 export interface ValidatedEscalationConfig {
   enabled: boolean;
   retries_at_tier: number;
   max_promotions: number;
+  effort_first?: boolean;
 }
 
 export interface TieredExecutionConfig {

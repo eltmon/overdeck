@@ -313,6 +313,27 @@ describe('tiered execution tier table', () => {
     }))).toThrow('tiered_execution.compaction_reroute');
   });
 
+  // PAN-4257: validate tiered_execution.escalation.effort_first.
+  it('accepts escalation.effort_first: true', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      escalation: { effort_first: true },
+    }));
+    expect(result.escalation.effort_first).toBe(true);
+  });
+
+  it('accepts escalation.effort_first: false', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      escalation: { effort_first: false },
+    }));
+    expect(result.escalation.effort_first).toBe(false);
+  });
+
+  it('rejects a non-boolean escalation.effort_first', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      escalation: { effort_first: 'yes' as never },
+    }))).toThrow('tiered_execution.escalation.effort_first must be a boolean');
+  });
+
   // PAN-3858 no-loss audit: the floundering trigger was deleted because no
   // patrol could supply per-item dispatch times without new infrastructure.
   // These two tests prove the state it guarded is unreachable: no config key
