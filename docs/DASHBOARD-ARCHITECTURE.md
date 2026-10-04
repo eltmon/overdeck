@@ -969,15 +969,22 @@ Sources, merged in `useMergedFeed.ts`:
 
 **All shows transitions.** A conversation card is dated by a lifecycle fact:
 `endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
-`started`. It is never dated by transcript activity (`lastActivityAt`, the
-transcript file mtime), which moves on every write and used to pull every busy
-conversation back to "Just Now" on each poll. All keeps a conversation only when
-that lifecycle timestamp is inside a 24 h window (`FEED_WINDOW_MS`).
+`started`. It is never dated by transcript activity (`lastActivityAt`), which
+moves on every turn and used to pull every busy conversation back to "Just Now"
+on each poll. All keeps a conversation only when that lifecycle timestamp is
+inside a 24 h window (`FEED_WINDOW_MS`).
 
 **Chats is a recency index.** It keeps root conversations that are alive or were
 active in the last 24 h, re-dated to the recency timestamp
 (`lastActivityAt ?? lastAttachedAt ?? createdAt`, labelled `active`), newest
-first.
+first. `lastActivityAt` is the timestamp of the last `user` or `assistant`
+record in the transcript, read by the pending-input scan (`scanPendingInputs`)
+for live rows. It is not the transcript's modified time: Claude Code touches
+every running session's transcript at startup and then hourly without writing
+a record, which used to move idle conversations to the top of Chats as "active
+just now" (PAN-4515). The modified time is only the fallback, for rows that are
+not live, non-Claude harnesses, and transcripts with no turn record in the last
+512 KB.
 
 **Gauntlet runs are one card.** Lane conversations never render as their own
 cards. `groupGauntletRuns` (`gauntletRunEntries.ts`) folds them into one run card
