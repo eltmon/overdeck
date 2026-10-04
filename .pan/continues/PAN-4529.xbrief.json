@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:05:59.743Z",
+  "updated": "2026-10-04T05:06:57.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-10-04T05:05:29.939Z"
     },
     "cross-cutting-security": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4529",
-      "claimedAt": "2026-10-04T05:05:59.743Z"
+      "claimedAt": "2026-10-04T05:05:59.743Z",
+      "doneAt": "2026-10-04T05:06:57.011Z"
     }
   }
 }
