@@ -1,0 +1,133 @@
+{
+  "version": "1",
+  "issueId": "PAN-4522",
+  "created": "2026-10-04T04:14:15.923Z",
+  "updated": "2026-10-04T05:51:00.520Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "event-store-runtime-history": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T04:14:15.923Z",
+      "doneAt": "2026-10-04T04:18:58.689Z"
+    },
+    "runtime-seed-fold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T04:19:05.509Z",
+      "doneAt": "2026-10-04T04:37:59.285Z"
+    },
+    "read-model-boot-seed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T04:38:06.833Z",
+      "doneAt": "2026-10-04T05:07:53.896Z"
+    },
+    "snapshot-runtime-merge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T05:08:00.981Z",
+      "doneAt": "2026-10-04T05:26:48.865Z"
+    },
+    "god-view-restart-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T05:27:04.811Z",
+      "doneAt": "2026-10-04T05:41:15.394Z"
+    },
+    "docs-runtime-seed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T05:41:22.362Z",
+      "doneAt": "2026-10-04T05:42:00.991Z"
+    },
+    "event-store-runtime-history.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:46:42.524Z"
+    },
+    "event-store-runtime-history.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:46:57.621Z"
+    },
+    "event-store-runtime-history.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:47:08.845Z"
+    },
+    "event-store-runtime-history.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:47:20.178Z"
+    },
+    "runtime-seed-fold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:47:34.658Z"
+    },
+    "runtime-seed-fold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:47:46.081Z"
+    },
+    "runtime-seed-fold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:47:57.587Z"
+    },
+    "runtime-seed-fold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:48:09.619Z"
+    },
+    "runtime-seed-fold.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:48:22.348Z"
+    },
+    "read-model-boot-seed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:48:37.769Z"
+    },
+    "read-model-boot-seed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:48:50.056Z"
+    },
+    "read-model-boot-seed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:01.795Z"
+    },
+    "snapshot-runtime-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:17.395Z"
+    },
+    "snapshot-runtime-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:31.875Z"
+    },
+    "snapshot-runtime-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:44.464Z"
+    },
+    "snapshot-runtime-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:56.361Z"
+    },
+    "snapshot-runtime-merge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:50:09.202Z"
+    },
+    "god-view-restart-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:50:25.633Z"
+    },
+    "god-view-restart-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:50:37.349Z"
+    },
+    "docs-runtime-seed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:50:48.610Z"
+    },
+    "docs-runtime-seed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:51:00.520Z"
+    }
+  }
+}

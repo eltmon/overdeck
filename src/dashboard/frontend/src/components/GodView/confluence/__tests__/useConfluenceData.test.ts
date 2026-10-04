@@ -550,6 +550,33 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
     const orb = result.current.find((candidate) => candidate.id === 'PAN-6');
     expect(orb?.state).toBe('stale');
   });
+
+  it('keeps a working orb active across a snapshot from a freshly restarted server (PAN-4522)', async () => {
+    const spawnStamp = new Date(NOW.getTime() - 71 * 60_000).toISOString();
+    const row = agent({ id: 'agent-pan-7', issueId: 'PAN-7', startedAt: spawnStamp, lastActivity: spawnStamp });
+    useDashboardStore.setState({
+      agentsById: { 'agent-pan-7': row },
+      agentRuntimeById: {
+        'agent-pan-7': { id: 'agent-pan-7', activity: 'working', lastActivity: new Date(NOW.getTime() - 20_000).toISOString(), updatedAtSequence: 99 } as never,
+      },
+      issuesRaw: [{ id: 'PAN-7', identifier: 'PAN-7', title: 'Busy', labels: [], state: 'open' }],
+    });
+    // The restarted server serves an empty runtime map.
+    act(() => {
+      useDashboardStore.getState().syncSnapshot({
+        sequence: 100, agents: [row], specialists: [], agentRuntimeById: {},
+        backendPanes: [pane('agent-pan-7')],
+        issues: [{ id: 'PAN-7', identifier: 'PAN-7', title: 'Busy', labels: [], state: 'open' }],
+        timestamp: NOW.toISOString(),
+      } as never);
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const orb = result.current.find((candidate) => candidate.id === 'PAN-7');
+    expect(orb?.state).toBe('active');
+    expect(orb?.idleMin).toBeLessThan(1);
+  });
 });
 
 describe('backend-observed liveness (PAN-3540)', () => {
