@@ -335,7 +335,9 @@
       "contextWindow": 1048576,
       "effortLevels": [
         "low",
+        "medium",
         "high",
+        "xhigh",
         "max"
       ],
       "costPer1MTokens": 9,
@@ -348,7 +350,9 @@
       "contextWindow": 262144,
       "effortLevels": [
         "low",
+        "medium",
         "high",
+        "xhigh",
         "max"
       ],
       "costPer1MTokens": 9,
