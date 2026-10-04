@@ -445,3 +445,40 @@ describe('EventStore.compact idempotency keys (PAN-3092)', () => {
   })
 })
 
+describe('EventStore.queryRuntimeHistory', () => {
+  let store: ReturnType<typeof createEventStore>
+
+  beforeEach(() => {
+    store = createEventStore(makeDb())
+  })
+
+  it('returns only the requested types for the requested agents, oldest first', () => {
+    store.append({ type: 'agent.activity_changed', timestamp: ts(0), payload: { agentId: 'agent-a' } } as any)
+    store.append({ type: 'agent.activity_changed', timestamp: ts(1), payload: { agentId: 'agent-a' } } as any)
+    store.append({ type: 'agent.model_set', timestamp: ts(2), payload: { agentId: 'agent-a' } } as any)
+    store.append({ type: 'agent.activity_changed', timestamp: ts(3), payload: { agentId: 'agent-b' } } as any)
+    store.append({ type: 'agent.activity_changed', timestamp: ts(4), payload: { agentId: 'agent-c' } } as any)
+    store.append({ type: 'agent.started', timestamp: ts(5), payload: { agentId: 'agent-a' } } as any)
+
+    const rows = store.queryRuntimeHistory(
+      ['agent.activity_changed', 'agent.model_set'],
+      ['agent-a', 'agent-b'],
+    )
+
+    expect(rows).toHaveLength(4)
+    expect(rows.every((row) => (row.payload as { agentId: string }).agentId !== 'agent-c')).toBe(true)
+    expect(rows.every((row) => row.type !== 'agent.started')).toBe(true)
+    expect(rows.map((row) => row.sequence)).toEqual([...rows.map((row) => row.sequence)].sort((a, b) => a - b))
+  })
+
+  it('returns [] when types is empty', () => {
+    store.append({ type: 'agent.activity_changed', timestamp: ts(), payload: { agentId: 'agent-a' } } as any)
+    expect(store.queryRuntimeHistory([], ['agent-a'])).toEqual([])
+  })
+
+  it('returns [] when agentIds is empty', () => {
+    store.append({ type: 'agent.activity_changed', timestamp: ts(), payload: { agentId: 'agent-a' } } as any)
+    expect(store.queryRuntimeHistory(['agent.activity_changed'], [])).toEqual([])
+  })
+})
+
