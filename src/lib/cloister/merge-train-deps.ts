@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { spawnRun } from '../agents.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
 
 const execAsync = promisify(exec);
@@ -54,11 +55,14 @@ export function buildRealReconcileDeps(): ReconcileDeps {
 
     reDispatchVerification: async (issueId) => {
       // The branch HEAD moved after the rebase — re-run review on the new HEAD.
+      const resolvedEffort = resolveEffort({ role: 'review', issueId });
       await spawnRun(issueId, 'review', {
         prompt:
           'Your branch was automatically rebased onto the latest main after another feature merged. ' +
           'Re-review on the new HEAD and confirm the issue is still correct and ready to merge.',
         startedBy: 'merge-train:verification',
+        effort: resolvedEffort.effort,
+        effortSource: resolvedEffort.source,
       });
     },
 

@@ -184,6 +184,75 @@ describe('distribution tiers (PAN-2391 / PAN-2397 W2)', () => {
   });
 });
 
+// PAN-4257 W1: Staffing carries the tier-aware effort and its source.
+describe('resolveStaffing effort (PAN-4257 W1)', () => {
+  it('ac1: explicit tier effort staffs the tier-configured level with source "tier"', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'trivial' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered({
+        tiers: {
+          cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'], effort: 'low' },
+          standard: { model: 'gpt-5.5', harness: 'codex', difficulties: ['medium', 'complex', 'expert'] },
+        },
+      }) } as never,
+    });
+    expect(staffing).toMatchObject({ tierName: 'cheap', effort: 'low', effortSource: 'tier' });
+  });
+
+  it('ac2: item metadata.effort outranks the tier effort, with source "item"', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'trivial', effort: 'xhigh' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered({
+        tiers: {
+          cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'], effort: 'low' },
+          standard: { model: 'gpt-5.5', harness: 'codex', difficulties: ['medium', 'complex', 'expert'] },
+        },
+      }) } as never,
+    });
+    expect(staffing).toMatchObject({ effort: 'xhigh', effortSource: 'item' });
+  });
+
+  it('ac2: plan.metadata.effort outranks the tier effort, with source "plan"', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'trivial' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered({
+        tiers: {
+          cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'], effort: 'low' },
+          standard: { model: 'gpt-5.5', harness: 'codex', difficulties: ['medium', 'complex', 'expert'] },
+        },
+      }) } as never,
+      planMetadata: { effort: 'medium' },
+    });
+    expect(staffing).toMatchObject({ effort: 'medium', effortSource: 'plan' });
+  });
+
+  it('ac3: tiered execution disabled falls to implicit staffing, ignoring a configured tier named "default"', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'trivial' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered({
+        enabled: false,
+        tiers: { default: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'], effort: 'low' } },
+      }) } as never,
+    });
+    expect(staffing).toMatchObject({ implicit: true, effort: 'high', effortSource: 'default' });
+  });
+
+  it('role-level effort applies to implicit staffing when no item/plan/tier effort is set', () => {
+    const staffing = resolveStaffing(item('task'), {
+      config: { roles: { work: { model: 'claude-sonnet-5', effort: 'medium' } } } as never,
+    });
+    expect(staffing).toMatchObject({ implicit: true, effort: 'medium', effortSource: 'role' });
+  });
+
+  it('ac4: no effort keys anywhere in config → effort "high" with source "default", and every pre-existing case keeps passing', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'medium' }), {
+      config: { roles: WORK_ROLES } as never,
+    });
+    expect(staffing).toMatchObject({ implicit: true, effort: 'high', effortSource: 'default' });
+
+    const tieredStaffing = resolveStaffing(item('task', { difficulty: 'medium' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered() } as never,
+    });
+    expect(tieredStaffing).toMatchObject({ effort: 'high', effortSource: 'default' });
+  });
+});
+
 // PAN-4191 acceptance: a tier pointed at `workhorse:mid` follows the slot, so
 // changing workhorses.mid changes the model a medium-difficulty plan staffs.
 describe('tiers backed by workhorse refs (PAN-4191)', () => {
