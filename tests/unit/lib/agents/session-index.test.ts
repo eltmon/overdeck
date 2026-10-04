@@ -14,6 +14,7 @@ import { kimiSessionsRoot } from '../../../../src/lib/runtimes/storage/kimi-code
 import {
   appendSessionIdToHistory,
   clearSessionResetMarker,
+  createFreshSessionIdentity,
   isSessionResetMarker,
   latestSessionResetTime,
   orderedTranscriptCandidates,
@@ -494,5 +495,12 @@ describe('sessions.json index', () => {
     writeFileSync(join(emptyIndexAgentDir, 'state.json'), JSON.stringify({ effort: 'high' }));
     const emptyIndexLookup = readLaunchEfforts('empty-index-agent');
     expect(emptyIndexLookup('anything')).toBe('high');
+  });
+
+  it('createFreshSessionIdentity records the effort it is given before state.json exists', () => {
+    const sessionId = createFreshSessionIdentity('a2', 'claude-code', 'claude-opus-5-5', 'max');
+
+    expect(sessionId).toBeDefined();
+    expect(readSessionIndex('a2').at(-1)?.effort).toBe('max');
   });
 });

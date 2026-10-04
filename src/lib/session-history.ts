@@ -294,10 +294,10 @@ export async function resetSessionIndex(
   writeFileSync(join(dir, SESSION_RESET_MARKER), '');
 }
 
-export function createFreshSessionIdentity(agentId: string, harness: RuntimeName, model?: string): string | undefined {
+export function createFreshSessionIdentity(agentId: string, harness: RuntimeName, model?: string, effort?: EffortLevel): string | undefined {
   if (getHarnessBehavior(harness).sessionIdSource !== 'launcher-session-id') return undefined;
   const sessionId = randomUUID();
-  appendSessionIdToHistory(agentId, sessionId, 'launcher', { harness, model });
+  appendSessionIdToHistory(agentId, sessionId, 'launcher', { harness, model, ...(effort ? { effort } : {}) });
   const dir = join(getOverdeckHome(), 'agents', agentId);
   logAgentLifecycle(agentId, `session identity allocated: harness=${harness} sessionId=${sessionId} indexPersisted=${existsSync(join(dir, 'sessions.json'))}`);
   return sessionId;
