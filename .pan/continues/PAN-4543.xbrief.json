@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:09:30.543Z",
+  "updated": "2026-10-04T10:09:41.821Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "gates-panel-skipped.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T10:09:30.542Z"
+    },
+    "verification-row-stale-artifact.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:41.821Z"
     }
   }
 }
