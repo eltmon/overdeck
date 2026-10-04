@@ -166,3 +166,16 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   stall from sync cost reads; stale `running` verification artifacts).
 - Throughput lesson: the night's bottleneck was the serialized gate queue
   plus the verification/merge bugs PAN-4527/4531/4532/4534/4540, not agents.
+
+### Operator decisions after the 2026-10-04 run
+
+- Release v0.65.0 (cut 2026-10-04).
+- SHOULD-level review findings (CodeRabbit's included) that merge unaddressed
+  are listed in every run report under "Unaddressed SHOULD-level review
+  findings". The operator picks which become issues; none are auto-filed.
+- Verification/auto-merge bugs PAN-4527/4532/4531/4540/4534 go through one
+  supervised handoff (conversation 3230, held until the operator sends it).
+- Two concurrent quality gates with a pressure fallback → PAN-4546
+  (needs-handoff). Automatic close-out restored → PAN-4547 (needs-handoff;
+  until it lands, the Flywheel closes deployed issues itself with
+  `pan close <id> --force`, never with an override).
