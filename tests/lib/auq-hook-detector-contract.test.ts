@@ -25,23 +25,25 @@ interface HookOutput {
   }
 }
 
-async function runHook(): Promise<HookOutput> {
-  const payload = JSON.stringify({
-    tool_name: 'AskUserQuestion',
-    tool_input: {
-      questions: [
-        {
-          question: 'Choose a strategy',
-          header: 'Strategy',
-          multiSelect: false,
-          options: [
-            { label: 'A', description: 'Fast path' },
-            { label: 'B', description: 'Safe path' },
-          ],
-        },
-      ],
-    },
-  })
+const DEFAULT_PAYLOAD = {
+  tool_name: 'AskUserQuestion',
+  tool_input: {
+    questions: [
+      {
+        question: 'Choose a strategy',
+        header: 'Strategy',
+        multiSelect: false,
+        options: [
+          { label: 'A', description: 'Fast path' },
+          { label: 'B', description: 'Safe path' },
+        ],
+      },
+    ],
+  },
+}
+
+async function runHook(payload: unknown = DEFAULT_PAYLOAD): Promise<HookOutput> {
+  const stdin = JSON.stringify(payload)
 
   return new Promise((resolve, reject) => {
     const proc = spawn('bash', [hookPath], { stdio: ['pipe', 'pipe', 'pipe'] })
@@ -49,7 +51,7 @@ async function runHook(): Promise<HookOutput> {
     let stderr = ''
     // A hook that exits before reading stdin makes this write EPIPE; the exit code is the answer.
     proc.stdin.on('error', () => {})
-    proc.stdin.write(payload)
+    proc.stdin.write(stdin)
     proc.stdin.end()
     proc.stdout.on('data', (chunk) => { stdout += chunk })
     proc.stderr.on('data', (chunk) => { stderr += chunk })
@@ -134,5 +136,27 @@ describe('AUQ deny hook → detector contract', () => {
     const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
+  })
+
+  it('detector treats a PAN-4514 guard-denied AskUserQuestion as answered', async () => {
+    const incident2Payload = {
+      tool_name: 'AskUserQuestion',
+      tool_input: {
+        questions: [{ question: 'placeholder', header: 'x', options: [{ label: 'a' }, { label: 'b' }] }],
+      },
+    }
+    const output = await runHook(incident2Payload)
+    const reason = output.hookSpecificOutput?.permissionDecisionReason
+    expect(reason).toBeTruthy()
+    expect(reason).not.toContain('PAN-1520')
+    expect(reason).not.toContain('surfaced to the operator')
+
+    const path = writeJsonlSession(testDir, [
+      { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t2')] } },
+      { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t2', reason!, true)] } },
+    ])
+
+    const result = await getPendingQuestions(path)
+    expect(result).toEqual([])
   })
 })
