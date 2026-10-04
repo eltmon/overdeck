@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4509",
   "created": "2026-10-04T02:10:08.078Z",
-  "updated": "2026-10-04T02:19:55.799Z",
+  "updated": "2026-10-04T02:20:27.663Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,10 @@
     "scanner.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T02:19:55.798Z"
+    },
+    "scanner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:27.663Z"
     }
   }
 }
