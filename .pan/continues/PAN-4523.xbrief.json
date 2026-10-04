@@ -1,0 +1,176 @@
+{
+  "version": "1",
+  "issueId": "PAN-4523",
+  "created": "2026-10-04T04:08:29.865Z",
+  "updated": "2026-10-04T06:48:04.270Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-04T06:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-04T06:48:04.269Z"
+    }
+  ],
+  "items": {
+    "layout-bands": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:08:29.865Z",
+      "doneAt": "2026-10-04T04:19:04.573Z"
+    },
+    "fit-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:19:15.297Z",
+      "doneAt": "2026-10-04T04:29:50.473Z"
+    },
+    "stage-live": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:29:58.061Z",
+      "doneAt": "2026-10-04T04:37:21.350Z"
+    },
+    "docs-god-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:37:25.279Z",
+      "doneAt": "2026-10-04T05:26:44.917Z"
+    },
+    "shelf-cap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:38:43.324Z",
+      "doneAt": "2026-10-04T04:56:03.904Z"
+    },
+    "merged-exit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T04:56:11.308Z",
+      "doneAt": "2026-10-04T05:06:43.867Z"
+    },
+    "shelf-rename": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T05:06:49.103Z",
+      "doneAt": "2026-10-04T05:25:54.549Z"
+    },
+    "uat-screenshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4523",
+      "claimedAt": "2026-10-04T05:26:53.934Z",
+      "doneAt": "2026-10-04T05:35:37.944Z"
+    },
+    "layout-bands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:37:28.227Z"
+    },
+    "layout-bands.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:37:49.264Z"
+    },
+    "layout-bands.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:38:41.520Z"
+    },
+    "layout-bands.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:38:54.084Z"
+    },
+    "fit-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:06.470Z"
+    },
+    "fit-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:18.270Z"
+    },
+    "fit-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:30.321Z"
+    },
+    "stage-live.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:42.425Z"
+    },
+    "stage-live.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:54.735Z"
+    },
+    "stage-live.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:07.578Z"
+    },
+    "shelf-cap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:24.147Z"
+    },
+    "shelf-cap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:35.524Z"
+    },
+    "shelf-cap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:47.674Z"
+    },
+    "merged-exit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:00.417Z"
+    },
+    "merged-exit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:12.574Z"
+    },
+    "merged-exit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:25.343Z"
+    },
+    "merged-exit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:38.083Z"
+    },
+    "shelf-rename.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:53.082Z"
+    },
+    "shelf-rename.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:05.765Z"
+    },
+    "docs-god-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:18.139Z"
+    },
+    "docs-god-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:30.804Z"
+    },
+    "uat-screenshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:43.153Z"
+    },
+    "uat-screenshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:55.566Z"
+    },
+    "uat-screenshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:43:07.892Z"
+    },
+    "uat-screenshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:43:21.171Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-04T06:48:04Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4523\n\n# Review — PAN-4523\n## Verdict: CHANGES REQUESTED — the widened shelf spread (0.5 → 0.7 × width) pushes the last shelf orb off the band and half off the canvas at the default 1280 px viewport; the PR's own screenshot shows it clipped\n\n## Context\n- Run ID: agent-pan-4523-review-b579e397\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4523/.pan/review/agent-pan-4523-review-b579e397/context.json\n- Branch / workspace: feature/pan-4523 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4523\n- PR: https://github.com/eltmon/overdeck/pull/4539\n- HEAD reviewed: b579e39709bfb21222adc9eae733663421dec00c\n- Base / prior cycle SHA: merge-base 66777e339e4 (origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [correctness/requirements] Last shelf orb renders past the band edge and is clipped by the canvas at laptop widths — `src/dashboard/frontend/src/components/GodView/confluence/model.ts:286`\n- Severity: !\n- Classification / requirement scope: implementation defect that follows a spec arithmetic error (PRD D3); in_pr_scope (regression introduced by this PR).\n- Trigger and changed-code connection: `positionOrb` places shelf orb `i` of `n` at `padX + 140 + (i/(n-1)) * width * 0.7` (changed from `0.5`). For any shelf with ≥ 2 orbs, the last orb is always at `166 + 0.7·W`. That is inside the band (`W - padX`) only when `W ≥ 640`, and its centred label stays on the canvas only when `W ≳ 660`. `.confluence-river-canvas` has `overflow: hidden` (`confluence.css` line 154).\n  PRD D3 justifies the widening with \"At width 1280 the shelf ends at x ≈ 1062, left of `portalX` (1246)\". That arithmetic uses the viewport width. The river canvas is much narrower, because the hook-bus panel and the right rail take ~700 px of a 1280 px viewport.\n- Expected / observed / impact: Expected: every shelf orb, label and reason inside the shelf band, which the issue states as \"Keep every orb label and reason inside its own band\". Observed: in the committed `docs/screenshots/pan-4523/god-view-bands.png` (1280×720, the PRD's target viewport), the river canvas is ≈ 572-577 px wide. PLAN and MERGE column centres are ~417 px apart, so colW ≈ 104. The fifth shelf orb sits at canvas x ≈ 566-570, right of the MAIN portal (`portalX` ≈ 540) and past the band rect (`W - padX` ≈ 548). Half the orb is cut off, its id reads `PAN-9`, and its reason is almost entirely off-canvas. With the old 0.5 spread, that orb was at x ≈ 453, inside the band. Impact: the shelf has no census (out of scope by design), so the id and reason are the only way to identify a shelved issue. On any laptop-class window with the sidebar open, the last shelved issue becomes unreadable. That is the same defect class this issue set out to fix. W8 step 6 asked the author to inspect this PNG for exactly this kind of problem.\n- Evidence: static trace of `positionOrb` (model.ts lines 284-289) plus `.confluence-river-canvas { overflow: hidden; }`. Column-position measurement on the committed PNG. I did not run a live browser; the PR's screenshot is the runtime evidence.\n- Fix: derive the shelf spread from the drawable range, not from a fixed fraction of the width. For example, `spread = max(0, (W - padX - SLOT_MARGIN - slotHalf) - (padX + 140))`, or clamp the end to `portalX - margin`. Put it in one helper that both `positionOrb` and `shelfSlotWidth` use, so the slot width and the real spacing cannot drift apart. Add a `model.test.ts` case asserting `lastShelfTx + shelfSlotWidth/2 ≤ W - padX` at realistic canvas widths (e.g. 577 and 1280). Retake the screenshot and inspect it. Spec correction: D3's \"x ≈ 1062 at width 1280\" should be computed against the river canvas width, not the viewport width.\n\n## Non-blocking Findings\n\n1. **~ [requirements] `evictionFor('shelf', 'MERGE')` returns `'merge'`** — `RiverCanvas.tsx:159`. This is a specification defect that the implementation follows. PRD W3 requires `evictionFor('shelf', 'MERGE')` to be `'merge'`, and critique round 2 flagged this as unresolved. Trigger: an operator-held merged issue (state `shelf`, stage `MERGE`) is displaced by the new 8-orb shelf cap. The removal loop then calls `startMerge`, the orb animates to the portal while still drawn as a shelf orb, and `finishMerge` posts `MERGED ✓` for an issue the operator is holding. The trigger is narrow: a merged and held issue that is also the 9th or later shelf orb. Spec correction: check state first (`shelf`/`stale` → `'drop'`), and merge only an `active` MERGE orb.\n2. **~ [validation gap] The new `fit-text.test.ts` does not run on CI.** CI runs frontend tests only through the explicit allowlist `test:frontend-subset` in the root `package.json`. From this directory, that list includes only `model.test.ts` and `rail-link.test.tsx`. So AC-W2's proving test, and the new `useConfluenceData.test.ts` and `choreography.test.ts` cases that prove AC-W3/W4/W5, never run in CI. The absence of the two older files is pre-existing; leaving out the new `fit-text.test.ts` is this PR's choice. Add at least `fit-text.test.ts` and `useConfluenceData.test.ts` to the subset. The Playwright spec is also missing from `test:playwright`, which runs only `command-deck-resource-strip.spec.ts`. That matches the existing pattern for `pan-NNNN` specs.\n3. **~ [requirements] AC-W8 says \"the PR body links it\"; it does not.** The PR body has only a checklist line (\"…commit its screenshot\") and no link to `docs/screenshots/pan-4523/god-view-bands.png`.\n4. **~ [UX] The bottom HUD tag and hint overlap at this canvas width.** In the committed screenshot, `.confluence-tag` wraps to two lines (\"yielded\" spills onto a second line), and the `.confluence-hint` pill is drawn over the tag text. The overlap between the two DOM overlays at narrow canvas widths is pre-existing. This PR makes the tag 9 characters longer, which causes the wrap. This is HUD text, not band text, so it is advisory. The issue's AC-6 asks for a screenshot with \"no overprinted text\", and this screenshot still shows overprinted HUD text.\n5. **~ [performance] `fitText` measures once per removed character** (`model.ts` `fitText` while-loop). A 58-character reason fitted to a ~45 px slot with 8 shelf orbs at 1280 costs ~50 `measureText` calls, so roughly 400-500 calls per frame once stale labels are included. All of them run on every animation frame. The loop is bounded and small, so this is not material without a measurement. A binary search or a `(text, slot, font)` memo would remove the cost.\n6. **? [spec concern] D7 residue on merged issues.** After a merge, `merge-agent.ts` closes the panes, so every agent is stopped and `pauseVoters` returns all agents. Any long-dead specialist row with a non-close-out `pausedReason` (PAN-3841-style residue), or a reason containing \"yield\", pins the merged issue to the shelf until close-out. D7 chose this explicitly (\"any non-close-out pause wins\"). To show impact, we would need evidence that stale paused specialist rows exist on merged issues in practice.\n7. **? [correctness] Canvas-local state changes bypass the band caps.** The frost sink (active → stale) and the governor tide (active → shelf) change `orb.state` inside `advance()`. So the canvas can briefly draw a 15th stale orb or a 9th shelf orb until the next reconcile overwrites the state from props. The stale path is pre-existing; the shelf cap is new. Critique round 2 left this unresolved. It is transient.\n8. **? [UX] Animated labels can overlap briefly.** A newly spawned shelf orb starts at `tx - 60`, and stale orbs wobble ±8 px. During easing, two fitted labels can overlap until the orbs settle. Critique round 2 left this unresolved. It is cosmetic and transient.\n9. **? [scope] `needs-you` orbs share the shelf row but are not counted by `SHELF_ORB_LIMIT`.** The row can therefore hold more than 8 orbs. Slot widths still adapt, because `drawOrbs` counts `shelf` plus `needs-you`. FR-4 caps only the `shelf` state, so this is compliant.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| `src/dashboard/frontend/src/components/GodView/confluence/model.ts` | Reviewed: layout, positionOrb, classifyOrb, fitText, slot widths |\n| `src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx` | Reviewed: evictionFor, reconcile loop, drawZones, drawOrbs, advance (merge dwell vs frost, D10) |\n| `src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts` | Reviewed: orbStage guards, pauseVoters/D7, admission (`hasLiveAgent`/`mergeActive`), shelf cap |\n| `src/dashboard/frontend/src/components/GodView/confluence/ConfluenceHelp.tsx` | Reviewed: copy only |\n| `src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx` | Reviewed: tag copy only |\n| `__tests__/model.test.ts`, `fit-text.test.ts`, `useConfluenceData.test.ts`, `choreography.test.ts`, `confluence-smoke.test.tsx` | Reviewed; ran all five locally |\n| `src/dashboard/frontend/tests/pan-4523-river-bands.spec.ts` | Reviewed: isolated dashboard, WS closed, HUD-below-Doldrums assertion; not in the CI Playwright command |\n| `docs/GOD-VIEW.md` | Reviewed: FR-9 content present |\n| `docs/screenshots/pan-4523/god-view-bands.png` | Inspected: shows the blocking clip and the HUD overlap |\n| `.pan/drafts/PAN-4523.md`, `PAN-4523-critique.md`, `PAN-4523-critique-2.md` | Read as requirements and critique context |\n| `.pan/specs/...PAN-4523...xbrief.json`, `.pan/continues/PAN-4523.xbrief.json` | Planning artifacts; not applicable to runtime behaviour |\n\n### Dimensions\n- **Correctness:** Band geometry is consistent, with one layout function. Stale label row selection (`orb.ty < doldrumsY`) matches the upper/lower centres (+44 / +62 vs +48). The merged-orb branch returns `active` before the stale branch can catch the orb. `spawnOrb` sets `mergeDwell` for MERGE orbs, and `advance()` checks the dwell before frost accrual, so the merge exit starts (1.5-3.5 s) before the 6 s frost sink (D10 holds). `retiredIds` prevents a respawn after `finishMerge`. `CLOSE_OUT_PAUSE_REASON` exactly matches `merge-agent.ts` line 349, and `pausedReason` reaches the snapshot through `agent-state-read.ts`. Blocker: the shelf spread (above).\n- **Security:** No new trust boundary. `pausedReason` is only compared and drawn with canvas `fillText`, with no HTML sink. No dependencies changed.\n- **Performance:** Bounded per-frame `filter`/`measureText` work. See advisory 5.\n- **Requirements/UX:** See the AC matrix below.\n\n### AC-to-evidence matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| Issue AC1 / AC-W1: bands disjoint at 600/800/1000 | Met | `model.test.ts` \"keeps the shelf and doldrums bands disjoint\" plus the text-row test; `canvasLayout` deleted |\n| Issue AC2 / AC-W2: text no wider than the allotted spacing | Met for fitted width; unmet in effect for the last shelf orb, which is clipped by the canvas edge (blocker) | `fit-text.test.ts` (does not run on CI, advisory 2) |\n| AC-W3: shelf cap 8, longest-idle, eviction drop | Met | hook test plus `evictionFor` tests; spec-defect advisory 1 |\n| Issue AC3 / AC-W4: merged plus close-out → not shelf | Met | `model.test.ts` D6 cases; hook test `{ stage: 'MERGE', state: 'active' }` |\n| Issue AC4 / AC-W5: stopped plan/review/test → no stage pull | Met | four `orb stage counts only live agents` tests |\n| AC-W6: renamed strings | Met | grep for the old string returns nothing; help copy updated |\n| Issue AC5 / AC-W7: docs | Met | `docs/GOD-VIEW.md` diff |\n| Issue AC6 / AC-W8: screenshot with ≥ 5 shelf and ≥ 5 stale orbs, no overprint, linked in the PR | Unmet | PNG shows the clipped fifth shelf orb (blocker) and overlapping HUD text (advisory 4); the PR body does not link the PNG (advisory 3) |\n| NFR-1 no server change | Met | diff touches only frontend, docs and `.pan` |\n| NFR-2 file size ≤ 1000 | Met | RiverCanvas 804, useConfluenceData 902, model 479 lines |\n| NFR-3 behavioural tests, no skip/only | Met | CI lint-group passes |\n\n## Verification\n- `gh pr checks 4539` at head b579e397: every job passes, including build (22), lint, lint-group core/effect/skills/state (effect diagnostics covered by lint-group effect), test-shard 1-4, test-e2e, test, and `overdeck/test` (verification gate: typecheck plus lint). Mintlify was skipped.\n- Local focused run: `npx vitest run` on `model.test.ts`, `fit-text.test.ts`, `useConfluenceData.test.ts`, `choreography.test.ts`, `confluence-smoke.test.tsx` → 5 files, 65 tests passed. Only `model.test.ts` of these also runs on CI.\n- Not run: the Playwright spec (it needs `npm run build` plus an isolated dashboard). I used the committed screenshot as the runtime evidence. I did not run the full suite, per the review budget.\n\n## Scope Note\nPRD \"Unresolved after two critic rounds\" lists three items: the held MERGE orb merge exit, canvas transitions bypassing the caps, and animated text slots. All three shipped as specified. Advisory 1 is the cheapest to fix while the author is already cycling on the blocker.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4523/.pan/review/agent-pan-4523-review-b579e397/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4523 -m \"Fixed review issues\"`"
+    }
+  ]
+}

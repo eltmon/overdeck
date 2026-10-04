@@ -167,7 +167,8 @@ export class AcpHost {
         const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
         const effortOption = configOptions.find((option) => option.id === "effort");
         if (effortOption) {
-          await Effect.runPromise(this.options.runtime.setConfigOption("effort", this.options.effort ?? "high"));
+          if (!this.options.effort) throw new Error("OpenCode launch requires --effort when the model exposes an effort setting.");
+          await Effect.runPromise(this.options.runtime.setConfigOption("effort", this.options.effort));
         } else if (this.options.effort && this.options.effort !== "high") {
           throw new Error(`The selected OpenCode model does not expose an effort setting (${this.options.effort} requested).`);
         }

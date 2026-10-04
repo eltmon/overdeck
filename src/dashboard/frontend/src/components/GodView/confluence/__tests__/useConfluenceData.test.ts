@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from 'react';
 import type { AgentSnapshot, BackendPane, DomainEvent } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
+import { CLOSE_OUT_PAUSE_REASON } from '../model';
 import {
   useConfluenceData,
   useConfluenceOrbs,
@@ -276,6 +277,186 @@ describe('useConfluenceOrbs', () => {
       'requirements',
       'synthesis',
     ]);
+  });
+
+  it('caps the shelf at eight orbs, longest-idle first', () => {
+    const agentsById: Record<string, AgentSnapshot> = {};
+    const issuesRaw: { id: string; identifier: string; title: string; labels: string[] }[] = [];
+    for (let index = 0; index < 10; index++) {
+      const issueId = `PAN-20${index}`;
+      const minutesAgo = (index + 1) * 10;
+      agentsById[`agent-${issueId}`] = agent({
+        id: `agent-${issueId}`,
+        issueId,
+        status: 'stopped',
+        paused: true,
+        pausedReason: `hold ${index}`,
+        lastActivity: new Date(NOW.getTime() - minutesAgo * 60_000).toISOString(),
+      });
+      issuesRaw.push({ id: issueId, identifier: issueId, title: `Shelf ${index}`, labels: [] });
+    }
+    useDashboardStore.setState({ agentsById, issuesRaw });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', issuesRaw.map((issue) => issue.id)], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    const shelfIds = () => result.current.filter((orb) => orb.state === 'shelf').map((orb) => orb.id);
+    expect(shelfIds()).toHaveLength(8);
+    expect(shelfIds()).not.toContain('PAN-200');
+    expect(shelfIds()).not.toContain('PAN-201');
+
+    // PAN-200 (the freshest, 10m) becomes the oldest at 200m; the cap still
+    // holds at 8, and PAN-200 now displaces PAN-202 (the next freshest).
+    act(() => useDashboardStore.setState((state) => ({
+      agentsById: {
+        ...state.agentsById,
+        'agent-PAN-200': agent({
+          id: 'agent-PAN-200',
+          issueId: 'PAN-200',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'hold 0',
+          lastActivity: new Date(NOW.getTime() - 200 * 60_000).toISOString(),
+        }),
+      },
+    })));
+
+    expect(shelfIds()).toHaveLength(8);
+    expect(shelfIds()).toContain('PAN-200');
+    expect(shelfIds()).not.toContain('PAN-201');
+    expect(shelfIds()).not.toContain('PAN-202');
+  });
+
+  it('lets a merged issue with close-out-paused agents flow to MERGE (PAN-4523 D6/D7)', () => {
+    const twoHoursAgo = new Date(NOW.getTime() - 2 * 60 * 60_000).toISOString();
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-11': agent({
+          id: 'agent-pan-11',
+          issueId: 'PAN-11',
+          status: 'stopped',
+          paused: true,
+          pausedReason: CLOSE_OUT_PAUSE_REASON,
+          lastActivity: twoHoursAgo,
+        }),
+        'planning-pan-11': agent({
+          id: 'planning-pan-11',
+          issueId: 'PAN-11',
+          role: 'plan',
+          status: 'stopped',
+          paused: true,
+          pausedReason: CLOSE_OUT_PAUSE_REASON,
+          lastActivity: twoHoursAgo,
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-11', identifier: 'PAN-11', title: 'Merged', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-11': { issueId: 'PAN-11', state: 'merged' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-11']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-11')).toMatchObject({
+      stage: 'MERGE',
+      state: 'active',
+    });
+  });
+
+  it('still shelves a merged issue carrying a non-close-out operator hold', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-16': agent({
+          id: 'agent-pan-16',
+          issueId: 'PAN-16',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'operator hold',
+          lastActivity: new Date(NOW.getTime() - 2 * 60 * 60_000).toISOString(),
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-16', identifier: 'PAN-16', title: 'Merged but held', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-16': { issueId: 'PAN-16', state: 'merged' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-16']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-16')).toMatchObject({ state: 'shelf' });
+  });
+});
+
+describe('orb stage counts only live agents (PAN-4523)', () => {
+  it('does not report PLAN when the plan agent has stopped and a work agent is live', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-110-plan': agent({ id: 'agent-pan-110-plan', issueId: 'PAN-110', role: 'plan', status: 'stopped' }),
+        'agent-pan-110-work': agent({ id: 'agent-pan-110-work', issueId: 'PAN-110', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-110', identifier: 'PAN-110', title: 'Plan stopped', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-110']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-110')).toMatchObject({ stage: 'WORK' });
+  });
+
+  it('does not report REVIEW when the review agent has stopped and a work agent is live', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-111-review': agent({ id: 'agent-pan-111-review', issueId: 'PAN-111', role: 'review', status: 'stopped' }),
+        'agent-pan-111-work': agent({ id: 'agent-pan-111-work', issueId: 'PAN-111', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-111', identifier: 'PAN-111', title: 'Review stopped', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-111']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-111')).toMatchObject({ stage: 'WORK' });
+  });
+
+  it('does not report TEST when the test agent has stopped on an in-review issue', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-112-test': agent({ id: 'agent-pan-112-test', issueId: 'PAN-112', role: 'test', status: 'stopped' }),
+        'agent-pan-112-work': agent({ id: 'agent-pan-112-work', issueId: 'PAN-112', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-112', identifier: 'PAN-112', title: 'Test stopped', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-112': { issueId: 'PAN-112', state: 'in-review' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-112']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-112')).toMatchObject({ stage: 'REVIEW' });
+  });
+
+  it('still reports PLAN when the plan agent is live (regression)', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-113-plan': agent({ id: 'agent-pan-113-plan', issueId: 'PAN-113', role: 'plan' }),
+      },
+      issuesRaw: [{ id: 'PAN-113', identifier: 'PAN-113', title: 'Planning live', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-113']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-113')).toMatchObject({ stage: 'PLAN' });
   });
 });
 

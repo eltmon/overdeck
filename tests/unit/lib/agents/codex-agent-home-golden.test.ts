@@ -103,7 +103,7 @@ describe('golden per-agent codex home (PAN-4013)', () => {
   it('initCodexHome links codex-home-v2/sessions to <agentDir>/codex-home/sessions', () => {
     const agentDir = join(agentsRoot, 'agent-golden-f');
     const v2 = join(agentDir, 'codex-home-v2');
-    initCodexHome(v2);
+    initCodexHome(v2, { effort: 'high' });
     const link = join(v2, 'sessions');
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
     expect(readlinkSync(link)).toBe(join(agentDir, 'codex-home', 'sessions'));

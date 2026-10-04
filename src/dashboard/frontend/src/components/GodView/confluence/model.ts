@@ -1,4 +1,4 @@
-import type { IssueAttention } from '../../../types';
+import type { DerivedIssueStateName, IssueAttention } from '../../../types';
 
 export const STAGES = ['PLAN', 'WORK', 'REVIEW', 'TEST', 'MERGE'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -91,7 +91,6 @@ export interface LayoutRect {
   padX: number;
   riverTop: number;
   riverBottom: number;
-  spectrumH: number;
   doldrumsH: number;
   shelfH: number;
   colW: number;
@@ -100,28 +99,71 @@ export interface LayoutRect {
   portalX: number;
   sunX: number;
   sunY: number;
+  shelfTop: number;
+  shelfBottom: number;
+  shelfHeaderY: number;
+  shelfLabelY: number;
+  shelfReasonY: number;
+  doldrumsTop: number;
+  doldrumsBottom: number;
+  doldrumsHeaderY: number;
+  doldrumsUpperY: number;
+  doldrumsLowerY: number;
+  doldrumsUpperLabelY: number;
+  doldrumsLowerLabelY: number;
 }
+
+/** Reserved below the Doldrums for the bottom HUD overlays (PAN-4523 D2). */
+const HUD_GUTTER = 32;
+const DOLDRUMS_H = 96;
+const SHELF_H = 70;
+/** Gap between the shelf band's bottom and the doldrums band's top. */
+const BAND_GAP = 10;
 
 export function computeLayout(width: number, height: number): LayoutRect {
   const padX = 26;
   const riverTop = 92;
-  const spectrumH = 54;
-  const doldrumsH = 64;
-  const shelfH = 34;
+
+  const doldrumsBottom = height - HUD_GUTTER;
+  const doldrumsTop = doldrumsBottom - DOLDRUMS_H;
+  const doldrumsY = doldrumsTop + 48;
+  const doldrumsHeaderY = doldrumsTop + 11;
+  const doldrumsUpperLabelY = doldrumsTop + 26;
+  const doldrumsUpperY = doldrumsTop + 44;
+  const doldrumsLowerY = doldrumsTop + 62;
+  const doldrumsLowerLabelY = doldrumsTop + 88;
+
+  const shelfBottom = doldrumsTop - BAND_GAP;
+  const shelfTop = shelfBottom - SHELF_H;
+  const shelfHeaderY = shelfTop + 11;
+  const shelfLabelY = shelfTop + 26;
+  const shelfY = shelfTop + 44;
+  const shelfReasonY = shelfTop + 68;
 
   return {
     padX,
     riverTop,
-    spectrumH,
-    doldrumsH,
-    shelfH,
-    riverBottom: height - spectrumH - doldrumsH - shelfH - 14,
+    riverBottom: shelfTop - 12,
+    doldrumsH: DOLDRUMS_H,
+    shelfH: SHELF_H,
     colW: (width - padX * 2) / STAGES.length,
-    shelfY: height - spectrumH - doldrumsH - shelfH + shelfH / 2 - 6,
-    doldrumsY: height - spectrumH - doldrumsH + doldrumsH / 2 - 4,
+    shelfY,
+    doldrumsY,
     portalX: width - padX - 8,
     sunX: 64,
     sunY: 52,
+    shelfTop,
+    shelfBottom,
+    shelfHeaderY,
+    shelfLabelY,
+    shelfReasonY,
+    doldrumsTop,
+    doldrumsBottom,
+    doldrumsHeaderY,
+    doldrumsUpperY,
+    doldrumsLowerY,
+    doldrumsUpperLabelY,
+    doldrumsLowerLabelY,
   };
 }
 
@@ -153,17 +195,38 @@ export function parkedOrbitTag(orbit: string | null | undefined): string | null 
 export const SWEEP_BEAM_COLOR = '#bfe3ff';
 export const SWEEP_FLARE_COLOR = '#ffd75e';
 
+/** The pause merge-agent.ts writes after a merge (src/lib/cloister/merge-agent.ts,
+ * grep "awaiting close-out"). Duplicated as a string: the frontend cannot import src/lib. */
+export const CLOSE_OUT_PAUSE_REASON = 'awaiting close-out (verify on main)';
+
 export interface RiverOrbInput {
   paused?: boolean | null;
   yieldedByScheduler?: boolean | null;
   /** The derived issue state's attention signal (FR-6). */
   attention?: IssueAttention | null;
   lastActivity?: string | number | null;
+  /** The issue's derived pipeline state (PAN-4523 D6): a merged issue paused only
+   * for close-out has nothing left to stall on and must exit through MERGE. */
+  issueState?: DerivedIssueStateName | null;
+  /** The pause reason that should speak for the issue (PAN-4523 D7). */
+  pausedReason?: string | null;
 }
 
 export const STALE_AFTER_MS = 30 * 60 * 1000;
 
+/**
+ * Precedence: merged-close-out-exit > shelf > failed > stale > active. A merged
+ * issue whose only pause is the close-out pause has nothing left to stall on —
+ * the merge exit (MERGE stage, state 'active') is the only correct way off the
+ * river, so this branch returns 'active' outright rather than merely skipping
+ * the shelf check (which would otherwise let the stale branch catch it).
+ */
 export function classifyOrb(input: RiverOrbInput, now: number): OrbState {
+  if (
+    input.issueState === 'merged'
+    && input.yieldedByScheduler !== true
+    && (input.paused !== true || input.pausedReason === CLOSE_OUT_PAUSE_REASON)
+  ) return 'active';
   if (input.paused === true || input.yieldedByScheduler === true) return 'shelf';
   // PAN-4383: waiting on the operator (e.g. a `pan ask` decision) is not idle.
   if (input.attention === 'needs-you') return 'needs-you';
@@ -195,6 +258,31 @@ function layoutWidth(layout: LayoutRect): number {
   return layout.colW * STAGES.length + layout.padX * 2;
 }
 
+/** x where the shelf/needs-you row's spread begins. */
+const SHELF_SPREAD_START_X = 140;
+/**
+ * Right margin reserved for the shelf spread (PAN-4523 review: a fixed
+ * 0.7×width spread pushed the last shelf orb's centred label past the
+ * canvas edge — `.confluence-river-canvas` has `overflow: hidden` — once the
+ * river shared a narrower-than-viewport canvas with the hook-bus panel and
+ * the sidebar, e.g. ~577px at a 1280px browser width). Clamping the spread's
+ * end to the canvas's own drawable width, minus this margin, keeps the last
+ * orb inside the band at any canvas width. Paired with SHELF_SLOT_MAX_WIDTH
+ * below (2× this margin) so its *label*, sized up to that cap and centred on
+ * the orb, also can't clip the edge — a bare endpoint clamp alone still fails
+ * for a sparse shelf (few orbs ⇒ wide neighbour spacing ⇒ an oversized slot).
+ */
+const SHELF_SPREAD_END_MARGIN = 60;
+
+/** The x-range shelf/needs-you orbs spread across, shared by positionOrb
+ * (orb placement) and shelfSlotWidth (text sizing) so they cannot drift apart. */
+function shelfSpreadRange(layout: LayoutRect): { startX: number; endX: number } {
+  const width = layoutWidth(layout);
+  const startX = layout.padX + SHELF_SPREAD_START_X;
+  const endX = Math.max(startX, width - layout.padX - SHELF_SPREAD_END_MARGIN);
+  return { startX, endX };
+}
+
 export function positionOrb<T extends PositionableOrb>(
   orb: T,
   orbs: readonly T[],
@@ -207,7 +295,7 @@ export function positionOrb<T extends PositionableOrb>(
   if (orb.state === 'stale') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'stale').indexOf(orb));
     orb.tx = layout.padX + 70 + (index / expectedStale) * (width * 0.72 - layout.padX);
-    orb.ty = layout.doldrumsY + (index % 2 ? 13 : -11);
+    orb.ty = index % 2 ? layout.doldrumsLowerY : layout.doldrumsUpperY;
     return orb;
   }
 
@@ -220,8 +308,8 @@ export function positionOrb<T extends PositionableOrb>(
 
   if (orb.state === 'shelf' || orb.state === 'needs-you') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').indexOf(orb));
-    orb.tx = layout.padX + 140
-      + (index / Math.max(1, expectedShelf - 1 || 1)) * (width * 0.5);
+    const { startX, endX } = shelfSpreadRange(layout);
+    orb.tx = startX + (index / Math.max(1, expectedShelf - 1 || 1)) * (endX - startX);
     orb.ty = layout.shelfY;
     return orb;
   }
@@ -235,6 +323,52 @@ export function positionOrb<T extends PositionableOrb>(
   orb.ty = layout.riverTop + 40
     + ((hashStr(orb.id) + laneCount * 53) % Math.max(60, layout.riverBottom - layout.riverTop - 80));
   return orb;
+}
+
+/** Margin subtracted from the raw neighbour spacing when sizing a text slot. */
+export const SLOT_MARGIN = 12;
+
+/**
+ * Longest prefix of `text` (plus '…' when cut) whose measured width fits
+ * `maxWidth`. Returns `text` unchanged when it already fits, and '' when even
+ * '…' alone does not fit.
+ */
+export function fitText(text: string, maxWidth: number, measure: (value: string) => number): string {
+  if (measure(text) <= maxWidth) return text;
+  if (measure('…') > maxWidth) return '';
+
+  let prefix = text;
+  while (prefix.length > 0 && measure(`${prefix}…`) > maxWidth) {
+    prefix = prefix.slice(0, -1);
+  }
+  return `${prefix}…`;
+}
+
+/**
+ * Upper bound on a shelf text slot (PAN-4523 review). Without it, a sparse
+ * shelf — few orbs spread across the whole shelfSpreadRange — hands the last
+ * orb's centred, fitted label a budget wide enough that half of it clips the
+ * canvas edge even though the orb's own position (shelfSpreadRange) is
+ * clamped: e.g. 2 orbs on a 577px-wide canvas get a ~300px slot each. Sized
+ * at 2× SHELF_SPREAD_END_MARGIN so the worst case (this cap, centred on the
+ * clamped endpoint) still lands inside the canvas.
+ */
+const SHELF_SLOT_MAX_WIDTH = SHELF_SPREAD_END_MARGIN * 2;
+
+/** Text width allotted to one shelf orb: neighbour spacing (the same
+ * shelfSpreadRange positionOrb places orbs across), capped at
+ * SHELF_SLOT_MAX_WIDTH, minus SLOT_MARGIN. */
+export function shelfSlotWidth(layout: LayoutRect, shelfCount: number): number {
+  const { startX, endX } = shelfSpreadRange(layout);
+  const spread = endX - startX;
+  const spacing = shelfCount <= 1 ? spread : spread / (shelfCount - 1);
+  return Math.max(0, Math.min(spacing, SHELF_SLOT_MAX_WIDTH) - SLOT_MARGIN);
+}
+
+/** Text width allotted to one stale orb: same-row neighbour spacing (two stale steps) minus SLOT_MARGIN. */
+export function staleSlotWidth(layout: LayoutRect, staleCount: number): number {
+  const width = layoutWidth(layout);
+  return (2 * (width * 0.72 - layout.padX)) / Math.max(1, staleCount) - SLOT_MARGIN;
 }
 
 export interface PickableOrb {

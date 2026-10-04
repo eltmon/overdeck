@@ -396,6 +396,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
+- Reasoning effort resolves only through `resolveEffort` (`src/lib/agents/resolve-effort.ts`),
+  which also clamps to model∩harness levels; `npm run lint:effort` ratchets new
+  `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3
+  translation (`src/lib/kimi-effort.ts`), so a Kimi model row must list canonical
+  levels, not native ones, or `medium`/`xhigh` clamp wrongly (PAN-4260).
 - A Claude Code transcript's modified time is not activity: Claude's
   `touchSessionTranscript` touches every running session's transcript at
   startup and then hourly, adding no record. PAN-4515 makes conversation `lastActivityAt`

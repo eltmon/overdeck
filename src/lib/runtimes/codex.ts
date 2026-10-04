@@ -44,6 +44,7 @@ import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSession } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
+import { resolveEffort } from '../agents/resolve-effort.js'
 
 
 const execAsync = promisify(exec)
@@ -247,7 +248,7 @@ class CodexSpawnTimeout extends Error {
 export interface InitCodexHomeOpts {
   trustedDir?: string
   model?: string
-  effort?: string
+  effort: string
   approvalPolicy?: string
   sandboxMode?: string
   approvalsReviewer?: string
@@ -262,7 +263,7 @@ export interface InitCodexHomeOpts {
  *     rules/        — Symlink to the user's global Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
-export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
+export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts): void {
   mkdirSync(codexHomeDir, { recursive: true, mode: 0o700 })
   if (codexHomeDir.endsWith('/codex-home-v2')) {
     // Keep transcript data in the established private root while using a new
@@ -291,7 +292,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       '# model/provider set at launch via -m flag',
       '',
       `approval_policy = "${opts.approvalPolicy ?? 'never'}"`,
-      `model_reasoning_effort = ${JSON.stringify(opts.effort ?? 'high')}`,
+      `model_reasoning_effort = ${JSON.stringify(opts.effort)}`,
       ...((opts.model?.startsWith('gpt-6-') || opts.model?.startsWith('gpt-6.') || opts.model?.startsWith('gpt-5.6-')) ? [`model_context_window = ${opts.model.endsWith('[372k]') ? 372_000 : 272_000}`] : []),
     ]
     if (opts.sandboxMode) {
@@ -657,7 +658,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2')
 
     // 1. Create the private CODEX_HOME structure (config + sessions; no AGENTS.md).
-    initCodexHome(codexHomeDir)
+    initCodexHome(codexHomeDir, { effort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'codex' }).effort })
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
     const sandbox = toCodexSandboxValue(config.codexSandboxMode)

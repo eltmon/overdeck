@@ -166,7 +166,14 @@
   pointer-events: none;
 }
 
-.confluence-tag { left: 12px; }
+/* PAN-4523 review: without a right-hand reserve and truncation, this label
+   wraps to a second line once its text is long enough (it was already within
+   ~12px of the wrap threshold before this issue's "shelf = paused / yielded"
+   wording), and the wrapped line sits in .confluence-hint's pill — "no
+   overprinted text" (issue AC-6). 440px clears the hint pill's own ~405px
+   content plus its 12px right offset at today's copy; the ellipsis is the
+   fallback if a future copy change needs more room than that. */
+.confluence-tag { left: 12px; right: 440px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .confluence-hint { right: 12px; padding: 5px 11px; border: 1px solid var(--gv-border); border-radius: 999px; background: rgba(13, 18, 32, .7); }
 .confluence-tag b,
 .confluence-hint b { color: var(--gv-blue); }

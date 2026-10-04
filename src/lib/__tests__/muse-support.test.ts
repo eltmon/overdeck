@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { getHarnessBehavior, KNOWN_HARNESSES } from '@overdeck/contracts';
+import { EFFORT_LEVELS, getHarnessBehavior, KNOWN_HARNESSES } from '@overdeck/contracts';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import { getProviderForModel } from '../providers.js';
 import { parseMuseSessionMetadata } from '../conversations/harness-metadata.js';
 import { applyFallback } from '../model-fallback.js';
@@ -114,7 +115,7 @@ describe('Muse model and harness support', () => {
 
   it.each(models)('launches %s interactively and resumes only a native UUID', model => {
     const script = generateLauncherScript({ role: 'work', workingDir: '/tmp/muse workspace', harness: 'muse',
-      museModel: model, overdeckEnv: { agentId: 'conv-muse-test' },
+      museModel: model, museEffort: 'high', overdeckEnv: { agentId: 'conv-muse-test' },
       resumeSessionId: 'stale-claude-id', museResumeSessionId: 'native-muse-id',
       museContextFile: '/tmp/context with spaces.md', spawnMode: 'conversation' });
     expect(script).toContain(`muse --model '${model}' --reasoning-effort 'high'`);
@@ -129,6 +130,19 @@ describe('Muse model and harness support', () => {
   it('requires an explicit model instead of using Muse settings as a fallback', () => {
     expect(() => generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
       overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('explicit supported Muse');
+  });
+
+  it.each(EFFORT_LEVELS)('muse launch argv carries the resolved effort %s (max clamps to xhigh)', level => {
+    const museEffort = resolveEffort({ explicit: level, model: 'muse-spark-1.3', harness: 'muse' }).effort;
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-spark-1.3', museEffort, overdeckEnv: { agentId: 'agent-muse-effort-test' } });
+    const expected = level === 'max' ? 'xhigh' : level;
+    expect(script).toContain(`--reasoning-effort '${expected}'`);
+  });
+
+  it('muse launcher without museEffort throws', () => {
+    expect(() => generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-spark-1.3', overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('muse launcher requires museEffort');
   });
 
   it('selects only the newest root session in the requested agent directory', async () => {

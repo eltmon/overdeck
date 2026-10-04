@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveKimiNativeEffort } from '../kimi-effort.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 
 describe('managed Kimi effort', () => {
   it.each([
@@ -14,10 +15,14 @@ describe('managed Kimi effort', () => {
     });
   });
   it.each(['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k'])(
-    'defaults %s to high instead of the CLI model default', (model) => {
-      expect(resolveKimiNativeEffort(model)).toBe('high');
+    'requires a resolved effort for %s', (model) => {
+      expect(() => resolveKimiNativeEffort(model, undefined)).toThrow('requires a resolved effort level');
     },
   );
+
+  it('exposes no adjustable effort for kimi-for-coding even with no effort given', () => {
+    expect(resolveKimiNativeEffort('kimi-code/kimi-for-coding', undefined)).toBeUndefined();
+  });
 
   it.each([['low', 'low'], ['medium', 'high'], ['high', 'high'], ['xhigh', 'max'], ['max', 'max']])(
     'preserves the meaning of saved %s effort', (requested, expected) => {
@@ -57,6 +62,29 @@ describe('managed Kimi effort', () => {
     expect(script).toContain('unset KIMI_MODEL_THINKING_EFFORT');
     expect(script).not.toContain('export KIMI_MODEL_THINKING_EFFORT');
   });
+
+  it.each([['low', 'low'], ['medium', 'high'], ['high', 'high'], ['xhigh', 'max'], ['max', 'max']] as const)(
+    'kimi-code launch translates canonical %s to native %s end to end (F4)', (level, native) => {
+      const kimiCodeEffort = resolveEffort({ explicit: level, model: 'kimi-code/k3', harness: 'kimi-code' }).effort;
+      const script = generateLauncherScript({
+        role: 'work', workingDir: '/workspace', harness: 'kimi-code',
+        kimiCodeModel: 'kimi-code/k3', kimiCodeEffort,
+      });
+      expect(script).toContain(`export KIMI_MODEL_THINKING_EFFORT='${native}'`);
+    },
+  );
+
+  it.each([['low', 'low'], ['medium', 'high'], ['high', 'high'], ['xhigh', 'max'], ['max', 'max']] as const)(
+    'ACP Kimi launch translates canonical %s to native %s end to end (F4)', (level, native) => {
+      const acpEffort = resolveEffort({ explicit: level, model: 'k3', harness: 'acp' }).effort;
+      const script = generateLauncherScript({
+        role: 'work', workingDir: '/workspace', harness: 'acp',
+        acpAgentId: 'agent-test', acpProvider: 'kimi', acpWorkspace: '/workspace',
+        acpBinaryPath: '/bin/kimi', model: 'k3', acpEffort,
+      });
+      expect(script).toContain(`--effort '${native}'`);
+    },
+  );
 
   it('passes explicit effort into the persistent ACP host', () => {
     const script = generateLauncherScript({

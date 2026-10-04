@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { Effect } from 'effect';
 import type { MemoryIdentity } from '@overdeck/contracts';
+import { isEffortLevel } from '@overdeck/contracts';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, type RoleEffort } from '../config-yaml.js';
 import { resolveEffort } from './resolve-effort.js';
@@ -122,7 +123,7 @@ export function getAcpLauncherFields(
   model: string,
   workspace: string,
   binaryPath: string,
-  _role?: Role,
+  role?: Role,
   effort?: string,
 ): {
   harness: 'acp' | 'opencode';
@@ -131,18 +132,19 @@ export function getAcpLauncherFields(
   acpWorkspace: string;
   acpBinaryPath: string;
   acpContextFile: string;
-  acpEffort?: string;
+  acpEffort: string;
   model: string;
   unsetProviderEnv: true;
 } {
+  const harness = model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
-    harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
+    harness,
     acpAgentId: agentId,
     acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
-    ...(effort ? { acpEffort: effort } : {}),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness),
+    acpEffort: harness === 'opencode' && effort && !isEffortLevel(effort) ? effort : resolveEffort({ explicit: effort, role, model, harness }).effort,
     model,
     unsetProviderEnv: true,
   };
@@ -152,7 +154,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   harness: 'kimi-code';
   kimiCodeModel: string;
   kimiCodeYolo: true;
-  kimiCodeEffort?: string;
+  kimiCodeEffort: string;
   model: string;
   unsetProviderEnv: true;
   kimiContextDelivery: 'initial-message';
@@ -162,7 +164,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
     harness: 'kimi-code',
     kimiCodeModel,
     kimiCodeYolo: true,
-    ...(effort ? { kimiCodeEffort: effort } : {}),
+    kimiCodeEffort: resolveEffort({ explicit: effort, model: kimiCodeModel, harness: 'kimi-code' }).effort,
     model,
     unsetProviderEnv: true,
     kimiContextDelivery: 'initial-message',
@@ -187,10 +189,11 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     : codexPermMode === 'read-only' ? 'read-only'
     : 'workspace-write';
   const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
+  const codexEffort = resolveEffort({ explicit: effort, role, model, harness: 'codex' }).effort;
   initCodexHome(codexHome, {
     trustedDir: workspacePath,
     model,
-    effort,
+    effort: codexEffort,
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
@@ -199,7 +202,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   return {
     harness: 'codex',
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
-    codexEffort: resolveEffort({ explicit: effort, role, model, harness: 'codex' }).effort,
+    codexEffort,
     codexHome,
     codexSessionDir: codexSessionsRoot(codexHome),
     model,

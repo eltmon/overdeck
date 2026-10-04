@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerHost, codexNotificationCost, installHostExitHandlers } from '../app-server-host.js';
+import { CodexAppServerHost, codexNotificationCost, installHostExitHandlers, parseArgs } from '../app-server-host.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import {
   CodexAppServerManager,
   type CodexAppServerState,
@@ -98,6 +99,7 @@ function makeHost(manager: FakeManager, opts: Partial<ConstructorParameters<type
     cwd: '/tmp/workspace',
     overdeckHome,
     manager,
+    effort: 'high',
     ...opts,
   });
 }
@@ -235,7 +237,7 @@ describe('CodexAppServerHost', () => {
     });
   });
 
-  it('uses High by default and applies acknowledged effort changes to subsequent turns', async () => {
+  it('starts at the launch effort and applies acknowledged effort changes to subsequent turns', async () => {
     const manager = new FakeManager();
     const host = makeHost(manager);
     await host.handleOp({ op: 'message', content: 'first', model: 'gpt-6-astra' });
@@ -248,6 +250,24 @@ describe('CodexAppServerHost', () => {
     manager.setState({ state: 'idle', threadId: 'thread-started' });
     await host.handleOp({ op: 'message', content: 'third' });
     expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('low');
+  });
+
+  it.each(EFFORT_LEVELS)('set-effort %s is accepted and applied to the next turn', async (level) => {
+    const manager = new FakeManager();
+    const host = makeHost(manager, { model: 'gpt-6-astra' });
+    expect((await host.handleOp({ op: 'set-effort', effort: level })).status).toBe(200);
+    await host.handleOp({ op: 'message', content: 'next' });
+    expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe(level);
+  });
+
+  it.each(['ultra', 'invalid'])('set-effort rejects %s', async (level) => {
+    const manager = new FakeManager();
+    const host = makeHost(manager);
+    expect((await host.handleOp({ op: 'set-effort', effort: level })).status).toBe(400);
+  });
+
+  it('parseArgs reads --effort', () => {
+    expect(parseArgs(['--effort', 'xhigh']).effort).toBe('xhigh');
   });
 
   it('starts a thread, persists threadId, starts a turn, and logs manager notifications', async () => {

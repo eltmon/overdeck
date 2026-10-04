@@ -93,6 +93,7 @@ function canvasContext(): RecordedContext {
     fillRect: vi.fn(),
     fillText: vi.fn(),
     lineTo: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 6 })) as unknown as CanvasRenderingContext2D['measureText'],
     moveTo: vi.fn(),
     restore: vi.fn(),
     rotate: vi.fn(),

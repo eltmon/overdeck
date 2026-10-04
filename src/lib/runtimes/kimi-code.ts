@@ -53,6 +53,7 @@ import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import { closeBackendPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 import { launchRuntimePane, runtimeUsesSupervisor } from './runtime-pane-launch.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import type {
   Agent,
   AgentRuntimeSync,
@@ -574,7 +575,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       workingDir: config.workspace,
       harness: 'kimi-code',
       kimiCodeModel: model,
-      kimiCodeEffort: config.effort,
+      kimiCodeEffort: resolveEffort({ explicit: config.effort, model, harness: 'kimi-code' }).effort,
       kimiCodeYolo: true,
       extraEnvExports: [pathExport],
       overdeckEnv: { agentId: config.agentId },
