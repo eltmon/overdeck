@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:14:51.769Z",
+  "updated": "2026-10-04T05:15:04.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "prototype-probe.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:14:51.768Z"
+    },
+    "candidate-1-operator-state-band.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:04.015Z"
     }
   }
 }
