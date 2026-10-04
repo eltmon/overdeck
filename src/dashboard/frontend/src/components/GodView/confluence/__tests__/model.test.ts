@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLOSE_OUT_PAUSE_REASON,
   ROLE_COLORS,
   acquireRadius,
   advanceFrostAccrual,
@@ -14,6 +15,7 @@ import {
   pickOrb,
   positionOrb,
   pruneTraceEvents,
+  shelfSlotWidth,
   toolToFamily,
   traceTimeToX,
   type OrbState,
@@ -27,21 +29,33 @@ function orb(id: string, state: OrbState, stage = 'WORK'): PositionableOrb {
 
 describe('Confluence model', () => {
   describe('layout and positioning', () => {
-    it('keeps the mockup layout constants at 1680×945', () => {
-      expect(computeLayout(1680, 945)).toEqual({
-        padX: 26,
-        riverTop: 92,
-        riverBottom: 779,
-        spectrumH: 54,
-        doldrumsH: 64,
-        shelfH: 34,
-        colW: 1628 / 5,
-        shelfY: 804,
-        doldrumsY: 855,
-        portalX: 1646,
-        sunX: 64,
-        sunY: 52,
-      });
+    const BAND_TEST_HEIGHTS = [600, 800, 1000] as const;
+
+    it('keeps the shelf and doldrums bands disjoint', () => {
+      for (const height of BAND_TEST_HEIGHTS) {
+        const layout = computeLayout(1280, height);
+        expect(layout.shelfBottom + 8).toBeLessThanOrEqual(layout.doldrumsTop);
+        expect(layout.shelfTop).toBeGreaterThan(layout.riverBottom);
+        expect(layout.doldrumsBottom).toBeLessThanOrEqual(height - 30);
+      }
+    });
+
+    it('keeps every band text row inside its band', () => {
+      for (const height of BAND_TEST_HEIGHTS) {
+        const layout = computeLayout(1280, height);
+        for (const y of [layout.shelfHeaderY, layout.shelfLabelY, layout.shelfReasonY]) {
+          expect(y).toBeGreaterThanOrEqual(layout.shelfTop + 9);
+          expect(y).toBeLessThanOrEqual(layout.shelfBottom - 2);
+        }
+        for (const y of [layout.doldrumsHeaderY, layout.doldrumsUpperLabelY, layout.doldrumsLowerLabelY]) {
+          expect(y).toBeGreaterThanOrEqual(layout.doldrumsTop + 9);
+          expect(y).toBeLessThanOrEqual(layout.doldrumsBottom - 2);
+        }
+        expect(layout.shelfLabelY).toBeLessThan(layout.shelfY - 14);
+        expect(layout.shelfReasonY).toBeGreaterThan(layout.shelfY + 14);
+        expect(layout.doldrumsUpperLabelY).toBeLessThan(layout.doldrumsUpperY - 14);
+        expect(layout.doldrumsLowerLabelY).toBeGreaterThan(layout.doldrumsLowerY + 14);
+      }
     });
 
     it('spreads stale orbs monotonically across two alternating rows', () => {
@@ -55,14 +69,14 @@ describe('Confluence model', () => {
       );
       expect(new Set(orbs.map((candidate) => candidate.tx)).size).toBe(8);
       expect(orbs.map((candidate) => candidate.ty)).toEqual([
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
       ]);
     });
 
@@ -91,8 +105,26 @@ describe('Confluence model', () => {
 
       for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, orbs.length);
 
-      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 586, 1006]);
+      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 880, 1594]);
       expect(orbs.every((candidate) => candidate.ty === layout.shelfY)).toBe(true);
+    });
+
+    it('keeps the last shelf orb and its fitted label inside the canvas at realistic canvas widths (PAN-4523 review)', () => {
+      // 577: the river canvas's own width at a 1280px browser viewport once
+      // the hook-bus panel and sidebar take their share (the committed
+      // screenshot's measured width); 1280: a full-width synthetic canvas.
+      for (const canvasWidth of [577, 1280]) {
+        const layout = computeLayout(canvasWidth, 800);
+        for (const shelfCount of [1, 2, 5, 8]) {
+          const orbs = Array.from({ length: shelfCount }, (_, index) => orb(`PAN-${index}`, 'shelf'));
+          for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, shelfCount);
+
+          const lastTx = orbs[orbs.length - 1]!.tx;
+          const slot = shelfSlotWidth(layout, shelfCount);
+          expect(lastTx + slot / 2).toBeLessThanOrEqual(canvasWidth - layout.padX);
+          expect(lastTx).toBeLessThanOrEqual(layout.portalX);
+        }
+      }
     });
   });
 
@@ -100,7 +132,7 @@ describe('Confluence model', () => {
     const now = Date.parse('2026-08-01T12:00:00.000Z');
     const staleActivity = '2026-08-01T11:30:00.000Z';
 
-    it('classifies with shelf > needs-you > failed > stale > active precedence', () => {
+    it('classifies with merged-close-out-exit > shelf > needs-you > failed > stale > active precedence', () => {
       expect(classifyOrb({
         paused: true,
         attention: 'stuck',
@@ -118,6 +150,34 @@ describe('Confluence model', () => {
       expect(classifyOrb({ lastActivity: staleActivity }, now)).toBe('stale');
       expect(classifyOrb({ lastActivity: '2026-08-01T11:30:00.001Z' }, now)).toBe('active');
       expect(classifyOrb({}, now)).toBe('active');
+    });
+
+    it('lets a merged issue paused only for close-out exit through MERGE (PAN-4523 D6)', () => {
+      expect(classifyOrb({
+        issueState: 'merged',
+        paused: true,
+        pausedReason: CLOSE_OUT_PAUSE_REASON,
+        lastActivity: staleActivity,
+      }, now)).toBe('active');
+      expect(classifyOrb({
+        issueState: 'merged',
+        paused: true,
+        pausedReason: 'RUN-92 safety hold: operator',
+        lastActivity: staleActivity,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'merged',
+        yieldedByScheduler: true,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'working',
+        paused: true,
+        pausedReason: CLOSE_OUT_PAUSE_REASON,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'merged',
+        lastActivity: staleActivity,
+      }, now)).toBe('active');
     });
 
     it('keeps a needs-you orb out of the Doldrums after 17 hours, but a pause still shelves it (PAN-4383)', () => {

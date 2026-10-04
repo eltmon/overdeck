@@ -10,6 +10,7 @@ import type { DerivedIssueState, DerivedIssueStateName, IssueAttention, Issue } 
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useWorkspaceStackHealthQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import {
+  CLOSE_OUT_PAUSE_REASON,
   HOOK_KEYS,
   classifyOrb,
   modelGlyph,
@@ -239,6 +240,8 @@ const MERGE_LANE_STATES = new Set<DerivedIssueStateName>(['ready', 'merged']);
 /** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
  * so a large stale population never becomes an unreadable label wall. */
 const STALE_ORB_LIMIT = 14;
+/** Shelf emissary cap (PAN-4523 D5): the longest-idle shelf orbs represent the population. */
+const SHELF_ORB_LIMIT = 8;
 
 /**
  * The agents whose paused / yielded flags describe the issue RIGHT NOW.
@@ -307,9 +310,9 @@ const STAGE_BY_PHASE: Record<PipelineIssuePhase, Stage> = {
 
 function orbStage(agents: readonly AgentSnapshot[], derived: DerivedIssueState | undefined): Stage {
   const stage = STAGE_BY_PHASE[getPipelineIssuePhase(derived ?? null)];
-  if (stage === 'REVIEW' && agents.some((agent) => agent.role === 'test')) return 'TEST';
-  if (stage === 'WORK' && agents.some((agent) => agent.role === 'plan')) return 'PLAN';
-  if (stage === 'WORK' && agents.some((agent) => agent.role === 'review' || agent.id.includes('-review'))) return 'REVIEW';
+  if (stage === 'REVIEW' && agents.some((agent) => agent.role === 'test' && activeStatus(agent.status))) return 'TEST';
+  if (stage === 'WORK' && agents.some((agent) => agent.role === 'plan' && activeStatus(agent.status))) return 'PLAN';
+  if (stage === 'WORK' && agents.some((agent) => (agent.role === 'review' || agent.id.includes('-review')) && activeStatus(agent.status))) return 'REVIEW';
   return stage;
 }
 
@@ -681,6 +684,11 @@ export function useConfluenceOrbs(
         (agent as AgentSnapshot & { yieldedByScheduler?: boolean }).yieldedByScheduler === true ||
         agent.pausedReason?.toLowerCase().includes('yield') === true,
       );
+      // D7: any non-close-out pause (including a reasonless one) speaks for the
+      // issue, so an operator hold on a merged issue still keeps it shelved.
+      const pausedVoters = voters.filter((agent) => agent.paused === true);
+      const holdVoter = pausedVoters.find((agent) => agent.pausedReason !== CLOSE_OUT_PAUSE_REASON);
+      const pausedReason = holdVoter ? (holdVoter.pausedReason ?? null) : (pausedVoters[0]?.pausedReason ?? null);
       const micro = aggregateMicroState(issueAgents, microStatesByAgentId);
       const broken = workspaceHealth[id.toUpperCase()]?.stackHealth?.healthy === false
         || (issue?.stackHealth as { healthy?: boolean } | undefined)?.healthy === false;
@@ -699,6 +707,8 @@ export function useConfluenceOrbs(
           yieldedByScheduler,
           attention: derived?.attention ?? null,
           lastActivity,
+          issueState: derived?.state ?? null,
+          pausedReason,
         }, now),
         convoy: convoyMembers(issueAgents),
         yieldReason: voters.find((agent) => agent.pausedReason)?.pausedReason ?? null,
@@ -758,9 +768,12 @@ export function useConfluenceOrbs(
     const staleOrbs = next.filter((orb) => orb.state === 'stale')
       .sort((a, b) => b.staleMin - a.staleMin)
       .slice(0, STALE_ORB_LIMIT);
-    const keepStale = new Set(staleOrbs.map((orb) => orb.id));
+    const shelfOrbs = next.filter((orb) => orb.state === 'shelf')
+      .sort((a, b) => b.idleMin - a.idleMin)
+      .slice(0, SHELF_ORB_LIMIT);
+    const keep = new Set([...staleOrbs, ...shelfOrbs].map((orb) => orb.id));
     return next
-      .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
+      .filter((orb) => (orb.state !== 'stale' && orb.state !== 'shelf') || keep.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
   }, [agents, issuesRaw, microStatesByAgentId, derivedIssueStateByIssueId, workspaceHealth, parked, agentRuntimeById]);
 }

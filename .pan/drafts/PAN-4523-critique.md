@@ -1,0 +1,9 @@
+plan-digest: 4f33b14cd5721c755e2b825f93bdf2274fc9eee8eaa6674928b20ae67a2401fc
+
+## blocks-the-design: Lower labels sit behind the bottom HUD
+
+The proposed `doldrumsLowerLabelY = doldrumsTop + 88 = H - 16` is inside the existing bottom overlay. [confluence.css](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4523/src/dashboard/frontend/src/components/GodView/confluence/confluence.css), lines 158-170, places both `.confluence-tag` and `.confluence-hint` at `bottom: 8px` with `z-index: 14`; the hint also has 5px vertical padding. [GodViewConfluence.tsx](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4523/src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx), lines 168-169, renders both over the canvas, and the tag remains visible at the planned 1280px viewport (the CSS hides it only below 1180px, lines 266-269). The fixed label row therefore passes the W1 band tests while lower-row stale labels are covered in the W8 screenshot, leaving the overprint defect. Reserve a bottom gutter below the Doldrums for these overlays, or move the overlays outside the canvas; add a browser assertion that their bounds do not intersect the lower label row.
+
+## blocks-the-design: Shelf cap does not cap rendered orbs during churn
+
+W3 caps the array returned by `useConfluenceOrbs`, but the canvas retains an orb absent from new props for a one-second fade. [RiverCanvas.tsx](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4523/src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx), lines 418-424, assigns `fading = 1` to removed orbs; lines 648-652 retain them until fade completes, and lines 554-574 still draw them. Replacing one of eight shelved issues with an older one can therefore draw nine shelf orbs, contrary to FR-4, while the hook-only W3 test still passes. Specify immediate removal or a render-layer cap for evicted shelf orbs, and test the eight-to-eight replacement transition.

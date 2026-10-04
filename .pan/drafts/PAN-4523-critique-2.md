@@ -1,0 +1,13 @@
+plan-digest: b8629f2617ff4f8d47d65d60d44ce71a1b2f041333d2c197d91d5e3de3527bc8
+
+## blocks-the-design: Evicting a held MERGE orb launches a merge exit
+
+The PRD explicitly requires an operator-held merged issue to remain shelved (D6, lines 139–148; W4, lines 260–261). Yet W3's `evictionFor` checks `stage === 'MERGE'` before `state === 'shelf'` (PRD lines 224–246), and its test requires `evictionFor('shelf', 'MERGE') === 'merge'` (line 250). `orbStage` maps a derived `merged` issue to MERGE (`src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts`, lines 308–314), so a held merged orb displaced by the eight-orb cap starts `startMerge` in the removal loop (`RiverCanvas.tsx`, lines 418–422, 328–340). It also remains a drawn shelf orb until it exits, breaking the cap during replacement. Change `evictionFor` to drop shelf and stale states before considering MERGE, and start the merge exit only for an active MERGE orb. Test an evicted, operator-held merged orb in the canvas removal path.
+
+## blocks-the-design: Canvas transitions bypass both band caps
+
+W3 caps only `next` in `useConfluenceOrbs` (PRD lines 207–220) and drops orbs only when absent from props (lines 234–243). The canvas independently changes `orb.state`: frost turns an active orb stale in `RiverCanvas.tsx`, line 662, while the tide turns an active orb shelf at line 671. Neither transition removes an orb from `renderOrbs` or reruns the hook filter. With fourteen stale orbs already rendered, one active orb sinking makes fifteen visible stale orbs; the analogous tide can create a ninth shelf orb. `drawOrbs` iterates the full render map (lines 554–557). Enforce the 14/8 limits after canvas-local transitions or make the hook's cast authoritative for band membership. Add a render-level transition test; the proposed eight-to-eight replacement test exercises only prop eviction.
+
+## blocks-the-design: Text slots ignore where labels are drawn during animation
+
+W2 fits each label to target spacing minus 12 px (PRD lines 189–201), but draws it at `orb.x`. A new shelf orb starts at `orb.tx - 60` (`RiverCanvas.tsx`, lines 320–325) and eases toward `tx` (line 659). At 1280 px with eight shelf orbs, D3's 70% spread gives target spacing 128 px and a 116 px text slot; a new orb immediately left of an established neighbor is only 68 px away, so two valid fitted labels can overlap by up to 48 px. Stale orbs also drift up to 8 px each side of `tx` (line 661), exceeding the planned 12 px margin between same-row labels. Fit against current same-row center distances, or reserve enough space for the maximum displacement and test animated neighbors at the eight-shelf and fourteen-stale limits. The five-orb screenshot in W8 will not expose either maximum-density case.
