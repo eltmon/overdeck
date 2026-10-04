@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:14:07.796Z",
+  "updated": "2026-10-04T05:14:19.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "start-worker-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:14:07.796Z"
+    },
+    "worker-run-effort-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:19.802Z"
     }
   }
 }
