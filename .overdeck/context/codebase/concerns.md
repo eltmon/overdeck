@@ -430,4 +430,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   only for codex (`recordAgentActivity`, every 5 s); codex posts no
   `agent.activity_changed`, so the God View's row-stamp fallback is codex's only
   liveness signal.
+- **Deploy boot preflight reads the entry bundle's text** (PAN-4541) —
+  `pan reload` refuses to switch generations when `dashboardServerBootFailure`
+  (`src/lib/deploy/dashboard-bundle-integrity.ts`) or `supervisorDeploymentFailure`
+  report an unresolvable bare import, via `unresolvedBundleImports`
+  (`src/lib/bundle-imports.ts`). Until PAN-4541 lands and the CLI running
+  `pan reload` is rebuilt, that scanner is a regex that also matches comments:
+  rolldown keeps JSDoc, so any comment reaching `dist/dashboard/server.js` that
+  pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
+  deploy. Even after the lexer fix, the first reload of a change runs the
+  *installed* CLI, so never write that syntax in source comments.
 <!-- last-verified: 2026-10-04 -->

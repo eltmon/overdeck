@@ -58,7 +58,10 @@ What it checks:
 - ES module syntax only (static `import` / `export … from`, and dynamic
   `import()`) — exactly what Node resolves in this ESM package. AMD/UMD
   `define([…])` arrays and the bundler's `__require` shim inside inlined
-  third-party code are ignored; Node never resolves those.
+  third-party code are ignored; Node never resolves those. The deploy-time
+  boot preflight (`src/lib/bundle-imports.ts`) applies the same rule at
+  runtime using es-module-lexer, which is inlined via `deps.alwaysBundle` and
+  is therefore a devDependency (PAN-4541).
 - A specifier's package must appear in `dependencies`, `optionalDependencies`,
   or `peerDependencies`. A **devDependency does not count** — a published
   install has none, which is how both PAN-3209 and PAN-1562 shipped broken.
