@@ -1452,6 +1452,7 @@ describe('generateLauncherScript', () => {
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
+      piEffort: 'high',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
@@ -1669,6 +1670,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
+      piEffort: 'high',
       model: 'anthropic/claude-sonnet-4-6',
       piExtensionPath: '/abs/packages/ohmypi-extension/dist/index.js',
       piFifoPath: '/home/u/.overdeck/agents/agent-pan-1989/rpc.in',
@@ -1701,6 +1703,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       role: 'work',
       spawnMode: 'resume',
       harness: 'ohmypi',
+      piEffort: 'high',
       model: 'gpt-5.4-mini',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
@@ -1716,6 +1719,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
+      piEffort: 'high',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
@@ -1732,6 +1736,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       ...DEFAULT_CONFIG,
       agentType: 'conversation',
       harness: 'ohmypi',
+      piEffort: 'high',
       piMode: 'tui',
       model: 'gpt-5.4-mini',
       piSessionDir: '/x/sessions',
@@ -1743,6 +1748,32 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
     expect(script).not.toMatch(/--no-context-files/);
     expect(script).toMatch(/\bomp\b/);
+  });
+
+  it.each(EFFORT_LEVELS)('ohmypi launch argv carries the resolved effort %s (max clamps to xhigh)', (level) => {
+    const piEffort = resolveEffort({ explicit: level, model: 'claude-fable-5', harness: 'ohmypi' }).effort;
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'ohmypi',
+      piEffort,
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+    });
+    const expected = level === 'max' ? 'xhigh' : level;
+    expect(script).toMatch(new RegExp(`--thinking '${expected}'`));
+  });
+
+  it('ohmypi launcher without piEffort throws', () => {
+    expect(() => generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'ohmypi',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+    })).toThrow('ohmypi launcher requires piEffort');
   });
 
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
@@ -2045,6 +2076,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
         overdeckEnv: { agentId: 'agent-pan-1837' },
         unsetProviderEnv: true,
@@ -2065,6 +2097,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
         promptFile: '/workspace/project/.pan/init-prompt.txt',
       });
@@ -2080,6 +2113,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
         resumeSessionId: 'session-abc-123',
       });
@@ -2092,6 +2126,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
       });
       expect(script).not.toMatch(/-S /);
@@ -2103,6 +2138,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
         kimiCodeAddDirs: ['/workspace/other-repo', '/workspace/third'],
       });
@@ -2115,6 +2151,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
       });
       expect(script).toMatch(/^exec kimi -m 'kimi-code\/k3-256k'$/m);
       expect(script).not.toMatch(/--yolo/);
@@ -2134,6 +2171,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
+        kimiCodeEffort: 'high',
         kimiCodeYolo: true,
         spawnMode: 'conversation',
         useSupervisor: true,
@@ -2159,6 +2197,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: given,
+        kimiCodeEffort: 'high',
       });
       expect(script).toContain(`kimi -m '${expected}'`);
     });
@@ -2232,7 +2271,7 @@ describe('generateLauncherScript — skill overrides (PAN-3942)', () => {
   it('remote and ohmypi launchers get no skill-override step', () => {
     const remote = generateLauncherScript({ ...DEFAULT_CONFIG, role: 'work', spawnMode: 'remote', baseCommand: 'claude' });
     const ohmypi = generateLauncherScript({
-      ...DEFAULT_CONFIG, role: 'work', harness: 'ohmypi', piMode: 'tui', piSessionDir: '/x/sessions', piExtensionPath: '/x/dist/index.js',
+      ...DEFAULT_CONFIG, role: 'work', harness: 'ohmypi', piMode: 'tui', piEffort: 'high', piSessionDir: '/x/sessions', piExtensionPath: '/x/dist/index.js',
     });
     for (const script of [remote, ohmypi]) {
       expect(script).not.toContain('pan skills launch-settings');

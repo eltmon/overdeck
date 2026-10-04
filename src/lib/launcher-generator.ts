@@ -756,6 +756,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (!config.piSessionDir) {
     throw new Error('ohmypi launcher requires piSessionDir');
   }
+  if (!config.piEffort) throw new Error('ohmypi launcher requires piEffort');
   if (piMode === 'rpc') {
     if (!config.piExtensionPath) {
       throw new Error('ohmypi launcher (rpc mode) requires piExtensionPath');
@@ -769,7 +770,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
-  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
+  tokens.push('--thinking', shellQuote(config.piEffort));
   if (config.model) {
     tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model)));
   }
