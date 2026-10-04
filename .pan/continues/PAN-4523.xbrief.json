@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:41:53.082Z",
+  "updated": "2026-10-04T05:42:05.765Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "shelf-rename.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:41:53.082Z"
+    },
+    "shelf-rename.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:42:05.765Z"
     }
   }
 }
