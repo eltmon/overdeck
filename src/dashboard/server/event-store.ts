@@ -118,6 +118,11 @@ export interface EventStore {
    * never materialize unrelated retained history the way `readFrom(0)` does.
    */
   queryByTypesSince(types: string[], afterSequence: number): StoredEvent[];
+  /**
+   * PAN-4522: every event whose type is in `types` and whose payload.agentId is
+   * in `agentIds`, oldest first. Seeds the read model's runtime map at boot.
+   */
+  queryRuntimeHistory(types: readonly string[], agentIds: readonly string[]): StoredEvent[];
   /** Subscribe to live events. Returns an unsubscribe function. */
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
@@ -518,6 +523,20 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     return rows.map(rowToStored);
   }
 
+  function queryRuntimeHistory(types: readonly string[], agentIds: readonly string[]): StoredEvent[] {
+    if (types.length === 0 || agentIds.length === 0) return [];
+    // The agent ids are bound as one JSON array through json_each, so there is
+    // no bound-variable limit the way an IN-list of ids would have.
+    const placeholders = types.map(() => '?').join(', ');
+    const stmt = db.prepare<EventRow>(
+      `SELECT sequence, type, timestamp, payload FROM events
+       WHERE type IN (${placeholders})
+         AND json_extract(payload, '$.agentId') IN (SELECT value FROM json_each(?))
+       ORDER BY sequence ASC`,
+    );
+    return stmt.all([...types, JSON.stringify(agentIds)]).map(rowToStored);
+  }
+
   function emitStored(event: StoredEvent): void {
     emitter.emit('event', event);
   }
@@ -531,6 +550,7 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     queryLatestPerIssue,
     appendOnce,
     queryByTypesSince,
+    queryRuntimeHistory,
     subscribe,
     compact,
     purgeType,

@@ -1,0 +1,282 @@
+{
+  "version": "1",
+  "issueId": "PAN-4529",
+  "created": "2026-10-04T04:49:09.873Z",
+  "updated": "2026-10-04T05:23:24.151Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Report-only change: the diff is .pan/drafts Markdown/HTML plus plan state, no code or test subject changed; the gate matched 'test' in a glossary role list. No test applies; evidence refs were checked with the PRD's ref checker (checked=75, no BAD) at 480f50ea7a0.",
+      "recordedAt": "2026-10-04T05:23:24.151Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "commit-research-brief": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T04:49:09.873Z",
+      "doneAt": "2026-10-04T04:49:22.217Z"
+    },
+    "report-skeleton": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T04:50:23.119Z",
+      "doneAt": "2026-10-04T04:52:03.942Z"
+    },
+    "prototype-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T04:52:09.562Z",
+      "doneAt": "2026-10-04T04:55:31.813Z"
+    },
+    "candidate-1-operator-state-band": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T04:59:02.247Z",
+      "doneAt": "2026-10-04T04:59:48.737Z"
+    },
+    "candidate-2-message-delivery": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T04:59:50.019Z",
+      "doneAt": "2026-10-04T05:00:51.021Z"
+    },
+    "candidate-3-liveness-signals": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:00:52.145Z",
+      "doneAt": "2026-10-04T05:01:39.579Z"
+    },
+    "candidate-4-auq-permissions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:01:40.729Z",
+      "doneAt": "2026-10-04T05:02:48.410Z"
+    },
+    "candidate-5-flywheel-pane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:02:49.602Z",
+      "doneAt": "2026-10-04T05:03:32.164Z"
+    },
+    "candidate-6-review-worker-bands": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:03:33.273Z",
+      "doneAt": "2026-10-04T05:04:14.505Z"
+    },
+    "candidate-7-other-uses": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:04:15.588Z",
+      "doneAt": "2026-10-04T05:05:29.939Z"
+    },
+    "cross-cutting-security": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:05:59.743Z",
+      "doneAt": "2026-10-04T05:06:57.011Z"
+    },
+    "ranked-recommendation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:06:58.587Z",
+      "doneAt": "2026-10-04T05:08:13.975Z"
+    },
+    "html-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:08:15.544Z",
+      "doneAt": "2026-10-04T05:09:50.895Z"
+    },
+    "publish-handoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4529",
+      "claimedAt": "2026-10-04T05:09:55.533Z",
+      "doneAt": "2026-10-04T05:10:40.589Z"
+    },
+    "commit-research-brief.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:01.930Z"
+    },
+    "report-skeleton.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:50.133Z"
+    },
+    "report-skeleton.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:02.390Z"
+    },
+    "report-skeleton.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:14.882Z"
+    },
+    "prototype-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:26.875Z"
+    },
+    "prototype-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:39.595Z"
+    },
+    "prototype-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:51.768Z"
+    },
+    "candidate-1-operator-state-band.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:04.015Z"
+    },
+    "candidate-1-operator-state-band.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:16.688Z"
+    },
+    "candidate-1-operator-state-band.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:28.710Z"
+    },
+    "candidate-2-message-delivery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:40.770Z"
+    },
+    "candidate-2-message-delivery.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:52.861Z"
+    },
+    "candidate-2-message-delivery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:04.364Z"
+    },
+    "candidate-2-message-delivery.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:16.779Z"
+    },
+    "candidate-3-liveness-signals.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:29.780Z"
+    },
+    "candidate-3-liveness-signals.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:42.117Z"
+    },
+    "candidate-3-liveness-signals.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:54.513Z"
+    },
+    "candidate-4-auq-permissions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:07.149Z"
+    },
+    "candidate-4-auq-permissions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:19.395Z"
+    },
+    "candidate-4-auq-permissions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:30.454Z"
+    },
+    "candidate-4-auq-permissions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:41.987Z"
+    },
+    "candidate-5-flywheel-pane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:53.645Z"
+    },
+    "candidate-5-flywheel-pane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:05.599Z"
+    },
+    "candidate-5-flywheel-pane.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:18.181Z"
+    },
+    "candidate-6-review-worker-bands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:30.676Z"
+    },
+    "candidate-6-review-worker-bands.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:42.718Z"
+    },
+    "candidate-6-review-worker-bands.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:54.871Z"
+    },
+    "candidate-7-other-uses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:07.559Z"
+    },
+    "candidate-7-other-uses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:20.527Z"
+    },
+    "candidate-7-other-uses.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:33.354Z"
+    },
+    "candidate-7-other-uses.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:46.986Z"
+    },
+    "cross-cutting-security.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:59.607Z"
+    },
+    "cross-cutting-security.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:20:13.162Z"
+    },
+    "cross-cutting-security.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:20:25.479Z"
+    },
+    "cross-cutting-security.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:20:37.204Z"
+    },
+    "ranked-recommendation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:20:48.549Z"
+    },
+    "ranked-recommendation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:20:59.735Z"
+    },
+    "ranked-recommendation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:21:11.176Z"
+    },
+    "html-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:21:22.503Z"
+    },
+    "html-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:21:34.194Z"
+    },
+    "html-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:21:45.888Z"
+    },
+    "publish-handoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:21:57.453Z"
+    },
+    "publish-handoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:22:08.657Z"
+    },
+    "publish-handoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:22:46.240Z"
+    },
+    "commit-research-brief.ac2": {
+      "status": "cancelled"
+    }
+  }
+}

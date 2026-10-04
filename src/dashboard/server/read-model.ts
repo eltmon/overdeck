@@ -21,8 +21,9 @@ import {
   trimTurnDiffSummaries,
   withPaneLivenessAlias,
 } from '@overdeck/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, BackendPane, DerivedIssueState } from '@overdeck/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, AgentRuntimeSnapshot, BackendPane, DerivedIssueState } from '@overdeck/contracts';
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
+import { foldRuntimeSeed, RUNTIME_SEED_EVENT_TYPES } from './services/runtime-seed.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -486,6 +487,7 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Sequence from event store (labels the snapshot, not a replay source) ─
       let sequence = 0;
       let recentActivity: unknown[] = [];
+      let agentRuntimeById: Record<string, AgentRuntimeSnapshot> = {};
       try {
         const { getEventStore } = yield* Effect.promise(
           () => import('./event-store.js'),
@@ -495,6 +497,18 @@ export const ReadModelServiceLive = Layer.effect(
         recentActivity = activityEntriesFromStoredEvents(
           eventStore.queryByType('activity.entry', MAX_SNAPSHOT_ACTIVITY_ENTRIES),
         );
+
+        try {
+          const seedT0 = performance.now();
+          const runtimeEvents = eventStore.queryRuntimeHistory(RUNTIME_SEED_EVENT_TYPES, Object.keys(agentsById));
+          agentRuntimeById = foldRuntimeSeed(runtimeEvents, agentsById);
+          console.log(
+            `[ReadModel] Seeded ${Object.keys(agentRuntimeById).length} runtime entries ` +
+            `from ${runtimeEvents.length} events in ${Math.round(performance.now() - seedT0)} ms`,
+          );
+        } catch (err) {
+          console.error('[ReadModel] Failed to seed the runtime map:', err);
+        }
       } catch (err) {
         console.error('[ReadModel] Failed to read the event-store sequence:', err);
       }
@@ -503,6 +517,7 @@ export const ReadModelServiceLive = Layer.effect(
         ...INITIAL_READ_MODEL_STATE,
         sequence,
         agentsById,
+        agentRuntimeById,
         issuesRaw: [],
         recentActivity,
       };
