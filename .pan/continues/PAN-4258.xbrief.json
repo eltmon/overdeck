@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:10:58.308Z",
+  "updated": "2026-10-04T03:11:11.392Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "effort-docs-planning-strike.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:10:58.308Z"
+    },
+    "effort-docs-planning-strike.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:11:11.392Z"
     }
   }
 }
