@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:09:13.158Z",
+  "updated": "2026-10-04T03:09:26.039Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "plan-dialog-default-high.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:09:13.157Z"
+    },
+    "plan-dialog-default-high.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:09:26.039Z"
     }
   }
 }
