@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:57:23.527Z",
+  "updated": "2026-10-04T03:57:36.315Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "ledger-effort-column.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T03:57:23.527Z"
+    },
+    "reconciler-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:57:36.314Z"
     }
   }
 }
