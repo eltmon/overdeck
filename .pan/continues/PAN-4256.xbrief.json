@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:13:29.035Z",
+  "updated": "2026-10-04T05:13:41.459Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "review-pipeline-test-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T05:13:29.035Z"
+    },
+    "start-worker-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:41.458Z"
     }
   }
 }
