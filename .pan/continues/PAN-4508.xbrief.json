@@ -1,0 +1,209 @@
+{
+  "version": "1",
+  "issueId": "PAN-4508",
+  "created": "2026-10-04T02:15:51.137Z",
+  "updated": "2026-10-04T03:44:48.567Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "jev-settings-validation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:15:51.137Z",
+      "doneAt": "2026-10-04T02:20:08.000Z"
+    },
+    "jev-settings-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:20:35.120Z",
+      "doneAt": "2026-10-04T02:34:30.040Z"
+    },
+    "jev-toggle-validation-server": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:34:34.242Z",
+      "doneAt": "2026-10-04T02:39:17.822Z"
+    },
+    "jev-usage-log": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:39:34.488Z",
+      "doneAt": "2026-10-04T02:47:18.160Z"
+    },
+    "jev-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:47:32.118Z",
+      "doneAt": "2026-10-04T02:50:28.730Z"
+    },
+    "jev-settings-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:50:33.735Z",
+      "doneAt": "2026-10-04T02:58:57.512Z"
+    },
+    "jev-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:59:02.467Z",
+      "doneAt": "2026-10-04T03:00:38.760Z"
+    },
+    "jev-toggle-gating-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T03:00:50.202Z",
+      "doneAt": "2026-10-04T03:08:31.221Z"
+    },
+    "jev-usage-readout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T03:08:49.242Z",
+      "doneAt": "2026-10-04T03:15:49.162Z"
+    },
+    "jev-settings-playwright": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T03:16:02.613Z",
+      "doneAt": "2026-10-04T03:27:02.408Z"
+    },
+    "jev-settings-validation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:37:11.795Z"
+    },
+    "jev-settings-validation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:38:05.012Z"
+    },
+    "jev-settings-validation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:38:18.184Z"
+    },
+    "jev-settings-validation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:38:30.765Z"
+    },
+    "jev-settings-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:38:43.161Z"
+    },
+    "jev-settings-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:38:56.100Z"
+    },
+    "jev-settings-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:08.707Z"
+    },
+    "jev-settings-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:20.845Z"
+    },
+    "jev-toggle-validation-server.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:32.941Z"
+    },
+    "jev-toggle-validation-server.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:44.953Z"
+    },
+    "jev-toggle-validation-server.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:56.670Z"
+    },
+    "jev-usage-log.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:40:10.605Z"
+    },
+    "jev-usage-log.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:40:26.623Z"
+    },
+    "jev-usage-log.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:40:40.351Z"
+    },
+    "jev-usage-log.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:40:53.202Z"
+    },
+    "jev-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:41:05.568Z"
+    },
+    "jev-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:41:17.325Z"
+    },
+    "jev-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:41:29.193Z"
+    },
+    "jev-settings-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:41:41.492Z"
+    },
+    "jev-settings-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:41:54.036Z"
+    },
+    "jev-settings-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:42:05.965Z"
+    },
+    "jev-settings-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:42:17.521Z"
+    },
+    "jev-toggle-gating-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:42:29.190Z"
+    },
+    "jev-toggle-gating-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:42:40.351Z"
+    },
+    "jev-toggle-gating-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:42:51.528Z"
+    },
+    "jev-usage-readout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:03.549Z"
+    },
+    "jev-usage-readout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:17.298Z"
+    },
+    "jev-usage-readout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:29.578Z"
+    },
+    "jev-settings-playwright.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:42.899Z"
+    },
+    "jev-settings-playwright.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:55.262Z"
+    },
+    "jev-settings-playwright.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:44:08.366Z"
+    },
+    "jev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:44:20.668Z"
+    },
+    "jev-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:44:34.379Z"
+    },
+    "jev-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:44:48.567Z"
+    }
+  }
+}

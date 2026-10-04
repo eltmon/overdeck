@@ -1,0 +1,784 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:08:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4508: Jev settings in the dashboard: route, model and timeout, plus a per-feature usage readout",
+    "updated": "2026-10-04T02:15:29.007Z"
+  },
+  "plan": {
+    "id": "pan-4508",
+    "title": "Jev settings in the dashboard: route, model and timeout, plus a per-feature usage readout",
+    "status": "running",
+    "uid": "6bf37c8b-e828-4255-b5c8-1250b6d49051",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:08:04Z",
+    "updated": "2026-10-04T02:15:29.007Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4508",
+        "label": "PAN-4508",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4508.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "jev",
+      "settings",
+      "dashboard",
+      "background-ai",
+      "config-yaml"
+    ],
+    "narratives": {
+      "Problem": "Settings → Background AI exposes the three Jev toggles and the TypeSafe key, but jev.base_url (route), jev.model (required, no default) and jev.timeout_ms live only in ~/.overdeck/config.yaml, so switching off the limited-time jev-1.13-free model means hand-editing YAML. Nothing shows what Jev is doing: AC-review judgments go to eval-log files, turn-end labels live only in memory, and failed requests are recorded nowhere.",
+      "Proposal": "Add a path-scoped config door (src/lib/jev/settings.ts, PUT/GET /api/jev/settings in a new routes/jev.ts) that writes only jev.base_url, jev.model and jev.timeout_ms, validated by a pure leaf module (src/lib/jev/settings-validation.ts), then clears the config cache and the Jev memo so the next call uses the new values. Block turning a Jev toggle on without a model, client-side in BackgroundAiSection and server-side in validateSettingsApi (off→on is an error, already-on is a grandfathered warning). Record one JSONL usage line per real Jev request (src/lib/jev/usage-log.ts, hooked in assess()), summarize it at GET /api/jev/usage, and render calls-in-24h / last call / last error under each Jev toggle. A JevSettingsPanel with route select, model field and timeout field autosaves through a useJevSettings hook. Document the UI in configuration/jev.mdx. Full detail, decisions D1–D14 and exact strings: .pan/drafts/PAN-4508.md.",
+      "NonGoals": "- Editing jev.api_key_ref in the UI (stays config.yaml-only; the door never writes or deletes it)\n- Adding jev to ApiSettingsConfig or changing the whole-document PUT /api/settings payload shape\n- Any line growth in src/dashboard/server/routes/settings.ts, or raising any file-size allowlist cap\n- Showing turn-end labels or acceptance-criteria eval-log contents in the usage readout\n- Storing SDK error message text, request state, answers, or the API key in the usage log or API responses\n- Pruning or rotating ~/.overdeck/jev/usage/ files\n- A live Jev connection-test button or a per-route model allowlist\n- New route-scopes.ts rows (the new routes keep the default admin scope)\n- Wiring jevMemoryRelevance to a caller"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Write route/model/timeout through a dedicated path-scoped door (PUT /api/jev/settings in a new routes/jev.ts), not the whole-document PUT /api/settings.",
+        "rationale": "routes/settings.ts is at its file-size cap (1104/1104) and settings-api.ts has 32 lines of headroom; the whole-document save is documented as lossy (codebase map concerns.md); writeYamlConfigPreservingComments never touches jev:, so both writers coexist inside runSettingsWriteSerialized. Same pattern as PAN-4400 model presets."
+      },
+      {
+        "summary": "Route select: zen writes base_url https://opencode.ai/zen, direct deletes base_url, any other existing base_url shows as read-only 'custom' and is preserved.",
+        "rationale": "Matches the two routes documented in configuration/jev.mdx and never destroys a hand-set endpoint."
+      },
+      {
+        "summary": "jev.api_key_ref stays config.yaml-only.",
+        "rationale": "The issue's Proposal names only route, model and timeout; the key slot already exists in Settings."
+      },
+      {
+        "summary": "'Toggle on' means background_ai.features.<key> === true regardless of low-cost mode; turning one on with a blank model is an error, an already-on toggle with a blank model is a warning on unrelated saves.",
+        "rationale": "Low-cost mode can be switched off at any time, so an on toggle must already have a model; grandfathering avoids 400s on every unrelated autosave for operators already in that state."
+      },
+      {
+        "summary": "Usage is a file-backed JSONL log (~/.overdeck/jev/usage/<UTC date>.jsonl), not an in-memory counter.",
+        "rationale": "Acceptance-criteria review runs inside the pan plan finalize CLI process, so a dashboard-only counter would miss those calls."
+      },
+      {
+        "summary": "Usage rows store the closed failure reason plus HTTP status, never err.message.",
+        "rationale": "SDK error messages can echo response bodies; the client header promises never to log the error object."
+      },
+      {
+        "summary": "After a settings write, clear the config cache and the Jev memo.",
+        "rationale": "The memo key includes the model but not base_url or timeout, so without a reset a route change could be answered from a result obtained on the old route."
+      },
+      {
+        "summary": "Usage window: calls counted over the last 24 h; last call and last error scanned over the last 7 UTC day files.",
+        "rationale": "Keeps the read bounded while still showing an older last call or error with its time."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Not needed: ~22 files across 5 subsystems, under the 25-file / 6-subsystem limits.",
+      "canonicalFilename": "2026-10-04-PAN-4508-jev-settings-in-the-dashboard-route-model-and-timeout-plus-a-per-feature-usage-readout.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "jev-settings-validation",
+        "title": "Pure Jev settings validation leaf module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/settings-validation.ts",
+            "src/lib/jev/__tests__/settings-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/settings-validation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings-validation.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/jev/settings-validation.ts with type-only imports (PRD WI-1). Export JEV_ZEN_BASE_URL='https://opencode.ai/zen', JEV_FEATURE_KEYS, type JevRoute ('zen'|'direct'|'custom'), interface JevSettingsInput {route, model, timeoutMs}, routeForBaseUrl(baseUrl) (absent→direct; Zen URL with or without one trailing slash→zen; else custom), validateJevSettingsInput(input: unknown, current: {baseUrl?, features?}) returning {ok:true,value} with the model trimmed or {ok:false, errors} collecting all of: 'route must be zen, direct, or custom'; 'route custom keeps an existing custom base_url; none is set' (custom when current base_url is not custom); 'jev.model is required while a Jev feature is on' (blank model while any JEV_FEATURE_KEYS entry is true in current.features); 'jev.timeout_ms must be an integer between 1 and 30000'. Export jevToggleProblems(next, current|undefined): for each Jev key with next[key]===true and blank current.model → error 'Set a Jev model in Settings → Background AI before turning on <key>' when current.features[key]!==true, else warning '<key> is on but jev.model is not set; Jev makes no requests until a model is set'. current undefined means all toggles off and model blank. Add the unit test file."
+        },
+        "items": [
+          {
+            "id": "jev-settings-validation.ac1",
+            "title": "Given base_url values undefined, 'https://opencode.ai/zen', 'https://opencode.ai/zen/' and 'https://example.test/jev', routeForBaseUrl returns direct, zen, zen and custom respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-validation.ac2",
+            "title": "Given a blank model and current.features.jevTurnEndAssessment true, validateJevSettingsInput returns ok:false with the exact error 'jev.model is required while a Jev feature is on'; given timeoutMs 0, 30001 or 1.5 it returns 'jev.timeout_ms must be an integer between 1 and 30000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-validation.ac3",
+            "title": "Given route 'custom' while the current base_url is absent, validateJevSettingsInput rejects with 'route custom keeps an existing custom base_url; none is set'; a valid input returns ok:true with the model trimmed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-validation.ac4",
+            "title": "jevToggleProblems returns an error when a Jev toggle goes off→on with a blank current model, returns a warning (no error) when that toggle is already on in current, and returns no problems when current is undefined and next has no Jev toggle on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-settings-door",
+        "title": "Path-scoped jev: block read/write door with cache and memo reset",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "jev-routes"
+          ],
+          "files_scope": [
+            "src/lib/jev/settings.ts",
+            "src/lib/jev/__tests__/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/settings.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "settings.test.ts passes",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/jev/settings.ts per PRD WI-2. Import getGlobalConfigPath/clearConfigCache/loadConfigSync from ../config-yaml/load.js (not ../config-yaml.js), runSettingsWriteSerialized from ../settings-api.js, writeFileAtomic from ../model-presets/state.js, resetJevMemo from ./memo.js, defaults from ../config-yaml/jev.js, and WI-1 exports. Export JevSettingsValidationError (errors: string[]), jevSettingsFromDocument(doc) → JevSettingsView {configured, route, baseUrl, model, timeoutMs (default 2000), apiKeyRef (default TYPESAFE_API_KEY)}, readJevSettings(deps) (ENOENT → defaults with configured:false), and saveJevSettings(input, deps) which runs inside runSettingsWriteSerialized: re-read and parse config.yaml, clearConfigCache() then read features from loadConfigSync().config.backgroundAi.features, validate with validateJevSettingsInput, throw JevSettingsValidationError without writing on failure; on success zen→setIn(['jev','base_url'], JEV_ZEN_BASE_URL), direct→deleteIn(['jev','base_url']), custom→untouched; non-blank model→setIn, blank→deleteIn(['jev','model']); setIn(['jev','timeout_ms']); never touch api_key_ref; write via writeFileAtomic(path, doc.toString({lineWidth:120}), 0o600); then clearConfigCache(), resetJevMemo(), return the view. Use fs/promises only. Tests use a real mkdtemp config path injected through deps."
+        },
+        "items": [
+          {
+            "id": "jev-settings-door.ac1",
+            "title": "Given a config.yaml with a Zen jev block, api_key_ref MY_KEY, a comment and an unrelated top-level key, saveJevSettings({route:'direct', model:'jev-1.13.0', timeoutMs:1500}) writes a file with no jev.base_url, model jev-1.13.0, timeout_ms 1500, and preserves api_key_ref, the comment and the unrelated key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-door.ac2",
+            "title": "Given a config.yaml with no jev block, saveJevSettings({route:'zen', model:'jev-1.13-free', timeoutMs:2000}) creates the block and readJevSettings then returns configured:true, route:'zen', model:'jev-1.13-free', timeoutMs:2000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-door.ac3",
+            "title": "Given an invalid input (timeoutMs 0), saveJevSettings rejects with JevSettingsValidationError and the config file bytes are identical before and after",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-door.ac4",
+            "title": "After a successful save, loadConfigSync().config.jev returns the new model and timeoutMs without a process restart, and resetJevMemo was called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-toggle-validation-server",
+        "title": "Reject turning a Jev toggle on without a model in validateSettingsApi",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "settings-api.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: in src/lib/settings-api.ts add `import { jevToggleProblems } from './jev/settings-validation.js';` beside the settings-api-telemetry import, and directly after `validateWorkhorsesAndRoles(settings, errors, warnings);` in validateSettingsApi add the five-line block from the PRD that reads `loadConfigSync()?.config` with optional chaining and pushes jevToggleProblems errors and warnings. Add at most 10 lines to settings-api.ts. Add a describe('validateSettingsApi Jev toggles (PAN-4508)') block to src/lib/__tests__/settings-api.test.ts using mockLoadConfig."
+        },
+        "items": [
+          {
+            "id": "jev-toggle-validation-server.ac1",
+            "title": "Given mockLoadConfig returns jevTurnEndAssessment off and no jev.model, validateSettingsApi with background_ai.features.jevTurnEndAssessment true returns valid:false and an error naming jevTurnEndAssessment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-toggle-validation-server.ac2",
+            "title": "Given the toggle is already on in the loaded config with no jev.model, the same payload returns valid:true and a warning containing 'jev.model is not set'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-toggle-validation-server.ac3",
+            "title": "Given mockLoadConfig returns undefined, validateSettingsApi completes without throwing, and `wc -l src/lib/settings-api.ts` reports at most 1486 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-usage-log",
+        "title": "Append one usage line per real Jev request and summarize it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/usage-log.ts",
+            "src/lib/jev/__tests__/usage-log.test.ts",
+            "src/lib/jev/client.ts",
+            "src/lib/jev/__tests__/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/usage-log.test.ts src/lib/jev/__tests__/client.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "usage-log.test.ts and client.test.ts pass",
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: create src/lib/jev/usage-log.ts (eval-log.ts style, `import type` only for JevFeature/JevFailureReason) exporting JevUsageRow {ts, feature, outcome:'answered'|'failed', reason?, status?, model, durationMs}, resolveJevUsageLogPath(home, date) → <home>/jev/usage/<UTC YYYY-MM-DD>.jsonl, appendJevUsage(row, {home?}) (mkdir+appendFile, swallows every error), and readJevUsageSummary({home?, now?}) → {hours:24, features:{jevTurnEndAssessment, jevAcceptanceCriteriaReview, jevMemoryRelevance: {calls24h, lastCallAt, lastError:{at, reason, status?}|null}}} reading the last 7 UTC day files with fs/promises, skipping missing files and unparsable lines. In src/lib/jev/client.ts inside the withJevSlot callback: record startedAt before systemOne; after recordBackgroundAiCost `void appendJevUsage({... outcome:'answered', model: servedModel, durationMs})`; in catch compute reason=classifyJevError(err), `void appendJevUsage({... outcome:'failed', reason, status when err instanceof APIError, model: resolved.model, durationMs})`, then return failed(reason, err). Never record on memo hits, unavailable results, or the config-load failure path. Never store err.message, state, answers or the key. Update the client module header."
+        },
+        "items": [
+          {
+            "id": "jev-usage-log.ac1",
+            "title": "Given rows at now-1h, now-23h and now-25h for jevTurnEndAssessment, readJevUsageSummary returns calls24h 2 and lastCallAt equal to the now-1h timestamp; given only a row 3 days old it returns calls24h 0 and lastCallAt set to that row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-usage-log.ac2",
+            "title": "readJevUsageSummary returns lastError {at, reason:'auth-failed', status:401} from the newest failed row, returns all three feature keys with zeros and nulls for a missing usage directory, and skips an unparsable line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-usage-log.ac3",
+            "title": "Given an answered assess() in client.test.ts, exactly one row with outcome answered is appended; given a fake fetch returning 401, exactly one row with outcome failed, reason auth-failed and status 401 is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-usage-log.ac4",
+            "title": "A memo-hit assess() and an unavailable assess() (feature toggle off) append zero rows, and no appended row contains the API key or the state text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-routes",
+        "title": "HTTP routes for Jev settings and usage, registered with no-loss rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/jev.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "no-loss-matrix, remote-request-gate and route-scopes tests pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: create src/dashboard/server/routes/jev.ts modeled on routes/model-presets.ts with GET /api/jev/settings (jsonResponse(await readJevSettings())), PUT /api/jev/settings (rejectUnsafeDashboardMutationRequest first; saveJevSettings(body); JevSettingsValidationError → 400 {error: err.message, errors: err.errors}; other errors rethrown), GET /api/jev/usage (jsonResponse(await readJevUsageSummary())), exported as jevRouteLayer = Layer.mergeAll(...). Import and list jevRouteLayer in src/dashboard/server/server.ts beside modelPresetsRouteLayer. Add the three rows from the PRD to tests/unit/lib/overdeck/no-loss-matrix.ts after the model-presets rows. Do not modify routes/settings.ts or route-scopes.ts. The new matrix rows are also exercised by src/dashboard/server/__tests__/remote-request-gate.test.ts (each off-allowlist surface must return 401 to a LAN peer) and route-scopes.test.ts; the new routes are not on the remote allowlist and need no route-scopes.ts row, so both pass unchanged."
+        },
+        "items": [
+          {
+            "id": "jev-routes.ac1",
+            "title": "src/dashboard/server/routes/jev.ts registers exactly GET /api/jev/settings, PUT /api/jev/settings and GET /api/jev/usage, and server.ts includes jevRouteLayer in its layer list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-routes.ac2",
+            "title": "PUT /api/jev/settings returns HTTP 400 with body {error, errors} when saveJevSettings throws JevSettingsValidationError, and calls rejectUnsafeDashboardMutationRequest before reading the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-routes.ac3",
+            "title": "no-loss-matrix.test.ts passes with the three new rows, and `git diff origin/main -- src/dashboard/server/routes/settings.ts` produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-settings-panel",
+        "title": "Settings panel for Jev route, model and timeout with autosave",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/hooks/useJevSettings.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/JevSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/JevSettingsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/JevSettingsPanel.test.tsx src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "JevSettingsPanel.test.tsx and the existing BackgroundAiSection.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: add JevRoute, JevSettingsView, JevSettingsInput, JevUsageView to Settings/types.ts exactly as the PRD API contract. Create hooks/useJevSettings.ts: useQuery ['jev-settings'] (GET /api/jev/settings), useQuery ['jev-usage'] (GET /api/jev/usage, non-OK → null, refetchInterval 60_000), latest-wins save(next, {debounce}) debounced by AUTOSAVE_DEBOUNCE_MS from ./useAutosavePipeline, setQueryData on 200, serverError from a 400 body's error; return {settings, usage, save, serverError}. Create sections/JevSettingsPanel.tsx (presentational; props settings, anyJevToggleOn, serverError, onSave) with data-testids jev-settings-panel, jev-route-select (zen 'OpenCode Zen', direct 'TypeSafe direct', custom 'Custom: <baseUrl>' only when route is custom; saves immediately), jev-model-input (datalist jev-1.13-free, jev-1.13, jev-1.13.0; saves with debounce), jev-timeout-input (number 1–30000; saves with debounce), jev-settings-error (role=alert; client rule text or serverError), and a read-only 'Key env fallback: <apiKeyRef>' line. Client rules block onSave: blank model while anyJevToggleOn; timeout not an integer in 1–30000. In BackgroundAiSection.tsx add optional prop jev {settings?, usage?, serverError, onSave}, replace the PAN-4369 comment at the key row with the PAN-4508 comment from the PRD, change the key description to drop 'set under jev: in config.yaml', and render JevSettingsPanel below the key row when jev?.settings is defined. In SettingsPage.tsx call useJevSettings() and pass the jev prop. Any debounce test uses vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "jev-settings-panel.ac1",
+            "title": "Given settings {route:'zen', model:'jev-1.13-free', timeoutMs:2000}, JevSettingsPanel renders jev-route-select with value zen, jev-model-input with value jev-1.13-free and jev-timeout-input with value 2000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-panel.ac2",
+            "title": "Given typing jev-1.13 into jev-model-input, the panel sends onSave({route:'zen', model:'jev-1.13', timeoutMs:2000}, {debounce:true}); given selecting direct, it sends onSave without debounce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-panel.ac3",
+            "title": "Given anyJevToggleOn true, clearing jev-model-input renders jev-settings-error with 'jev.model is required while a Jev feature is on' and does not call onSave; timeout 0 or 30001 renders 'jev.timeout_ms must be an integer between 1 and 30000' and does not call onSave",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-panel.ac4",
+            "title": "The custom route option renders only when settings.route is 'custom', and BackgroundAiSection renders no JevSettingsPanel when its jev prop is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-toggle-gating-client",
+        "title": "Block a Jev toggle from turning on in Settings while no model is set",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "BackgroundAiSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: in BackgroundAiSection.tsx add local state jevToggleError. In the feature toggle onClick, when feature.key starts with 'jev', the click turns it on (!featureOn), the jev prop is present and jev.settings.model is blank after trim, set jevToggleError to 'Set a Jev model below before turning on a Jev feature.' and return without calling updateBackgroundAi. A successful toggle click clears the error. Render the error under that row with role=alert and data-testid=jev-toggle-error. Do not block when the jev prop is absent or when turning a toggle off. Add the cases to BackgroundAiSection.test.tsx."
+        },
+        "items": [
+          {
+            "id": "jev-toggle-gating-client.ac1",
+            "title": "Given jev.settings.model null, clicking the off jevTurnEndAssessment switch renders jev-toggle-error with 'Set a Jev model below before turning on a Jev feature.' and onSettingsChange is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-toggle-gating-client.ac2",
+            "title": "Given jev.settings.model 'jev-1.13-free', clicking the same switch calls onSettingsChange with background_ai.features.jevTurnEndAssessment true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-toggle-gating-client.ac3",
+            "title": "Given a Jev toggle that is on and a null model, clicking it calls onSettingsChange with that feature false (turning off is never blocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-usage-readout",
+        "title": "Per-feature Jev usage readout under each Jev toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/BackgroundAiSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "BackgroundAiSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: in BackgroundAiSection.tsx, for each feature row whose key starts with 'jev' and when jev?.usage is defined, render below the description a muted text-[11px] line with data-testid `jev-usage-${feature.key}`: 'No calls yet' when lastCallAt is null; otherwise '<n> calls in 24h · last call <relative>' (singular '1 call') plus ' · last error: <reason>[ (<status>)] <relative>' when lastError is set. Use formatRelativeTime(date, now) from src/dashboard/frontend/src/lib/formatRelativeTime.ts with now = new Date() taken once per render. Follow pan-style-guide: muted text, no pill badge, no decorative color. Add the cases to BackgroundAiSection.test.tsx."
+        },
+        "items": [
+          {
+            "id": "jev-usage-readout.ac1",
+            "title": "Given usage with jevTurnEndAssessment lastCallAt null, jev-usage-jevTurnEndAssessment renders 'No calls yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-usage-readout.ac2",
+            "title": "Given calls24h 3, a recent lastCallAt and lastError {reason:'auth-failed', status:401}, the readout renders text containing '3 calls in 24h', 'last call' and 'last error: auth-failed (401)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-usage-readout.ac3",
+            "title": "Non-Jev feature rows render no jev-usage-* element, and no readout renders when the jev prop has no usage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-settings-playwright",
+        "title": "Playwright check that changes the Jev model and sees it saved",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4508-jev-settings.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4508-jev-settings.spec.ts"
+          ],
+          "expected_outputs": [
+            "3 passed in pan-4508-jev-settings.spec.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: create src/dashboard/frontend/tests/pan-4508-jev-settings.spec.ts modeled on tests/experimental-channels-toggle.spec.ts. Use only the default per-test `page` fixture (fresh browser context; no storageState, no persistent profile, no shared browser). Mock **/api/settings (GET base settings with background_ai {cheap_mode:false, features:{jevTurnEndAssessment:true}}; PUT 200), **/api/jev/settings (GET a Zen view with model jev-1.13-free; PUT records the body and returns the view updated by it), and **/api/jev/usage (jevTurnEndAssessment calls24h 3). Navigate to `${DASHBOARD_URL ?? 'http://localhost:3010'}/settings`. Test 1: fill jev-model-input with jev-1.13, poll the recorded PUT body for {route:'zen', model:'jev-1.13', timeoutMs:2000}, reload with GET now returning the saved view, assert jev-model-input has value jev-1.13. Test 2: clear jev-model-input, assert jev-settings-error shows 'jev.model is required while a Jev feature is on' and no PUT was recorded after 1 s. Test 3: jev-usage-jevTurnEndAssessment contains '3 calls in 24h'."
+        },
+        "items": [
+          {
+            "id": "jev-settings-playwright.ac1",
+            "title": "In a fresh per-test browser context, filling jev-model-input with jev-1.13 sends PUT /api/jev/settings with body {route:'zen', model:'jev-1.13', timeoutMs:2000}, and after reload the input shows jev-1.13",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-playwright.ac2",
+            "title": "Clearing the model while jevTurnEndAssessment is on renders 'jev.model is required while a Jev feature is on' and sends no PUT /api/jev/settings within 1 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-settings-playwright.ac3",
+            "title": "The jev-usage-jevTurnEndAssessment element renders text containing '3 calls in 24h'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jev-docs",
+        "title": "Document the Jev Settings controls and usage readout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4508",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/jev.mdx",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Set it in Settings' configuration/jev.mdx",
+            "grep -n 'Usage readout' configuration/jev.mdx",
+            "grep -n 'jev/settings.ts' .overdeck/context/codebase/stack.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10: in configuration/jev.mdx add a 'Set it in Settings' subsection under Configuration (Route select: OpenCode Zen sets jev.base_url https://opencode.ai/zen, TypeSafe direct removes base_url, a custom base_url shows as Custom and is kept; Model field required while any Jev toggle is on, suggestions jev-1.13-free, jev-1.13, jev-1.13.0; Timeout field 1–30000 ms; saves automatically to the jev: block and applies to the next Jev request with no restart; api_key_ref stays config.yaml-only; turning a Jev toggle on with no model shows an error and does not save) and a 'Usage readout' section (calls in the last 24 hours, last call time, last error with failure reason and HTTP status; one line per real request in ~/.overdeck/jev/usage/<UTC date>.jsonl with time, feature, outcome, failure reason, HTTP status, model and duration; never the key, the text sent, the answers, or error messages; memo repeats not counted). In .overdeck/context/codebase/stack.md extend the Jev bullet with the door, the usage log and GET /api/jev/usage, and update its last-verified date."
+        },
+        "items": [
+          {
+            "id": "jev-docs.ac1",
+            "title": "configuration/jev.mdx contains a 'Set it in Settings' heading that names the Route, Model and Timeout controls, the https://opencode.ai/zen base_url, and the 1–30000 ms range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-docs.ac2",
+            "title": "configuration/jev.mdx contains a 'Usage readout' heading that names ~/.overdeck/jev/usage/ and states the log never stores the key, the text sent, the answers or error messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jev-docs.ac3",
+            "title": "The Jev bullet in .overdeck/context/codebase/stack.md names src/lib/jev/settings.ts and GET /api/jev/usage, and the file's last-verified comment shows the implementation date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "jev-settings-validation",
+        "to": "jev-settings-door",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-settings-validation",
+        "to": "jev-toggle-validation-server",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-settings-door",
+        "to": "jev-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-usage-log",
+        "to": "jev-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-settings-panel",
+        "to": "jev-toggle-gating-client",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-toggle-gating-client",
+        "to": "jev-usage-readout",
+        "type": "blocks"
+      },
+      {
+        "from": "jev-usage-readout",
+        "to": "jev-settings-playwright",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

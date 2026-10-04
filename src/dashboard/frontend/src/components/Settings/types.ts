@@ -157,6 +157,42 @@ export const BACKGROUND_AI_FEATURE_META: ReadonlyArray<{
   { key: 'jevMemoryRelevance', label: 'Jev: memory relevance filter', description: 'Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection.' },
 ];
 
+/** Mirrors src/lib/jev/settings-validation.ts's JevRoute (PAN-4508). */
+export type JevRoute = 'zen' | 'direct' | 'custom';
+
+/** GET /api/jev/settings response shape (mirrors src/lib/jev/settings.ts's JevSettingsView). */
+export interface JevSettingsView {
+  configured: boolean;
+  route: JevRoute;
+  baseUrl?: string;
+  model?: string;
+  timeoutMs: number;
+  apiKeyRef: string;
+}
+
+/** PUT /api/jev/settings request body (mirrors src/lib/jev/settings-validation.ts's JevSettingsInput). */
+export interface JevSettingsInput {
+  route: JevRoute;
+  model: string;
+  timeoutMs: number;
+}
+
+export interface JevFeatureUsage {
+  calls24h: number;
+  lastCallAt: string | null;
+  lastError: { at: string; reason: string; status?: number } | null;
+}
+
+/** GET /api/jev/usage response shape (mirrors src/lib/jev/usage-log.ts's JevUsageSummary). */
+export interface JevUsageView {
+  hours: number;
+  features: {
+    jevTurnEndAssessment: JevFeatureUsage;
+    jevAcceptanceCriteriaReview: JevFeatureUsage;
+    jevMemoryRelevance: JevFeatureUsage;
+  };
+}
+
 export interface ConversationSearchConfig {
   enabled?: boolean;
   provider?: 'openai';
