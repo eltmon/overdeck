@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:11:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4498: Conversation bookmarks: mark a message by clicking its role icon and jump back to it later",
-    "updated": "2026-10-04T02:14:04.211Z"
+    "updated": "2026-10-04T02:14:39.047Z"
   },
   "plan": {
     "id": "pan-4498",
     "title": "Conversation bookmarks: mark a message by clicking its role icon and jump back to it later",
-    "status": "proposed",
+    "status": "running",
     "uid": "3baab8e8-7c0a-4f4a-b1e2-9974e90e99fe",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:11:35Z",
-    "updated": "2026-10-04T02:14:04.211Z",
+    "updated": "2026-10-04T02:14:39.047Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4498",
@@ -752,5 +752,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
