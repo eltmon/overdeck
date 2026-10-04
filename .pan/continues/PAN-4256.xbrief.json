@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:03:52.187Z",
+  "updated": "2026-10-04T05:04:05.935Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4256",
       "claimedAt": "2026-10-04T04:44:35.236Z",
       "doneAt": "2026-10-04T05:03:52.187Z"
+    },
+    "docs-effort-surfaces": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T05:04:05.935Z"
     }
   }
 }
