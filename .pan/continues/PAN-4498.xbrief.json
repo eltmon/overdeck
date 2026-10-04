@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:35:52.809Z",
+  "updated": "2026-10-04T03:35:53.885Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4498",
       "claimedAt": "2026-10-04T03:35:52.809Z"
+    },
+    "role-icon-toggle.ac5": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4498",
+      "claimedAt": "2026-10-04T03:35:53.885Z"
     }
   }
 }
