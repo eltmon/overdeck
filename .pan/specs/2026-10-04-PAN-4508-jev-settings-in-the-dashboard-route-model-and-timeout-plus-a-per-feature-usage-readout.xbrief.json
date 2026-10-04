@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:08:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4508: Jev settings in the dashboard: route, model and timeout, plus a per-feature usage readout",
-    "updated": "2026-10-04T02:14:43.466Z"
+    "updated": "2026-10-04T02:15:29.007Z"
   },
   "plan": {
     "id": "pan-4508",
     "title": "Jev settings in the dashboard: route, model and timeout, plus a per-feature usage readout",
-    "status": "proposed",
+    "status": "running",
     "uid": "6bf37c8b-e828-4255-b5c8-1250b6d49051",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:08:04Z",
-    "updated": "2026-10-04T02:14:43.466Z",
+    "updated": "2026-10-04T02:15:29.007Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4508",
@@ -780,5 +780,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
