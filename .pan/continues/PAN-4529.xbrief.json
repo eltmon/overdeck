@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:17:41.988Z",
+  "updated": "2026-10-04T05:17:53.645Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "candidate-4-auq-permissions.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T05:17:41.987Z"
+    },
+    "candidate-5-flywheel-pane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:53.645Z"
     }
   }
 }
