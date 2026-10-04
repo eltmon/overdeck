@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:52:41.866Z",
+  "updated": "2026-10-04T03:54:33.701Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-4259",
       "claimedAt": "2026-10-04T03:39:28.271Z",
       "doneAt": "2026-10-04T03:52:41.865Z"
+    },
+    "sessions-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:54:33.700Z"
     }
   }
 }
