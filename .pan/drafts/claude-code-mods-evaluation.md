@@ -159,7 +159,86 @@ To be written (spec item `ranked-recommendation`).
 
 ## Appendix A: Prototype probe
 
-To be written (spec item `prototype-probe`).
+The probe tested whether a small Overdeck band can be written, validated and tested without loading it into any session. It followed the PRD rules: the files lived only in `/tmp/pan-4529-mods-scratch/overdeck-band/`, nothing was written to `~/.claude/dev-mods/`, and no `--plugin-dir`, `/reload-plugins` or nested `claude -p` ran. The only commands were `claude plugin validate --json` and `claude plugin test`, both with Claude Code 2.1.288. The scratch dir was removed afterwards with `rm -rf /tmp/pan-4529-mods-scratch`.
+
+**What was written.** Five files: `.claude-plugin/plugin.json` (name `overdeck-band`, `"types": "./types/index.d.ts"`), `hooks/hooks.json` (`{ "modules": ["./register.ts"] }`), `types/index.d.ts` (declares the state key `overdeck-band.snapshot`), `hooks/register.ts`, and `hooks/register.test.ts`. The module uses the global `h` factory instead of JSX, so it stays a plain `.ts` file. A `session.start` hook starts a 15 s `$.clock.every` timer. Each tick reads a JSON state file with `$.fs.read`, asks a dashboard route over a Unix socket with `$.http.fetch({ socketPath })`, and writes the result to `$.state`. A `ui.render` hook on `AbovePrompt` draws `<issue> · <phase>` from that state and yields to the engine when there is no snapshot or a survey holds the band.
+
+```ts
+import type { Register } from 'claude-code'
+import type { OverdeckBandSnapshot } from '../types'
+
+// Probe only: paths live in the scratch dir, never in a real session.
+const STATE_FILE = '/tmp/pan-4529-mods-scratch/state.json'
+const DASHBOARD_SOCKET = '/tmp/pan-4529-mods-scratch/dashboard.sock'
+const snapshot = { plugin: 'overdeck-band', key: 'snapshot' } as const
+
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    $.clock.every(15000, () => {
+      void (async () => {
+        try {
+          const fromFile = JSON.parse(String(await $.fs.read(STATE_FILE))) as OverdeckBandSnapshot
+          const res = await $.http.fetch('http://localhost/api/issues/PAN-4529/phase', {
+            socketPath: DASHBOARD_SOCKET,
+          })
+          const phase = res.ok ? res.text.trim() : fromFile.phase
+          await $.state.set(snapshot, { issue: fromFile.issue, phase })
+        } catch {
+          // The band keeps the last snapshot when the file or socket is missing.
+        }
+      })()
+    })
+    return next(e)
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const { value } = await $.state.get(snapshot)
+    if (e.props.hasSurvey || value == null) return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    return h(Box, null, h(Text, { key: 'band', dimColor: true }, `${value.issue} · ${value.phase}`))
+  })
+}
+```
+
+**`claude plugin validate --json` output** (condensed from the JSON; exit code 0):
+
+```text
+success: true
+manifest notes:
+  types ./types/index.d.ts declares on $: nothing (no EngineInterface member)
+  types ./types/index.d.ts declares state: overdeck-band.snapshot
+manifest warning: No author information provided. Consider adding author details for plugin attribution
+hooks/hooks.json notes:
+  ./register.ts hooks: session.start, ui.render{component=AbovePrompt}
+  ./register.ts calls: $.clock.every, $.fs.read, $.http.fetch, $.state.get, $.state.set, $.ui.resolve
+  ./register.ts state writes: overdeck-band.snapshot
+  ./register.ts state reads: overdeck-band.snapshot
+```
+
+The `calls:` line lists `$.fs.read` and `$.http.fetch`, so a reviewer sees the band's file and network reach before it loads. This is the review surface the Security section builds its CI ratchet on.
+
+**`claude plugin test` output** (final run; exit code 0):
+
+```text
+hooks/register.test.ts:
+(pass) band draws issue and phase after one refresh [34.59ms]
+(pass) band stays out of the way before the first refresh [10.74ms]
+
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [0.16s]
+```
+
+The remote kill switch ([#99130](https://github.com/anthropics/claude-code/issues/99130)) did not block the test kit on this machine.
+
+**What it took to pass.** The first four runs failed, and each failure taught something about the test kit that a future Overdeck mod suite needs to know:
+
+1. The engine `$` in a test has no `state` noun (`TypeError: undefined is not an object (evaluating '$.state.set')`), and the kit holds no session state between calls. The test therefore records the band's `state.set` and answers `state.get` itself.
+2. Nothing sits beneath the plugin, so the test must answer every event the plugin passes to `next`: `ui.render` (with a tree, not `null`), `session.start` (with `{ cwd }`), and each `$` call the plugin makes.
+3. A test hook that answers a `$` call event (`fs.read`, `http.fetch`, `state.get`) wraps the result as `{ value: … }`; a bare result is skipped with "returned neither { value } nor { deny }".
+4. A `key` on a `Text` element built with `h` did not reach the drawing (`key: undefined` in `findAll`), so the test finds the band by element type and text.
+
+**What the probe proves and what it does not.** It proves that a band can draw issue and phase from `$.state` on the terminal and desktop surfaces, that a `$.clock.every` timer refreshes that state from a file read and a socket fetch, and that `validate` lists the `fs.read` and `http.fetch` calls a reviewer must approve. The test kit has no fs, network or process access, and the test itself answered the file read and the fetch. So the probe **does not prove a socket round trip** to the Overdeck dashboard, does not show how the band looks in a real tmux or Herdr pane, and does not measure the cost of a 15 s poll in a live session. Those stay open for the follow-up issue.
 
 ## Appendix B: Sources
 
