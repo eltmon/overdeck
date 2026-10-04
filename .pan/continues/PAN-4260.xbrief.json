@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T04:21:58.187Z",
+  "updated": "2026-10-04T04:32:13.829Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,9 @@
       "claimedBy": "agent-pan-4260",
       "claimedAt": "2026-10-04T04:14:27.225Z",
       "doneAt": "2026-10-04T04:21:58.186Z"
+    },
+    "w2-codex-home-effort.ac3": {
+      "status": "cancelled"
     }
   }
 }
