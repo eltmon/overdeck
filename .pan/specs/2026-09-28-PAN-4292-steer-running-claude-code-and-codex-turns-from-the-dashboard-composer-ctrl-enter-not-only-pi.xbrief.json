@@ -4,17 +4,17 @@
     "created": "2026-09-28T13:10:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4292: Steer running Claude Code and Codex turns from the dashboard composer (Ctrl+Enter), not only Pi",
-    "updated": "2026-09-28T12:49:41.636Z"
+    "updated": "2026-09-28T17:24:50.897Z"
   },
   "plan": {
     "id": "pan-4292",
     "title": "Steer running Claude Code and Codex turns from the dashboard composer (Ctrl+Enter), not only Pi",
-    "status": "running",
+    "status": "completed",
     "uid": "d63a5a0c-0a37-4d81-adc9-253c6d949c5f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T13:10:00Z",
-    "updated": "2026-09-28T12:49:41.636Z",
+    "updated": "2026-09-28T17:24:50.897Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4292",
@@ -1062,5 +1062,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

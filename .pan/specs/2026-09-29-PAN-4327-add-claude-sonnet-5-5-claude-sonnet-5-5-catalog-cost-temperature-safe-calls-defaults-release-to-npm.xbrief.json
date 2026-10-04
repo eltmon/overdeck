@@ -4,17 +4,17 @@
     "created": "2026-09-29T00:20:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4327: Add Claude Sonnet 5.5 (claude-sonnet-5-5): catalog, cost, temperature-safe calls, defaults; release to npm",
-    "updated": "2026-09-29T00:24:49.528Z"
+    "updated": "2026-09-29T06:01:01.333Z"
   },
   "plan": {
     "id": "pan-4327",
     "title": "Add Claude Sonnet 5.5 (claude-sonnet-5-5): catalog, cost, temperature-safe calls, defaults; release to npm",
-    "status": "running",
+    "status": "completed",
     "uid": "d1c052ff-cbe0-45bf-9309-f2e6951031a5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-29T00:20:00Z",
-    "updated": "2026-09-29T00:24:49.528Z",
+    "updated": "2026-09-29T06:01:01.333Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4327",
@@ -1006,5 +1006,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

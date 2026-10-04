@@ -4,17 +4,17 @@
     "created": "2026-09-28T17:27:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4324: pan close DoD post-merge row trusts stored agent status: exited agents block every close-out",
-    "updated": "2026-09-28T17:28:32.542Z"
+    "updated": "2026-09-29T02:31:49.242Z"
   },
   "plan": {
     "id": "pan-4324",
     "title": "pan close DoD post-merge row trusts stored agent status: exited agents block every close-out",
-    "status": "running",
+    "status": "completed",
     "uid": "5e8e221d-e8f5-4b77-9f8d-cc1588be0c90",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T17:27:16Z",
-    "updated": "2026-09-28T17:28:32.542Z",
+    "updated": "2026-09-29T02:31:49.242Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4324",
@@ -199,5 +199,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -4,17 +4,17 @@
     "created": "2026-09-28T13:30:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4310: Herdr terminal stream decodes UTF-8 bytes as Latin-1: mojibake in the dashboard Terminal tab",
-    "updated": "2026-09-28T13:31:22.596Z"
+    "updated": "2026-09-28T17:26:15.833Z"
   },
   "plan": {
     "id": "pan-4310",
     "title": "Herdr terminal stream decodes UTF-8 bytes as Latin-1: mojibake in the dashboard Terminal tab",
-    "status": "proposed",
+    "status": "completed",
     "uid": "57858433-c663-4256-95dc-489fa08e2987",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-28T13:30:26Z",
-    "updated": "2026-09-28T13:31:22.596Z",
+    "updated": "2026-09-28T17:26:15.833Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4310",
@@ -205,5 +205,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "completed"
 }

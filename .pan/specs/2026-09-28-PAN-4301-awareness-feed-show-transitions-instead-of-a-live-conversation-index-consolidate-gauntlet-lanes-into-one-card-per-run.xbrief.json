@@ -4,17 +4,17 @@
     "created": "2026-09-28T13:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4301: Awareness feed: show transitions instead of a live conversation index; consolidate gauntlet lanes into one card per run",
-    "updated": "2026-09-28T13:03:23.870Z"
+    "updated": "2026-09-28T17:25:46.875Z"
   },
   "plan": {
     "id": "pan-4301",
     "title": "Awareness feed: show transitions instead of a live conversation index; consolidate gauntlet lanes into one card per run",
-    "status": "running",
+    "status": "completed",
     "uid": "9950c35a-2442-4f13-816f-c73081ee5d6a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T13:30:00.000Z",
-    "updated": "2026-09-28T13:03:23.870Z",
+    "updated": "2026-09-28T17:25:46.875Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4301",
@@ -1111,5 +1111,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

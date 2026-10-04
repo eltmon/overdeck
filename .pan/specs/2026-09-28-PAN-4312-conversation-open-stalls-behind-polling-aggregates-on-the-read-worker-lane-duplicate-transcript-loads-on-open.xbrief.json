@@ -4,17 +4,17 @@
     "created": "2026-09-28T14:06:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4312: Conversation open stalls behind polling aggregates on the read worker lane; duplicate transcript loads on open",
-    "updated": "2026-09-28T14:11:16.220Z"
+    "updated": "2026-09-28T17:26:41.775Z"
   },
   "plan": {
     "id": "pan-4312",
     "title": "Conversation open stalls behind polling aggregates on the read worker lane; duplicate transcript loads on open",
-    "status": "running",
+    "status": "completed",
     "uid": "22f0c67f-ba34-44f9-89bf-e6b77e8ca776",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T14:06:54Z",
-    "updated": "2026-09-28T14:11:16.220Z",
+    "updated": "2026-09-28T17:26:41.775Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4312",
@@ -804,5 +804,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -4,17 +4,17 @@
     "created": "2026-09-28T12:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4291: GitHub GraphQL budget exhausted hourly by Overdeck's own polling; quota sampler reads the wrong counter",
-    "updated": "2026-09-28T12:48:45.061Z"
+    "updated": "2026-09-28T17:24:23.772Z"
   },
   "plan": {
     "id": "pan-4291",
     "title": "GitHub GraphQL budget exhausted hourly by Overdeck's own polling; quota sampler reads the wrong counter",
-    "status": "running",
+    "status": "completed",
     "uid": "4483c336-ced3-4745-9907-d15cfcc17891",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T12:45:00Z",
-    "updated": "2026-09-28T12:48:45.061Z",
+    "updated": "2026-09-28T17:24:23.772Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4291",
@@ -991,5 +991,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

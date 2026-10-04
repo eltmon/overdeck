@@ -4,17 +4,17 @@
     "created": "2026-09-28T12:49:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4300: Dead agents re-emit heartbeat_dead + status_changed → running every minute (~50k events/day)",
-    "updated": "2026-09-28T12:53:44.012Z"
+    "updated": "2026-09-28T17:25:19.688Z"
   },
   "plan": {
     "id": "pan-4300",
     "title": "Dead agents re-emit heartbeat_dead + status_changed → running every minute (~50k events/day)",
-    "status": "running",
+    "status": "completed",
     "uid": "33b7725a-f5cf-40e7-ba0b-4df493f5a690",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-28T12:49:43Z",
-    "updated": "2026-09-28T12:53:44.012Z",
+    "updated": "2026-09-28T17:25:19.688Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4300",
@@ -393,5 +393,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

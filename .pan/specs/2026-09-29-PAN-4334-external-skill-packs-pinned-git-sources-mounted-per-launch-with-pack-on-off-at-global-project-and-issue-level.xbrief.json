@@ -4,17 +4,17 @@
     "created": "2026-09-29T00:43:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4334: External skill packs: pinned git sources mounted per launch, with pack on/off at global, project, and issue level",
-    "updated": "2026-09-29T00:44:23.656Z"
+    "updated": "2026-09-29T05:51:02.674Z"
   },
   "plan": {
     "id": "pan-4334",
     "title": "External skill packs: pinned git sources mounted per launch, with pack on/off at global, project, and issue level",
-    "status": "running",
+    "status": "completed",
     "uid": "61a8bfb0-61c4-405a-a49e-2ce136be74bf",
     "author": "agent:claude-opus-5-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-09-29T00:43:48Z",
-    "updated": "2026-09-29T00:44:23.656Z",
+    "updated": "2026-09-29T05:51:02.674Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4334",
@@ -1523,5 +1523,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
