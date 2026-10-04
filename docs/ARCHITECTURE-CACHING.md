@@ -19,7 +19,7 @@ Dashboard Server (Express)
   |-- IssueDataService (background poller)
   |     |-- Polls each tracker on its own schedule
   |     |-- Detects changes, pushes via socket.io
-  |     |-- Adaptive backoff on rate limit pressure
+  |     |-- Adaptive backoff on rate limit pressure or unchanged data
   |
   |-- CacheService (two-layer)
   |     |-- L1: In-memory Map (hot, 10s TTL, 50 entries max)
@@ -63,9 +63,9 @@ Key methods:
 Central orchestrator that replaces the inline `/api/issues` handler. Responsibilities:
 
 1. **Background polling** per tracker on independent timers
-2. **Change detection** via JSON comparison
+2. **Change detection** via length + newest `updatedAt`
 3. **Socket.io push** when data changes
-4. **Adaptive backoff** when rate limits are low
+4. **Adaptive backoff** when rate limits are low or nothing changed
 5. **Instant serve** from in-memory cache
 
 #### Poll Intervals
@@ -86,6 +86,54 @@ When rate limits are under pressure, poll intervals increase automatically:
 | 25-50%      | 2x |
 | 10-25%      | 5x |
 | < 10%       | 10x |
+
+The result is clamped to the tracker's min/max. When the quota is exhausted, the tracker is
+suspended until the rate-limit reset (capped at 1 hour), past the max. While the PAT REST
+bucket is paused (PAN-4264), the GitHub poll waits for the pause end.
+
+#### Unchanged backoff (GitHub)
+
+Each scheduled GitHub poll that returns unchanged data (every repo answered 304, so the issue
+count and newest `updatedAt` are the same) doubles the next interval, up to the max
+(PAN-4507, `src/dashboard/server/services/poll-cadence.ts`):
+
+| Consecutive unchanged polls | Next interval |
+|-----------------------------|---------------|
+| 0                           | 30 s          |
+| 1                           | 60 s          |
+| 2                           | 120 s         |
+| 3                           | 240 s         |
+| 4 or more                   | 300 s         |
+
+The delay combines in this order:
+
+1. `max(unchanged backoff, rate-limit backoff)` — the longer delay wins; a tie is reported as rate-limit backoff.
+2. A rate-limit suspension replaces that delay.
+3. A PAT REST quota pause can only lengthen it.
+
+Only scheduled polls move the streak. The startup poll and the poll inside `invalidateTracker`
+do not, and a skipped poll (quota pause, no GitHub config) or a failed poll leaves it as it is.
+Linear and Rally keep a streak of 0, so their cadence is unchanged.
+
+These events return GitHub to the 30 s cadence:
+
+- A scheduled poll that returns changed data.
+- `POST /api/trackers/refresh` (the Kanban Refresh button) and every other `invalidateTracker` caller (issue transitions, close-out).
+- `POST /api/cache/clear` (`clearCacheAndRefresh()`).
+- `GET /api/issues`.
+- A verified GitHub `issues` webhook from a tracked repo.
+
+The last two use `IssueDataService.resetPollCadence(tracker)`. It zeroes the streak and re-arms
+the timer at the default interval only when the armed poll is further away than that, so
+repeated resets never postpone a poll that is already due. A cadence reset never polls and
+never deletes cache rows, so the stored ETags keep the next conditional request free. Under
+rate-limit pressure the re-armed delay is the rate-limit-adjusted interval, not 30 s.
+
+> **GitHub App setup:** the webhook reset fires only if the GitHub App subscribes to **Issues**
+> events: GitHub → Settings → Developer settings → GitHub Apps → the Overdeck app →
+> Permissions & events → Subscribe to events → Issues. This is app configuration, not code.
+> Without the subscription the poller still works, but an issue edited on GitHub can take up
+> to 300 s to appear while the poller is backed off.
 
 ### Tracker-Specific Strategies
 
@@ -174,7 +222,13 @@ Diagnostics endpoint returning per-tracker cache health:
   "github": {
     "remaining": 4800,
     "total": 5000,
-    "pollInterval": 30000,
+    "backoffMs": 0,
+    "suspendedUntil": null,
+    "rateLimited": false,
+    "pollInterval": 120000,
+    "pollIntervalReason": "unchanged-backoff",
+    "unchangedStreak": 2,
+    "nextPollAt": "2026-02-08T12:02:00.000Z",
     "lastFetched": "2026-02-08T12:00:00.000Z",
     "lastError": null,
     "issueCount": 42
@@ -183,6 +237,18 @@ Diagnostics endpoint returning per-tracker cache health:
   "rally": { ... }
 }
 ```
+
+`pollInterval` is the delay of the armed poll timer. `nextPollAt` is when it fires, or `null`
+when no timer is armed (polling not started, or a poll is in flight). `pollIntervalReason`
+names the term that set the delay:
+
+| Reason | Meaning |
+|--------|---------|
+| `default` | No backoff applies; the tracker's default interval. |
+| `unchanged-backoff` | Consecutive unchanged GitHub polls lengthened the interval (`unchangedStreak` counts them). |
+| `rate-limit-backoff` | Low remaining quota lengthened the interval (`backoffMs`), at least as much as the unchanged backoff. |
+| `rate-limit-suspended` | The quota is exhausted; the poll waits for the rate-limit reset (capped at 1 hour). |
+| `quota-pause` | The PAT REST bucket is paused (PAN-4264); the GitHub poll waits for the pause end. |
 
 ## Frontend Query Intervals
 
@@ -225,6 +291,8 @@ Diagnostics endpoint returning per-tracker cache health:
 |------|---------|
 | `src/dashboard/server/services/cache-service.ts` | SQLite + in-memory two-layer cache |
 | `src/dashboard/server/services/issue-data-service.ts` | Background poller, change detection, socket.io push |
+| `src/dashboard/server/services/poll-cadence.ts` | Poll intervals and the pure poll-delay math (unchanged + rate-limit backoff, suspension, quota pause) |
+| `src/dashboard/server/services/issue-status-mapping.ts` | Raw tracker status → canonical state and display label |
 | `src/dashboard/server/services/tracker-config.ts` | Extracted config readers |
 | `src/dashboard/frontend/src/hooks/useSocketIssues.ts` | Socket.io client hook |
 
