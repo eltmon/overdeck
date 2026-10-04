@@ -72,6 +72,8 @@ describe('resolveSlotTierSpawnParams', () => {
     harness: undefined,
     tierName: 'default',
     implicit: true,
+    effort: 'high',
+    effortSource: 'default',
   };
   const IMPLICIT_PARAMS_EXPERT = { ...IMPLICIT_PARAMS, difficulty: 'expert' };
 
@@ -91,7 +93,22 @@ describe('resolveSlotTierSpawnParams', () => {
       tierName: 'frontier',
       implicit: false,
       difficulty: 'expert',
+      effort: 'high',
+      effortSource: 'default',
     });
+  });
+
+  // PAN-4257: a tier's configured effort reaches the spawn params.
+  it('carries the tier-configured effort and source "tier" into the spawn params', () => {
+    mockConfig({
+      ...TIER_CONFIG,
+      tiers: { ...TIER_CONFIG.tiers, frontier: { ...TIER_CONFIG.tiers.frontier, effort: 'xhigh' } },
+    });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
+
+    const params = resolveSlotTierSpawnParams('/ws', 'task-x');
+    expect(params.effort).toBe('xhigh');
+    expect(params.effortSource).toBe('tier');
   });
 
   it('staffs from the implicit roles.work tier when tiering is disabled (PAN-2397)', () => {
@@ -155,6 +172,8 @@ describe('resolveSlotTierSpawnParams', () => {
       // PAN-3842 + PAN-3858: fitness judges the model against the SAME
       // (promoted) difficulty staffing routed on, not the authored 'simple'.
       difficulty: 'expert',
+      effort: 'high',
+      effortSource: 'default',
     });
   });
 });
@@ -189,6 +208,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     harness: undefined,
     tierName: 'default',
     implicit: true,
+    effort: 'high',
+    effortSource: 'default',
   };
 
   beforeEach(() => {
@@ -209,12 +230,29 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'frontier',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       planDifficulties: ['simple', 'expert'],
       planItems: [
         { id: 'cheap', difficulty: 'simple' },
         { id: 'frontier', difficulty: 'expert' },
       ],
     });
+  });
+
+  // PAN-4257: a tier's configured effort reaches the single-work spawn params.
+  it('carries the tier-configured effort and source "tier" into the single-work spawn params', () => {
+    mockConfig({
+      ...TIER_CONFIG,
+      tiers: { ...TIER_CONFIG.tiers, frontier: { ...TIER_CONFIG.tiers.frontier, effort: 'xhigh' } },
+    });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('frontier', { difficulty: 'expert' }),
+    ]));
+
+    const params = resolveSingleWorkTierSpawnParams('/ws');
+    expect(params.effort).toBe('xhigh');
+    expect(params.effortSource).toBe('tier');
   });
 
   it('staffs from the implicit tier when global config is on but plan metadata opts out (PAN-2397)', () => {
@@ -252,6 +290,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'standard',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       planDifficulties: ['simple', 'complex'],
       planItems: [
         { id: 'first', difficulty: 'simple' },
@@ -275,6 +315,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'cheap',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       // PAN-3842: the fitness sweep is deliberately WIDER than the staffing
       // candidate set — a running item is what this agent is working and a
       // blocked one unblocks into the same agent, so both difficulties still
@@ -300,6 +342,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'standard',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       // 'ux' declares no difficulty of its own, so the fitness sweep has
       // nothing to judge it against and lists only 'code'.
       planDifficulties: ['simple'],
@@ -319,6 +363,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'standard',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       // by_kind raises the STAFFING difficulty only; the fitness sweep reports
       // each item's own authored difficulty.
       planDifficulties: ['trivial', 'simple'],
@@ -366,6 +412,8 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       harness: 'claude-code',
       tierName: 'frontier',
       implicit: false,
+      effort: 'high',
+      effortSource: 'default',
       // PAN-3842 + PAN-3858: the promotion reaches the fitness sweep too.
       planDifficulties: ['expert', 'complex'],
       planItems: [
