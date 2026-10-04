@@ -13,6 +13,7 @@ import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { resolveKimiNativeEffort } from '../kimi-effort.js'
+import { resolveEffort } from '../agents/resolve-effort.js'
 import { getOverdeckHome, packageRoot } from '../paths.js'
 import { getRuntimeBehavior } from './behavior.js'
 import {
@@ -196,12 +197,13 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       '--context-file',
       shellQuote(contextFile),
     ]
-    if (this.name === 'opencode' && config.effort) command.push('--effort', shellQuote(config.effort))
+    const effort = resolveEffort({ explicit: config.effort, model: config.model, harness: this.name }).effort
+    if (this.name === 'opencode') command.push('--effort', shellQuote(effort))
     if (config.sessionId) command.push('--resume', shellQuote(config.sessionId))
     if (config.model) command.push('--model', shellQuote(config.model))
     if (provider === 'kimi' && config.model) {
-      const effort = resolveKimiNativeEffort(config.model, config.effort)
-      if (effort) command.push('--effort', shellQuote(effort))
+      const native = resolveKimiNativeEffort(config.model, effort)
+      if (native) command.push('--effort', shellQuote(native))
     }
 
     rmSync(this.agentPath(config.agentId, 'acp-session-id'), { force: true })

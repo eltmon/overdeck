@@ -54,7 +54,7 @@ describe('Claude launch context delivery', () => {
     const launcher = join(root, 'omp-launcher.sh');
     writeFileSync(launcher, generateLauncherScript({
       workingDir: root, spawnMode: 'conversation', harness: 'ohmypi',
-      piMode: 'tui', piSessionDir: join(root, 'sessions'),
+      piMode: 'tui', piEffort: 'high', piSessionDir: join(root, 'sessions'),
       appendSystemPromptFiles: [first, second], promptInline: 'ROLE_SENTINEL',
     }));
     execFileSync('bash', [launcher], { cwd: root, timeout: 10000 });

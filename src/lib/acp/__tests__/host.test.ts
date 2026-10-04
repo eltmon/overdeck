@@ -26,6 +26,8 @@ import { parseSessionUpdateEvent } from "../runtime-model.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
 import { parseAcpConversationMessages } from "../../../dashboard/server/services/acp-conversation-parser.js";
 import { readSessionIndex } from "../../session-history.js";
+import { resolveKimiNativeEffort } from "../../kimi-effort.js";
+import { EFFORT_LEVELS } from "@overdeck/contracts";
 
 // Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
 async function readPersistedAcpSessionId(
@@ -390,6 +392,7 @@ describe("AcpHost", () => {
       provider: "kimi",
       workspace: process.cwd(),
       model: "k3[1m]",
+      effort: "high",
       overdeckHome,
       runtime: stub.runtime,
     });
@@ -402,7 +405,8 @@ describe("AcpHost", () => {
     expect(stub.order.indexOf("set-model")).toBeLessThan(stub.order.indexOf("set-thinking"));
   });
 
-  it.each(["low", "high", "max"])("applies requested K3 %s effort on resume before accepting prompts", async (effort) => {
+  it.each(EFFORT_LEVELS)("applies requested K3 canonical %s effort on resume before accepting prompts", async (level) => {
+    const native = resolveKimiNativeEffort("k3", level);
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime();
     const host = new AcpHost({
@@ -410,14 +414,14 @@ describe("AcpHost", () => {
       provider: "kimi",
       workspace: process.cwd(),
       model: "kimi-code/k3-256k",
-      effort,
+      effort: native,
       resumeSessionId: "existing-session",
       overdeckHome,
       runtime: stub.runtime,
     });
     hosts.push(host);
     await host.start();
-    expect(stub.setThinking).toEqual([effort]);
+    expect(stub.setThinking).toEqual([native]);
   });
 
   it("does not send unsupported effort levels to always-thinking K2.7", async () => {
@@ -447,6 +451,7 @@ describe("AcpHost", () => {
       provider: "kimi",
       workspace: process.cwd(),
       model: "kimi-code/k3",
+      effort: "high",
       overdeckHome,
       runtime: {
         ...stub.runtime,
@@ -486,7 +491,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-invalid-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/k3", overdeckHome, runtime: stub.runtime,
+      model: "kimi-code/k3", effort: "high", overdeckHome, runtime: stub.runtime,
     });
     hosts.push(host);
     await host.start();
@@ -512,7 +517,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-rejected-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/k3", overdeckHome,
+      model: "kimi-code/k3", effort: "high", overdeckHome,
       runtime: {
         ...stub.runtime,
         setConfigOption: (id, value) => value === "low"
@@ -534,7 +539,7 @@ describe("AcpHost", () => {
       options: [{ value: "high", name: "High" }, { value: "medium", name: "Medium" }],
     }] });
     const host = new AcpHost({ agentId: "agent-opencode-effort", provider,
-      workspace: process.cwd(), model: `${provider}/kimi-k3`,
+      workspace: process.cwd(), model: `${provider}/kimi-k3`, effort: "high",
       overdeckHome: await makeHome(), runtime: stub.runtime });
     hosts.push(host);
     await host.start();
@@ -553,6 +558,44 @@ describe("AcpHost", () => {
       overdeckHome: await makeHome(), runtime: stub.runtime });
     hosts.push(host);
     await expect(host.start()).rejects.toThrow("does not expose an effort setting");
+  });
+
+  it.each(EFFORT_LEVELS)("sends OpenCode effort %s when the model exposes the option", async (level) => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "effort", name: "Thinking effort", type: "select", currentValue: "medium",
+      options: [{ value: level, name: level }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-opencode-effort-table", provider: "opencode",
+      workspace: process.cwd(), model: "opencode/kimi-k3", effort: level,
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.order.at(-1)).toBe(`config:effort:${level}`);
+  });
+
+  it("passes a non-canonical OpenCode variant through unchanged", async () => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "effort", name: "Thinking effort", type: "select", currentValue: "medium",
+      options: [{ value: "custom-variant", name: "Custom" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-opencode-variant", provider: "opencode",
+      workspace: process.cwd(), model: "opencode/kimi-k3", effort: "custom-variant",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.order.at(-1)).toBe("config:effort:custom-variant");
+  });
+
+  it("rejects starting an OpenCode host with an effort option but no effort given", async () => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "effort", name: "Thinking effort", type: "select", currentValue: "medium",
+      options: [{ value: "high", name: "High" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-opencode-no-effort", provider: "opencode",
+      workspace: process.cwd(), model: "opencode/kimi-k3",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("OpenCode launch requires --effort");
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {

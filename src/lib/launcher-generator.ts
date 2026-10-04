@@ -756,6 +756,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (!config.piSessionDir) {
     throw new Error('ohmypi launcher requires piSessionDir');
   }
+  if (!config.piEffort) throw new Error('ohmypi launcher requires piEffort');
   if (piMode === 'rpc') {
     if (!config.piExtensionPath) {
       throw new Error('ohmypi launcher (rpc mode) requires piExtensionPath');
@@ -769,7 +770,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
-  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
+  tokens.push('--thinking', shellQuote(config.piEffort));
   if (config.model) {
     tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model)));
   }
@@ -985,8 +986,8 @@ function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   const agentId = config.overdeckEnv?.agentId;
   if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');
-  const effort = config.museEffort ?? 'high';
-  if (!['low', 'medium', 'high', 'xhigh'].includes(effort)) throw new Error('Unsupported Muse reasoning effort');
+  const effort = config.museEffort;
+  if (!effort) throw new Error('muse launcher requires museEffort');
   const tokens = ['muse', '--model', shellQuote(model), '--reasoning-effort', shellQuote(effort),
     '--workspace', shellQuote(config.workingDir), '--trust-workspace'];
   if (config.museResumeSessionId) tokens.push('resume', shellQuote(config.museResumeSessionId));

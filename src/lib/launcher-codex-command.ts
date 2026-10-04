@@ -123,8 +123,9 @@ function computeCodexCommandTokens(
   }
 
   if (codexMode === 'app-server') {
+    if (!config.codexEffort) throw new Error('codex app-server launcher requires codexEffort');
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
-    const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort ?? 'high')];
+    const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort)];
     if (config.model) {
       tokens.push('--model', shellQuoteModelId(config.model));
     }
