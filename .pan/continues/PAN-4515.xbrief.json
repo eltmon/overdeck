@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-4515",
+  "created": "2026-10-04T03:22:32.796Z",
+  "updated": "2026-10-04T03:50:19.770Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "scan-last-record-at": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4515",
+      "claimedAt": "2026-10-04T03:22:32.796Z",
+      "doneAt": "2026-10-04T03:30:18.054Z"
+    },
+    "list-uses-last-record-at": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4515",
+      "claimedAt": "2026-10-04T03:30:29.196Z",
+      "doneAt": "2026-10-04T03:38:07.841Z"
+    },
+    "docs-last-activity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4515",
+      "claimedAt": "2026-10-04T03:38:14.730Z",
+      "doneAt": "2026-10-04T03:40:01.244Z"
+    },
+    "scan-last-record-at.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:47:58.914Z"
+    },
+    "scan-last-record-at.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:48:20.565Z"
+    },
+    "scan-last-record-at.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:48:37.890Z"
+    },
+    "scan-last-record-at.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:48:57.802Z"
+    },
+    "list-uses-last-record-at.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:49:15.189Z"
+    },
+    "list-uses-last-record-at.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:49:31.190Z"
+    },
+    "list-uses-last-record-at.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:49:46.634Z"
+    },
+    "docs-last-activity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:50:02.958Z"
+    },
+    "docs-last-activity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:50:19.770Z"
+    }
+  }
+}
