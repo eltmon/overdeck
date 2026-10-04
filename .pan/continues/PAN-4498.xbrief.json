@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:37:23.507Z",
+  "updated": "2026-10-04T03:37:24.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -191,6 +191,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4498",
       "claimedAt": "2026-10-04T03:37:23.507Z"
+    },
+    "bookmark-edit-popover.ac4": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4498",
+      "claimedAt": "2026-10-04T03:37:24.664Z"
     }
   }
 }
