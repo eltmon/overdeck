@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T03:38:12.720Z",
+  "updated": "2026-10-04T03:42:23.596Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-10-04T03:38:06.033Z"
     },
     "w6-acp-host-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4260",
-      "claimedAt": "2026-10-04T03:38:12.720Z"
+      "claimedAt": "2026-10-04T03:38:12.720Z",
+      "doneAt": "2026-10-04T03:42:23.596Z"
     }
   }
 }
