@@ -102,6 +102,7 @@ import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
+import { resolveEffort } from './resolve-effort.js';
 const execAsync = promisify(exec);
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
@@ -330,7 +331,7 @@ async function spawnRunWithoutConsentClaim(
   const museLauncherFields = resolvedHarness === 'muse' ? {
     harness: 'muse' as const,
     museModel: selectedModel,
-    museEffort: options.effort,
+    museEffort: resolveEffort({ explicit: options.effort, role, model: selectedModel, harness: 'muse' }).effort,
     museContextFile: await materializeMuseContext(agentId, workspace, roleAgentDefinitionPath(role)),
     museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
   } : {};

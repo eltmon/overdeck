@@ -30,6 +30,7 @@ import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
 import { buildTierFitnessContext } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
+import { resolveEffort } from './resolve-effort.js';
 import {
   buildCavemanExports,
   determineModel,
@@ -732,7 +733,7 @@ export async function buildAgentLaunchConfig(opts: {
   const museLauncherFields = opts.harness === 'muse' ? {
     harness: 'muse' as const,
     museModel: model,
-    museEffort: opts.effort,
+    museEffort: resolveEffort({ explicit: opts.effort, role: launchRole, model, harness: 'muse' }).effort,
     museContextFile: await materializeMuseContext(opts.agentId, opts.workspace, roleAgentDefinitionPath(launchRole)),
     museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
   } : {};

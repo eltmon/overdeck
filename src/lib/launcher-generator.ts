@@ -986,8 +986,8 @@ function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   const agentId = config.overdeckEnv?.agentId;
   if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');
-  const effort = config.museEffort ?? 'high';
-  if (!['low', 'medium', 'high', 'xhigh'].includes(effort)) throw new Error('Unsupported Muse reasoning effort');
+  const effort = config.museEffort;
+  if (!effort) throw new Error('muse launcher requires museEffort');
   const tokens = ['muse', '--model', shellQuote(model), '--reasoning-effort', shellQuote(effort),
     '--workspace', shellQuote(config.workingDir), '--trust-workspace'];
   if (config.museResumeSessionId) tokens.push('resume', shellQuote(config.museResumeSessionId));

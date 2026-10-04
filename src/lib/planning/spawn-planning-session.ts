@@ -35,6 +35,7 @@ import { isWorkspaceSetupIncomplete } from '../workspace-manager/setup-marker.js
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentState } from '../agents.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields, getProviderAuthMode } from '../agents/runtime-command.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -618,7 +619,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
         ...(primeLaunch?.fields ?? {}),
-        ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
+        ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: resolveEffort({ explicit: effort, role: 'plan', model: planningModel, harness: 'muse' }).effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },
     );
