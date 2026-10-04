@@ -125,7 +125,7 @@ export function computeLayout(width: number, height: number): LayoutRect {
   };
 }
 
-export type OrbState = 'active' | 'shelf' | 'stale' | 'failed';
+export type OrbState = 'active' | 'shelf' | 'needs-you' | 'stale' | 'failed';
 
 /**
  * Parked-orbit identity (PAN-3485 / PAN-3490). One color per orbit so the
@@ -165,6 +165,8 @@ export const STALE_AFTER_MS = 30 * 60 * 1000;
 
 export function classifyOrb(input: RiverOrbInput, now: number): OrbState {
   if (input.paused === true || input.yieldedByScheduler === true) return 'shelf';
+  // PAN-4383: waiting on the operator (e.g. a `pan ask` decision) is not idle.
+  if (input.attention === 'needs-you') return 'needs-you';
   if (input.attention === 'stuck' || input.attention === 'api-error') return 'failed';
 
   const lastActivity = typeof input.lastActivity === 'number'
@@ -216,8 +218,8 @@ export function positionOrb<T extends PositionableOrb>(
     return orb;
   }
 
-  if (orb.state === 'shelf') {
-    const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf').indexOf(orb));
+  if (orb.state === 'shelf' || orb.state === 'needs-you') {
+    const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').indexOf(orb));
     orb.tx = layout.padX + 140
       + (index / Math.max(1, expectedShelf - 1 || 1)) * (width * 0.5);
     orb.ty = layout.shelfY;

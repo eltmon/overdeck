@@ -1,0 +1,242 @@
+{
+  "version": "1",
+  "issueId": "PAN-4383",
+  "created": "2026-09-29T06:22:16.508Z",
+  "updated": "2026-10-03T17:50:21.407Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-09-29T14:38:32.507Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-09-30T16:54:35.952Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-01T13:36:00.101Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-02T03:31:14.583Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-03T17:17:03.687Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-10-03T17:34:59.280Z"
+    }
+  ],
+  "items": {
+    "decision-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T06:22:16.507Z",
+      "doneAt": "2026-09-29T06:43:28.689Z"
+    },
+    "pan-ask-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T06:43:41.621Z",
+      "doneAt": "2026-09-29T06:58:06.474Z"
+    },
+    "enrichment-needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T06:58:07.515Z",
+      "doneAt": "2026-09-29T07:01:39.308Z"
+    },
+    "answer-route-clears": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:01:40.383Z",
+      "doneAt": "2026-09-29T07:09:36.115Z"
+    },
+    "operator-message-closes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:09:36.970Z",
+      "doneAt": "2026-09-29T07:09:49.192Z"
+    },
+    "derived-attention": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:09:50.051Z",
+      "doneAt": "2026-09-29T07:16:19.657Z"
+    },
+    "parked-operator-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:16:20.543Z",
+      "doneAt": "2026-09-29T07:16:32.800Z"
+    },
+    "godview-needs-you-orb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:16:33.874Z",
+      "doneAt": "2026-09-29T07:23:12.254Z"
+    },
+    "work-role-pan-ask": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:23:13.082Z",
+      "doneAt": "2026-09-29T07:23:37.592Z"
+    },
+    "docs-operator-decisions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4383",
+      "claimedAt": "2026-09-29T07:23:38.450Z",
+      "doneAt": "2026-09-29T07:24:16.921Z"
+    },
+    "decision-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:42:13.000Z"
+    },
+    "decision-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:42:48.412Z"
+    },
+    "decision-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:43:00.279Z"
+    },
+    "decision-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:43:12.311Z"
+    },
+    "pan-ask-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:43:25.114Z"
+    },
+    "pan-ask-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:43:38.675Z"
+    },
+    "pan-ask-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:43:52.667Z"
+    },
+    "pan-ask-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:44:07.432Z"
+    },
+    "enrichment-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:44:19.519Z"
+    },
+    "enrichment-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:44:31.281Z"
+    },
+    "enrichment-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:44:42.462Z"
+    },
+    "enrichment-needs-you.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:44:54.608Z"
+    },
+    "answer-route-clears.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:07.357Z"
+    },
+    "answer-route-clears.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:19.923Z"
+    },
+    "answer-route-clears.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:31.729Z"
+    },
+    "operator-message-closes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:43.508Z"
+    },
+    "operator-message-closes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:45:55.447Z"
+    },
+    "operator-message-closes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:07.582Z"
+    },
+    "derived-attention.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:19.754Z"
+    },
+    "derived-attention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:31.699Z"
+    },
+    "derived-attention.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:43.361Z"
+    },
+    "parked-operator-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:55.216Z"
+    },
+    "parked-operator-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:06.908Z"
+    },
+    "parked-operator-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:18.950Z"
+    },
+    "godview-needs-you-orb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:29.947Z"
+    },
+    "godview-needs-you-orb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:41.784Z"
+    },
+    "godview-needs-you-orb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:53.036Z"
+    },
+    "godview-needs-you-orb.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:04.769Z"
+    },
+    "work-role-pan-ask.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:15.629Z"
+    },
+    "work-role-pan-ask.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:26.432Z"
+    },
+    "work-role-pan-ask.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:37.081Z"
+    },
+    "docs-operator-decisions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:47.324Z"
+    },
+    "docs-operator-decisions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:48:57.498Z"
+    },
+    "docs-operator-decisions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:49:07.910Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

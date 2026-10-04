@@ -11,7 +11,20 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// PAN-4383: a test can point project resolution at a temp project; every
+// other test keeps the real resolver.
+const projectOverride = vi.hoisted(() => ({ value: null as { projectPath: string } | null }));
+vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: (issueId: string) =>
+      projectOverride.value ?? actual.resolveProjectFromIssueSync(issueId),
+  };
+});
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 import {
   deriveIssueState,
@@ -20,6 +33,7 @@ import {
   specExistsFor,
   type IssueStateFacts,
 } from '../../../../src/lib/overdeck/derived-issue-state.js';
+import { requestOperatorDecision } from '../../../../src/lib/cloister/operator-decision.js';
 
 const NOW = 1_800_000_000_000;
 
@@ -170,5 +184,58 @@ describe('the backend owns liveness', () => {
       model: 'opus', state: 'blocked' as const, stateSince: NOW, terminalId: 'w1:p1',
     };
     expect(deriveIssueState(facts({ panes: [pane] })).attention).toBe('needs-you');
+  });
+});
+
+// PAN-4383: an open `pan ask` decision is the operator's move.
+describe('the pipeline journal owns an open operator decision', () => {
+  const idleWithUnpushedWork = {
+    panes: [{
+      id: 'w1:p1', issue: 'PAN-3917', role: 'work' as const, harness: 'claude-code',
+      model: 'opus', state: 'idle' as const, stateSince: NOW - 17 * 60 * 60_000, terminalId: 'w1:p1',
+    }],
+    branch: { name: 'feature/pan-3917', aheadOfMain: 3, pushed: false },
+  };
+
+  it('needs you when a decision is open, even where the agent would otherwise be stuck', () => {
+    expect(deriveIssueState(facts({ ...idleWithUnpushedWork, operatorDecisionOpen: true })).attention).toBe('needs-you');
+  });
+
+  it('keeps the old result when no decision is open', () => {
+    expect(deriveIssueState(facts({ ...idleWithUnpushedWork, operatorDecisionOpen: false })).attention).toBe('stuck');
+    expect(deriveIssueState(facts({ operatorDecisionOpen: false })).attention).toBeUndefined();
+  });
+});
+
+describe('the loader reads an open operator decision from the workspace journal (PAN-4383)', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-decision-'));
+    projectOverride.value = { projectPath };
+  });
+
+  afterEach(() => {
+    projectOverride.value = null;
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('carries operatorDecisionOpen true while the issue workspace has an open decision', async () => {
+    const workspace = join(projectPath, 'workspaces', 'feature-pan-3917');
+    mkdirSync(workspace, { recursive: true });
+    requestOperatorDecision(workspace, {
+      issueId: 'PAN-3917', agentId: 'agent-pan-3917', question: 'Rotate the token?', options: ['Yes', 'No'],
+    });
+
+    const loaded = await loadIssueStateFacts('PAN-3917', { ...offline, readIssue: async () => ({ open: true, labels: [] }) });
+
+    expect(loaded.operatorDecisionOpen).toBe(true);
+    expect(deriveIssueState(loaded).attention).toBe('needs-you');
+  });
+
+  it('carries operatorDecisionOpen false when the workspace journal has none', async () => {
+    const loaded = await loadIssueStateFacts('PAN-3917', { ...offline, readIssue: async () => ({ open: true, labels: [] }) });
+
+    expect(loaded.operatorDecisionOpen).toBe(false);
   });
 });

@@ -359,7 +359,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         const res = await fetchWithTimeout(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
+          body: JSON.stringify({ answers, toolUseId }),
         });
         if (!res.ok) {
           let message = `Failed to deliver answer (${res.status})`;
