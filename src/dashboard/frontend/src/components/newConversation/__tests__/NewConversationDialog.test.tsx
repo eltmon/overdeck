@@ -59,7 +59,10 @@ function mockApi() {
       return { ok: true, status: 200, json: async () => ({ effort: 'high', source: 'default', requested: 'high', clamped: false }) };
     }
     if (url.startsWith('/api/skills/overrides')) {
-      return { ok: true, status: 200, json: async () => ({ skills: [{ name: 'grilling', core: false, enabled: true, source: 'default' }], packs: [] }) };
+      return {
+        ok: true, status: 200,
+        json: async () => ({ skills: [{ name: 'grilling', core: false, enabled: true, source: 'default', origin: 'personal' }], packs: [] }),
+      };
     }
     return { ok: false, status: 404, json: async () => ({}) };
   }));
@@ -111,7 +114,8 @@ describe('NewConversationDialog', () => {
     await screen.findByText('Default: high (default)');
     fireEvent.change(screen.getByLabelText('Effort'), { target: { value: 'xhigh' } });
     fireEvent.click(screen.getByLabelText('No context'));
-    const skills = await screen.findByRole('radiogroup', { name: 'grilling' });
+    fireEvent.click(await screen.findByRole('button', { name: /^Personal/ }));
+    const skills = screen.getByRole('radiogroup', { name: 'grilling' });
     fireEvent.click(within(skills).getByRole('radio', { name: 'Off' }));
     const picker = screen.getByRole('combobox', { name: 'Link to an issue' });
     fireEvent.change(picker, { target: { value: 'PAN-1' } });
