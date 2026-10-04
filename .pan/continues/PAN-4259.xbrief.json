@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:59:24.969Z",
+  "updated": "2026-10-04T03:59:36.147Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "effort-cost-report.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:59:24.968Z"
+    },
+    "directory-entry-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:59:36.147Z"
     }
   }
 }
