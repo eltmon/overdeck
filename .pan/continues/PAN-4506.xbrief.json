@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T02:50:54.318Z",
+  "updated": "2026-10-04T02:52:55.261Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-04T02:50:44.038Z"
     },
     "docs-dispatch-failed-and-herdr-text": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4506",
-      "claimedAt": "2026-10-04T02:50:54.318Z"
+      "claimedAt": "2026-10-04T02:50:54.318Z",
+      "doneAt": "2026-10-04T02:52:55.261Z"
     }
   }
 }
