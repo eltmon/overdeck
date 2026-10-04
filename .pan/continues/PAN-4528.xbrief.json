@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4528",
   "created": "2026-10-04T04:36:24.345Z",
-  "updated": "2026-10-04T05:34:09.033Z",
+  "updated": "2026-10-04T05:34:21.073Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "collapsible-groups.ac5": {
       "status": "completed",
       "doneAt": "2026-10-04T05:34:09.032Z"
+    },
+    "docs-skills-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:34:21.072Z"
     }
   }
 }
