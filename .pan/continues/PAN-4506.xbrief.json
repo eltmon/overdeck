@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T02:13:03.046Z",
+  "updated": "2026-10-04T02:17:41.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-04T02:12:56.072Z"
     },
     "herdr-wire-sanitize": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4506",
-      "claimedAt": "2026-10-04T02:13:03.045Z"
+      "claimedAt": "2026-10-04T02:13:03.045Z",
+      "doneAt": "2026-10-04T02:17:41.697Z"
     }
   }
 }
