@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:29:07.861Z",
+  "updated": "2026-10-04T03:29:21.753Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "launch-effort-slots.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T03:29:07.860Z"
+    },
+    "review-callsite-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:29:21.752Z"
     }
   }
 }
