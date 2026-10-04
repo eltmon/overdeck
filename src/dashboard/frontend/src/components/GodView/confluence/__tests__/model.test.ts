@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLOSE_OUT_PAUSE_REASON,
   ROLE_COLORS,
   acquireRadius,
   advanceFrostAccrual,
@@ -102,7 +103,7 @@ describe('Confluence model', () => {
     const now = Date.parse('2026-08-01T12:00:00.000Z');
     const staleActivity = '2026-08-01T11:30:00.000Z';
 
-    it('classifies with shelf > failed > stale > active precedence', () => {
+    it('classifies with merged-close-out-exit > shelf > failed > stale > active precedence', () => {
       expect(classifyOrb({
         paused: true,
         attention: 'stuck',
@@ -119,6 +120,34 @@ describe('Confluence model', () => {
       expect(classifyOrb({ lastActivity: staleActivity }, now)).toBe('stale');
       expect(classifyOrb({ lastActivity: '2026-08-01T11:30:00.001Z' }, now)).toBe('active');
       expect(classifyOrb({}, now)).toBe('active');
+    });
+
+    it('lets a merged issue paused only for close-out exit through MERGE (PAN-4523 D6)', () => {
+      expect(classifyOrb({
+        issueState: 'merged',
+        paused: true,
+        pausedReason: CLOSE_OUT_PAUSE_REASON,
+        lastActivity: staleActivity,
+      }, now)).toBe('active');
+      expect(classifyOrb({
+        issueState: 'merged',
+        paused: true,
+        pausedReason: 'RUN-92 safety hold: operator',
+        lastActivity: staleActivity,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'merged',
+        yieldedByScheduler: true,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'working',
+        paused: true,
+        pausedReason: CLOSE_OUT_PAUSE_REASON,
+      }, now)).toBe('shelf');
+      expect(classifyOrb({
+        issueState: 'merged',
+        lastActivity: staleActivity,
+      }, now)).toBe('active');
     });
 
     it('uses the mockup acquire/drop radii and reverse draw order for picking', () => {

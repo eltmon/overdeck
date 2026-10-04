@@ -1,4 +1,4 @@
-import type { IssueAttention } from '../../../types';
+import type { DerivedIssueStateName, IssueAttention } from '../../../types';
 
 export const STAGES = ['PLAN', 'WORK', 'REVIEW', 'TEST', 'MERGE'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -195,17 +195,38 @@ export function parkedOrbitTag(orbit: string | null | undefined): string | null 
 export const SWEEP_BEAM_COLOR = '#bfe3ff';
 export const SWEEP_FLARE_COLOR = '#ffd75e';
 
+/** The pause merge-agent.ts writes after a merge (src/lib/cloister/merge-agent.ts,
+ * grep "awaiting close-out"). Duplicated as a string: the frontend cannot import src/lib. */
+export const CLOSE_OUT_PAUSE_REASON = 'awaiting close-out (verify on main)';
+
 export interface RiverOrbInput {
   paused?: boolean | null;
   yieldedByScheduler?: boolean | null;
   /** The derived issue state's attention signal (FR-6). */
   attention?: IssueAttention | null;
   lastActivity?: string | number | null;
+  /** The issue's derived pipeline state (PAN-4523 D6): a merged issue paused only
+   * for close-out has nothing left to stall on and must exit through MERGE. */
+  issueState?: DerivedIssueStateName | null;
+  /** The pause reason that should speak for the issue (PAN-4523 D7). */
+  pausedReason?: string | null;
 }
 
 export const STALE_AFTER_MS = 30 * 60 * 1000;
 
+/**
+ * Precedence: merged-close-out-exit > shelf > failed > stale > active. A merged
+ * issue whose only pause is the close-out pause has nothing left to stall on —
+ * the merge exit (MERGE stage, state 'active') is the only correct way off the
+ * river, so this branch returns 'active' outright rather than merely skipping
+ * the shelf check (which would otherwise let the stale branch catch it).
+ */
 export function classifyOrb(input: RiverOrbInput, now: number): OrbState {
+  if (
+    input.issueState === 'merged'
+    && input.yieldedByScheduler !== true
+    && (input.paused !== true || input.pausedReason === CLOSE_OUT_PAUSE_REASON)
+  ) return 'active';
   if (input.paused === true || input.yieldedByScheduler === true) return 'shelf';
   if (input.attention === 'stuck' || input.attention === 'api-error') return 'failed';
 

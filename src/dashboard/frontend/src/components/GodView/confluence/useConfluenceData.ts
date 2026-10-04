@@ -10,6 +10,7 @@ import type { DerivedIssueState, DerivedIssueStateName, IssueAttention, Issue } 
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useWorkspaceStackHealthQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import {
+  CLOSE_OUT_PAUSE_REASON,
   HOOK_KEYS,
   classifyOrb,
   modelGlyph,
@@ -683,6 +684,11 @@ export function useConfluenceOrbs(
         (agent as AgentSnapshot & { yieldedByScheduler?: boolean }).yieldedByScheduler === true ||
         agent.pausedReason?.toLowerCase().includes('yield') === true,
       );
+      // D7: any non-close-out pause (including a reasonless one) speaks for the
+      // issue, so an operator hold on a merged issue still keeps it shelved.
+      const pausedVoters = voters.filter((agent) => agent.paused === true);
+      const holdVoter = pausedVoters.find((agent) => agent.pausedReason !== CLOSE_OUT_PAUSE_REASON);
+      const pausedReason = holdVoter ? (holdVoter.pausedReason ?? null) : (pausedVoters[0]?.pausedReason ?? null);
       const micro = aggregateMicroState(issueAgents, microStatesByAgentId);
       const broken = workspaceHealth[id.toUpperCase()]?.stackHealth?.healthy === false
         || (issue?.stackHealth as { healthy?: boolean } | undefined)?.healthy === false;
@@ -701,6 +707,8 @@ export function useConfluenceOrbs(
           yieldedByScheduler,
           attention: derived?.attention ?? null,
           lastActivity,
+          issueState: derived?.state ?? null,
+          pausedReason,
         }, now),
         convoy: convoyMembers(issueAgents),
         yieldReason: voters.find((agent) => agent.pausedReason)?.pausedReason ?? null,

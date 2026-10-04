@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from 'react';
 import type { AgentSnapshot, BackendPane, DomainEvent } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
+import { CLOSE_OUT_PAUSE_REASON } from '../model';
 import {
   useConfluenceData,
   useConfluenceOrbs,
@@ -325,6 +326,69 @@ describe('useConfluenceOrbs', () => {
     expect(shelfIds()).toContain('PAN-200');
     expect(shelfIds()).not.toContain('PAN-201');
     expect(shelfIds()).not.toContain('PAN-202');
+  });
+
+  it('lets a merged issue with close-out-paused agents flow to MERGE (PAN-4523 D6/D7)', () => {
+    const twoHoursAgo = new Date(NOW.getTime() - 2 * 60 * 60_000).toISOString();
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-11': agent({
+          id: 'agent-pan-11',
+          issueId: 'PAN-11',
+          status: 'stopped',
+          paused: true,
+          pausedReason: CLOSE_OUT_PAUSE_REASON,
+          lastActivity: twoHoursAgo,
+        }),
+        'planning-pan-11': agent({
+          id: 'planning-pan-11',
+          issueId: 'PAN-11',
+          role: 'plan',
+          status: 'stopped',
+          paused: true,
+          pausedReason: CLOSE_OUT_PAUSE_REASON,
+          lastActivity: twoHoursAgo,
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-11', identifier: 'PAN-11', title: 'Merged', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-11': { issueId: 'PAN-11', state: 'merged' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-11']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-11')).toMatchObject({
+      stage: 'MERGE',
+      state: 'active',
+    });
+  });
+
+  it('still shelves a merged issue carrying a non-close-out operator hold', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-16': agent({
+          id: 'agent-pan-16',
+          issueId: 'PAN-16',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'operator hold',
+          lastActivity: new Date(NOW.getTime() - 2 * 60 * 60_000).toISOString(),
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-16', identifier: 'PAN-16', title: 'Merged but held', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-16': { issueId: 'PAN-16', state: 'merged' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-16']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-16')).toMatchObject({ state: 'shelf' });
   });
 });
 
