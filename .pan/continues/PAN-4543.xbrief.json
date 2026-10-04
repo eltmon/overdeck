@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:11:01.871Z",
+  "updated": "2026-10-04T10:11:12.751Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "deploy-probe-retry.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T10:11:01.871Z"
+    },
+    "deploy-probe-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:12.751Z"
     }
   }
 }
