@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:02:49.602Z",
+  "updated": "2026-10-04T05:03:32.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-04T05:02:48.410Z"
     },
     "candidate-5-flywheel-pane": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4529",
-      "claimedAt": "2026-10-04T05:02:49.602Z"
+      "claimedAt": "2026-10-04T05:02:49.602Z",
+      "doneAt": "2026-10-04T05:03:32.164Z"
     }
   }
 }
