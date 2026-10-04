@@ -89,6 +89,7 @@ import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
+import { diffCompareRouteLayer } from './routes/diff-compare.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { claudeCodeRouteLayer } from './routes/claude-code.js';
 import { linearMcpAuthRouteLayer } from './routes/linear-mcp-auth.js';
@@ -329,6 +330,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   webhooksRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
+  diffCompareRouteLayer,
   codexAuthRouteLayer,
   claudeCodeRouteLayer,
   linearMcpAuthRouteLayer,

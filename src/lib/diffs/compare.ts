@@ -20,12 +20,27 @@ import { realpath } from 'node:fs/promises'
 import { isAbsolute, resolve, sep } from 'node:path'
 import { listProjectsAsync } from '../projects.js'
 import { listConversations } from '../overdeck/conversations.js'
+import { diffOptionArgs, parseNumstatWithStatus, type DiffOptions, type TurnDiffFileChange } from './diff-output.js'
 
 export type CompareErrorCode =
   | 'INVALID_REPO' | 'REPO_NOT_ALLOWED' | 'NOT_A_GIT_REPO'
   | 'INVALID_REF' | 'UNKNOWN_REF' | 'INVALID_MODE' | 'NO_MERGE_BASE'
 
 export interface CompareError { code: CompareErrorCode; error: string }
+
+export type CompareMode = 'two-dot' | 'three-dot'
+
+export interface CompareResponse {
+  repoRoot: string
+  mode: CompareMode
+  base: { ref: string; sha: string }
+  head: { ref: string; sha: string }
+  /** Set in three-dot mode only. */
+  mergeBase: string | null
+  files: TurnDiffFileChange[]
+  /** Present only when a `file` was requested (PRD Decision D3). */
+  diff?: string
+}
 
 export type CompareResult<T> = { ok: true; value: T } | { ok: false; failure: CompareError }
 
@@ -129,4 +144,56 @@ export async function resolveCommit(repoRoot: string, ref: string): Promise<Comp
     // fall through: the ref does not name a commit
   }
   return fail('UNKNOWN_REF', `Ref does not resolve to a commit: ${ref}`)
+}
+
+/** Narrow a `mode` query value; absent means two-dot (PRD Decision D6). */
+export function parseCompareMode(mode: string | null): CompareResult<CompareMode> {
+  if (mode === null || mode === '' || mode === 'two-dot') return ok('two-dot')
+  if (mode === 'three-dot') return ok('three-dot')
+  return fail('INVALID_MODE', `mode must be two-dot or three-dot, got: ${mode}`)
+}
+
+/**
+ * Diff two resolved commits. Two-dot diffs base → head; three-dot diffs
+ * merge-base(base, head) → head. The file list always comes back; the patch
+ * only for the one requested `file`.
+ */
+export async function compareRefs(input: {
+  repoRoot: string
+  base: { ref: string; sha: string }
+  head: { ref: string; sha: string }
+  mode: CompareMode
+  file?: string
+  options?: DiffOptions
+}): Promise<CompareResult<CompareResponse>> {
+  const { repoRoot, base, head, mode, file, options = {} } = input
+
+  let mergeBase: string | null = null
+  if (mode === 'three-dot') {
+    try {
+      mergeBase = (await runGit(repoRoot, ['merge-base', base.sha, head.sha])).trim() || null
+    } catch {
+      mergeBase = null
+    }
+    if (!mergeBase) return fail('NO_MERGE_BASE', `${base.ref} and ${head.ref} share no history`)
+  }
+  const from = mergeBase ?? base.sha
+
+  // --no-renames + core.quotePath=false key numstat and name-status paths identically (PRD D7).
+  const listArgs = ['-c', 'core.quotePath=false', 'diff', '--no-renames']
+  const [numstat, nameStatus] = await Promise.all([
+    runGit(repoRoot, [...listArgs, '--numstat', '--no-color', ...diffOptionArgs(options), from, head.sha]),
+    runGit(repoRoot, [...listArgs, '--name-status', '--no-color', from, head.sha]),
+  ])
+  const files = parseNumstatWithStatus(numstat, nameStatus)
+
+  const response: CompareResponse = { repoRoot, mode, base, head, mergeBase, files }
+  if (file) {
+    response.diff = await runGit(
+      repoRoot,
+      [...listArgs, '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), from, head.sha, '--', file],
+      50 * 1024 * 1024,
+    )
+  }
+  return ok(response)
 }
