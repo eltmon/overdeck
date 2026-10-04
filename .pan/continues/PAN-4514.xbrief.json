@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4514",
   "created": "2026-10-04T02:58:32.050Z",
-  "updated": "2026-10-04T03:21:01.051Z",
+  "updated": "2026-10-04T03:21:12.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "detector-contract.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:21:01.050Z"
+    },
+    "kickoff-prompt-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:21:12.987Z"
     }
   }
 }
