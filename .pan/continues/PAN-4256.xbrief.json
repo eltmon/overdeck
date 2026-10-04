@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:15:33.400Z",
+  "updated": "2026-10-04T05:15:45.374Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "pan-spawn-effort-flag.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T05:15:33.400Z"
+    },
+    "flywheel-role-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:45.374Z"
     }
   }
 }
