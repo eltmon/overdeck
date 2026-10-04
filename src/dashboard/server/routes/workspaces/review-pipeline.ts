@@ -662,10 +662,15 @@ export async function requestReviewGuarded(
           // Cloister normally drives this on lifecycle transitions; this path
           // is a manual re-dispatch for an already-approved PR.
           const { spawnRun } = await import('../../../../lib/agents.js');
+          const { resolveEffort } = await import('../../../../lib/agents/resolve-effort.js');
+          const testEffort = resolveEffort({ role: 'test', issueId });
+          if (testEffort.warning) console.warn(`[request-review] ${testEffort.warning}`);
           try {
             const testRun = await spawnRun(issueId, 'test', {
               workspace: workspacePath,
               startedBy: 'dashboard:review-pipeline',
+              effort: testEffort.effort,
+              effortSource: testEffort.source,
             });
             console.log(
               `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
