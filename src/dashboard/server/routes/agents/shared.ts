@@ -13,6 +13,7 @@ import { EFFORT_LEVELS, isEffortLevel, type AgentStatus, type EffortLevel } from
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
+import { normalizeModelOverride } from '../../../../lib/model-validation.js';
 import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
 import { resolvePrimaryWorkspaceRepoDir } from '../../../../lib/project-repos.js';
 import {
@@ -105,6 +106,40 @@ export function parseAgentEffortOverride(value: unknown): EffortLevel | undefine
     throw new Error(`Invalid effort "${value}"; expected one of ${EFFORT_LEVELS.join(', ')}`);
   }
   return value;
+}
+
+export interface AgentRestartBody {
+  model?: string;
+  harness?: RuntimeName;
+  effort?: EffortLevel;
+  graceful: boolean;
+  message?: string;
+  force: boolean;
+}
+
+/**
+ * Today's `/api/agents/:id/restart` body destructure plus model/effort
+ * validation, consolidated so the route can replace both with one parse
+ * call (PAN-4256).
+ */
+export function parseAgentRestartBody(body: unknown): { ok: true; value: AgentRestartBody } | { ok: false; error: string } {
+  const { model, harness, graceful = true, message, force = false, effort } = body as {
+    model?: string;
+    harness?: RuntimeName;
+    graceful?: boolean;
+    message?: string;
+    force?: boolean;
+    effort?: unknown;
+  };
+  let restartModel: string | undefined;
+  let restartEffort: EffortLevel | undefined;
+  try {
+    restartModel = normalizeModelOverride(model);
+    restartEffort = parseAgentEffortOverride(effort);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  return { ok: true, value: { model: restartModel, harness, effort: restartEffort, graceful, message, force } };
 }
 
 /**
