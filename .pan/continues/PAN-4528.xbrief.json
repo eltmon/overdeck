@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4528",
   "created": "2026-10-04T04:36:24.345Z",
-  "updated": "2026-10-04T05:01:25.396Z",
+  "updated": "2026-10-04T05:01:46.804Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4528",
       "claimedAt": "2026-10-04T04:55:59.104Z",
       "doneAt": "2026-10-04T05:01:25.396Z"
+    },
+    "collapsible-groups": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4528",
+      "claimedAt": "2026-10-04T05:01:46.804Z"
     }
   }
 }
