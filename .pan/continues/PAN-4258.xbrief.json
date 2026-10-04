@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:06:47.149Z",
+  "updated": "2026-10-04T03:06:58.375Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "start-planning-effort-400.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:06:47.149Z"
+    },
+    "start-planning-effort-400.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:06:58.375Z"
     }
   }
 }
