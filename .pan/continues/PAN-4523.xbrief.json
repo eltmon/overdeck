@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:39:42.425Z",
+  "updated": "2026-10-04T05:39:54.735Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "stage-live.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:39:42.425Z"
+    },
+    "stage-live.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:39:54.735Z"
     }
   }
 }
