@@ -382,4 +382,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
+- A Claude Code transcript's modified time is not activity: Claude's
+  `touchSessionTranscript` touches every running session's transcript at
+  startup and then hourly, adding no record. PAN-4515 makes conversation `lastActivityAt`
+  (`overdeck/conversation-list.ts`) take the last `user`/`assistant` record's
+  timestamp for live rows, with the modified time only as a fallback.
+  Never date conversation activity by transcript modified time.
 <!-- last-verified: 2026-10-03 -->

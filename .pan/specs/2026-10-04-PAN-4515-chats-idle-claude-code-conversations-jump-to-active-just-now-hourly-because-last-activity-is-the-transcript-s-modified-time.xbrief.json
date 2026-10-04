@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:48:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4515: Chats: idle Claude Code conversations jump to 'active just now' hourly because last activity is the transcript's modified time",
-    "updated": "2026-10-04T02:48:45.043Z"
+    "updated": "2026-10-04T03:22:10.883Z"
   },
   "plan": {
     "id": "pan-4515",
     "title": "Chats: idle Claude Code conversations jump to 'active just now' hourly because last activity is the transcript's modified time",
-    "status": "proposed",
+    "status": "running",
     "uid": "3e42cea2-1670-490d-ba64-015a60e93bdc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:48:40Z",
-    "updated": "2026-10-04T02:48:45.043Z",
+    "updated": "2026-10-04T03:22:10.883Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4515",
@@ -261,5 +261,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
