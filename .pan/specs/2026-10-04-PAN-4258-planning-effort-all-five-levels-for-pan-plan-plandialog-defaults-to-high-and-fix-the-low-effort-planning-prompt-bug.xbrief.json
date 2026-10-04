@@ -1,0 +1,631 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:11:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4258: Planning effort: all five levels for pan plan, PlanDialog defaults to high, and fix the 'LOW effort planning' prompt bug",
+    "updated": "2026-10-04T02:16:06.687Z"
+  },
+  "plan": {
+    "id": "pan-4258",
+    "title": "Planning effort: all five levels for pan plan, PlanDialog defaults to high, and fix the 'LOW effort planning' prompt bug",
+    "status": "running",
+    "uid": "90d96f7d-a9d6-4a4b-949f-815cc5da460b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:11:53Z",
+    "updated": "2026-10-04T02:16:06.687Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4258",
+        "label": "PAN-4258",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4258.md",
+        "label": "PRD draft (.pan/drafts/PAN-4258.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (foundation, program PRD)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "planning",
+      "cli",
+      "dashboard",
+      "pan-4249-sibling"
+    ],
+    "narratives": {
+      "Problem": "Planning effort is a three-level copy of the effort enum. pan start --effort xhigh|max renders 'LOW effort planning' because buildPlanningPrompt treats every non-high, non-medium value as low. claude-code planning never receives an effort (getAgentRuntimeBaseCommand is called without one), other harnesses get the raw unclamped value, and roles.plan.effort is never read. The start-planning API does not validate effort, PlanDialog defaults to medium against the effort-high-default rule, and pan strike --dry-run prints medium while help says high.",
+      "Proposal": "Route planning and strike effort through resolveEffort (role plan / role strike) and the contracts enum: pan plan accepts five levels, the start-planning API returns 400 for an unknown level before any mutation, spawnPlanningSession resolves once and passes the clamped level to every harness and to the prompt, the prompt bands by rank (low/medium/high-and-above) so xhigh and max get the deep-analysis section and probe pass, PlanDialog renders EFFORT_LEVELS with DEFAULT_EFFORT via an extracted PlanEffortPicker, strike resolves once for both dry-run and launch, the four lint:effort baseline rows are deleted, and effort.mdx, MODEL-CONTEXT-AUDIT.md and the pan-plan skill describe the new behavior.",
+      "NonGoals": "- Editing src/cli/commands/start.ts (its unplanned-path forwarding of --effort to planning stays; PRD D2)\n- Resolving the PlanDialog default from GET /api/effort/default\n- src/cli/commands/lane.ts --effort help and other surfaces owned by #4256, #4257, #4259, #4260\n- Persisting or displaying planning effort on AgentState, agent rows or cost data (#4259)\n- Changing roles/plan.md or roles/strike.md frontmatter\n- Changing how pan strike resolves its model\n- Defaulting anything to xhigh or max\n- Raising any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planning prompt effort section and probe pass key off the resolved effort level by rank (low / medium / high-and-above), so default planning runs (resolved high) now carry the deep-analysis section and probe pass.",
+        "rationale": "The prompt then describes the effort the harness actually runs at; high is the declared default by rule, and PlanDialog defaulting to high already implies the probe for dashboard plans. Keying off the request source would make the CLI and dashboard disagree."
+      },
+      {
+        "summary": "pan start keeps forwarding its --effort to the planning session on the unplanned path; start.ts is not edited.",
+        "rationale": "Documented behavior (pan-start SKILL.md, PAN-3022 D4); the bug is in prompt banding, and start.ts sits at its PAN-4249 line ceiling."
+      },
+      {
+        "summary": "pan plan does no client-side effort validation; the start-planning API 400 is the single gate.",
+        "rationale": "One validation point; plan.ts already surfaces the API error text and exits 1."
+      },
+      {
+        "summary": "PlanDialog's effort picker moves into a new PlanEffortPicker.tsx.",
+        "rationale": "PlanDialog.tsx is over the 1000-line ceiling and may not grow; five levels plus hints would grow it inline."
+      },
+      {
+        "summary": "pan strike clamps effort against the explicit --model only and passes effort plus effortSource to spawnAgent.",
+        "rationale": "Makes the dry-run print exactly what launches without re-implementing spawnAgent's model resolution in the CLI."
+      },
+      {
+        "summary": "The strike.ts lint:effort baseline row (labelled PAN-4259) is deleted by this issue.",
+        "rationale": "Its only match is the dry-run ?? 'medium' fallback that this issue removes."
+      },
+      {
+        "summary": "All lint:effort baseline edits land in one final item blocked by the four source items.",
+        "rationale": "scripts/lint-effort.sh is a shared file; a single item avoids serializing the source items on it, and a dropped count only prints a note so intermediate states pass."
+      }
+    ],
+    "items": [
+      {
+        "id": "plan-cli-five-levels",
+        "title": "pan plan --effort accepts all five levels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/plan.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/plan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/plan.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan.test.ts passes including the new effort max case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1: retype PlanOptions.effort in src/cli/commands/plan.ts to EffortLevel imported from @overdeck/contracts, change the pan plan --effort help text at src/cli/index.ts:322 to list low | medium | high | xhigh | max on the same single line, and add a plan.test.ts case that calls planCommand('PAN-123', { effort: 'max' }) and inspects the fetch body. No client-side validation (PRD D3)."
+        },
+        "items": [
+          {
+            "id": "plan-cli-five-levels.ac1",
+            "title": "Given planCommand('PAN-123', { effort: 'max' }), when it posts to start-planning, then the request body contains effort: 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-cli-five-levels.ac2",
+            "title": "pan plan --help prints the --effort option listing low | medium | high | xhigh | max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-cli-five-levels.ac3",
+            "title": "src/cli/index.ts preserves its origin/main line count; the help-text edit stays on one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-planning-effort-400",
+        "title": "start-planning API rejects an invalid effort with 400 before any mutation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/lib/overdeck/__tests__/start-planning-effort-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/start-planning-effort-validation.test.ts src/lib/overdeck/__tests__/start-planning-harness-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2: in startPlanningForIssue (src/lib/overdeck/planning-sessions.ts) insert the isEffortLevel check right after `void startDocker;` and before `const requestedHarness`, returning jsonResponse 400 with an error that lists EFFORT_LEVELS when body.effort is present (not undefined/null/'') and invalid. Add a new test file copied from start-planning-harness-gate.test.ts with the bogus-effort case and a valid-effort-reaches-harness-gate case."
+        },
+        "items": [
+          {
+            "id": "start-planning-effort-400.ac1",
+            "title": "Given body { effort: 'bogus' }, startPlanningForIssue returns status 400 with an error that contains 'low, medium, high, xhigh, max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-planning-effort-400.ac2",
+            "title": "When the effort is rejected, lifecycle.transitionTo, eventStore.append and the tracker getIssue mocks are never called and no planning agent state.json is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-planning-effort-400.ac3",
+            "title": "Given body { effort: 'max', harness: 'kimi-code', model: 'claude-sonnet-5' }, the request passes the effort check and returns the existing harness-gate 400 with the Kimi policy reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-prompt-rank-bands",
+        "title": "buildPlanningPrompt bands the effort section by rank so xhigh and max never render LOW",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/planning/__tests__/spawn-planning-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/spawn-planning-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-planning-session.test.ts passes including the new xhigh/max/low/medium cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3: retype buildPlanningPrompt's effort param to EffortLevel and replace the effortSection block (spawn-planning-session.ts ~254-268) with the rank-banded version from the PRD: low renders the LOW text, medium renders nothing, high/xhigh/max render the deep-analysis text whose heading and sentence name the actual level. Change the probe condition to `probe || deepEffort` where deepEffort = compareEffort(effort, 'high') >= 0. Touch only buildPlanningPrompt in this item."
+        },
+        "items": [
+          {
+            "id": "planning-prompt-rank-bands.ac1",
+            "title": "Given effort 'xhigh' or 'max', buildPlanningPrompt renders '## Planning Effort: Xhigh (Deep Analysis)' or 'Max (Deep Analysis)' and contains 'Probe Pass', and the output does not contain 'LOW effort planning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-rank-bands.ac2",
+            "title": "Given effort 'low', the prompt contains 'LOW effort planning' and does not contain 'Probe Pass'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-rank-bands.ac3",
+            "title": "Given effort 'medium', the prompt contains no '## Planning Effort' heading and no 'Probe Pass'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-rank-bands.ac4",
+            "title": "Given effort 'high' the prompt renders 'Probe Pass'; given effort undefined it renders no effort section and no 'Probe Pass' (the two existing tests, unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-planning-resolve-effort",
+        "title": "spawnPlanningSession resolves effort with role plan and passes it to every harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/planning/__tests__/spawn-planning-session-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/spawn-planning-session-effort.test.ts src/lib/planning/__tests__/spawn-planning-session-backend.test.ts src/lib/planning/__tests__/spawn-planning-session-prime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three planning spawn test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4: after effectiveHarness is resolved in spawnPlanningSession, call resolveEffort({ explicit: effort, role: 'plan', issueId: issue.identifier, model: planningModel, harness: effectiveHarness }), log its warning and source, and pass resolved.effort as the 5th argument of getAgentRuntimeBaseCommand and to both buildPlanningPrompt calls and every launcher-fields call (pi, codex, acp, kimi-code, prime-agent, muse). Retype SpawnPlanningOptions.effort to EffortLevel. New test file modeled on spawn-planning-session-backend.test.ts; muse clamp case uses the PRD's implementation checkpoint and fallback."
+        },
+        "items": [
+          {
+            "id": "spawn-planning-resolve-effort.ac1",
+            "title": "Given spawnPlanningSession with effort 'max', model 'claude-sonnet-5', harness 'claude-code', getAgentRuntimeBaseCommand is called with 'max' as its 5th argument and the written planning-prompt.md contains 'MAX effort planning' and does not contain 'LOW effort planning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-planning-resolve-effort.ac2",
+            "title": "Given no explicit effort and no roles.plan.effort config, getAgentRuntimeBaseCommand receives 'high' (defaults to high)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-planning-resolve-effort.ac3",
+            "title": "Given effort 'max' with harness 'muse', the effort that reaches the muse launcher resolves to 'xhigh' (clamped), never 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-planning-resolve-effort.ac4",
+            "title": "spawn-planning-session.ts contains no 'low' | 'medium' union and no effort ?? fallback (bash scripts/lint-effort.sh prints a lower-to-0 note for it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-dialog-default-high",
+        "title": "PlanDialog offers five effort levels and defaults to high via an extracted PlanEffortPicker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PlanEffortPicker.tsx",
+            "src/dashboard/frontend/src/components/PlanDialog.tsx",
+            "src/dashboard/frontend/src/components/PlanDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/PlanDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PlanDialog.test.tsx passes including the default-high and max cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5: create PlanEffortPicker.tsx rendering the effort label, one button per EFFORT_LEVELS entry and a per-level hint (high marked default), move the markup from PlanDialog.tsx ~865-888 into it, and change PlanDialog's effort state to useState<EffortLevel>(DEFAULT_EFFORT). PlanDialog.tsx must end shorter than its 1093-line origin/main count. Add PlanDialog tests for the initial high effort and for selecting max."
+        },
+        "items": [
+          {
+            "id": "plan-dialog-default-high.ac1",
+            "title": "When the operator opens PlanDialog and clicks Plan automatically without touching effort, the start-planning request body contains effort: 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-dialog-default-high.ac2",
+            "title": "PlanDialog renders five effort buttons (low, medium, high, xhigh, max) and selecting max sends effort: 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-dialog-default-high.ac3",
+            "title": "The effort hint line shows '(default)' next to the high description and nowhere else",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-dialog-default-high.ac4",
+            "title": "PlanDialog.tsx line count is below 1093 and PlanEffortPicker.tsx contains no literal effort-level array or union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-resolve-effort",
+        "title": "pan strike resolves effort once and the dry-run prints the resolved level",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/strike.ts",
+            "src/cli/commands/__tests__/strike.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/strike.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "strike.test.ts passes including the resolveStrikeEffort cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6: add resolveStrikeEffort(issueId, options, config?) in strike.ts that calls resolveEffort with role 'strike', expose it on __testInternals, call it at the top of runOne, before resolveStrikePlan and the dry-run branch, (InvalidEffortError becomes an Error listing EFFORT_LEVELS), print `${resolved.effort} (${resolved.source})` in the dry-run Effort line, and pass effort plus effortSource to spawnAgent."
+        },
+        "items": [
+          {
+            "id": "strike-resolve-effort.ac1",
+            "title": "Given no --effort and no roles.strike.effort, resolveStrikeEffort returns effort 'high' with source 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-resolve-effort.ac2",
+            "title": "Given roles.strike.effort 'medium' and no explicit effort, resolveStrikeEffort returns 'medium' with source 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-resolve-effort.ac3",
+            "title": "Given --effort bogus, resolveStrikeEffort throws InvalidEffortError and runOne fails without calling spawnAgent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-resolve-effort.ac4",
+            "title": "The dry-run Effort line prints the resolved level and source instead of the literal 'medium'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-docs-planning-strike",
+        "title": "Document planning and strike effort in effort.mdx, MODEL-CONTEXT-AUDIT and the pan-plan skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "sync-sources/skills/pan-plan/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "lint:skills exits 0",
+            "lint:slash-commands exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7: in configuration/effort.mdx 'What honors it today' add the planning and pan strike bullets from the PRD, remove planning from the ad hoc sentence and delete the #4258 table row; in docs/MODEL-CONTEXT-AUDIT.md line 37 stop listing planning/#4258 as ad hoc and name spawnPlanningSession and pan strike as resolveEffort surfaces; in sync-sources/skills/pan-plan/SKILL.md list five levels and say effort high or above enables the probe. Regenerate any manifest lint:skills or lint:slash-commands asks for."
+        },
+        "items": [
+          {
+            "id": "effort-docs-planning-strike.ac1",
+            "title": "configuration/effort.mdx 'What honors it today' contains a planning bullet naming pan plan --effort, the Plan dialog default high, and the 400 on an unknown level, and contains a pan strike bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-docs-planning-strike.ac2",
+            "title": "Neither configuration/effort.mdx nor docs/MODEL-CONTEXT-AUDIT.md contains '#4258' or 'issues/4258' after the edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-docs-planning-strike.ac3",
+            "title": "sync-sources/skills/pan-plan/SKILL.md usage line shows --effort low|medium|high|xhigh|max and npm run lint:skills exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-effort-baseline-lower",
+        "title": "Delete the four cleaned rows from the lint:effort baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:11:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4258",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effort.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-effort.sh"
+          ],
+          "expected_outputs": [
+            "script exits 0 and prints '✓ lint:effort passed' with no note lines for the four cleaned files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ],
+          "acJustification": "A two-line baseline edit has exactly two observable outcomes: the script passes and the four rows are gone."
+        },
+        "narrative": {
+          "Action": "PRD W8: after the four source items land, delete the BASELINE rows for src/cli/commands/strike.ts, src/lib/planning/spawn-planning-session.ts, src/cli/commands/plan.ts and src/dashboard/frontend/src/components/PlanDialog.tsx from scripts/lint-effort.sh, leaving all other rows unchanged, then re-run the script. If any of those files still matches, fix the source instead of keeping a row."
+        },
+        "items": [
+          {
+            "id": "lint-effort-baseline-lower.ac1",
+            "title": "bash scripts/lint-effort.sh exits 0 and prints '✓ lint:effort passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-effort-baseline-lower.ac2",
+            "title": "scripts/lint-effort.sh BASELINE contains no rows for strike.ts, spawn-planning-session.ts, plan.ts or PlanDialog.tsx and every other row is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "planning-prompt-rank-bands",
+        "to": "spawn-planning-resolve-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-cli-five-levels",
+        "to": "lint-effort-baseline-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-planning-resolve-effort",
+        "to": "lint-effort-baseline-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-dialog-default-high",
+        "to": "lint-effort-baseline-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "strike-resolve-effort",
+        "to": "lint-effort-baseline-lower",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches 15 files. The 7-subsystem count comes from the first-two-segment bucketing treating each single top-level file (configuration/effort.mdx, docs/MODEL-CONTEXT-AUDIT.md, scripts/lint-effort.sh) as its own subsystem; those are the docs and ratchet edits this slice is required to ship with the code, so splitting them into sibling issues would ship behavior without its docs.",
+      "canonicalFilename": "2026-10-04-PAN-4258-planning-effort-all-five-levels-for-pan-plan-plandialog-defaults-to-high-and-fix-the-low-effort-planning-prompt-bug.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

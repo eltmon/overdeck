@@ -136,6 +136,19 @@ describe('recoverStalledReviews', () => {
     expect(actions).toHaveLength(1);
   });
 
+  // PAN-4506: a rejected kickoff never started a reviewer, so there is
+  // nothing to re-dispatch — stalledReviewReason has no case for this tail
+  // type, so the routine already skips it without any code change.
+  it('re-requests nothing when a review.dispatch-failed entry tails a review.requested', async () => {
+    journal([
+      { type: 'review.requested', minutesAgo: 60 },
+      { type: 'review.dispatch-failed', minutesAgo: 40 },
+    ]);
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+  });
+
   it('leaves a fresh request alone', async () => {
     journal([{ type: 'review.requested', minutesAgo: 3 }]);
 

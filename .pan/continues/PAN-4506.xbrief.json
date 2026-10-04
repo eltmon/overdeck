@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-4506",
+  "created": "2026-10-04T02:08:07.398Z",
+  "updated": "2026-10-04T03:02:58.325Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "well-formed-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:08:07.398Z",
+      "doneAt": "2026-10-04T02:09:32.742Z"
+    },
+    "tier1-preview-truncation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:09:56.592Z",
+      "doneAt": "2026-10-04T02:12:56.072Z"
+    },
+    "herdr-wire-sanitize": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:13:03.045Z",
+      "doneAt": "2026-10-04T02:17:41.697Z"
+    },
+    "spawn-kickoff-rejection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:17:50.499Z",
+      "doneAt": "2026-10-04T02:26:23.996Z"
+    },
+    "journal-dispatch-failed-type": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:26:34.172Z",
+      "doneAt": "2026-10-04T02:34:58.309Z"
+    },
+    "review-dispatch-failure-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:35:06.461Z",
+      "doneAt": "2026-10-04T02:48:35.019Z"
+    },
+    "recovery-skips-dispatch-failed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:48:44.550Z",
+      "doneAt": "2026-10-04T02:50:44.038Z"
+    },
+    "docs-dispatch-failed-and-herdr-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4506",
+      "claimedAt": "2026-10-04T02:50:54.318Z",
+      "doneAt": "2026-10-04T02:52:55.261Z"
+    },
+    "well-formed-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:57:44.339Z"
+    },
+    "well-formed-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:58:32.487Z"
+    },
+    "well-formed-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:58:45.503Z"
+    },
+    "tier1-preview-truncation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:58:58.562Z"
+    },
+    "tier1-preview-truncation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:59:11.799Z"
+    },
+    "herdr-wire-sanitize.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:59:24.348Z"
+    },
+    "herdr-wire-sanitize.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:59:37.623Z"
+    },
+    "herdr-wire-sanitize.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:59:50.398Z"
+    },
+    "spawn-kickoff-rejection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:03.390Z"
+    },
+    "spawn-kickoff-rejection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:17.005Z"
+    },
+    "spawn-kickoff-rejection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:29.832Z"
+    },
+    "journal-dispatch-failed-type.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:41.727Z"
+    },
+    "journal-dispatch-failed-type.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:53.915Z"
+    },
+    "review-dispatch-failure-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:01:07.831Z"
+    },
+    "review-dispatch-failure-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:01:20.105Z"
+    },
+    "review-dispatch-failure-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:01:33.164Z"
+    },
+    "review-dispatch-failure-record.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:01:46.073Z"
+    },
+    "recovery-skips-dispatch-failed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:00.203Z"
+    },
+    "recovery-skips-dispatch-failed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:14.580Z"
+    },
+    "docs-dispatch-failed-and-herdr-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:28.798Z"
+    },
+    "docs-dispatch-failed-and-herdr-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:42.340Z"
+    },
+    "docs-dispatch-failed-and-herdr-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:58.325Z"
+    }
+  }
+}

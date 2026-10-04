@@ -834,6 +834,12 @@ Verified live on 2026-09-18 against the running `overdeck` session.
 - `probe()` compares the live `ping` protocol against the committed fixture
   (`src/lib/terminal-backends/__fixtures__/herdr-v0.9.1/schema.json`, protocol 22, schema_version 1).
   A mismatch is a typed error — never a reason to stop or update a server.
+- **Request text must be well-formed UTF-16.** A lone surrogate in a request string (e.g. a
+  truncated review summary that split an emoji) makes `JSON.stringify` emit an unpaired
+  `\udXXX` escape, and Herdr's `serde_json` rejects the whole request with
+  `invalid_request: … unexpected end of hex escape` (PAN-4506) — the kickoff never lands.
+  `herdr-api.ts` replaces every lone surrogate with U+FFFD (`src/lib/well-formed-text.ts`,
+  `toWellFormedText`) before writing `call` and `stream` requests to the wire.
 
 ### Why `startAgent` does not call `agent.start`
 

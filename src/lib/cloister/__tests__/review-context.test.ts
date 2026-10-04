@@ -508,4 +508,17 @@ describe('CodeRabbit findings integration', () => {
 
     expect(withEmptyFindings).toBe(withoutFindings);
   });
+
+  it('does not leave a lone surrogate when a 200-unit preview cut splits an emoji (PAN-4383 pattern)', () => {
+    const body = 'x'.repeat(199) + '🛠️ Refactor suggestion' + 'y'.repeat(300);
+    const summary = formatTier1Summary({
+      ...baseManifest,
+      issueId,
+      codeRabbitFindings: [{ body, url: 'https://example.com/1' }],
+    });
+
+    expect(summary).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(summary).toContain('x'.repeat(199) + '...');
+    expect(JSON.stringify(summary)).not.toMatch(/\\ud[89ab][0-9a-f]{2}(?!\\ud[c-f])/i);
+  });
 });

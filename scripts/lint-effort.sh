@@ -40,9 +40,6 @@ declare -A BASELINE=(
   ["src/lib/overdeck/conversation-runtime.ts"]=1                 # lane door SAFE_EFFORT_PATTERN (PAN-4223 D20), kept by PAN-4254 D11
   ["packages/pi-extension/src/index.ts"]=1                       # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
   ["packages/ohmypi-extension/src/index.ts"]=1                   # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
-  ["src/lib/planning/spawn-planning-session.ts"]=2               # PAN-4258
-  ["src/cli/commands/plan.ts"]=1                                 # PAN-4258
-  ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
   ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
 )
