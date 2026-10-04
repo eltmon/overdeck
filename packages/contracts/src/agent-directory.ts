@@ -5,6 +5,7 @@
 // `AgentDirectoryResponse`; the dashboard's three-pane Agents Directory renders it.
 
 import { Schema } from "effect"
+import { EffortLevelSchema } from "./effort"
 
 export const DirectoryEntryKind = Schema.Literals(["agent", "conversation", "subagent", "external"])
 export type DirectoryEntryKind = typeof DirectoryEntryKind.Type
@@ -72,6 +73,10 @@ export const DirectoryEntry = Schema.Struct({
   harness: Schema.String,
   /** `unknown` when not known. */
   model: Schema.String,
+  /** The launch effort from state.json, native agents only (PAN-4259). */
+  effort: Schema.optional(EffortLevelSchema),
+  /** Where `effort` came from (an EffortSource), native agents only. */
+  effortSource: Schema.optional(Schema.String),
   state: DirectoryEntryState,
   startedAt: Schema.NullOr(Schema.String),
   lastActivityAt: Schema.NullOr(Schema.String),

@@ -453,6 +453,27 @@ describe('buildAgentDirectory — pause facts (PAN-4197 FR-3)', () => {
   });
 });
 
+describe('buildAgentDirectory — effort (PAN-4259)', () => {
+  it("carries a native agent's effort and source from state.json", async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-1', effort: 'xhigh', effortSource: 'role' } as Partial<AgentState> & { id: string }),
+        agent({ id: 'agent-pan-2', issueId: 'PAN-2' }),
+      ],
+      getBackendPanes: async () => [
+        pane({ id: 'w1:p1', agentId: 'agent-pan-1', state: 'idle' }),
+        pane({ id: 'w2:p1', agentId: 'agent-pan-2', state: 'idle' }),
+      ],
+    }));
+
+    const withEffort = result.entries.find((entry) => entry.id === 'agent-pan-1')!;
+    const withoutEffort = result.entries.find((entry) => entry.id === 'agent-pan-2')!;
+    expect(withEffort).toMatchObject({ effort: 'xhigh', effortSource: 'role' });
+    expect(withoutEffort).not.toHaveProperty('effort');
+    expect(withoutEffort).not.toHaveProperty('effortSource');
+  });
+});
+
 describe('buildAgentDirectory — runtime id (PAN-4222)', () => {
   it("gives a conversation entry the conversation's tmux session as runtimeId", async () => {
     const result = await buildAgentDirectory(24, deps({
