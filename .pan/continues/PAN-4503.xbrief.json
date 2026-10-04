@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4503",
   "created": "2026-10-03T23:54:05.751Z",
-  "updated": "2026-10-04T00:08:49.913Z",
+  "updated": "2026-10-04T00:09:00.119Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
       "claimedBy": "agent-pan-4503",
       "claimedAt": "2026-10-04T00:08:07.624Z",
       "doneAt": "2026-10-04T00:08:49.913Z"
+    },
+    "refs-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T00:09:00.119Z"
     }
   }
 }
