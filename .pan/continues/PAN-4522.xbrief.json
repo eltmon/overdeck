@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4522",
   "created": "2026-10-04T04:14:15.923Z",
-  "updated": "2026-10-04T04:37:59.285Z",
+  "updated": "2026-10-04T04:38:06.833Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4522",
       "claimedAt": "2026-10-04T04:19:05.509Z",
       "doneAt": "2026-10-04T04:37:59.285Z"
+    },
+    "read-model-boot-seed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T04:38:06.833Z"
     }
   }
 }
