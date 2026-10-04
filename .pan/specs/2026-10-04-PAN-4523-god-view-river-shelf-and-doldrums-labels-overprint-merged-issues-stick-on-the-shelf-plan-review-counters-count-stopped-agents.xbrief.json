@@ -4,17 +4,17 @@
     "created": "2026-10-04T03:54:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4523: God View river: shelf and doldrums labels overprint, merged issues stick on the shelf, PLAN/REVIEW counters count stopped agents",
-    "updated": "2026-10-04T04:07:33.202Z"
+    "updated": "2026-10-04T04:08:14.461Z"
   },
   "plan": {
     "id": "pan-4523",
     "title": "God View river: shelf and doldrums labels overprint, merged issues stick on the shelf, PLAN/REVIEW counters count stopped agents",
-    "status": "proposed",
+    "status": "running",
     "uid": "4b9553ab-e5d4-4c55-bcf2-60bcde9115b7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T03:54:42Z",
-    "updated": "2026-10-04T04:07:33.202Z",
+    "updated": "2026-10-04T04:08:14.461Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4523",
@@ -634,5 +634,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
