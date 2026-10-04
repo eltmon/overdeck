@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:10:04.125Z",
+  "updated": "2026-10-04T10:10:17.224Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "verification-row-stale-artifact.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T10:10:04.125Z"
+    },
+    "verification-row-stale-artifact.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:17.224Z"
     }
   }
 }
