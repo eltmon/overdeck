@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4522",
   "created": "2026-10-04T04:14:15.923Z",
-  "updated": "2026-10-04T05:48:50.056Z",
+  "updated": "2026-10-04T05:49:01.795Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "read-model-boot-seed.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T05:48:50.056Z"
+    },
+    "read-model-boot-seed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:01.795Z"
     }
   }
 }
