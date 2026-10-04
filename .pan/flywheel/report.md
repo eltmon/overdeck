@@ -1,23 +1,28 @@
 # Flywheel report — overnight run 2026-10-04
 
-Run: 2026-10-04 02:04 → in progress (draft written 08:30 UTC). Auto-pickup was OFF.
+Run: 2026-10-04 02:04 → in progress (updated 09:20 UTC). Auto-pickup was OFF.
 The loop drained the issues the operator started with `pan start` and the
 issues it filed itself. The operator authorized restart approvals for this
 night only.
 
 ## Headline
 
-- **All 12 issues the operator started merged**, plus PAN-4383 (stuck in
-  review for 2 days) and the 4 issues the Flywheel filed and launched.
-  17 PRs merged overnight.
-- **Deploys are blocked** by PAN-4541 (critical, in progress). Every
-  `pan reload` since `66777e339e4` (PAN-4508, 05:35 UTC) refuses to deploy.
-  The boot preflight's import scanner reads `from "custom"` inside a JSDoc
-  comment as an import of a missing package. The running dashboard is safe:
-  the preflight left it up. **Live build: `906978556d7`.** Eleven merges are
-  waiting, including both God View fixes.
-- The God View video (conversation 3215) is on hold until PAN-4522 and
-  PAN-4523 are **deployed**. Both are merged.
+- **All 12 issues the operator started merged, deployed and (all but two)
+  closed out**, plus PAN-4383 (stuck in review for 2 days) and the 5 issues
+  the Flywheel filed and launched (PAN-4522, PAN-4523, PAN-4528, PAN-4529,
+  PAN-4541). **18 PRs merged overnight.**
+- **Live build: `cd27acfd` = `origin/main` tip**, deployed 09:07 UTC. It
+  contains every merge from tonight, including both God View fixes.
+- Deploys were blocked 05:35-09:07 by PAN-4541: the boot preflight read
+  `from "custom"` inside a JSDoc comment as an import. It is fixed, merged and
+  deployed; the preflight now reads real imports only.
+- **The God View video (conversation 3215) is released**: told at 09:08 that
+  the fixes are live.
+- **Closed out: 16 of 18.** PAN-4498 and PAN-4508 are blocked by a stale
+  `running` verification artifact left by a duplicate run. PAN-4543 (in
+  flight) fixes that and the flaky deploy-row probe; after it lands they close
+  with no override. Alternative now: `pan close <id> --accept-verification`
+  (an explicit override, your call).
 
 ## Merged tonight (`origin/main`)
 
@@ -40,17 +45,18 @@ night only.
 | PAN-4523 | 9c871fc4 | God View river: bands, merged-exit, stage counters |
 | PAN-4260 | 19089607 | Harness effort correctness |
 | PAN-4259 | 6eb8d3d1 | Show effort everywhere, record it in cost data |
+| PAN-4541 | cd27acfd | Deploy preflight reads real imports only (unblocked all deploys) |
 
-Deployed overnight: up to PAN-4383 (`906978556d7`). Everything after it waits on PAN-4541.
+All of the above is deployed (`cd27acfd`).
 
 ## Release inputs (v0.64.0 → next)
 
-- Since v0.64.0: **140 commits, 57 PR merges**.
+- Since v0.64.0: **~145 commits, 58 PR merges**.
 - Recommendation: **v0.65.0** is the honest next number. **v0.70.0** is
   defensible as a showcase milestone. It is the operator's call
   (`pan release stable --version X.Y.Z`).
-- Cut the release only after PAN-4541 merges and deploys, so the tagged build
-  is one that boots.
+- Pre-condition met: PAN-4541 merged and deployed, so the tagged build boots.
+  Optionally wait for PAN-4543 so close-out is clean.
 
 ## Deliverables for review
 
@@ -108,8 +114,14 @@ auto-merge executor), then PAN-4530 with the design session.
 - The operator's overnight restart authorization ends with this run
   (recorded in `state.md`).
 
+## In flight
+
+- **PAN-4543:** `pan close` false refusals (deploy probe single 3 s try vs a
+  4-5 s event-loop stall measured during close-out; stale `running`
+  verification artifact). Auto-planning at 09:20 UTC.
+
 ## Substrate fixes this run
 
 PAN-4506 (Herdr kickoff, landed), PAN-4522 and PAN-4523 (God View, landed),
-PAN-4541 (deploy preflight, in progress), plus the six needs-handoff items
+PAN-4541 (deploy preflight, landed), PAN-4543 (close-out DoD, in flight), plus the six needs-handoff items
 above. Details in `.pan/flywheel/state.md`.
