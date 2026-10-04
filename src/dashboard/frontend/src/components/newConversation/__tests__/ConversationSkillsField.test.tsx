@@ -8,11 +8,21 @@ const BODY = {
   project: 'tst',
   issue: null,
   skills: [
-    { name: 'grilling', core: false, enabled: true, source: 'project' },
-    { name: 'pan-done', core: true, enabled: true, source: 'core' },
-    { name: 'codebase-design', core: false, enabled: false, source: 'global' },
+    { name: 'grilling', core: false, enabled: true, source: 'project', description: 'Grill the plan.' },
+    { name: 'pan-done', core: true, enabled: true, source: 'core', description: 'Finish work.' },
+    { name: 'codebase-design', core: false, enabled: false, source: 'global', description: 'Design modules.' },
+    {
+      name: 'acestep', core: false, enabled: true, source: 'default',
+      description: 'AI music generation with ACE-Step 1.5 — background music, vocal tracks, covers, stem extraction for video production.',
+    },
   ],
-  packs: [{ id: 'mattpocock', skills: [{ id: 'mattpocock/tdd', enabled: false, source: 'default' }] }],
+  packs: [{
+    id: 'mattpocock',
+    skills: [
+      { id: 'mattpocock/tdd', enabled: false, source: 'default', description: 'Test first.' },
+      { id: 'mattpocock/ask-matt', enabled: false, source: 'default', description: 'Ask Matt a question about TypeScript.' },
+    ],
+  }],
 };
 
 function respond(ok: boolean, body: unknown = BODY) {
@@ -93,5 +103,33 @@ describe('ConversationSkillsField', () => {
     fireEvent.change(screen.getByLabelText('Filter skills'), { target: { value: 'tdd' } });
     expect(screen.queryByRole('radiogroup', { name: 'grilling' })).toBeNull();
     expect(screen.getByRole('radiogroup', { name: 'mattpocock/tdd' })).toBeTruthy();
+  });
+
+  it('shows the description under the name with the full text in title', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond(true)));
+    renderField();
+    await screen.findByRole('radiogroup', { name: 'grilling' });
+    const row = document.querySelector('[data-skill="acestep"]');
+    expect(row).toBeTruthy();
+    const description = within(row as HTMLElement).getByText(BODY.skills[3].description);
+    expect(description.getAttribute('title')).toBe(BODY.skills[3].description);
+  });
+
+  it('shows a pack skill description', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond(true)));
+    renderField();
+    await screen.findByRole('radiogroup', { name: 'grilling' });
+    expect(screen.getByText('Ask Matt a question about TypeScript.')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Filter skills by name or description')).toBeTruthy();
+  });
+
+  it('filters rows by description', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond(true)));
+    renderField();
+    await screen.findByRole('radiogroup', { name: 'grilling' });
+    fireEvent.change(screen.getByLabelText('Filter skills'), { target: { value: 'music' } });
+    expect(screen.getByRole('radiogroup', { name: 'acestep' })).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: 'grilling' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'mattpocock/tdd' })).toBeNull();
   });
 });

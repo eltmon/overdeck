@@ -18,11 +18,12 @@ interface SkillRow {
   id: string;
   enabled: boolean;
   source: string;
+  description: string;
 }
 
 interface SkillOverridesResponse {
-  skills?: Array<{ name: string; core: boolean; enabled: boolean; source: string }>;
-  packs?: Array<{ skills?: Array<{ id: string; enabled: boolean; source: string }> }>;
+  skills?: Array<{ name: string; core: boolean; enabled: boolean; source: string; description?: string }>;
+  packs?: Array<{ skills?: Array<{ id: string; enabled: boolean; source: string; description?: string }> }>;
 }
 
 export interface ConversationSkillsFieldProps {
@@ -48,8 +49,8 @@ async function fetchSkillRows(projectKey?: string, issueId?: string): Promise<Sk
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = (await res.json()) as SkillOverridesResponse;
   const rows: SkillRow[] = [
-    ...(body.skills ?? []).filter(skill => !skill.core).map(skill => ({ id: skill.name, enabled: skill.enabled, source: skill.source })),
-    ...(body.packs ?? []).flatMap(pack => pack.skills ?? []).map(skill => ({ id: skill.id, enabled: skill.enabled, source: skill.source })),
+    ...(body.skills ?? []).filter(skill => !skill.core).map(skill => ({ id: skill.name, enabled: skill.enabled, source: skill.source, description: skill.description ?? '' })),
+    ...(body.packs ?? []).flatMap(pack => pack.skills ?? []).map(skill => ({ id: skill.id, enabled: skill.enabled, source: skill.source, description: skill.description ?? '' })),
   ];
   return rows.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -74,7 +75,7 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
 
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return (rows ?? []).filter(row => !needle || row.id.toLowerCase().includes(needle));
+    return (rows ?? []).filter(row => !needle || row.id.toLowerCase().includes(needle) || row.description.toLowerCase().includes(needle));
   }, [rows, filter]);
 
   const choose = (id: string, choice: boolean | null) => {
@@ -93,7 +94,7 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
         type="text"
         className={styles.filter}
         aria-label="Filter skills"
-        placeholder="Filter skills"
+        placeholder="Filter skills by name or description"
         value={filter}
         onChange={event => setFilter(event.target.value)}
       />
@@ -103,7 +104,10 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
           const current = Object.prototype.hasOwnProperty.call(value, row.id) ? value[row.id] : null;
           return (
             <div key={row.id} className={styles.row} data-skill={row.id}>
-              <span className={styles.name}>{row.id}</span>
+              <div className={styles.nameCell}>
+                <span className={styles.name}>{row.id}</span>
+                {row.description && <span className={styles.description} title={row.description}>{row.description}</span>}
+              </div>
               <span className={styles.inherited}>{row.enabled ? 'On' : 'Off'} · {row.source.replace('-', ' ')}</span>
               <div role="radiogroup" aria-label={row.id} className={styles.choices}>
                 {CHOICES.map(([choice, label]) => (
