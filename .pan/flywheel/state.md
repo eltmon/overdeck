@@ -80,3 +80,25 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Instance recovery: told the agent the failure was stale and to re-request
   review on its current head. Tell: a `verification.failed` whose gate record
   names a different head than its `head8`, or a test gate at `0ms`, is this bug.
+
+## Run rules (operator decisions)
+
+### Go idle when the pipeline is clear; stuck is not clear (2026-10-04, PAN-4530)
+
+- With auto-pickup off, when nothing is pickable and the pipeline is clear,
+  write and push `.pan/flywheel/report.md`, print `phase=idle needs-you=pipeline
+  clear — ready for operator close-out`, stop scheduling ticks, and keep the
+  conversation open. Only the operator ends the run.
+- Clear = every drained issue merged, deployed (`/api/health` `buildCommit`
+  contains it) and closed out or waiting only on automatic verify-on-main.
+  Not in flight: `needs-handoff` / operator-decision items, parked or vetoed
+  issues, other projects' long-paused agents.
+- If an in-flight issue cannot move without the operator, keep ticking and
+  name the blocker; a stopped loop must always mean clear, never stuck.
+- PAN-4530 carries the skill-text change (needs-handoff, TENET-10).
+
+### Overnight restart approval is per-run, never standing (2026-10-04)
+
+- The operator authorized `pan restart approve` for the 2026-10-04 night only,
+  after each merge with CI green on the exact `origin/main` tip, then verifying
+  `/api/health` `buildCommit` contains the merge. Ask again on every new run.
