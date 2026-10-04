@@ -61,6 +61,7 @@ import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
+import { jevRouteLayer } from './routes/jev.js'
 import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
@@ -69,6 +70,7 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
+import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { conversationPullRequestRoutes } from './routes/conversation-pull-requests.js';
@@ -302,6 +304,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   remoteRouteLayer,
   settingsRouteLayer,
   modelPresetsRouteLayer,
+  jevRouteLayer,
   vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
@@ -310,6 +313,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
+  conversationBookmarksRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
   conversationPullRequestRoutes,

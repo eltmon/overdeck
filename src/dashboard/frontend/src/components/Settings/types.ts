@@ -1,3 +1,4 @@
+import type { EffortLevel } from '@overdeck/contracts';
 import type { ConfigurableProvider } from '../../../../../lib/configurable-providers.js';
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
@@ -157,6 +158,42 @@ export const BACKGROUND_AI_FEATURE_META: ReadonlyArray<{
   { key: 'jevMemoryRelevance', label: 'Jev: memory relevance filter', description: 'Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection.' },
 ];
 
+/** Mirrors src/lib/jev/settings-validation.ts's JevRoute (PAN-4508). */
+export type JevRoute = 'zen' | 'direct' | 'custom';
+
+/** GET /api/jev/settings response shape (mirrors src/lib/jev/settings.ts's JevSettingsView). */
+export interface JevSettingsView {
+  configured: boolean;
+  route: JevRoute;
+  baseUrl?: string;
+  model?: string;
+  timeoutMs: number;
+  apiKeyRef: string;
+}
+
+/** PUT /api/jev/settings request body (mirrors src/lib/jev/settings-validation.ts's JevSettingsInput). */
+export interface JevSettingsInput {
+  route: JevRoute;
+  model: string;
+  timeoutMs: number;
+}
+
+export interface JevFeatureUsage {
+  calls24h: number;
+  lastCallAt: string | null;
+  lastError: { at: string; reason: string; status?: number } | null;
+}
+
+/** GET /api/jev/usage response shape (mirrors src/lib/jev/usage-log.ts's JevUsageSummary). */
+export interface JevUsageView {
+  hours: number;
+  features: {
+    jevTurnEndAssessment: JevFeatureUsage;
+    jevAcceptanceCriteriaReview: JevFeatureUsage;
+    jevMemoryRelevance: JevFeatureUsage;
+  };
+}
+
 export interface ConversationSearchConfig {
   enabled?: boolean;
   provider?: 'openai';
@@ -177,6 +214,8 @@ export interface TieredExecutionConfig {
     /** PAN-2391: weighted entries this tier spreads tasks across. When
      * present, model/harness above are the max-weight representative. */
     distribution?: Array<{ model: ModelId; modelRef?: string; harness: Harness; weight: number }>;
+    /** PAN-4257: reasoning effort this tier launches its agents at. */
+    effort?: EffortLevel;
   }>;
   supervisor?: {
     model: ModelId;
@@ -196,6 +235,8 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
+    /** PAN-4257: raise effort a step before promoting to the next tier's model. */
+    effort_first?: boolean;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;

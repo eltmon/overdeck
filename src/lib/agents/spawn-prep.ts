@@ -19,7 +19,7 @@ import { generateLauncherScript } from '../launcher-generator.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
-import type { EffortSource, MemoryIdentity } from '@overdeck/contracts';
+import type { EffortLevel, EffortSource, MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
@@ -206,6 +206,11 @@ export interface SlotTierSpawnParams {
    * `harness` unset so override precedence is preserved. This field echoes
    * the override for clarity in tests and logs. */
   explicitOverride?: string;
+  /** PAN-4257: the staffed reasoning effort and its precedence source. Unset
+   * on the explicit-model and {} returns (D5) — effort only accompanies a
+   * resolved staffing. */
+  effort?: EffortLevel;
+  effortSource?: EffortSource;
 }
 
 /**
@@ -289,6 +294,8 @@ export function resolveSlotTierSpawnParams(
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    effort: staffing.effort,
+    effortSource: staffing.effortSource,
     // PAN-3858: staffing routed this item by its effective (promoted)
     // difficulty, so the fitness warning must judge the model against the
     // same difficulty.
@@ -539,6 +546,8 @@ export function resolveSingleWorkTierSpawnParams(
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    effort: staffing.effort,
+    effortSource: staffing.effortSource,
     ...collectPlanFitnessItems(doc, tierOverrides),
   };
 }
