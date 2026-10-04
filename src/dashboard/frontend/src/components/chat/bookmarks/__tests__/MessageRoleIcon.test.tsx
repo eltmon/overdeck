@@ -162,3 +162,86 @@ describe('MessageRoleIcon (PAN-4498 WI-4)', () => {
     });
   });
 });
+
+describe('BookmarkEditPopover (PAN-4498 WI-5)', () => {
+  async function renderBookmarked(label = 'Saved label') {
+    const stored: Array<{ messageId: string; label: string; messageCreatedAt: string | null; createdAt: string; updatedAt: string }> = [
+      { messageId: 'm1', label, messageCreatedAt: null, createdAt: 'a', updatedAt: 'a' },
+    ];
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'GET') return Promise.resolve(new Response(JSON.stringify({ bookmarks: [...stored] }), { status: 200 }));
+      if (method === 'PUT') {
+        const body = JSON.parse(String(init?.body)) as { label: string };
+        stored[0] = { ...stored[0]!, label: body.label };
+        return Promise.resolve(new Response(JSON.stringify({ bookmark: stored[0] }), { status: 200 }));
+      }
+      if (method === 'DELETE') {
+        stored.length = 0;
+        return Promise.resolve(new Response(JSON.stringify({ removed: true }), { status: 200 }));
+      }
+      throw new Error(`unexpected ${method}`);
+    });
+    renderIcon(makeMessage());
+    await waitFor(() => expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true'));
+    return stored;
+  }
+
+  it('clicking a bookmarked icon opens the popover with the current label', async () => {
+    await renderBookmarked('Saved label');
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('textbox', { name: 'Bookmark label' })).toHaveValue('Saved label');
+  });
+
+  it('Enter saves a renamed label via PUT', async () => {
+    await renderBookmarked('Old label');
+    fireEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('textbox', { name: 'Bookmark label' });
+    fireEvent.change(input, { target: { value: 'New label' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(String((putCall?.[1] as RequestInit).body))).toMatchObject({ label: 'New label' });
+    });
+    expect(screen.queryByRole('textbox', { name: 'Bookmark label' })).not.toBeInTheDocument();
+  });
+
+  it('Remove sends DELETE and the icon returns to the role icon', async () => {
+    await renderBookmarked();
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => {
+      const deleteCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE');
+      expect(deleteCall).toBeDefined();
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Bookmark this message' })).toHaveAttribute('aria-pressed', 'false'));
+    expect(screen.queryByRole('textbox', { name: 'Bookmark label' })).not.toBeInTheDocument();
+  });
+
+  it('Escape closes without a request', async () => {
+    await renderBookmarked('Saved label');
+    const putDeleteCallsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('textbox', { name: 'Bookmark label' });
+    fireEvent.change(input, { target: { value: 'Ignored edit' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(screen.queryByRole('textbox', { name: 'Bookmark label' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter((_, i) => i >= putDeleteCallsBefore).some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(false);
+  });
+
+  it('an empty label closes without a request', async () => {
+    await renderBookmarked('Saved label');
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('textbox', { name: 'Bookmark label' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(screen.queryByRole('textbox', { name: 'Bookmark label' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter((_, i) => i >= callsBefore).some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(false);
+  });
+});
