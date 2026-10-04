@@ -1,0 +1,570 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:07:56Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4507: Issue poller: back off when nothing changes instead of polling every repo every 30 s",
+    "updated": "2026-10-04T02:13:24.933Z"
+  },
+  "plan": {
+    "id": "pan-4507",
+    "title": "Issue poller: back off when nothing changes instead of polling every repo every 30 s",
+    "status": "proposed",
+    "uid": "dc30c2a5-4c82-4e64-982a-1c326ed7cf26",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T02:07:56Z",
+    "updated": "2026-10-04T02:13:24.933Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4507",
+        "label": "PAN-4507",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "issue-poller",
+      "github",
+      "backoff",
+      "rate-limit"
+    ],
+    "narratives": {
+      "Problem": "IssueDataService polls GitHub every 30 s with two listForRepo calls per configured repo (about 960 requests an hour for four repos). ETag 304s are free against quota, but the interval only grows under rate-limit pressure, never when nothing changed.",
+      "Proposal": "Track a per-tracker unchanged streak for GitHub. Each scheduled poll that returns unchanged data doubles the interval from 30 s up to the existing 300 s max; a changed poll, an operator refresh (invalidateTracker, cache clear), a GET /api/issues read, or a verified GitHub issues webhook resets it to 30 s without deleting ETags. The delay math lives in a new pure module (poll-cadence.ts) combined with the existing rate-limit backoff, suspension and PAT quota pause; /api/cache-status reports the interval, the reason, the streak and the next poll time. A preparatory extraction keeps issue-data-service.ts under its file-size cap.",
+      "NonGoals": "- Backing off Linear or Rally polling\n- Hooking the WS getSnapshot bootstrap in ws-rpc.ts\n- Configuring GitHub App event subscriptions from code\n- Resetting cadence on check_run, status, pull_request*, or issue_comment webhooks\n- Changing getBackoffMs multipliers, the 300 s max, ETag handling, or the per-poll request count\n- Raising any file-size allowlist row\n- Any frontend change"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Back off GitHub only; Linear and Rally keep today's cadence.",
+        "rationale": "The issue scopes the GitHub poller and its reset triggers are GitHub webhooks; Linear has no webhook reset and its own 5-minute full-refresh safety net."
+      },
+      {
+        "summary": "Interval = min(30 s x 2^streak, 300 s), combined as max(unchanged, rate-limit), then suspension, then quota pause; the startup poll never advances the streak.",
+        "rationale": "Produces exactly the issue's 30-60-120-240-300 sequence and preserves every existing rate-limit and PAN-4264 behavior."
+      },
+      {
+        "summary": "Report five interval reasons (default, unchanged-backoff, rate-limit-backoff, rate-limit-suspended, quota-pause) instead of three.",
+        "rationale": "Suspension and the PAT quota pause already set the delay; folding them into another label would make /api/cache-status misreport why the poller waits."
+      },
+      {
+        "summary": "'Opening the issue list' maps to GET /api/issues; the WS getSnapshot bootstrap is not hooked.",
+        "rationale": "The Kanban list arrives over the WS snapshot, but ws-rpc.ts sits one line under its file-size cap; the Refresh button already resets and worst-case staleness equals the existing 300 s max."
+      },
+      {
+        "summary": "Webhook reset uses a new resetPollCadence (re-arm at <=30 s) on 'issues' events only, never invalidateTracker.",
+        "rationale": "invalidateTracker deletes ETags so every poll would become a paid 200; check_run/status/pull_request events fire constantly and would pin the cadence at 30 s."
+      },
+      {
+        "summary": "Extract the pure status-mapping helpers to a new module before wiring the feature.",
+        "rationale": "issue-data-service.ts is exactly at its 1754-line allowlist cap and agents may not raise it."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4507-issue-poller-back-off-when-nothing-changes-instead-of-polling-every-repo-every-30-s.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "extract-status-mapping",
+        "title": "Extract status-mapping helpers out of issue-data-service.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/issue-status-mapping.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/dashboard/issue-data-service.test.ts src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+            "wc -l src/dashboard/server/services/issue-data-service.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both issue-data-service test files report zero failures",
+            "line count is 1700 or less",
+            "lint:file-size reports no violation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Move getCanonicalStatus, shouldRefreshPlanningStateForIssue, displayStatusForCanonical and mapRallyStateToCanonical verbatim (with doc comments) into the new module src/dashboard/server/services/issue-status-mapping.ts, all exported. In issue-data-service.ts import the four for internal use and re-export the first three with one `export { ... } from './issue-status-mapping.js'` line. Do not touch computeTaskCounts, issuesChanged, or any importer. This frees ~70 lines so later items stay under the 1754-line allowlist cap; never edit scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "extract-status-mapping.ac1",
+            "title": "Given the refactor lands, when tests/dashboard/issue-data-service.test.ts imports getCanonicalStatus from issue-data-service.js, then it resolves via the re-export and vitest reports zero failures without edits to that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-status-mapping.ac2",
+            "title": "Given the refactor lands, when `wc -l src/dashboard/server/services/issue-data-service.ts` runs, then it returns 1700 or less and `npm run lint:file-size` reports no violation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-status-mapping.ac3",
+            "title": "Given issue-status-mapping.ts exists, when a test imports it, then the import returns the functions getCanonicalStatus, shouldRefreshPlanningStateForIssue, displayStatusForCanonical and mapRallyStateToCanonical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poll-cadence-module",
+        "title": "Add pure poll-cadence module with POLL_INTERVALS and computePollDelay",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/poll-cadence.ts",
+            "src/dashboard/server/services/__tests__/poll-cadence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/poll-cadence.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "poll-cadence.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/services/poll-cadence.ts exporting POLL_INTERVALS (same values as today's const in issue-data-service.ts), PollIntervals, PollIntervalReason ('default'|'unchanged-backoff'|'rate-limit-backoff'|'rate-limit-suspended'|'quota-pause'), MAX_SUSPENSION_MS = 3_600_000, unchangedBackoffMs(intervals, streak) = min(default * 2^max(0,streak), max), and computePollDelay({intervals, unchangedStreak, rateBackoffMs, suspendMs, quotaPauseMs}) -> {delayMs, reason}. Formula (PRD Decision 2): unchangedMs as above; rateMs = min(max(default+rateBackoffMs, min), max); delay = max(unchangedMs, rateMs); if suspendMs>0 delay = min(suspendMs, MAX_SUSPENSION_MS); then delay = max(delay, quotaPauseMs). Reason precedence (Decision 3): quota-pause if quotaPauseMs set the final delay (quotaPauseMs > pre-pause delay); else rate-limit-suspended if suspendMs>0; else rate-limit-backoff if rateMs>default and rateMs>=unchangedMs; else unchanged-backoff if unchangedMs>default; else default. No I/O, no timers. Write the pure unit tests listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "poll-cadence-module.ac1",
+            "title": "Given github intervals, when unchangedBackoffMs is called with streak 0..6, then it returns 30000, 60000, 120000, 240000, 300000, 300000, 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-cadence-module.ac2",
+            "title": "Given rateBackoffMs 30000 and streak 1, when computePollDelay runs, then it returns delayMs 60000 with reason rate-limit-backoff (rate limit wins the tie)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-cadence-module.ac3",
+            "title": "Given suspendMs 10000000, when computePollDelay runs, then it returns delayMs 3600000 with reason rate-limit-suspended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-cadence-module.ac4",
+            "title": "Given quotaPauseMs 500000 and streak 4, when computePollDelay runs, then it returns delayMs 500000 with reason quota-pause; with quotaPauseMs 1000 it returns 300000 with reason unchanged-backoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-unchanged-backoff",
+        "title": "Grow the GitHub poll interval on unchanged polls and reset it on change or operator refresh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4507",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts src/dashboard/server/services/__tests__/issue-data-service-quota.test.ts tests/dashboard/issue-data-service.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "backoff, quota and issue-data-service tests pass",
+            "lint:file-size reports no violation for issue-data-service.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "cache-status-reason",
+            "reset-poll-cadence",
+            "issues-webhook-reset"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, steps 1-6 exactly. Delete the local POLL_INTERVALS const and import POLL_INTERVALS/computePollDelay/PollIntervalReason from ./poll-cadence.js. Add TrackerState fields unchangedStreak (0), intervalReason ('default'), nextPollAt (null), cadenceGeneration (0). pollGitHub/pollGitHubRepos return Promise<boolean|null>: null on PAT-pause or no-config early return, else the computed `changed`. scheduleNext: clear any armed timer first, compute the delay via computePollDelay (quotaPauseMs = patRestPauseDelayMs() for github, 0 otherwise), store intervalReason, currentInterval and nextPollAt = Date.now()+delay; keep the suspension console.warn; in the cache-read catch path fall back to default and still apply the github PAT pause. Timer callback: first set state.timer=null and nextPollAt=null, capture cadenceGeneration, then for github: changed===true -> streak 0; changed===false and generation unchanged -> streak+1; null/throw -> leave streak. invalidateTracker sets unchangedStreak=0 right before its scheduleNext. Startup poll in start() never advances the streak. Create the test file modeled on issue-data-service-quota.test.ts (hoisted Octokit mock whose paginate returns [] = unchanged, fake timers, temp OVERDECK_HOME) with the cases in PRD WI-3. Use vi.useFakeTimers + vi.advanceTimersByTimeAsync only; no real waits; no source-reading assertions. In the tracker-config.js mock override getGitHubConfig AND getLinearApiKey: () => null AND getRallyConfig: () => null so no test touches a real Linear or Rally API."
+        },
+        "items": [
+          {
+            "id": "wire-unchanged-backoff.ac1",
+            "title": "Given every scheduled GitHub poll returns unchanged data, when the timer is advanced through six polls, then currentInterval reads 30000, 60000, 120000, 240000, 300000, 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-unchanged-backoff.ac2",
+            "title": "Given the interval has grown to 240000, when the next poll returns one changed issue, then the following currentInterval is 30000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-unchanged-backoff.ac3",
+            "title": "Given the interval has grown to 240000, when invalidateTracker('github') completes, then currentInterval is 30000, unchangedStreak is 0 and vi.getTimerCount() returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-unchanged-backoff.ac4",
+            "title": "Given a PAT REST pause is active, when scheduleNext('github') runs, then currentInterval still equals the pause length and issue-data-service-quota.test.ts reports zero failures without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cache-status-reason",
+        "title": "Report pollIntervalReason, unchangedStreak and nextPollAt in /api/cache-status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts tests/dashboard/issue-data-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "backoff and issue-data-service tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In getDiagnostics() add per tracker: pollIntervalReason: state.intervalReason, unchangedStreak: state.unchangedStreak, nextPollAt: state.nextPollAt === null ? null : new Date(state.nextPollAt).toISOString(). Keep every existing field (remaining, total, backoffMs, suspendedUntil, rateLimited, pollInterval, lastFetched, lastError, issueCount). Add the WI-4 test cases to issue-data-service-backoff.test.ts."
+        },
+        "items": [
+          {
+            "id": "cache-status-reason.ac1",
+            "title": "Given no poll has been scheduled, when getDiagnostics() runs, then the github row returns pollIntervalReason 'default', unchangedStreak 0 and nextPollAt null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-status-reason.ac2",
+            "title": "Given two unchanged scheduled polls, when getDiagnostics() runs, then the github row returns pollInterval 120000, pollIntervalReason 'unchanged-backoff', unchangedStreak 2 and nextPollAt equal to new Date(Date.now()+120000).toISOString()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-status-reason.ac3",
+            "title": "Given getBackoffMs returns 120000 and streak 0, when scheduleNext('github') then getDiagnostics() run, then the github row returns pollIntervalReason 'rate-limit-backoff'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reset-poll-cadence",
+        "title": "Add resetPollCadence and call it from cache clear and GET /api/issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts",
+            "src/dashboard/server/routes/issues.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service-backoff.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "backoff tests pass",
+            "lint:file-size reports no violation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and Decision 6. Add public resetPollCadence(tracker): unchangedStreak=0; cadenceGeneration++; if this.started and state.timer and state.nextPollAt !== null and state.nextPollAt - Date.now() > POLL_INTERVALS[tracker].default, then clearTimeout, state.timer=null, scheduleNext(tracker); otherwise leave the timer. It must never poll and never call cache.invalidate. clearCacheAndRefresh(): after pushSnapshot(), call resetPollCadence for github, linear and rally. routes/issues.ts GET /api/issues: call issueDataService.resetPollCadence('github') right after `const issueDataService = getIssueDataService();`. Add the WI-5 service tests (do not add source-grep tests). No GET /api/issues route-test harness exists (checked tests/unit/dashboard/routes and src/dashboard/server/routes/__tests__), so FR-4 is covered by the service-level resetPollCadence tests plus typecheck; do not build a new route harness for one line. The tracker-config.js mock must return null for getLinearApiKey and getRallyConfig because clearCacheAndRefresh polls all three trackers. The re-armed delay is the current rate-limit-adjusted interval at streak 0 (30 s when there is no rate-limit pressure)."
+        },
+        "items": [
+          {
+            "id": "reset-poll-cadence.ac1",
+            "title": "Given the interval has grown to 300000 and 10 s have passed, when resetPollCadence('github') runs, then unchangedStreak is 0, currentInterval is 30000, exactly one timer is armed and no Octokit call happens until 30 s later",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-poll-cadence.ac2",
+            "title": "Given the armed poll is due within 30 s, when resetPollCadence('github') runs again, then nextPollAt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-poll-cadence.ac3",
+            "title": "Given a scheduled poll is in flight returning unchanged data, when resetPollCadence('github') runs before it resolves, then the next currentInterval is 30000 rather than 60000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reset-poll-cadence.ac4",
+            "title": "Given the interval has grown, when clearCacheAndRefresh() completes, then the github currentInterval is 30000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issues-webhook-reset",
+        "title": "Reset the GitHub poll cadence on a verified issues webhook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/webhooks.ts",
+            "tests/unit/dashboard/routes/webhooks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/webhooks.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "webhooks.test.ts passes",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In routes/webhooks.ts dispatchWebhook add `case 'issues': getSharedIssueService().resetPollCadence('github'); break;` with a static import of getSharedIssueService from '../services/issue-service-singleton.js'; if lint:circular reports a new cycle, use the dynamic `await import(...)` form from routes/projects.ts instead. Do not call invalidateTracker (it deletes ETags). Do not add resets for any other event type. In tests/unit/dashboard/routes/webhooks.test.ts vi.mock the singleton module with getSharedIssueService: () => ({ resetPollCadence }) and add the three WI-6 cases."
+        },
+        "items": [
+          {
+            "id": "issues-webhook-reset.ac1",
+            "title": "Given a signed issues event from a tracked repo, when runWebhookHandler runs and dispatch settles, then it returns 200 and resetPollCadence is called once with 'github'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-webhook-reset.ac2",
+            "title": "Given a check_run event from a tracked repo, when runWebhookHandler runs, then resetPollCadence is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-webhook-reset.ac3",
+            "title": "Given an issues event from an untracked repo, when runWebhookHandler runs, then it returns 403 and resetPollCadence is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-caching",
+        "title": "Document unchanged backoff, reset triggers and cache-status reason in ARCHITECTURE-CACHING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4507",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ARCHITECTURE-CACHING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"unchanged-backoff\" docs/ARCHITECTURE-CACHING.md",
+            "grep -n \"Issues events\" docs/ARCHITECTURE-CACHING.md"
+          ],
+          "expected_outputs": [
+            "both greps print at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Edit docs/ARCHITECTURE-CACHING.md: fix the IssueDataService responsibilities list (change detection is length + newest updatedAt; backoff also on unchanged data); add an 'Unchanged backoff (GitHub)' subsection under Backoff Strategy with the streak table 30/60/120/240/300 s, the combination rule max(unchanged, rate-limit) then suspension then quota pause, and the reset triggers (changed poll, POST /api/trackers/refresh and every invalidateTracker caller, POST /api/cache/clear, GET /api/issues, GitHub issues webhook) noting a reset never deletes ETags; extend the GET /api/cache-status JSON example with backoffMs, pollIntervalReason, unchangedStreak, nextPollAt and a table of the five reason values; add the note that the webhook reset needs the GitHub App subscribed to Issues events (Settings > Developer settings > GitHub Apps > app > Permissions & events > Subscribe to events > Issues); add poll-cadence.ts and issue-status-mapping.ts to the Files section."
+        },
+        "items": [
+          {
+            "id": "docs-caching.ac1",
+            "title": "Given the docs change lands, when a reader opens the Backoff Strategy section, then the section contains the streak table 30 s, 60 s, 120 s, 240 s, 300 s and lists all five reset triggers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-caching.ac2",
+            "title": "Given the docs change lands, when a reader opens the GET /api/cache-status section, then the JSON example includes pollIntervalReason, unchangedStreak and nextPollAt and a table defines default, unchanged-backoff, rate-limit-backoff, rate-limit-suspended and quota-pause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-caching.ac3",
+            "title": "Given the docs change lands, when a reader searches for the webhook reset, then the doc contains the statement that it requires the GitHub App to subscribe to Issues events and gives the settings path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-status-mapping",
+        "to": "wire-unchanged-backoff",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-cadence-module",
+        "to": "wire-unchanged-backoff",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-unchanged-backoff",
+        "to": "cache-status-reason",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-status-reason",
+        "to": "reset-poll-cadence",
+        "type": "blocks"
+      },
+      {
+        "from": "reset-poll-cadence",
+        "to": "issues-webhook-reset",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
