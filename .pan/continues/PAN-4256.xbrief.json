@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:17:33.642Z",
+  "updated": "2026-10-04T05:17:45.426Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "remote-fly-effort.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T05:17:33.641Z"
+    },
+    "dashboard-start-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:45.425Z"
     }
   }
 }
