@@ -382,4 +382,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
-<!-- last-verified: 2026-10-03 -->
+- Text that reaches Herdr must be well-formed UTF-16 (PAN-4506) — a lone
+  surrogate (e.g. from a naive `.slice(0, N)` cut through an emoji) makes
+  `JSON.stringify` emit an unpaired `\udXXX` escape, and Herdr's `serde_json`
+  rejects the whole request with `invalid_request: … unexpected end of hex
+  escape`, silently killing a review kickoff. Use `truncateWellFormed` /
+  `toWellFormedText` from `src/lib/well-formed-text.ts` for any text (a
+  truncated preview, a paste payload) that is heading to a Herdr request.
+<!-- last-verified: 2026-10-04 -->
