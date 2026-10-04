@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T03:38:56.100Z",
+  "updated": "2026-10-04T03:39:08.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "jev-settings-door.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:38:56.100Z"
+    },
+    "jev-settings-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:39:08.707Z"
     }
   }
 }
