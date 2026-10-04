@@ -6,7 +6,7 @@
  */
 import type { JevFeature } from './config.js';
 
-/** The canonical OpenCode Zen gateway base_url; distinguishes the "zen" route from "custom". */
+/** The canonical OpenCode Zen gateway base_url; distinguishes the "zen" route and the "custom" route. */
 export const JEV_ZEN_BASE_URL = 'https://opencode.ai/zen';
 
 /** The three Jev feature toggles that require jev.model before they can run requests. */
