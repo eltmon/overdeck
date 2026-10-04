@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4509",
   "created": "2026-10-04T02:10:08.078Z",
-  "updated": "2026-10-04T02:13:39.130Z",
+  "updated": "2026-10-04T02:13:50.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4509",
       "claimedAt": "2026-10-04T02:10:08.078Z",
       "doneAt": "2026-10-04T02:13:39.130Z"
+    },
+    "cli": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:13:50.771Z"
     }
   }
 }
