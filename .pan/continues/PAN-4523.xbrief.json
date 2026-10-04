@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:40:47.674Z",
+  "updated": "2026-10-04T05:41:00.417Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "shelf-cap.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:40:47.674Z"
+    },
+    "merged-exit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:00.417Z"
     }
   }
 }
