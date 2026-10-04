@@ -1,0 +1,358 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T04:30:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4528: New-conversation Skills field: show each skill's description and group skills into collapsible sections",
+    "updated": "2026-10-04T04:35:27.177Z"
+  },
+  "plan": {
+    "id": "pan-4528",
+    "title": "New-conversation Skills field: show each skill's description and group skills into collapsible sections",
+    "status": "proposed",
+    "uid": "f324c977-a60b-41fe-9c8b-9f361fb7130d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T04:30:40Z",
+    "updated": "2026-10-04T04:35:27.177Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4528",
+        "label": "PAN-4528",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "skills",
+      "new-conversation-dialog",
+      "skill-overrides"
+    ],
+    "narratives": {
+      "Problem": "The Skills field in the New-conversation dialog lists ~237 skills as one flat list of bare names. Descriptions are already returned by GET /api/skills/overrides but ConversationSkillsField drops them, the filter matches names only, and the skill catalog does not record which root (overdeck, personal, project) a skill came from, so there is nothing to group by.",
+      "Proposal": "Server: add origin ('overdeck' | 'personal' | 'project') to SkillCatalogEntry in src/lib/skill-overrides/catalog.ts and to SkillState in resolve.ts so GET /api/skills/overrides returns it. Frontend: carry description into each row of ConversationSkillsField, render it as a truncated muted line with the full text in title (the SkillOverridesPanel pattern, in the field's CSS module), and filter by name or description. Then group rows into collapsible sections (Project skills, Overdeck, Personal, one per pack) with '<on> on · <total>' header counts; groups start collapsed unless they hold a row choice, and a non-empty filter shows only matching groups, expanded. Document the field in docs/CONTEXT-LAYERS.md. Full detail, before/after code and test names: .pan/drafts/PAN-4528.md.",
+      "NonGoals": "- No group-level Inherit/On/Off control; per-row choices and the emitted value stay as today.\n- No change to SkillOverridesPanel.tsx or the Settings/issue Skills panels (no origin badge, no grouping there).\n- No new HTTP route, no PUT body change, no change to how choices are stored or applied at launch.\n- No change to which skills are listed: core skills stay hidden; catalog roots and first-root-wins order unchanged.\n- No removal or change of meaning of the existing projectSkill field.\n- No resizing of the dialog or of the list's 220px max-height.\n- No persistence of group open/closed state across dialog openings.\n- No grouping by the existing 'source' field (override level); grouping uses origin only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "origin is a required field on SkillCatalogEntry and SkillState.",
+        "rationale": "readRoot is the only producer; required typing forces every producer to set it. Hand-built test fixtures add it explicitly."
+      },
+      {
+        "summary": "A skills[] entry without origin is grouped under Personal in the frontend.",
+        "rationale": "Without a fallback such a row would match no group and silently disappear; one expression prevents that and covers fixtures or a mid-reload server."
+      },
+      {
+        "summary": "Group header count is '<on> on · <total>' over the whole group, where on = row choice if set, else inherited enabled; counts ignore the filter.",
+        "rationale": "The issue example '4 on · 77' implies effective on-count over the group; a filter-independent number stays stable while typing."
+      },
+      {
+        "summary": "Open state: opened[key] ?? groupHasChoice when the filter is empty; every matching group open when filtering; any row choice pins its group open.",
+        "rationale": "Meets 'collapsed except groups with a choice' and 'filter expands matches' while preventing a group from collapsing under the cursor when its last choice returns to Inherit."
+      },
+      {
+        "summary": "Group headers are disabled while the filter is non-empty; clearing the filter restores each group's prior open state.",
+        "rationale": "The filter owns expansion while active; an enabled toggle with no visible effect would confuse the operator."
+      },
+      {
+        "summary": "Pack rows keep showing their full id (mattpocock/tdd) and radiogroup aria-label stays the row id.",
+        "rationale": "Keeps existing accessible names and tests stable; the issue asks for no change to row identity."
+      },
+      {
+        "summary": "The list keeps max-height 220px; no dialog resizing.",
+        "rationale": "Not requested; collapsed groups already shorten the list."
+      },
+      {
+        "summary": "Grouping logic stays inside ConversationSkillsField.tsx; no new module or test file.",
+        "rationale": "Single-use logic; avoids editing the CI test:frontend-subset list. Tests extend the existing ConversationSkillsField.test.tsx, already in the subset."
+      },
+      {
+        "summary": "Docs go in a new '## Choosing skills for one conversation' section of docs/CONTEXT-LAYERS.md after 'Bare conversations'.",
+        "rationale": "No page documents the Skills field (verified by grep of docs/, configuration/, reference/); the issue names CONTEXT-LAYERS.md as the fallback and 'Bare conversations' is where the dialog is introduced. configuration/context-layers.mdx does not mention the dialog, so no mirror edit."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4528.md",
+      "canonicalFilename": "2026-10-04-PAN-4528-new-conversation-skills-field-show-each-skill-s-description-and-group-skills-into-collapsible-sections.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "server-origin",
+        "title": "Server: add origin to skill catalog entries and GET /api/skills/overrides",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T04:30:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/resolve.ts",
+            "src/lib/skill-overrides/__tests__/resolve.test.ts",
+            "src/lib/skill-overrides/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/resolve.test.ts src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolve.test.ts and store.test.ts pass, including the new origin tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/skill-overrides/catalog.ts export `type SkillOrigin = 'overdeck' | 'personal' | 'project'` and add required `origin: SkillOrigin` to SkillCatalogEntry (keep `projectSkill?`). Change `readRoot(root, projectSkill: boolean)` to `readRoot(root, origin: SkillOrigin)`, set `origin` on every entry and keep `if (origin === 'project') entry.projectSkill = true`. In listSkillCatalog the roots table becomes `Array<[string, SkillOrigin]>`: ~/.overdeck/skills → 'overdeck', ~/.claude/skills → 'personal', ~/.agents/skills → 'personal', <projectRoot>/.pan/skills → 'project'; first root still wins. Add a sentence on origin to the module header. In resolve.ts import `type SkillOrigin`, add `origin: SkillOrigin` to SkillState and `origin: entry.origin` in resolveSkillStates. Tests: in resolve.test.ts update the listSkillCatalog toEqual expectations with origin (grilling → overdeck because first root wins, codebase-design → personal, project-skill → project), add origin to the shared `catalog` fixture and inline entries, add `it('tags each root with its origin, including ~/.agents/skills as personal')` and `it('carries the origin from the catalog')`. In store.test.ts add `origin: 'overdeck'` to the mocked listSkillCatalog entries and add 'origin' to the sorted key list asserted near line 307."
+        },
+        "items": [
+          {
+            "id": "server-origin.ac1",
+            "title": "Given one skill in each of ~/.overdeck/skills, ~/.claude/skills, ~/.agents/skills and <projectRoot>/.pan/skills, when listSkillCatalog runs, then it returns origin 'overdeck', 'personal', 'personal' and 'project' respectively, and the project entry also has projectSkill: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-origin.ac2",
+            "title": "Given a skill name present in both ~/.overdeck/skills and ~/.claude/skills, when listSkillCatalog runs, then it returns one entry with origin 'overdeck' and the ~/.overdeck/skills description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-origin.ac3",
+            "title": "Given a catalog entry with origin 'project', when resolveSkillStates runs, then the resulting SkillState carries origin 'project', and listSkillStates (store.test.ts) returns skills whose sorted keys include 'origin' alongside the existing nine keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-descriptions",
+        "title": "Skills field: show each skill's description and filter by name or description",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T04:30:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/ConversationSkillsField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx passes including the three new description tests",
+            "typecheck:frontend completes without new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In ConversationSkillsField.tsx add `description: string` to SkillRow and `description?: string` to the response's skills[] and packs[].skills[]; map `description: skill.description ?? ''` for both. Wrap the name in `<div className={styles.nameCell}>` and add `{row.description && <span className={styles.description} title={row.description}>{row.description}</span>}` under it; the .row grid stays three columns. Filter matches `row.id` or `row.description` (lowercased, trimmed needle). Placeholder becomes 'Filter skills by name or description'; aria-label stays 'Filter skills'. CSS module: `.nameCell { display:flex; flex-direction:column; min-width:0 }`, `.description { font-size:11px; color:var(--muted-foreground); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }`. Tests: extend BODY with native skill `acestep` (description 'AI music generation with ACE-Step 1.5 — background music, vocal tracks, covers, stem extraction for video production.') and pack skill `mattpocock/ask-matt` (description 'Ask Matt a question about TypeScript.'); other fixture descriptions must not contain 'music'. Add it('shows the description under the name with the full text in title'), it('shows a pack skill description'), it('filters rows by description'). Keep every existing test passing."
+        },
+        "items": [
+          {
+            "id": "row-descriptions.ac1",
+            "title": "Given the skills response gives acestep a description, when the field renders, then the [data-skill=\"acestep\"] row renders an element whose text is the description and whose title attribute equals the full description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-descriptions.ac2",
+            "title": "Given pack skill mattpocock/ask-matt has a description in packs[].skills[], when the field renders, then its row renders that description, and the empty filter input shows the hint text 'Filter skills by name or description'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-descriptions.ac3",
+            "title": "Given the filter text 'music', when typed into the field, then the acestep row (matched by description only) renders and the grilling and mattpocock/tdd rows do not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collapsible-groups",
+        "title": "Skills field: group rows into collapsible sections with on-counts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T04:30:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx and NewConversationDialog.test.tsx pass, including the four new group tests",
+            "typecheck:frontend completes without new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add `origin?: 'overdeck' | 'personal' | 'project'` to the response skills[] type and `id: string` to packs[]. Replace fetchSkillRows with fetchSkillGroups returning SkillGroup[] ({ key, label, rows }): native non-core skills bucketed by `skill.origin ?? 'personal'` in the order project → 'Project skills', overdeck → 'Overdeck', personal → 'Personal', then one group per pack in response order with key `pack:${id}` and label = pack id; rows sorted by id; drop empty groups. Keep the issue-fallback refetch and the drop-unlisted-choices effect (rows = groups.flatMap(g => g.rows)). State: `const [opened, setOpened] = useState<Record<string, boolean>>({})`; a group is open when the trimmed filter is non-empty, else `opened[key] ?? group.rows.some(row => key-in-value)`. Header is `<button type=\"button\" aria-expanded={open} disabled={filtering}>` with lucide ChevronRight (rotated 90deg when open), the label, and `{onCount} on · {group.rows.length}` where onCount counts rows whose (choice if set, else enabled) is true over the whole group. Header click sets opened[key] = !open. Any row choice (On, Off or Inherit) also sets opened[groupKey] = true. While filtering, render only groups with matching rows and only their matching rows; 'No skills match.' when none. Add CSS module classes .group, .groupHeader, .chevron, .chevronOpen, .groupLabel, .groupCount (muted text, no pills, no decorative color). Update the module header comment. Tests: fixture origins grilling → project, acestep → overdeck, codebase-design → personal; add it('renders groups collapsed, in order, with on-counts, when there is no filter and no choice'), it('expands the group that holds a row choice'), it('shows only groups with matches, expanded, while filtering'), it('toggles a group from its header') and it('keeps a group open after its last choice returns to Inherit') — the latter renders the field in a small wrapper holding value in useState (initial { grilling: false }) so the value really changes; update existing tests that find rows without a filter to open the group header first, keeping their assertions. NewConversationDialog.test.tsx: add origin 'personal' to the skills mock (line ~62) and click the 'Personal' header before finding the grilling radiogroup (line ~114). Memoize the flattened rows (useMemo over query.data) so the drop-unlisted-choices effect does not get a new array every render."
+        },
+        "items": [
+          {
+            "id": "collapsible-groups.ac1",
+            "title": "Given no filter and no row choices, when the field renders, then group headers render in the order Project skills, Overdeck, Personal, mattpocock, each with aria-expanded=\"false\" and a '<on> on · <total>' count (Personal shows '0 on · 1', Project skills shows '1 on · 1'), and no skill radiogroup renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsible-groups.ac2",
+            "title": "Given value { 'codebase-design': true } (a Personal row choice), when the field renders, then the Personal header has aria-expanded=\"true\" and shows '1 on · 1' while Overdeck stays collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsible-groups.ac3",
+            "title": "Given the filter 'music', when typed, then only the Overdeck group renders, expanded, with its header disabled and the acestep row visible; when the filter is cleared, all four headers render collapsed again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsible-groups.ac4",
+            "title": "Given the field rendered inside a test wrapper that holds value in useState with initial value { grilling: false } (so Project skills starts expanded by its choice), when grilling is set back to Inherit and value becomes {}, then the Project skills group still has aria-expanded=\"true\" and the grilling radiogroup still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsible-groups.ac5",
+            "title": "Given NewConversationDialog.test.tsx opens the Personal group header before choosing Off for grilling, when the dialog submits, then the request body still carries skillOverrides { grilling: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skills-field",
+        "title": "Docs: describe the New-conversation Skills field in docs/CONTEXT-LAYERS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:30:40Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONTEXT-LAYERS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"## Choosing skills for one conversation\" docs/CONTEXT-LAYERS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new section heading, located after '## Bare conversations' and before '## Respecting your existing context'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Insert a section '## Choosing skills for one conversation' in docs/CONTEXT-LAYERS.md directly after the 'Bare conversations' section (before '## Respecting your existing context', currently line 185). In plain prose plus one small table, state: the New-conversation dialog's Skills field lists every non-core skill and every pack skill with Inherit / On / Off, and only On/Off choices are stored on conversations.skill_overrides (PAN-4486); each row shows the name, the first line of the SKILL.md description (hover for the full text), and the inherited state with its source; the filter matches the name or the description; groups in order with their roots — Project skills (<projectRoot>/.pan/skills), Overdeck (~/.overdeck/skills), Personal (~/.claude/skills and ~/.agents/skills), then one group per skill pack; a name in several roots is listed once under the first root in the order ~/.overdeck/skills, ~/.claude/skills, ~/.agents/skills, <projectRoot>/.pan/skills; each header shows '<on> on · <total>'; groups start collapsed except those holding a choice made in the dialog, and a filter opens every group with a match and hides the rest; GET /api/skills/overrides reports each skill's origin (overdeck, personal, project)."
+        },
+        "items": [
+          {
+            "id": "docs-skills-field.ac1",
+            "title": "Given docs/CONTEXT-LAYERS.md after this change, when read, then a '## Choosing skills for one conversation' section placed between '## Bare conversations' and '## Respecting your existing context' names the group labels Project skills, Overdeck, Personal and per-pack groups with their roots ~/.overdeck/skills, ~/.claude/skills, ~/.agents/skills and <projectRoot>/.pan/skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills-field.ac2",
+            "title": "Given the new section, when read, then it states that the filter matches name or description, that groups start collapsed except those holding a dialog choice, that a filter opens only matching groups, and that the header shows '<on> on · <total>'; npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "server-origin",
+        "to": "collapsible-groups",
+        "type": "blocks"
+      },
+      {
+        "from": "row-descriptions",
+        "to": "collapsible-groups",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
