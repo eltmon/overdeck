@@ -256,9 +256,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       let pendingInputCount = 0;
       let pendingInputKinds: PendingInputKind[] = [];
       let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
+      let lastRecordAt: string | undefined;
       if (sessionAlive && convSf && existsSync(convSf)) {
         try {
           const scan = await scanPendingInputs(convSf);
+          lastRecordAt = scan.lastRecordAt;
           const kinds: PendingInputKind[] = [];
           const auqSnapshot = askUserQuestionSnapshotFromScan(scan);
           if (auqSnapshot) {
@@ -275,8 +277,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       }
       const compacting = convSf ? isCompacting(convSf) : false;
       const gitInfo = await resolveConversationGitInfo(row.cwd);
-      let lastActivityAt: string | null = null;
-      if (convSf && existsSync(convSf)) {
+      // PAN-4515: a live row is dated by its last turn record. Claude Code touches a
+      // running transcript hourly without writing one, so the mtime is only a fallback
+      // (no record in the tail, a non-Claude harness, or a row that is not live).
+      let lastActivityAt: string | null = lastRecordAt ?? null;
+      if (!lastActivityAt && convSf && existsSync(convSf)) {
         try {
           lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
         } catch {

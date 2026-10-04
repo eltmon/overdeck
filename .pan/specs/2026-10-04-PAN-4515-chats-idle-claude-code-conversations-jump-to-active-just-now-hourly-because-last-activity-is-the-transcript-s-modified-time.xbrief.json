@@ -1,0 +1,265 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:48:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4515: Chats: idle Claude Code conversations jump to 'active just now' hourly because last activity is the transcript's modified time",
+    "updated": "2026-10-04T03:22:10.883Z"
+  },
+  "plan": {
+    "id": "pan-4515",
+    "title": "Chats: idle Claude Code conversations jump to 'active just now' hourly because last activity is the transcript's modified time",
+    "status": "running",
+    "uid": "3e42cea2-1670-490d-ba64-015a60e93bdc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:48:40Z",
+    "updated": "2026-10-04T03:22:10.883Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4515",
+        "label": "PAN-4515",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "chats",
+      "dashboard",
+      "transcript"
+    ],
+    "narratives": {
+      "Problem": "GET /api/conversations sets lastActivityAt from the transcript's modified time (conversation-list.ts). Claude Code's touchSessionTranscript touches every running session's transcript at startup and hourly without adding a record, so idle conversations jump to the top of the Chats tab as 'active just now'. Verified on a real transcript whose mtime was 38 h newer than its last user/assistant record.",
+      "Proposal": "Track the last user/assistant record's timestamp inside scanPendingInputs, which already parses the last 512 KB of every live row's transcript, and expose it as optional PendingInputsScan.lastRecordAt. In enrichConversationList, live rows take lastActivityAt from lastRecordAt and fall back to the mtime only when absent; rows that are not live keep the mtime. Update docs/DASHBOARD-ARCHITECTURE.md.",
+      "NonGoals": "- Tail-reading transcripts for rows that are not live (no new I/O per row)\n- Changing getConversationsPendingInputFeed in conversation-reads.ts (codex askedAt fallback)\n- Dating codex, ACP, or pi/ohmypi rows by record timestamps\n- Any frontend change to Chats sorting or labels\n- Changing agent health / Agents Directory lastActivityAt (src/lib/agents/health.ts)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Apply the record timestamp only to live rows (where the pending-input scan already runs); other rows keep the mtime",
+        "rationale": "Claude's touch only reaches running sessions, and tail-reading every row (up to 500 x 512 KB) would undo the PAN-1705 enrichment-cost fix"
+      },
+      {
+        "summary": "A qualifying record is a top-level type 'user' or 'assistant' with a parseable string timestamp; the last one in file order wins",
+        "rationale": "Real transcripts end with timestamp-less mode/permission-mode/atis-latch records and timestamped attachment/system/queue-operation records that are not turns"
+      },
+      {
+        "summary": "Codex, ACP and pi/ohmypi transcripts fall back to the mtime unchanged",
+        "rationale": "Only Claude Code touches transcripts; ohmypi support is being removed"
+      },
+      {
+        "summary": "Expose the value as optional PendingInputsScan.lastRecordAt",
+        "rationale": "Reuses the existing tail read as the issue asks and keeps EMPTY_PENDING_INPUTS_SCAN and fixtures valid"
+      },
+      {
+        "summary": "Unit tests target scanPendingInputs with real temp files; no list-level test is required",
+        "rationale": "Existing list tests mock resolveSessionFile to null; reaching the scan needs five extra module mocks for a three-line wiring change reviewable from the diff"
+      },
+      {
+        "summary": "Leave conversation-reads.ts pending-input feed mtime read unchanged",
+        "rationale": "It only feeds the codex askedAt fallback, which Claude touches never affect"
+      }
+    ],
+    "items": [
+      {
+        "id": "scan-last-record-at",
+        "title": "Return the last user/assistant record timestamp from scanPendingInputs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:48:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4515",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/scan-pending-inputs-last-record.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/scan-pending-inputs-last-record.test.ts src/lib/__tests__/scan-pending-inputs-pi.test.ts src/lib/__tests__/agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "scan-pending-inputs-last-record.test.ts passes all five named cases",
+            "existing scan-pending-inputs-pi and agent-enrichment tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/agent-enrichment.ts add optional `readonly lastRecordAt?: string` to PendingInputsScan, add the module-private `turnRecordTimestamp(entry)` helper (qualifying record = top-level type 'user' or 'assistant' with a string timestamp that Date.parse turns into a finite number; normalize with toISOString), track the last qualifying record in file order inside the existing per-line loop of scanPendingInputs (right after JSON.parse, before the isPiMessageEntry check), and add `...(lastRecordAt ? { lastRecordAt } : {})` to the success return. The early-return and catch paths stay unchanged. Write src/lib/__tests__/scan-pending-inputs-last-record.test.ts with the five named cases from the PRD, using real temp files like scan-pending-inputs-pi.test.ts. No new reads or stat calls."
+        },
+        "items": [
+          {
+            "id": "scan-last-record-at.ac1",
+            "title": "Given a transcript whose last user/assistant record is at 2026-10-02T10:00:05.000Z followed by attachment, system and timestamp-less mode/permission-mode/atis-latch records, when scanPendingInputs runs, then it returns lastRecordAt equal to 2026-10-02T10:00:05.000Z",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scan-last-record-at.ac2",
+            "title": "Given that transcript, when utimesSync moves its modified time a day later and scanPendingInputs runs again, then lastRecordAt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scan-last-record-at.ac3",
+            "title": "Given that transcript, when a user record at 2026-10-03T09:00:00.000Z is appended, then scanPendingInputs returns lastRecordAt equal to 2026-10-03T09:00:00.000Z",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scan-last-record-at.ac4",
+            "title": "Given a transcript with only mode/atis-latch lines, a malformed line, a codex response_item line and a pi message line, when scanPendingInputs runs, then the returned scan has no lastRecordAt field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-uses-last-record-at",
+        "title": "Date live conversation rows by the scan's lastRecordAt with an mtime fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:48:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4515",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-list.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-input-target.test.ts src/lib/overdeck/__tests__/conversation-list-clear-chain.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three conversation-list test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In enrichConversationList (src/lib/overdeck/conversation-list.ts) declare `let lastRecordAt: string | undefined;` before the pending-input block and set `lastRecordAt = scan.lastRecordAt;` right after `const scan = await scanPendingInputs(convSf);`. Replace the mtime block with `let lastActivityAt: string | null = lastRecordAt ?? null;` and run the existing stat(convSf).mtimeMs fallback only when lastActivityAt is still null, with the PAN-4515 comment from the PRD. Do not touch conversation-reads.ts, the codex pass-through, or the frontend."
+        },
+        "items": [
+          {
+            "id": "list-uses-last-record-at.ac1",
+            "title": "Given a live Claude Code row whose scan returns lastRecordAt, when GET /api/conversations enriches it, then lastActivityAt equals that lastRecordAt and stat(convSf) is not called for that row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-uses-last-record-at.ac2",
+            "title": "Given a live row whose scan returns no lastRecordAt, or a row that is not live, when the list enriches it, then lastActivityAt falls back to the transcript modified time as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-uses-last-record-at.ac3",
+            "title": "Given a codex row with a pending approval, when the list enriches it, then codexConversationPendingInput still receives the modified-time value (codex rows never carry lastRecordAt)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-last-activity",
+        "title": "Document lastActivityAt as the last turn record's timestamp in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:48:40Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4515",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -n 'the transcript file mtime' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'PAN-4515' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the first grep finds no match",
+            "the second grep prints the new Chats paragraph line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. In docs/DASHBOARD-ARCHITECTURE.md 'Awareness feed' section, replace the parenthetical '(`lastActivityAt`, the transcript file mtime)' sentence with the PRD's replacement, and add the PRD's paragraph after the Chats recency paragraph explaining that lastActivityAt is the last user/assistant record's timestamp read by scanPendingInputs for live rows, that Claude Code touches running transcripts hourly without writing a record, and that the modified time is only the fallback."
+        },
+        "items": [
+          {
+            "id": "docs-last-activity.ac1",
+            "title": "Given the updated docs/DASHBOARD-ARCHITECTURE.md, when grepped, then it contains no occurrence of 'the transcript file mtime'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-last-activity.ac2",
+            "title": "Given the updated docs/DASHBOARD-ARCHITECTURE.md, when the Awareness feed section is read, then it renders a paragraph stating that lastActivityAt comes from the last user/assistant record via scanPendingInputs, that Claude Code touches running transcripts hourly, and that the modified time is the fallback, citing PAN-4515",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scan-last-record-at",
+        "to": "list-uses-last-record-at",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4515-chats-idle-claude-code-conversations-jump-to-active-just-now-hourly-because-last-activity-is-the-transcript-s-modified-time.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
