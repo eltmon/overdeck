@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T03:42:51.528Z",
+  "updated": "2026-10-04T03:43:03.550Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "jev-toggle-gating-client.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:42:51.528Z"
+    },
+    "jev-usage-readout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:03.549Z"
     }
   }
 }
