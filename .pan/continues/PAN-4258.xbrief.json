@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4258",
+  "created": "2026-10-04T02:16:20.498Z",
+  "updated": "2026-10-04T02:16:20.499Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "plan-cli-five-levels": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4258",
+      "claimedAt": "2026-10-04T02:16:20.498Z"
+    }
+  }
+}
