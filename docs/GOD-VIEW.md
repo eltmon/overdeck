@@ -11,16 +11,30 @@ and status grounded in dashboard state.
 
 - **The river engine** places issue orbs in the `PLAN → WORK → REVIEW → TEST →
   VERIFY → MERGE` flow. The WebGL aurora reacts to live hook energy, with a
-  canvas-only background when WebGL is unavailable.
+  canvas-only background when WebGL is unavailable. The PLAN, REVIEW, and TEST
+  column counts include only issues with a live (running or starting) agent of
+  that role — a stopped plan, review, or test agent cannot pin an issue's
+  displayed stage after a live work agent has already moved it on.
 - **Issue orbs** encode project, role, model glyph, stage, heat, and operational
   state. Review convoys orbit one issue orb so parallel reviewers remain one
   pipeline unit rather than appearing as unrelated work.
 - **Agent micro-states** show waiting, thinking, compaction, cost pulses, stack
   warnings, and merge activity on the orb that owns the work.
-- **The shelf and Doldrums** separate yielded or paused work from stalled work.
-  Frost accrues gradually from real idle time before an orb settles into the
-  Doldrums; governor tides move yielded work to the shelf. The Doldrums is
-  also the parked population's home (see "The Stall Sweeper" below).
+- **The shelf and Doldrums** are two disjoint bands that never overlap, each
+  with its own header row so labels and reasons stay inside their band. The
+  shelf (upper band, header `⏸ SHELF — paused / parked / yielded`) holds orbs
+  whose agents are paused by an operator or the pipeline, or yielded by the
+  scheduler/governor — at most 8, longest-idle first, each with its reason
+  truncated to fit the slot (the full reason is in the hover card). The
+  Doldrums (lower band, below the shelf with a gap) holds stale orbs (no
+  events for 30 min) and parked issues, arranged in two rows — at most 14.
+  A merged issue whose agents carry only the close-out pause
+  (`awaiting close-out (verify on main)`) is not shelved: it stays `active` in
+  MERGE and exits through the portal; any other pause on a merged issue still
+  shelves it. Frost accrues gradually from real idle time before an orb
+  settles into the Doldrums; governor tides move yielded work to the shelf.
+  The Doldrums is also the parked population's home (see "The Stall Sweeper"
+  below).
 - **The merge portal and wrecks** show the path into `main`, queued merge depth,
   successful merge motion, and failed merge residue.
 - **The Stall Sweeper** (PAN-3490) renders the parked population and the
@@ -65,7 +79,7 @@ and status grounded in dashboard state.
 | --- | --- |
 | Orb | One issue and its current primary agent role |
 | Orbiting satellites | Review convoy members attached to the same issue |
-| Shelf | Paused or scheduler-yielded work that still belongs to the pipeline |
+| Shelf | Paused, parked, or scheduler-yielded work that still belongs to the pipeline (operator holds included; close-out pauses on merged issues excluded) |
 | Frost / Doldrums | Increasing idle age and work that crossed the stale threshold |
 | Orbit-tinted frost | A parked issue — the frost color names its orbit (amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle) |
 | Mismatched frost | The `invariant-mismatch` orbit (PAN-3850): the report-only invariant checker saw the record, the review-status row, and liveness disagree — observation only, the tag names the repair door |
