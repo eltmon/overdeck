@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:06:35.173Z",
+  "updated": "2026-10-04T03:06:47.149Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "plan-cli-five-levels.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:06:35.172Z"
+    },
+    "start-planning-effort-400.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:06:47.149Z"
     }
   }
 }
