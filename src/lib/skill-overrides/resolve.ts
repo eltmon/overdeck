@@ -9,7 +9,7 @@
  * each level a per-skill value beats that level's pack toggle, and with no
  * value anywhere they are off. They are never hidden by name.
  */
-import type { SkillCatalogEntry } from './catalog.js';
+import type { SkillCatalogEntry, SkillOrigin } from './catalog.js';
 
 export const CORE_SKILLS: readonly string[] = [
   'pan', 'pan-done', 'pan-flywheel', 'pan-foreman', 'pan-plan', 'pan-start',
@@ -42,6 +42,7 @@ export interface SkillState {
   name: string;
   description: string;
   core: boolean;
+  origin: SkillOrigin;
   /** Exists only under the project's `.pan/skills`; never shown on the global page. */
   projectSkill: boolean;
   global: boolean | null;
@@ -128,6 +129,7 @@ export function resolveSkillStates(
       name: entry.name,
       description: entry.description,
       core: isCoreSkill(entry.name),
+      origin: entry.origin,
       projectSkill: entry.projectSkill === true,
       global: overrideValue(layers.global, entry.name),
       project: overrideValue(layers.project, entry.name),
