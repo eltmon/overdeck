@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:12:41.202Z",
+  "updated": "2026-10-04T05:12:53.141Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "role-file-effort-e2e-test.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T05:12:41.202Z"
+    },
+    "test-queue-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:53.140Z"
     }
   }
 }
