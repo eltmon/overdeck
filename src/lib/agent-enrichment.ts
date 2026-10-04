@@ -23,6 +23,11 @@ import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefix } from './issue-id.js'
 import { getLatestSessionId } from './agents/activity.js'
 import { resolveAgentTranscriptCandidate } from './agents/transcript-resolver.js'
+import {
+  operatorDecisionAsPendingQuestion,
+  readOpenOperatorDecision,
+  type OperatorDecision,
+} from './cloister/operator-decision.js'
 
 const execAsync = promisify(exec)
 
@@ -619,11 +624,38 @@ export async function scanPendingInputs(jsonlPath: string): Promise<PendingInput
   }
 }
 
-/** Get the pending questions for an agent by id. */
+/**
+ * PAN-4383: the open `pan ask` decision in the agent's workspace journal, when
+ * this agent asked it. Read on every poll: the JSONL mtime cache must not hide
+ * a new request, because `pan ask` writes the journal, not the transcript.
+ */
+function openDecisionForAgent(agentId: string): OperatorDecision | null {
+  const workspace = getAgentState(agentId)?.workspace
+  if (!workspace) return null
+  const decision = readOpenOperatorDecision(workspace)
+  return decision && decision.agentId === agentId ? decision : null
+}
+
+function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSnapshot {
+  return {
+    toolUseId: q.toolId,
+    askedAt: q.timestamp,
+    questions: q.questions.map(question => ({
+      question: question.question,
+      header: question.header,
+      multiSelect: question.multiSelect,
+      options: question.options.map(o => ({ label: o.label, description: o.description })),
+    })),
+  }
+}
+
+/** Get the pending questions for an agent by id: transcript questions, then its open operator decision. */
 export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = await getAgentJsonlPath(agentId)
-  if (!jsonlPath) return []
-  return [...(await getPendingQuestions(jsonlPath))]
+  const questions = jsonlPath ? [...(await getPendingQuestions(jsonlPath))] : []
+  const decision = openDecisionForAgent(agentId)
+  if (decision) questions.push(operatorDecisionAsPendingQuestion(decision))
+  return questions
 }
 
 /** Get the mtime of the agent's active JSONL session file (null when unknown). */
@@ -687,6 +719,16 @@ export async function computeAgentEnrichment(
       return !isNaN(qTime) && qTime >= agentStartTime
     })
   }
+  // PAN-4383: an open `pan ask` decision. No startedAt filter: a restarted
+  // agent still owes the answer.
+  const operatorDecision = openDecisionForAgent(agentId)
+  const specialistActive = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  if (operatorDecision) {
+    const decisionQuestion = operatorDecisionAsPendingQuestion(operatorDecision)
+    // PAN-4383: a decision request is fresh evidence, exempt from PAN-1834 suppression;
+    // while a specialist is active only the decision shows, never stale transcript questions.
+    pendingQuestions = specialistActive ? [decisionQuestion] : [...pendingQuestions, decisionQuestion]
+  }
 
   const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
     ? {
@@ -748,7 +790,7 @@ export async function computeAgentEnrichment(
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
   // PAN-1834 — suppresses every surface derived from the parked agent's stale
   // JSONL/runtime/fallback/turn-end state while a specialist is active.
-  const isSpecialistSuppressed = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  const isSpecialistSuppressed = specialistActive
   // PAN-3233 — a live blocking pane modal (tool_permission foremost) is fresh
   // evidence the agent is frozen RIGHT NOW, unlike the stale surfaces above, so
   // it bypasses suppression. Review fix: this exemption is scoped to ONLY the
@@ -756,7 +798,7 @@ export async function computeAgentEnrichment(
   // unrelated stale JSONL state (a pending ExitPlanMode, an old AskUserQuestion)
   // that happens to be sitting in the same scan.
   const hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason)
-  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection
+  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection && !operatorDecision
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.
@@ -772,23 +814,18 @@ export async function computeAgentEnrichment(
   if (!isSpecialistSuppressed) {
     if (pendingQuestions.length > 0) {
       pendingInputKinds.push('askUserQuestion')
-      const first = pendingQuestions[0]
-      pendingAskUserQuestion = {
-        toolUseId: first.toolId,
-        askedAt: first.timestamp,
-        questions: first.questions.map(q => ({
-          question: q.question,
-          header: q.header,
-          multiSelect: q.multiSelect,
-          options: q.options.map(o => ({ label: o.label, description: o.description })),
-        })),
-      }
+      pendingAskUserQuestion = toPendingAskUserQuestion(pendingQuestions[0])
     }
     if (exitPlanModePending) pendingInputKinds.push('exitPlanMode')
     if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
     // Only when nothing more specific is open — an agent parked on a permission
     // prompt is idle too, and must read as the permission, not as a bare turn-end.
     if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
+  }
+  // PAN-4383: under specialist suppression pendingQuestions holds only the decision.
+  if (isSpecialistSuppressed && operatorDecision && pendingQuestions.length > 0) {
+    pendingInputKinds.push('askUserQuestion')
+    pendingAskUserQuestion = toPendingAskUserQuestion(pendingQuestions[0])
   }
   // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
   // into the unified pending-input set so the indicator fires.

@@ -25,6 +25,7 @@ import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
 import { closeAgentPane } from '../terminal-backends/launch.js';
 import { canUseHarness } from '../harness-policy.js';
+import { EFFORT_LEVELS, isEffortLevel } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
@@ -172,6 +173,9 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
+    if (effort !== undefined && effort !== null && effort !== '' && !isEffortLevel(effort)) {
+      return jsonResponse({ error: `Invalid effort "${effort}". Expected one of: ${EFFORT_LEVELS.join(', ')}.` }, { status: 400 });
+    }
     const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' || harness === 'prime-agent' ? harness : 'claude-code';
 
     // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any

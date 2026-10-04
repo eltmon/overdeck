@@ -99,9 +99,19 @@ mechanically rejects agent code pushes to main.
 
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
 
+## Ask the operator with `pan ask`
+
+When you need an operator decision before you can continue (a blocking question), raise it with:
+
+```bash
+pan ask <ISSUE-ID> "<the question, with the facts the operator needs>" --option "<choice 1>" --option "<choice 2>" --context "<what you already tried>"
+```
+
+`pan ask` writes the request to the issue's pipeline journal. The dashboard shows it in Needs-you, with TTS and a desktop notification when they are enabled. God View and the Command Deck mark the issue "needs you" instead of idle. The operator's answer arrives as a normal message in this session. After you run it, stop and wait. Do not also post an issue comment or `pan tell` the flywheel for the same question. If the answer reaches you another way, or the question no longer matters, run `pan ask <ISSUE-ID> --withdraw`. If a message arrives that does not answer your question, run `pan ask` again.
+
 ## Signal the flywheel before you stall
 
-If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park:
+If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path (for a blocking question use `pan ask` above) — you MUST first notify the orchestrator, *before* you park:
 
 ```bash
 pan tell flywheel-orchestrator "work <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
@@ -111,7 +121,7 @@ Under full autonomy nobody is watching the `❯` prompt. A silent park leaves th
 
 If you are parked because other issues or PRs must merge first, also run `pan task block <issue> <item> --on <ref>...` for every item that waits on them (issue IDs like `PAN-123`, or `#N` for a PR). Overdeck then wakes you with a `BLOCKERS MERGED` message when the last of them merges; follow it, then `pan task unblock` the item. A comment alone wakes nobody.
 
-The four push-back shapes that require this signal: **self-abort** (the work can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing).
+The three push-back shapes that require this signal: **self-abort** (the work can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), and **full-pipeline-needed** (the work is broader than this role's path).
 
 ## Boundaries
 
