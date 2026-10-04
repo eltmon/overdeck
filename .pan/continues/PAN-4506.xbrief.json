@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T03:02:00.203Z",
+  "updated": "2026-10-04T03:02:14.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "recovery-skips-dispatch-failed.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:02:00.203Z"
+    },
+    "recovery-skips-dispatch-failed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:14.580Z"
     }
   }
 }
