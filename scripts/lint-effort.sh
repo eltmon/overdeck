@@ -9,11 +9,15 @@
 # but must never rise, and no new, unbaselined offender file may appear.
 #
 # Every current baseline row exists because the code fixing it lives in a
-# sibling issue (#4253, #4255-#4260) outside PAN-4249's own scope, or — the
+# sibling issue (#4253, #4255-#4259) outside PAN-4249's own scope, or — the
 # conversation-runtime.ts row — because it is the lane-door SAFE_EFFORT_PATTERN,
 # deliberately kept in scope (PAN-4223 D20, PAN-4254 D11); each row names its
-# issue. One row (ContextWindowMeter.tsx) is a false match on an unrelated
-# 'low'|'medium'|'high' tone enum and carries no sibling issue.
+# issue. Two rows (ContextWindowMeter.tsx, and the pi/ohmypi extension
+# ThinkingLevel unions) are false matches, not effort-enum copies: the former
+# is an unrelated 'low'|'medium'|'high' tone enum, and the latter two model
+# the Pi runtime's own native API vocabulary (it has 'off' and 'minimal',
+# which are not canonical effort levels) — a translation target, not a copy
+# of EFFORT_LEVELS.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,14 +37,9 @@ EXCLUDE_FILES=(
 # <path> => count. See the header comment above for what removes each row.
 declare -A BASELINE=(
   ["src/cli/commands/strike.ts"]=1                              # PAN-4259
-  ["src/lib/runtimes/codex.ts"]=1                                # PAN-4260
-  ["src/lib/acp/host.ts"]=1                                      # PAN-4260
-  ["src/lib/codex/app-server-host.ts"]=2                         # PAN-4260
-  ["src/lib/launcher-generator.ts"]=3                            # PAN-4260
   ["src/lib/overdeck/conversation-runtime.ts"]=1                 # lane door SAFE_EFFORT_PATTERN (PAN-4223 D20), kept by PAN-4254 D11
-  ["src/lib/launcher-codex-command.ts"]=1                        # PAN-4260
-  ["packages/pi-extension/src/index.ts"]=1                       # PAN-4260
-  ["packages/ohmypi-extension/src/index.ts"]=1                   # PAN-4260
+  ["packages/pi-extension/src/index.ts"]=1                       # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
+  ["packages/ohmypi-extension/src/index.ts"]=1                   # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
   ["src/lib/planning/spawn-planning-session.ts"]=2               # PAN-4258
   ["src/cli/commands/plan.ts"]=1                                 # PAN-4258
   ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258
