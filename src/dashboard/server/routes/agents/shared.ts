@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 import { HttpServerRequest } from 'effect/unstable/http';
-import type { AgentStatus } from '@overdeck/contracts';
+import { EFFORT_LEVELS, isEffortLevel, type AgentStatus, type EffortLevel } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
@@ -77,6 +77,8 @@ export function buildPanStartArgs(input: {
    */
   model?: string | null;
   harness?: RuntimeName | null;
+  /** Explicit operator-chosen effort only — never a resolved default (PAN-4256, same rule as model above). */
+  effort?: EffortLevel | null;
   allowHost?: boolean;
   offBook?: boolean;
 }): string[] {
@@ -86,9 +88,23 @@ export function buildPanStartArgs(input: {
     '--local',
     ...(input.model ? ['--model', input.model] : []),
     ...(input.harness ? ['--harness', input.harness] : []),
+    ...(input.effort ? ['--effort', input.effort] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
     ...(input.offBook ? ['--off-book'] : []),
   ];
+}
+
+/**
+ * Parses an explicit effort override from a request body. Blank/absent
+ * values resolve to undefined so `pan start` falls back to role/tier
+ * resolution; anything else must be a canonical effort level (PAN-4256).
+ */
+export function parseAgentEffortOverride(value: unknown): EffortLevel | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!isEffortLevel(value)) {
+    throw new Error(`Invalid effort "${value}"; expected one of ${EFFORT_LEVELS.join(', ')}`);
+  }
+  return value;
 }
 
 /**
