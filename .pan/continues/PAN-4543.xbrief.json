@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T09:42:10.401Z",
+  "updated": "2026-10-04T09:43:07.452Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "artifact-skipped-outcome": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4543",
-      "claimedAt": "2026-10-04T09:42:10.401Z"
+      "claimedAt": "2026-10-04T09:42:10.401Z",
+      "doneAt": "2026-10-04T09:43:07.452Z"
     }
   }
 }
