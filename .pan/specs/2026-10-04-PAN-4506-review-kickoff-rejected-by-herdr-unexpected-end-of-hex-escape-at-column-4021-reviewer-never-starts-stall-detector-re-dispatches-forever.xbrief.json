@@ -1,0 +1,595 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:01:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4506: Review kickoff rejected by Herdr ('unexpected end of hex escape at column 4021'): reviewer never starts, stall detector re-dispatches forever",
+    "updated": "2026-10-04T02:07:10.258Z"
+  },
+  "plan": {
+    "id": "pan-4506",
+    "title": "Review kickoff rejected by Herdr ('unexpected end of hex escape at column 4021'): reviewer never starts, stall detector re-dispatches forever",
+    "status": "proposed",
+    "uid": "4f311a62-f51e-4b2d-b4d5-ef52e299821f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T02:01:22Z",
+    "updated": "2026-10-04T02:07:10.258Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4506",
+        "label": "PAN-4506",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "review",
+      "delivery",
+      "unicode",
+      "deacon-lite",
+      "pipeline-journal"
+    ],
+    "narratives": {
+      "Problem": "Every PAN-4383 review kickoff is rejected by Herdr with 'invalid_request: unexpected end of hex escape'. Root cause (verified): review-context.ts:460 truncates CodeRabbit finding bodies with .slice(0, 200), which splits an emoji and leaves a lone high surrogate (\\ud83e) in the tier-1 summary embedded in the kickoff; JSON.stringify emits it as a lone \\ud83e escape that Herdr's serde_json rejects (reproduced live with a read-only agent.get). spawnRun discards the ok:false kickoff result for non-kimi harnesses, so the reviewer sits idle, silent-reviewer recovery re-dispatches the same doomed text, and every new review request repeats the cycle.",
+      "Proposal": "Fix the truncation code-point-safely (new leaf helper src/lib/well-formed-text.ts), sanitize every Herdr request and the paste-submit path as a backstop, make spawnRun fail (close pane, stop agent, throw KickoffRejectedError) when the kickoff fails with invalid_request, and have spawnReviewRoleForIssue journal a new review.dispatch-failed entry plus a Needs-you activity entry so deacon-lite recovery stops re-dispatching it. Document the new journal type and the Herdr wire rule.",
+      "NonGoals": "- Do not modify src/lib/agents/delivery.ts (1 line of file-size headroom); the resume retry loop still tries twice on invalid_request\n- Do not modify src/lib/terminal-backends/herdr.ts (at its 1008-line cap)\n- Do not fail the spawn on other ok:false kickoff failures (ambiguous disconnects, guard refusals, tmux failures)\n- Do not wire journal tails into the Command Deck Needs-you bucket (derived-issue-state attention)\n- Do not add permanent request-byte logging for Herdr invalid_request errors\n- Do not bump tsconfig lib to ES2024 or use String.prototype.toWellFormed\n- Do not file a Herdr upstream issue (its rejection is correct serde_json behavior)\n- Do not touch PAN-4383's workspace or re-request its review (operator step after deploy)\n- Do not audit or rewrite every other .slice(0, n) in src/lib\n- Do not raise any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix at the source (review-context truncation) and sanitize at the Herdr wire (herdr-api.ts replacer + herdr-submit).",
+        "rationale": "The source fix removes this failure; the wire sanitization guarantees no other truncated string anywhere can wedge a Herdr request again, at the cost of one U+FFFD character."
+      },
+      {
+        "summary": "Herdr is not at fault; no upstream issue.",
+        "rationale": "Reproduced: serde_json rejects a lone surrogate escape when deserializing a String; the client must send well-formed UTF-16."
+      },
+      {
+        "summary": "Only an 'invalid_request:' kickoff failure fails spawnRun; other ok:false failures keep today's behavior.",
+        "rationale": "invalid_request means Herdr executed nothing and a retry of the same text fails identically; other failures (e.g. an ambiguous disconnect after pane.send_text was written) may have typed the text, so failing the spawn could kill a working reviewer."
+      },
+      {
+        "summary": "Needs-you is surfaced through surfaceIssueFeedbackNeedsYou (activity entry), the channel PAN-4433's silent-reviewer escalation already uses.",
+        "rationale": "The Command Deck Needs-you bucket derives only from a blocked pane; extending derived attention is a separate, larger change."
+      },
+      {
+        "summary": "A new journal type review.dispatch-failed ends the recovery loops by becoming the journal tail.",
+        "rationale": "recoverUndispatchedReviews acts only on a request-review verification.passed tail and stalledReviewReason only on review.requested/dispatched/redispatched, so the new tail is skipped with no routine change; W7 pins it with tests."
+      },
+      {
+        "summary": "Issue fix step 1 (capture the rejected request bytes) was completed during planning instead of adding permanent logging.",
+        "rationale": "The probe of the real PAN-4383 manifest found the lone surrogate at the 200-char cut of CodeRabbit finding 0, and a live read-only Herdr probe reproduced the exact error."
+      },
+      {
+        "summary": "PAN-4383 recovery is an operator/Flywheel step after deploy (pan review request PAN-4383).",
+        "rationale": "The work agent cannot deploy; the AC's 'test reproducing its text' is covered by W2 and W3 tests using the PAN-4383 pattern."
+      }
+    ],
+    "items": [
+      {
+        "id": "well-formed-helper",
+        "title": "Add the well-formed UTF-16 text helper module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/well-formed-text.ts",
+            "src/lib/__tests__/well-formed-text.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/well-formed-text.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "well-formed-text.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Create src/lib/well-formed-text.ts (no imports) exporting toWellFormedText(text) (replace every lone surrogate with U+FFFD using the regex /[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]/g, no u flag) and truncateWellFormed(text, maxUnits) (slice, then drop a trailing high surrogate). Do not use String.prototype.toWellFormed (untyped under the ES2022 lib). Write the unit tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "well-formed-helper.ac1",
+            "title": "Given 'a\\uD83Eb', when toWellFormedText runs, then it returns 'a\\uFFFDb'; given 'ok 🛠️' it returns the input unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "well-formed-helper.ac2",
+            "title": "Given 'x'.repeat(199) + '🛠rest', when truncateWellFormed(text, 200) runs, then it returns a 199-unit string with no trailing high surrogate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "well-formed-helper.ac3",
+            "title": "Given 'x'.repeat(198) + '🛠rest', when truncateWellFormed(text, 200) runs, then it preserves the whole emoji and returns 200 units",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier1-preview-truncation",
+        "title": "Truncate CodeRabbit previews in the tier-1 summary without splitting surrogate pairs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-context.ts",
+            "src/lib/cloister/__tests__/review-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/review-context.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-context.test.ts passes including the new split-emoji case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. In formatTier1Summary (review-context.ts:460) replace `finding.body.slice(0, 200)` with `truncateWellFormed(finding.body, 200)` imported from '../well-formed-text.js'. Keep the '...' suffix logic. Add the formatTier1Summary test with a finding body whose 200-unit cut splits an emoji (the PAN-4383 pattern)."
+        },
+        "items": [
+          {
+            "id": "tier1-preview-truncation.ac1",
+            "title": "Given a CodeRabbit finding whose body is 'x'.repeat(199) + '_🛠️ Refactor suggestion_' + 300 more chars, when formatTier1Summary renders it, then the summary contains no lone surrogate (regex check) and contains 'x'.repeat(199) + '...'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier1-preview-truncation.ac2",
+            "title": "Given the same summary, when it is passed through JSON.stringify, then the output contains no lone high-surrogate escape matching /\\\\ud[89ab][0-9a-f]{2}(?!\\\\ud[c-f])/i",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "herdr-wire-sanitize",
+        "title": "Sanitize lone surrogates in every Herdr request and in the paste-submit path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-api.ts",
+            "src/lib/terminal-backends/herdr-submit.ts",
+            "src/lib/terminal-backends/__tests__/herdr-well-formed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/terminal-backends/__tests__/herdr-well-formed.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "herdr-well-formed.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In herdr-api.ts add a module-level wellFormedReplacer (strings -> toWellFormedText) and pass it to JSON.stringify at BOTH write sites (`call` and `stream`). In herdr-submit.ts pasteAndSubmitHerdrPane, rename the text parameter to rawText and make `const text = toWellFormedText(rawText);` the first statement so pane.send_text and screenComposerPayloadPresence see the same string. Do NOT edit herdr.ts (at its 1008-line cap). New test file uses a fake HerdrSocket via HerdrApiClient({ connect }) and a fake api for pasteAndSubmitHerdrPane with injected sleep/now; no real sockets or timers. Assert absence of lone surrogates by regex — Node's JSON.parse accepts them, so 'it parses' proves nothing."
+        },
+        "items": [
+          {
+            "id": "herdr-wire-sanitize.ac1",
+            "title": "Given HerdrApiClient.call('pane.send_text', { text: 'review ' + 'x'.repeat(3990) + '\\uD83E' }), when the request is written to the fake socket, then the written line contains no lone high-surrogate escape and JSON.parse(line).params.text ends with U+FFFD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-wire-sanitize.ac2",
+            "title": "Given HerdrApiClient.stream with a params string containing '\\uD83E', when the subscription request is written, then the written line contains no lone high-surrogate escape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-wire-sanitize.ac3",
+            "title": "Given pasteAndSubmitHerdrPane(fakeApi, 'p1', 'kickoff \\uD83E'), when it pastes, then the recorded pane.send_text text equals '\\x1b[200~kickoff \\uFFFD\\x1b[201~'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-kickoff-rejection",
+        "title": "Fail spawnRun when the backend rejects the kickoff with invalid_request",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/kickoff-rejection.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "agents-spawn-supervisor.test.ts passes including the invalid_request and refused cases",
+            "typecheck completes without errors",
+            "file-size guard passed (spawn.ts <= 1089 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "review-dispatch-failure-record"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Create src/lib/agents/kickoff-rejection.ts (no imports) with KickoffRejectedError (name 'KickoffRejectedError', message `Agent <id> kickoff rejected by the terminal backend: <failure>`, readonly failure), isRejectedKickoffFailure(failure) (startsWith 'invalid_request:'), isKickoffRejection(error). In spawn.ts's ready-wait else branch (search \"'spawnRun:initial-prompt', undefined, kickoffOpts\"), throw KickoffRejectedError when !delivery.ok && isRejectedKickoffFailure(delivery.failure), and run the existing closeBackendPane/stopAgent teardown for kimi-code OR isKickoffRejection(error). Exact before/after in the PRD. Only invalid_request fails the spawn; other ok:false failures keep today's behavior."
+        },
+        "items": [
+          {
+            "id": "spawn-kickoff-rejection.ac1",
+            "title": "Given deliverAgentMessage resolves { ok: false, failure: 'invalid_request: invalid request: unexpected end of hex escape at line 1 column 4021' } for a claude-code review spawn, when spawnRun runs, then it rejects with a message containing 'kickoff rejected by the terminal backend: invalid_request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-kickoff-rejection.ac2",
+            "title": "Given that rejection, when the test reads agents/agent-pan-1405-review/state.json, then it persists status 'stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-kickoff-rejection.ac3",
+            "title": "Given deliverAgentMessage resolves { ok: false, failure: 'refused: guard' } for claude-code, when spawnRun runs, then it resolves without throwing (behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-dispatch-failed-type",
+        "title": "Add the review.dispatch-failed pipeline journal type and its pan show rendering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/cli/commands/show.ts",
+            "src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/show-pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "show-pipeline-journal.test.ts passes including the review.dispatch-failed case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. Add 'review.dispatch-failed' to the PipelineJournalEntryType union (review.* line). In show.ts's journal formatter add `case 'review.dispatch-failed': return `${data.reviewer ?? 'reviewer'} never started — ${data.error ?? 'kickoff failed'}; request review again once fixed`;` next to the review.stall-escalated case, and a test case beside the existing stall-escalated one."
+        },
+        "items": [
+          {
+            "id": "journal-dispatch-failed-type.ac1",
+            "title": "Given a journal entry { type: 'review.dispatch-failed', data: { reviewer: 'agent-pan-4383-review', error: 'invalid_request: x' } }, when pan show formats it, then it renders 'agent-pan-4383-review never started — invalid_request: x; request review again once fixed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-dispatch-failed-type.ac2",
+            "title": "Given appendPipelineEntry called with type 'review.dispatch-failed', when npm run typecheck runs, then it accepts the type and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-dispatch-failure-record",
+        "title": "Journal and surface a review dispatch whose kickoff was rejected",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-dispatch-failure.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/__tests__/review-dispatch-failure.test.ts",
+            "src/lib/cloister/__tests__/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/review-dispatch-failure.test.ts src/lib/cloister/__tests__/review-agent.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint passes (no new import cycle, review-agent.ts <= 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. Create src/lib/cloister/review-dispatch-failure.ts with recordReviewDispatchFailure({ issueId, workspace, reviewer, error }): appendPipelineEntry type 'review.dispatch-failed' (issueId uppercased, source 'review-agent', data { reviewer, error }), then dynamic-import feedback-target.js and call surfaceIssueFeedbackNeedsYou with a reason containing the error; never throws. In review-agent.ts spawnReviewRoleForIssue's catch, right after `const spawnError = ...`, call it when isKickoffRejection(err). Return value unchanged. review-agent.ts grows by 3 lines max."
+        },
+        "items": [
+          {
+            "id": "review-dispatch-failure-record.ac1",
+            "title": "Given recordReviewDispatchFailure({ issueId: 'pan-4383', error: 'invalid_request: …' }) on a temp workspace, when it runs, then the journal gains an entry with type 'review.dispatch-failed', issueId 'PAN-4383' and data.error equal to the error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-dispatch-failure-record.ac2",
+            "title": "Given the same call, when it runs, then surfaceIssueFeedbackNeedsYou is called once with 'PAN-4383' and a reason containing the error; a rejecting mock does not make it throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-dispatch-failure-record.ac3",
+            "title": "Given mocks.spawnRun rejects with KickoffRejectedError, when spawnReviewRoleForIssue runs, then it returns success: false with error containing 'invalid_request' and records the dispatch failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-dispatch-failure-record.ac4",
+            "title": "Given mocks.spawnRun rejects with a plain Error('boom'), when spawnReviewRoleForIssue runs, then it returns success: false and records no dispatch failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recovery-skips-dispatch-failed",
+        "title": "Pin that deacon-lite review recovery leaves a review.dispatch-failed tail alone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/__tests__/deacon-lite-recover-undispatched-review.test.ts",
+            "src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts",
+            "src/lib/cloister/undispatched-review-recovery.ts",
+            "src/lib/cloister/deacon-lite.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-recover-undispatched-review.test.ts src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts"
+          ],
+          "expected_outputs": [
+            "both deacon-lite test files pass including the new dispatch-failed tail cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Add tests: (1) undispatched — journal [verification.passed source request-review aged past UNDISPATCHED_REVIEW_MIN_AGE_MS, then review.dispatch-failed] => recoverUndispatchedReviews never calls the route (follow the verification.failed-tail case ~line 114); (2) stalled — journal [review.requested 60 min ago, review.dispatch-failed 40 min ago] => recoverStalledReviews re-requests nothing (follow cases ~line 134/284). No routine change is expected (both key off the tail type); if a test fails, make that routine skip a review.dispatch-failed tail."
+        },
+        "items": [
+          {
+            "id": "recovery-skips-dispatch-failed.ac1",
+            "title": "Given a workspace journal whose tail is review.dispatch-failed after an aged request-review verification.passed, when recoverUndispatchedReviews runs, then it never calls the review route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recovery-skips-dispatch-failed.ac2",
+            "title": "Given a workspace journal whose tail is review.dispatch-failed after review.requested, when recoverStalledReviews runs, then it returns no re-request action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dispatch-failed-and-herdr-text",
+        "title": "Document review.dispatch-failed and Herdr's well-formed text rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:01:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4506",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/TERMINAL-BACKENDS.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'review.dispatch-failed' docs/PIPELINE-GATES.md",
+            "grep -n 'unexpected end of hex escape' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'PAN-4506' .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "PIPELINE-GATES.md shows the table row and the routine 7/8 sentences",
+            "TERMINAL-BACKENDS.md shows the wire-facts bullet",
+            "concerns.md shows the well-formed-text concern"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. docs/PIPELINE-GATES.md: add the review.dispatch-failed row after review.stall-escalated in the 'Entry types and who writes them' table (writer cloister/review-dispatch-failure.ts, data reviewer/error, issue needs you, never re-dispatched); add one sentence to routine 7 (recoverUndispatchedReviews) and routine 8 (recoverSilentReviewers) in the deacon-lite routine list. docs/TERMINAL-BACKENDS.md 'Herdr wire facts': add the lone-surrogate bullet (serde_json rejects it with invalid_request … unexpected end of hex escape; herdr-api.ts replaces lone surrogates with U+FFFD). concerns.md: add the 'Text that reaches Herdr must be well-formed UTF-16 (PAN-4506)' bullet and bump last-verified."
+        },
+        "items": [
+          {
+            "id": "docs-dispatch-failed-and-herdr-text.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, when a reader opens the journal entry-type table, then it lists review.dispatch-failed with its writer, its data fields (reviewer, error) and that no deacon-lite routine re-dispatches it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dispatch-failed-and-herdr-text.ac2",
+            "title": "Given docs/TERMINAL-BACKENDS.md 'Herdr wire facts', when a reader scans it, then it states Herdr rejects a lone surrogate escape with invalid_request and that herdr-api.ts replaces lone surrogates with U+FFFD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dispatch-failed-and-herdr-text.ac3",
+            "title": "Given .overdeck/context/codebase/concerns.md, when a reader scans it, then it names truncateWellFormed in src/lib/well-formed-text.ts as the way to truncate text bound for Herdr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "well-formed-helper",
+        "to": "tier1-preview-truncation",
+        "type": "blocks"
+      },
+      {
+        "from": "well-formed-helper",
+        "to": "herdr-wire-sanitize",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-kickoff-rejection",
+        "to": "review-dispatch-failure-record",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-dispatch-failed-type",
+        "to": "review-dispatch-failure-record",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-dispatch-failed-type",
+        "to": "recovery-skips-dispatch-failed",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4506-review-kickoff-rejected-by-herdr-unexpected-end-of-hex-escape-at-column-4021-reviewer-never-starts-stall-detector-re-dispatches-forever.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
