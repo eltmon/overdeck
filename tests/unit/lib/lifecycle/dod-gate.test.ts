@@ -107,6 +107,49 @@ describe('Definition-of-Done status rows', () => {
     });
   });
 
+  // PAN-4543: a duplicate run that found the PR merged after its gates left
+  // 'running' on disk. Landed work with green main CI settles that stale file.
+  it('accepts a stale running verification artifact when merged work is green on main', async () => {
+    const row = await checkVerificationRow(
+      issueId,
+      deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' })),
+      { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
+    );
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: 'verification artifact: running at 2026-10-04T05:44:24Z; stale non-terminal artifact — verification satisfied by green main CI after landing',
+    });
+  });
+
+  it('keeps a running verification artifact blocking until main CI is green', async () => {
+    const running = deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' }));
+
+    expect(await checkVerificationRow(issueId, running, {
+      trackerClosed: false, landedWork: true, mainVerifyStatus: 'miss',
+    })).toMatchObject({ status: 'miss' });
+  });
+
+  it('keeps a running verification artifact blocking when the work has not landed', async () => {
+    const running = deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' }));
+
+    expect(await checkVerificationRow(issueId, running, {
+      trackerClosed: false, landedWork: false, mainVerifyStatus: 'pass',
+    })).toMatchObject({ status: 'miss' });
+  });
+
+  it('accepts a skipped verification artifact when merged work is green on main', async () => {
+    const row = await checkVerificationRow(
+      issueId,
+      deps(pr(), artifact({ outcome: 'skipped', ranAt: '2026-10-04T06:00:00Z' })),
+      { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
+    );
+
+    expect(row.status).toBe('pass');
+    expect(row.observed).toContain('verification artifact: skipped at 2026-10-04T06:00:00Z');
+    expect(row.observed).toContain('stale non-terminal artifact');
+  });
+
   it('returns misses instead of throwing when there is no PR or a door fails', async () => {
     const empty = deps(null);
     const failing: DodStatusRowDeps = {

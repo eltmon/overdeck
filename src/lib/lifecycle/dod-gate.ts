@@ -436,8 +436,9 @@ export function checkTestsRow(
 
 /**
  * Row 3 reads the verification artifact the runner writes into the workspace
- * (FR-8). A missing artifact is a real miss: nothing ran, or the workspace is
- * already gone — in which case a landed, green main settles the row below.
+ * (FR-8). A missing or non-terminal ('running', 'skipped') artifact is no verdict:
+ * nothing ran, a run was cut short by the merge (PAN-4543), or the workspace is
+ * gone — so only a landed, green main settles the row below.
  */
 export async function checkVerificationRow(
   issueId: string,
@@ -460,8 +461,10 @@ export async function checkVerificationRow(
   // An out-of-band merge never enters merge-ops, so the CI-green skip cannot
   // record its normal verification verdict. Once rows 4 and 6 prove the landed
   // work and main CI green, that evidence satisfies row 3 without an override.
-  if (!artifact && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
-    return result('verification', 'pass', `${observed}; verification satisfied by green main CI after landing`);
+  const nonTerminal = Boolean(artifact) && outcome !== 'passed' && outcome !== 'failed';
+  if ((!artifact || nonTerminal) && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
+    const stale = nonTerminal ? '; stale non-terminal artifact —' : ';';
+    return result('verification', 'pass', `${observed}${stale} verification satisfied by green main CI after landing`);
   }
   const negative = outcome === 'failed' ? 'failed' : undefined;
   return terminalVerdictSettlement('verification', negative, observed, settlement) ??
