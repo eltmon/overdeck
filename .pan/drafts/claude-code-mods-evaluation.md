@@ -115,7 +115,25 @@ These limits apply to every candidate below. Each one comes from the docs refere
 
 ## Candidate 1: Operator state in the agent's own pane
 
-To be written (spec item `candidate-1-operator-state-band`).
+| Field | Finding |
+| --- | --- |
+| What it would do | Draw one band above the prompt (or one pinned status line) in every managed Claude Code pane, showing the issue, the pipeline phase, verification and review state, and whether the issue waits on the operator (Needs-you). |
+| Mod capability | `ui.render` on `AbovePrompt` for the band, or `$.ui.status` for a single line; `session.start` starts a `$.clock.every` timer; each tick reads state with `$.http.fetch` to the dashboard (or `$.fs.read` of a state file) and writes it to `$.state`, which redraws the band. |
+| Replaces or improves | Improves the operator's view inside a terminal. It replaces nothing: the dashboard stays the source of truth, and the bash status line (`src/lib/sync.ts:614` — `const STATUSLINE_TARGETS`) keeps showing model, context, cost and plan limits. |
+| Overdeck evidence | `src/lib/sync.ts:614` — `const STATUSLINE_TARGETS`; `src/lib/sync.ts:680` — `settings.statusLine = {`; `sync-sources/hooks/statusline.sh:2` — `# Claude Code status line`; `sync-sources/hooks/pan-hook-lib.sh:343` — `pan_emit_event() {` (how hooks reach the dashboard today, with the internal token) |
+| Harness parity | Claude Code only. Codex, Pi and Kimi panes get no band. That is acceptable because the band only mirrors dashboard state and no pipeline step depends on it. |
+| Risk | Low. The mod reads only; if it is unloaded ([#99130](https://github.com/anthropics/claude-code/issues/99130), three worker crashes, `disableAllHooks`) the band disappears and nothing else changes. The mod needs the dashboard internal token to call the API, so it carries a secret into every session that loads it (see Security). Herdr fullscreen behavior is **UNVERIFIED**. |
+| Size | S. One hooks module of about 60 lines plus one read route or state file; the probe in Appendix A already draws the band from state. |
+| Sources | plugin-authoring skill: reference.md "Drawing: ui.render" and "Work that outlives a dispatch", types/claude-code.d.ts line 1582 (`isFullscreen`); docs: https://code.claude.com/docs/en/plugins/mods/interface (S9), https://code.claude.com/docs/en/plugins/mods/reference (S3); research brief §5 and §7; Appendix A. |
+| Verdict | adopt-first: it is the only candidate whose silent loss costs the pipeline nothing, and it builds the packaging, scoping and review path every later mod needs. |
+
+**Where the band shows.** Overdeck sets no Claude Code fullscreen variable (`grep -rn "NO_FLICKER" src sync-sources` returns nothing). Under tmux, Claude Code therefore uses the main-screen layout, where `isFullscreen` is false ([skill] types/claude-code.d.ts line 1582). A band draws above the prompt in both layouts, so it works under tmux. A `Pane` would open inline above the prompt instead of docking beside the transcript, which takes vertical space from the agent's output; that is why this candidate uses a band or a status line and not a pane. Under Herdr the layout is **UNVERIFIED**: no source says whether Claude Code in a Herdr pane runs fullscreen, docks panes, or passes pointer events (brief §11 open question 1). This is an open question for the follow-up, to answer with a live check in a throwaway Herdr pane. If Herdr runs fullscreen, [#99354](https://github.com/anthropics/claude-code/issues/99354) (a docked pane ignores the light theme) applies only to panes, not to the band.
+
+**The operator sees it with no dashboard change.** The dashboard's terminal panel streams the pane's raw PTY bytes over `/ws/terminal` (`docs/DASHBOARD-ARCHITECTURE.md:28` — `/ws/terminal?session=<name>`). Whatever the mod draws is part of those bytes, so the band appears in the dashboard terminal view and in a direct attach alike. Non-Claude harnesses get nothing, so the band must only mirror what the dashboard already shows.
+
+**Comparison with the shipped status line.** `pan sync` copies `statusline.sh` to `~/.claude/statusline-command.sh` and points `settings.statusLine` at it (`src/lib/sync.ts:680` — `settings.statusLine = {`). That script runs on each status update, reads Claude Code's stdin JSON, and fetches plan usage with `curl` from the OAuth credentials file. It shows nothing about Overdeck's pipeline. A band adds what the status line cannot know: issue, phase, review and Needs-you. The docs present `$.ui.status` as coexisting with `statusLine`, and the order of the two lines is undocumented and **UNVERIFIED** (brief §11 open question 5), so a band is the safer surface than a second status line.
+
+**Data source.** The mod reads `OVERDECK_AGENT_ID` and `OVERDECK_DASHBOARD_URL` with `$.env.get` and the token from `~/.overdeck/internal-token` with `$.fs.read`, the same values `pan-hook-lib.sh` uses (`sync-sources/hooks/pan-hook-lib.sh:271` — `PAN_INTERNAL_TOKEN=`). No current dashboard route returns issue, phase, review and Needs-you for one agent in one call, so the follow-up must add a small read route or a per-agent state file; the probe used a placeholder route. A 15 s poll is cheap, but every managed pane polls, so the follow-up should measure the load with the fleet at full size.
 
 ## Candidate 2: Reliable in-session message delivery
 
