@@ -1,0 +1,188 @@
+{
+  "version": "1",
+  "issueId": "PAN-4260",
+  "created": "2026-10-04T02:27:59.173Z",
+  "updated": "2026-10-04T04:38:57.899Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-runtime-command-producers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T02:27:59.173Z",
+      "doneAt": "2026-10-04T02:44:36.263Z"
+    },
+    "w2-codex-home-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T02:44:44.214Z",
+      "doneAt": "2026-10-04T02:57:32.688Z"
+    },
+    "w3-codex-app-server-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T02:58:03.517Z",
+      "doneAt": "2026-10-04T03:09:57.242Z"
+    },
+    "w4-runtime-spawn-producers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T03:10:04.371Z",
+      "doneAt": "2026-10-04T03:18:29.769Z"
+    },
+    "w5-kimi-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T03:18:38.164Z",
+      "doneAt": "2026-10-04T03:38:06.033Z"
+    },
+    "w6-acp-host-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T03:38:12.720Z",
+      "doneAt": "2026-10-04T03:42:23.596Z"
+    },
+    "w7-pi-launcher-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T03:42:30.393Z",
+      "doneAt": "2026-10-04T04:00:08.151Z"
+    },
+    "w8-muse-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T04:00:15.503Z",
+      "doneAt": "2026-10-04T04:12:12.899Z"
+    },
+    "w9-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T04:12:23.028Z",
+      "doneAt": "2026-10-04T04:14:20.144Z"
+    },
+    "w10-lint-effort-baseline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T04:14:27.225Z",
+      "doneAt": "2026-10-04T04:21:58.186Z"
+    },
+    "w2-codex-home-effort.ac3": {
+      "status": "cancelled"
+    },
+    "w1-runtime-command-producers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:32:46.949Z"
+    },
+    "w1-runtime-command-producers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:33:39.472Z"
+    },
+    "w1-runtime-command-producers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:33:52.920Z"
+    },
+    "w2-codex-home-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:05.403Z"
+    },
+    "w2-codex-home-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:16.929Z"
+    },
+    "w3-codex-app-server-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:28.844Z"
+    },
+    "w3-codex-app-server-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:40.580Z"
+    },
+    "w3-codex-app-server-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:51.909Z"
+    },
+    "w4-runtime-spawn-producers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:35:04.053Z"
+    },
+    "w4-runtime-spawn-producers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:35:16.502Z"
+    },
+    "w4-runtime-spawn-producers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:35:27.839Z"
+    },
+    "w5-kimi-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:35:39.049Z"
+    },
+    "w5-kimi-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:35:51.579Z"
+    },
+    "w5-kimi-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:36:03.629Z"
+    },
+    "w6-acp-host-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:36:15.430Z"
+    },
+    "w6-acp-host-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:36:27.158Z"
+    },
+    "w6-acp-host-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:36:38.160Z"
+    },
+    "w7-pi-launcher-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:36:50.391Z"
+    },
+    "w7-pi-launcher-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:37:03.855Z"
+    },
+    "w7-pi-launcher-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:37:17.745Z"
+    },
+    "w8-muse-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:37:30.881Z"
+    },
+    "w8-muse-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:37:44.551Z"
+    },
+    "w8-muse-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:37:57.121Z"
+    },
+    "w9-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:38:10.053Z"
+    },
+    "w9-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:38:22.239Z"
+    },
+    "w9-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:38:34.539Z"
+    },
+    "w10-lint-effort-baseline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:38:46.532Z"
+    },
+    "w10-lint-effort-baseline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:38:57.899Z"
+    }
+  }
+}

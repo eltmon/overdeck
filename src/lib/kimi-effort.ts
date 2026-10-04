@@ -1,13 +1,15 @@
 /**
  * Native Kimi K3 accepts three effort levels. Claude-compatible saved values
  * retain their documented meaning at the native boundary. K2.7 Code always
- * thinks and does not expose adjustable effort.
+ * thinks and does not expose adjustable effort. Callers pass a level already
+ * resolved by resolveEffort; this function only translates.
  * https://www.kimi.com/code/docs/en/kimi-code/models.html
  */
-export function resolveKimiNativeEffort(model: string, effort = 'high'): 'low' | 'high' | 'max' | undefined {
+export function resolveKimiNativeEffort(model: string, effort: string | undefined): 'low' | 'high' | 'max' | undefined {
   if (!['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k'].includes(model)) {
     return undefined;
   }
+  if (effort === undefined) throw new Error(`Kimi K3 launch for "${model}" requires a resolved effort level.`);
   switch (effort) {
     case 'low': return 'low';
     case 'medium':

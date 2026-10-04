@@ -9,6 +9,8 @@ import { readSessionIndex } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntime } from '../claude-code.js'
 import { createCodexRuntime } from '../codex.js'
+import { EFFORT_LEVELS } from '@overdeck/contracts'
+import { resolveEffort } from '../../agents/resolve-effort.js'
 
 function withFakeCodexHome(): { codexHome: string; agentsHome: string; sharedSkills: string; cleanup: () => void } {
   const base = mkdtempSync(join(tmpdir(), 'pan-codex-runtime-'))
@@ -124,9 +126,9 @@ describe('initCodexHome', () => {
   afterEach(() => ctx.cleanup())
 
   it.each([
-    ['gpt-6-astra', undefined, 272000, 'high'],
-    ['gpt-6-sol', undefined, 272000, 'high'],
-    ['gpt-6.1-sol', undefined, 272000, 'high'],
+    ['gpt-6-astra', 'high', 272000, 'high'],
+    ['gpt-6-sol', 'high', 272000, 'high'],
+    ['gpt-6.1-sol', 'high', 272000, 'high'],
     ['gpt-6-luna', 'low', 272000, 'low'],
     ['gpt-5.6-sol', 'low', 272000, 'low'],
     ['gpt-5.6-terra[372k]', 'high', 372000, 'high'],
@@ -139,9 +141,17 @@ describe('initCodexHome', () => {
     expect(config).toContain(`model_reasoning_effort = "${expectedEffort}"`)
   })
 
+  it.each(EFFORT_LEVELS)('writes the resolved effort %s identically for gpt-5.6-sol (all levels supported)', (level) => {
+    const codexDir = join(ctx.codexHome, `effort-gpt-5.6-sol-${level}`)
+    const effort = resolveEffort({ explicit: level, model: 'gpt-5.6-sol', harness: 'codex' }).effort
+    initCodexHome(codexDir, { model: 'gpt-5.6-sol', effort })
+    const config = readFileSync(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain(`model_reasoning_effort = "${level}"`)
+  })
+
   it('creates sessions/ subdirectory', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-01')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
     const { existsSync: existsNode } = require('node:fs')
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
   })
@@ -153,7 +163,7 @@ describe('initCodexHome', () => {
     mkdirSync(join(oldHome, 'sessions'), { recursive: true });
     writeFileSync(join(oldHome, 'AGENTS.md'), 'Historical user or generated content');
     writeFileSync(join(oldHome, 'sessions', 'retained.jsonl'), 'retained');
-    initCodexHome(newHome);
+    initCodexHome(newHome, { effort: 'high' });
     expect(existsSync(join(newHome, 'AGENTS.md'))).toBe(false);
     expect(readFileSync(join(oldHome, 'AGENTS.md'), 'utf8')).toBe('Historical user or generated content');
     expect(readFileSync(join(newHome, 'sessions', 'retained.jsonl'), 'utf8')).toBe('retained');
@@ -161,7 +171,7 @@ describe('initCodexHome', () => {
 
   it('writes config.toml with flat top-level Codex keys', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-02')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     // approval_policy is a flat top-level string, not an [approval] table.
@@ -183,6 +193,7 @@ describe('initCodexHome', () => {
       trustedDir: '/home/eltmon/Projects/overdeck',
       approvalPolicy: 'never',
       sandboxMode: 'danger-full-access',
+      effort: 'high',
     })
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
@@ -197,6 +208,7 @@ describe('initCodexHome', () => {
   it('writes stdio MCP servers with escaped args, environment, and quoted names', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-mcp')
     initCodexHome(codexDir, {
+      effort: 'high',
       mcpServers: {
         playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@0.0.78'] },
         'quoted.server': {
@@ -221,7 +233,7 @@ describe('initCodexHome', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-mcp-unsupported')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-    initCodexHome(codexDir, { mcpServers: { remote: { type: 'http', command: 'proxy' } } })
+    initCodexHome(codexDir, { effort: 'high', mcpServers: { remote: { type: 'http', command: 'proxy' } } })
 
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
@@ -235,6 +247,7 @@ describe('initCodexHome', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     initCodexHome(codexDir, {
+      effort: 'high',
       mcpServers: { playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
     })
 
@@ -254,7 +267,7 @@ describe('initCodexHome', () => {
     writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
 
     const codexDir = join(ctx.agentsHome, 'agent-init-auth')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     const seeded = join(codexDir, 'auth.json')
     expect(existsNode(seeded)).toBe(true)
@@ -276,7 +289,7 @@ describe('initCodexHome', () => {
     // token family that wedged the agent).
     writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-stale-revoked"}}')
 
-    initCodexHome(codexDir) // resume — must migrate the stale copy to the symlink
+    initCodexHome(codexDir, { effort: 'high' }) // resume — must migrate the stale copy to the symlink
 
     const seeded = join(codexDir, 'auth.json')
     expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
@@ -290,7 +303,7 @@ describe('initCodexHome', () => {
     rmNode(join(ctx.codexHome, 'auth.json'), { force: true })
 
     const codexDir = join(ctx.agentsHome, 'agent-init-auth-none')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     expect(existsNode(join(codexDir, 'auth.json'))).toBe(false)
   })
@@ -302,7 +315,7 @@ describe('initCodexHome', () => {
     writeFileSync(join(globalRules, 'default.rules'), 'prefix_rule(pattern=["gh", "issue", "view"], decision="allow")\n')
 
     const codexDir = join(ctx.agentsHome, 'agent-init-rules')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     const seeded = join(codexDir, 'rules')
     expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
@@ -320,7 +333,7 @@ describe('initCodexHome', () => {
     mkdirSync(agentRules, { recursive: true })
     writeFileSync(join(agentRules, 'local.rules'), 'prefix_rule(pattern=["git", "status"], decision="allow")\n')
 
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     expect(lstatNode(agentRules).isSymbolicLink()).toBe(false)
     expect(readNode(join(agentRules, 'local.rules'), 'utf8')).toContain('git", "status')
@@ -330,7 +343,7 @@ describe('initCodexHome', () => {
     const { existsSync: existsNode } = require('node:fs')
     const codexDir = join(ctx.agentsHome, 'agent-init-rules-none')
 
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     expect(existsNode(join(codexDir, 'rules'))).toBe(false)
   })
@@ -346,7 +359,7 @@ describe('initCodexHome', () => {
     writeFileSync(join(legacySkills, 'SKILL.md'), '# Legacy\n')
     const codexDir = join(ctx.agentsHome, 'agent-init-skills')
 
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     const homeSkills = join(codexDir, 'skills')
     expect(lstatSync(homeSkills).isSymbolicLink()).toBe(false)
@@ -364,14 +377,14 @@ describe('initCodexHome', () => {
     mkdirSync(globalSkill, { recursive: true })
     writeFileSync(join(globalSkill, 'SKILL.md'), '# Version one\n')
     const codexDir = join(ctx.agentsHome, 'agent-init-skills-repeat')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     const localOnly = join(codexDir, 'skills', 'local-only')
     mkdirSync(localOnly, { recursive: true })
     writeFileSync(join(localOnly, 'SKILL.md'), '# Local only\n')
     writeFileSync(join(globalSkill, 'SKILL.md'), '# Version two\n')
 
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
 
     expect(readFileSync(join(codexDir, 'skills', 'managed', 'SKILL.md'), 'utf8')).toBe('# Version two\n')
     expect(readFileSync(join(localOnly, 'SKILL.md'), 'utf8')).toBe('# Local only\n')
@@ -380,7 +393,7 @@ describe('initCodexHome', () => {
   it('silently skips skill seeding when the shared Agent Skills directory is missing', () => {
     const codexDir = join(ctx.agentsHome, 'agent-init-skills-none')
 
-    expect(() => initCodexHome(codexDir)).not.toThrow()
+    expect(() => initCodexHome(codexDir, { effort: 'high' })).not.toThrow()
     expect(existsSync(join(codexDir, 'skills'))).toBe(false)
   })
 
@@ -390,8 +403,8 @@ describe('initCodexHome', () => {
     writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
 
     const codexDir = join(ctx.agentsHome, 'agent-init-auth-idem')
-    initCodexHome(codexDir)
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
+    initCodexHome(codexDir, { effort: 'high' })
 
     const seeded = join(codexDir, 'auth.json')
     expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
@@ -400,10 +413,10 @@ describe('initCodexHome', () => {
 
   it('always rewrites config.toml so permission-mode changes apply on resume', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-03')
-    initCodexHome(codexDir)
+    initCodexHome(codexDir, { effort: 'high' })
     const { writeFileSync: writeNode, readFileSync: readNode } = require('node:fs')
     writeNode(join(codexDir, 'config.toml'), 'custom-content')
-    initCodexHome(codexDir, { approvalPolicy: 'explicit' }) // second call — should overwrite with new policy
+    initCodexHome(codexDir, { effort: 'high', approvalPolicy: 'explicit' }) // second call — should overwrite with new policy
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     expect(config).not.toBe('custom-content')
     expect(config).toContain('approval_policy = "explicit"')

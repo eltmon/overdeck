@@ -96,8 +96,10 @@ contributes all five levels):
 - If the model and harness restrictions don't overlap at all, the requested
   level is kept as-is and flagged with a warning rather than dropped.
 
-Pi (`ohmypi`) and Muse Code never accept `max` — their `effortLevels` stop at
-`xhigh`.
+Pi (`ohmypi`) and Muse Code harness rows stop at `xhigh`, so `max` clamps to
+`xhigh` for them even though their CLIs parse `max`. Kimi K3 lists all five
+levels and translates them at launch (`medium`→`high`, `xhigh`→`max`). See
+[How each harness receives effort](/configuration/harnesses#how-each-harness-receives-effort).
 
 **Config validation rejects; a resolved flag clamps.** Setting an
 unsupported level in `config.yaml` (`roles.<role>.effort`,
@@ -186,6 +188,10 @@ assistant turn).
   claude-code agents through `/effort`, and codex, ACP, OpenCode, and pi
   conversations through their control channels — see
   [Changing effort on a running session](#changing-effort-on-a-running-session).
+- Every harness adapter — codex (TUI and app-server), OpenCode and Kimi via
+  ACP, native Kimi Code, Pi and Muse — receives a resolved, clamped level
+  from its producer and never applies its own default (see
+  [How each harness receives effort](/configuration/harnesses#how-each-harness-receives-effort)).
 - Planning — `pan plan --effort`, the dashboard Plan dialog (default `high`,
   all five levels), and the planning half of `pan start` on an unplanned
   issue. The start-planning API rejects an unknown level with 400; the
@@ -206,4 +212,3 @@ hoc and is tracked in sibling issues:
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
 | Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
-| Per-harness mapping/clamping correctness | [#4260](https://github.com/eltmon/overdeck/issues/4260) |

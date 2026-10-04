@@ -52,6 +52,7 @@ import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypi
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
 import { readLatestIndexedSessionId } from '../session-history.js'
+import { resolveEffort } from '../agents/resolve-effort.js'
 
 const execAsync = promisify(exec)
 
@@ -346,6 +347,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       role: 'work',
       workingDir: config.workspace,
       harness: 'ohmypi',
+      piEffort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'ohmypi' }).effort,
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,

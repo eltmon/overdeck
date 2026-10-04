@@ -1040,6 +1040,26 @@ Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**.
 
 Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.
 
+### How each harness receives effort
+
+| Harness | Mechanism | `low` | `medium` | `high` | `xhigh` | `max` |
+|---|---|---|---|---|---|---|
+| Claude Code | `claude --effort <level>` at launch; `/effort` live | low | medium | high | xhigh | max (clamped to the model, e.g. Sonnet 4.6 `xhigh`→`high`) |
+| Codex (TUI) | `model_reasoning_effort` in the agent's `CODEX_HOME/config.toml` | low | medium | high | xhigh | max on models that advertise it |
+| Codex (app-server) | host `--effort` at launch, per-turn `effort`, live `set-effort` | same as Codex TUI | | | | |
+| OpenCode | ACP `setConfigOption("effort", …)`; model variants pass through | low | medium | high | xhigh | max (only levels/variants the model exposes) |
+| Kimi K3 (ACP) | ACP `thinking` option | low | high | high | max | max |
+| Kimi K3 (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
+| Pi (`omp`) | `--thinking <level>`; live `set_thinking_level` | low | medium | high | xhigh | xhigh |
+| Muse Code | `--reasoning-effort <level>` | low | medium | high | xhigh | xhigh |
+| Prime Agent | `--thinking <level>` (1:1) | low | medium | high | xhigh | max |
+
+Overdeck resolves and clamps effort before launch (see [Reasoning effort](/configuration/effort)), and a launch path that reaches a harness without a resolved effort fails with a `requires …Effort` error instead of silently falling back to that harness's own default.
+
+The Pi and Muse CLIs parse `max` (`omp` 17.4.1, `pi` 0.85.0, `muse` 1.4.2), but Overdeck sends at most `xhigh` because their harness rows stop there — relaxing that is a separate decision, not a bug.
+
+**GPT through Claude Code (CLIProxy):** Claude Code sends the level as `output_config.effort` with adaptive thinking; CLIProxy `v7.3.16` maps it to the Codex request's `reasoning.effort` and clamps it to the model, so `--effort` is honored end to end. Overdeck always passes `--effort` on a Claude Code launch, so CLIProxy's own fallbacks (`xhigh` for adaptive thinking without a level, `medium` with no thinking block) never apply. One caveat: `gpt-5.5` is a deprecated alias of `gpt-5.6-sol` in the model catalog, so its effective effort levels and clamping come from the `gpt-5.6-sol` row, not from any levels set on `gpt-5.5` itself.
+
 
 ## OpenRouter favorites
 

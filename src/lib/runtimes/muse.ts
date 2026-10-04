@@ -19,6 +19,7 @@ import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } fro
 import { getRuntimeBehavior } from './behavior.js';
 import { appendSessionIdToHistory } from '../session-history.js';
 import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import { agentPaneExists, closeBackendPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 import { launchRuntimePane, runtimeUsesSupervisor } from './runtime-pane-launch.js';
@@ -92,7 +93,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
     if (useSupervisor) await writePtyToken(config.agentId);
     const launcher = join(dir, 'launcher.sh');
     const script = generateLauncherScript({
-      role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model, museEffort: config.effort,
+      role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model, museEffort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'muse' }).effort,
       museContextFile: await materializeMuseContext(config.agentId, config.workspace),
       museResumeSessionId: config.sessionId, overdeckEnv: { agentId: config.agentId },
       extraEnvExports: [launch.pathExport], useSupervisor,
