@@ -392,6 +392,33 @@ describe('single-work spawn emits the fitness warning for the model it launches'
   });
 });
 
+describe('single-work spawn records the staffed effort on sessions.json (PAN-4259 review fix)', () => {
+  it('writes the tier-staffed effort to the new sessions.json line, not the caller\'s unset effort', async () => {
+    // Before the fix, spawn.ts passed the caller's (unset) options.effort to
+    // createFreshSessionIdentity instead of the staffed launchEffort.effort,
+    // so a tiered single-work spawn's first sessions.json line carried no
+    // effort at all even though state.json (and the launcher) got 'xhigh'.
+    tieredFixture = {
+      enabled: true,
+      tiers: { top: { model: TIER_FRONTIER_MODEL, harness: 'claude-code', difficulties: ['expert'], effort: 'xhigh' } },
+      difficultyToTier: { trivial: 'top', simple: 'top', medium: 'top', complex: 'top', expert: 'top' },
+    };
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+    const { readSessionIndex } = await import('../session-history.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-3842',
+      workspace,
+      role: 'work',
+    });
+
+    expect(state.model).toBe(TIER_FRONTIER_MODEL);
+    expect(state.effort).toBe('xhigh');
+    expect(readSessionIndex(state.id).at(-1)?.effort).toBe('xhigh');
+  });
+});
+
 describe('slot spawn checks the staffed model, not the parent default', () => {
   // This is the ordering the earlier in-test simulator could not protect. The
   // slot path resolves a tier AFTER computing a parent default, so logging

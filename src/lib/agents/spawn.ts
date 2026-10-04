@@ -716,7 +716,7 @@ async function spawnAgentWithoutConsentClaim(
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
-    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel, options.effort),
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel, launchEffort.effort),
     startedBy,
   };
   // PAN-3917 W12: one backend answer for both the supervisor decision and the

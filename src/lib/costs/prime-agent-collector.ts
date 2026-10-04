@@ -44,6 +44,15 @@ export async function collectPrimeAgentCostEvents(home = getOverdeckHome()): Pro
   const events: PrimeAgentCollectedCostEvent[] = [];
   const skipped: Array<{ file: string; reason: string }> = [];
   const errors: string[] = [];
+  const effortLookups = new Map<string, ReturnType<typeof readLaunchEfforts>>();
+  const effortForAgent = (agentId: string): ReturnType<typeof readLaunchEfforts> => {
+    let lookup = effortLookups.get(agentId);
+    if (!lookup) {
+      lookup = readLaunchEfforts(agentId);
+      effortLookups.set(agentId, lookup);
+    }
+    return lookup;
+  };
   for (const { agentId, file } of sessions) {
     let usage: Awaited<ReturnType<typeof parsePrimeAgentCostEvents>>;
     try {
@@ -56,7 +65,7 @@ export async function collectPrimeAgentCostEvents(home = getOverdeckHome()): Pro
       skipped.push({ file, reason: 'no-usage' });
       continue;
     }
-    const effortFor = readLaunchEfforts(agentId);
+    const effortFor = effortForAgent(agentId);
     for (const event of usage) {
       events.push({
         ts: new Date(event.timestamp),
