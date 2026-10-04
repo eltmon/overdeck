@@ -237,6 +237,21 @@ describe('overdeck schema top-ups', () => {
     ).toContain('recovered');
   });
 
+  it('adds cost_events.effort to a database created without it', () => {
+    const dbPath = makeDbPath();
+    const initial = getOverdeckDatabase(dbPath);
+    initial.exec('ALTER TABLE `cost_events` DROP COLUMN `effort`');
+    closeOverdeckDatabase();
+
+    const reopened = getOverdeckDatabase(dbPath);
+    expect(
+      reopened
+        .prepare('PRAGMA table_info(`cost_events`)')
+        .all<{ name: string }>()
+        .map((column) => column.name),
+    ).toContain('effort');
+  });
+
   it('logs a missing-table top-up failure while startup and later top-ups continue', () => {
     const dbPath = makeDbPath();
     const initial = getOverdeckDatabase(dbPath);

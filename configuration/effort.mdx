@@ -277,10 +277,21 @@ assistant turn).
   probe pass.
 - `pan strike` (`roles.strike.effort` → project → `high`); `--dry-run`
   prints the resolved level and its source.
+- Recording — every new `sessions.json` line carries the launch `effort`, and
+  every new cost-ledger row (`cost_events.effort`, `events.jsonl`) carries the
+  effort its request ran at: for claude-code the level on the transcript
+  record, else the session's launch effort. Rows recorded before this change
+  read as `unrecorded`.
+- Reporting — `pan cost effort [--issue <id>] [--json]` groups spend by
+  effort, one bucket per level plus `unrecorded`.
+- Display — Agents page History rows and the detail header show
+  `<level> (<source>)`; `pan status` prints `Effort:`; `pan show` prints
+  `effort` and includes `effort`/`effortSource` in `--json`. The conversation
+  composer chip shows it for conversations.
 
-Everything else — dashboard-wide display — still resolves effort ad hoc and
-is tracked in sibling issues:
+Everything else — issue-view and conversation-row display — still resolves
+effort ad hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
-| Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
+| Effort on issue-view agent rows, conversation rows, and Agents-page conversation entries | [#4510](https://github.com/eltmon/overdeck/issues/4510) |

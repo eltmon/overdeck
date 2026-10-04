@@ -11,6 +11,7 @@ import type { DirectoryEntry } from '@overdeck/contracts';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { useDerivedIssueState } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
+import { formatEffortLabel } from '../../chat/effortChip';
 import { conversationMessagesQueryKey } from '../../chat/useConversationMessagesStream';
 import { TellComposer } from '../../issue-view/TellComposer';
 import { DirectoryIssueContext } from './DirectoryIssueContext';
@@ -72,7 +73,7 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
   const isWorker = entry.role === 'worker' && entry.kind === 'agent' && entry.source === 'overdeck';
   const attention = useDerivedIssueState(entry.issueId)?.attention;
   const state = displayStateOf(entry, attention);
-  const runtime = [known(entry.harness), known(entry.model)].filter(Boolean).join(' · ');
+  const runtime = [known(entry.harness), known(entry.model), formatEffortLabel(entry.effort, entry.effortSource)].filter(Boolean).join(' · ');
 
   return (
     <div className="flex h-full min-h-0 flex-col @container/detail" data-component="directory-detail">

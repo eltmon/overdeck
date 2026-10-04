@@ -27,7 +27,7 @@ import {
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 import { reconcile as reconcileClaudeTranscripts, type ReconcileResult } from '../../lib/costs/reconciler.js';
 import { CostDoorLive, CostWriter, type CostReconcileSummary } from '../../lib/overdeck/cost.js';
-import { getAgentRollup, getCostForIssueAggregate, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
+import { getAgentRollup, getCostForIssueAggregate, getEffortRollup, type EffortRollup, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
 import { codexHome, codexSessionsRoot } from '../../lib/runtimes/storage/codex.js';
 import { piSessionsRoot, piUserAgentDir } from '../../lib/runtimes/storage/pi.js';
 
@@ -206,6 +206,19 @@ export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggreg
     lines.push('');
   }
 
+  return lines;
+}
+
+export function formatEffortRollup(rows: EffortRollup[], issueId?: string): string[] {
+  if (rows.length === 0) return ['No cost events found.'];
+
+  const lines = [
+    chalk.bold(`Costs by effort${issueId ? ` for ${issueId.toUpperCase()}` : ''}`),
+    '',
+  ];
+  for (const row of rows) {
+    lines.push(`  ${row.effort.padEnd(10)} ${formatCost(row.totalCost)}  ${row.calls} calls  ${row.totalTokens.toLocaleString()} tokens`);
+  }
   return lines;
 }
 
@@ -411,6 +424,28 @@ export function createCostCommand(): Command {
           for (const [model, cost] of Object.entries(summary.byModel)) {
             console.log(`  ${model}: ${formatCost(cost)}`);
           }
+        }
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
+        return exitCli(1);
+      }
+    });
+
+  // Show costs grouped by reasoning effort
+  cost
+    .command('effort')
+    .description('Show costs grouped by reasoning effort')
+    .option('-i, --issue <issueId>', 'Limit to one issue')
+    .option('--json', 'Print JSON')
+    .action((options: { issue?: string; json?: boolean }) => {
+      try {
+        const rows = getEffortRollup(options.issue);
+        if (options.json) {
+          console.log(JSON.stringify(rows, null, 2));
+          return;
+        }
+        for (const line of formatEffortRollup(rows, options.issue)) {
+          console.log(line);
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));

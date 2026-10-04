@@ -44,6 +44,13 @@ export function resolveEffortChip(input: {
   return null;
 }
 
+/** `xhigh (role)` for list rows and headers (PAN-4259); null when the level is unknown. */
+export function formatEffortLabel(effort: string | null | undefined, source?: string | null): string | null {
+  if (!isEffortLevel(effort)) return null;
+  const label = source && source in EFFORT_SOURCE_LABELS ? EFFORT_SOURCE_LABELS[source as EffortChipSource] : null;
+  return label ? `${effort} (${label})` : effort;
+}
+
 export function effortChipTitle(
   chip: EffortChip,
   options: { liveChangeEnabled: boolean; harness: string | null | undefined },

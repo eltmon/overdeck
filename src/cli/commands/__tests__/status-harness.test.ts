@@ -110,6 +110,48 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     expect(out).toMatch(/Harness:\s+claude-code/)
   })
 
+  it("prints the agent's effort and source", async () => {
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'agent-pan-4259',
+        issueId: 'PAN-4259',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/ws',
+        startedAt: new Date().toISOString(),
+        tmuxActive: true,
+        effort: 'high',
+        effortSource: 'explicit',
+      },
+    ])
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toMatch(/Effort:\s+high \(explicit\)/)
+  })
+
+  it('prints no "Effort:" line for an agent without effort', async () => {
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'agent-pan-4260',
+        issueId: 'PAN-4260',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/ws',
+        startedAt: new Date().toISOString(),
+        tmuxActive: true,
+      },
+    ])
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).not.toMatch(/Effort:/)
+  })
+
   it('json mode includes harness in the agent payload', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
       {
