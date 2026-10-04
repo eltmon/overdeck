@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:07:56Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4507: Issue poller: back off when nothing changes instead of polling every repo every 30 s",
-    "updated": "2026-10-04T02:13:24.933Z"
+    "updated": "2026-10-04T02:14:01.172Z"
   },
   "plan": {
     "id": "pan-4507",
     "title": "Issue poller: back off when nothing changes instead of polling every repo every 30 s",
-    "status": "proposed",
+    "status": "running",
     "uid": "dc30c2a5-4c82-4e64-982a-1c326ed7cf26",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:07:56Z",
-    "updated": "2026-10-04T02:13:24.933Z",
+    "updated": "2026-10-04T02:14:01.172Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4507",
@@ -566,5 +566,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
