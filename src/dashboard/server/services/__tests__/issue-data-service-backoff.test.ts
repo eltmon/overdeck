@@ -148,4 +148,30 @@ describe('IssueDataService GitHub unchanged backoff (PAN-4507)', () => {
     expect(github().currentInterval).toBe(150_000);
     expect(github().intervalReason).toBe('rate-limit-backoff');
   });
+
+  describe('getDiagnostics', () => {
+    it('reports the default cadence before any poll is scheduled', () => {
+      expect(svc.getDiagnostics().github).toMatchObject({
+        pollIntervalReason: 'default',
+        unchangedStreak: 0,
+        nextPollAt: null,
+      });
+    });
+
+    it('reports the unchanged backoff, streak and next poll time', async () => {
+      await grow(2);
+      expect(svc.getDiagnostics().github).toMatchObject({
+        pollInterval: 120_000,
+        pollIntervalReason: 'unchanged-backoff',
+        unchangedStreak: 2,
+        nextPollAt: new Date(Date.now() + 120_000).toISOString(),
+      });
+    });
+
+    it('reports a rate-limit backoff', async () => {
+      backoffMs = 120_000;
+      await grow(0);
+      expect(svc.getDiagnostics().github.pollIntervalReason).toBe('rate-limit-backoff');
+    });
+  });
 });
