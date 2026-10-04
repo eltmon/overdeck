@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T03:00:38.761Z",
+  "updated": "2026-10-04T03:00:50.202Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4508",
       "claimedAt": "2026-10-04T02:59:02.467Z",
       "doneAt": "2026-10-04T03:00:38.760Z"
+    },
+    "jev-toggle-gating-client": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T03:00:50.202Z"
     }
   }
 }
