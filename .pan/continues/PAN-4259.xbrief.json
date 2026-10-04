@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:59:58.327Z",
+  "updated": "2026-10-04T04:00:09.907Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "agents-row-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:59:58.327Z"
+    },
+    "agents-row-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:00:09.906Z"
     }
   }
 }
