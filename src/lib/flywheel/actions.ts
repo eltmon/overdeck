@@ -13,8 +13,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import type { EffortLevel, EffortSource } from '@overdeck/contracts';
 
 import type { LegacyConversation } from '../overdeck/conversations.js';
+import type { NormalizedConfig } from '../config-yaml.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND } from './constants.js';
 import {
@@ -51,6 +53,7 @@ export interface FlywheelStartResult {
   session: string;
   harness: RuntimeName;
   model: string;
+  effort: EffortLevel;
   prompt: string;
   cwd: string;
 }
@@ -70,12 +73,14 @@ export interface FlywheelActionDeps extends Pick<
   /** Raw pane probe on the host backend — true even for a row-less orphan session. */
   tmuxSessionExists?: (session: string) => Promise<boolean>;
   killSession?: (session: string) => Promise<void>;
-  resolveModelAndHarness?: (opts: { model?: string; harness?: string }) => Promise<{ model: string; harness: RuntimeName }>;
+  resolveModelAndHarness?: (opts: { model?: string; harness?: string }) => Promise<{
+    model: string; harness: RuntimeName; effort: EffortLevel; effortSource: EffortSource;
+  }>;
   createConversation?: (opts: {
     name: string; tmuxSession: string; cwd: string; claudeSessionId: string; title: string;
     titleSource: 'manual'; model: string; effort: string; harness: RuntimeName;
   }) => unknown;
-  spawnSession?: (session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName) => Promise<void>;
+  spawnSession?: (session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName, effort: EffortLevel) => Promise<void>;
   waitReady?: (session: string, harness: RuntimeName, mode: 'spawn' | 'respawn') => Promise<void>;
   /** Deliver a message (a slash command, a request) to the loop and submit it. */
   sendMessage?: (session: string, message: string, caller: string) => Promise<void>;
@@ -100,16 +105,22 @@ async function defaultKillSession(session: string): Promise<void> {
   await closeConversationPane(session);
 }
 
-async function defaultResolveModelAndHarness(opts: { model?: string; harness?: string }): Promise<{ model: string; harness: RuntimeName }> {
-  const [{ loadConfigSync }, { resolveModel }, { resolveHarness }] = await Promise.all([
+/** Resolves the flywheel's launch model, harness, and reasoning effort together, so roles.flywheel.effort is honored instead of a hardcoded default. */
+export async function resolveFlywheelLaunch(
+  opts: { model?: string; harness?: string },
+  config?: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution'>,
+): Promise<{ model: string; harness: RuntimeName; effort: EffortLevel; effortSource: EffortSource }> {
+  const [{ loadConfigSync }, { resolveModel }, { resolveHarness }, { resolveEffort }] = await Promise.all([
     import('../config-yaml/load.js'),
     import('../config-yaml/roles.js'),
     import('../harness-resolve.js'),
+    import('../agents/resolve-effort.js'),
   ]);
-  const { config } = loadConfigSync();
-  const model = opts.model ?? resolveModel('flywheel', undefined, config);
+  const cfg = config ?? loadConfigSync().config;
+  const model = opts.model ?? resolveModel('flywheel', undefined, cfg);
   const harness = await resolveHarness({ explicit: opts.harness as RuntimeName | undefined, role: 'flywheel', model });
-  return { model, harness };
+  const resolved = resolveEffort({ role: 'flywheel', model, harness, config: cfg });
+  return { model, harness, effort: resolved.effort, effortSource: resolved.source };
 }
 
 async function defaultCreateConversation(opts: Parameters<NonNullable<FlywheelActionDeps['createConversation']>>[0]): Promise<void> {
@@ -117,9 +128,9 @@ async function defaultCreateConversation(opts: Parameters<NonNullable<FlywheelAc
   createConversation(opts);
 }
 
-async function defaultSpawnSession(session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName): Promise<void> {
+async function defaultSpawnSession(session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName, effort: EffortLevel): Promise<void> {
   const runtime = await import('../overdeck/conversation-runtime.js');
-  await runtime.spawnConversationSession(session, cwd, claudeSessionId, model, 'high', undefined, false, harness);
+  await runtime.spawnConversationSession(session, cwd, claudeSessionId, model, effort, undefined, false, harness);
   await runtime.waitForTmuxSession(session);
 }
 
@@ -198,7 +209,7 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
   }
 
   const cwd = opts.cwd ?? process.cwd();
-  const { model, harness } = await (deps.resolveModelAndHarness ?? defaultResolveModelAndHarness)(opts);
+  const { model, harness, effort } = await (deps.resolveModelAndHarness ?? resolveFlywheelLaunch)(opts);
 
   // Register the conversation before the session exists, so the dashboard's
   // conversation list sees it the moment it comes up. An operator
@@ -212,14 +223,14 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
     title: 'Flywheel',
     titleSource: 'manual',
     model,
-    effort: 'high',
+    effort,
     harness,
   });
 
   // The loop is the skill. Hand it the slash command and let it run.
   const prompt = opts.orders ? `${FLYWHEEL_SKILL_COMMAND} ${opts.orders}` : FLYWHEEL_SKILL_COMMAND;
   try {
-    await (deps.spawnSession ?? defaultSpawnSession)(FLYWHEEL_CONVERSATION_SESSION, cwd, claudeSessionId, model, harness);
+    await (deps.spawnSession ?? defaultSpawnSession)(FLYWHEEL_CONVERSATION_SESSION, cwd, claudeSessionId, model, harness, effort);
     await (deps.waitReady ?? defaultWaitReady)(FLYWHEEL_CONVERSATION_SESSION, harness, 'spawn');
     await (deps.sendMessage ?? defaultSendMessage)(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start');
   } catch (error) {
@@ -231,7 +242,7 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
     throw error;
   }
 
-  return { session: FLYWHEEL_CONVERSATION_SESSION, harness, model, prompt, cwd };
+  return { session: FLYWHEEL_CONVERSATION_SESSION, harness, model, effort, prompt, cwd };
 }
 
 /** D4: stop the session, keep the row and the transcript. */

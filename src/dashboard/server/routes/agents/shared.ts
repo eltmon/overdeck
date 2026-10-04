@@ -8,11 +8,12 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 import { HttpServerRequest } from 'effect/unstable/http';
-import type { AgentStatus } from '@overdeck/contracts';
+import { EFFORT_LEVELS, isEffortLevel, type AgentStatus, type EffortLevel } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
+import { normalizeModelOverride } from '../../../../lib/model-validation.js';
 import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
 import { resolvePrimaryWorkspaceRepoDir } from '../../../../lib/project-repos.js';
 import {
@@ -77,6 +78,8 @@ export function buildPanStartArgs(input: {
    */
   model?: string | null;
   harness?: RuntimeName | null;
+  /** Explicit operator-chosen effort only — never a resolved default (PAN-4256, same rule as model above). */
+  effort?: EffortLevel | null;
   allowHost?: boolean;
   offBook?: boolean;
 }): string[] {
@@ -86,9 +89,57 @@ export function buildPanStartArgs(input: {
     '--local',
     ...(input.model ? ['--model', input.model] : []),
     ...(input.harness ? ['--harness', input.harness] : []),
+    ...(input.effort ? ['--effort', input.effort] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
     ...(input.offBook ? ['--off-book'] : []),
   ];
+}
+
+/**
+ * Parses an explicit effort override from a request body. Blank/absent
+ * values resolve to undefined so `pan start` falls back to role/tier
+ * resolution; anything else must be a canonical effort level (PAN-4256).
+ */
+export function parseAgentEffortOverride(value: unknown): EffortLevel | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!isEffortLevel(value)) {
+    throw new Error(`Invalid effort "${value}"; expected one of ${EFFORT_LEVELS.join(', ')}`);
+  }
+  return value;
+}
+
+export interface AgentRestartBody {
+  model?: string;
+  harness?: RuntimeName;
+  effort?: EffortLevel;
+  graceful: boolean;
+  message?: string;
+  force: boolean;
+}
+
+/**
+ * Today's `/api/agents/:id/restart` body destructure plus model/effort
+ * validation, consolidated so the route can replace both with one parse
+ * call (PAN-4256).
+ */
+export function parseAgentRestartBody(body: unknown): { ok: true; value: AgentRestartBody } | { ok: false; error: string } {
+  const { model, harness, graceful = true, message, force = false, effort } = body as {
+    model?: string;
+    harness?: RuntimeName;
+    graceful?: boolean;
+    message?: string;
+    force?: boolean;
+    effort?: unknown;
+  };
+  let restartModel: string | undefined;
+  let restartEffort: EffortLevel | undefined;
+  try {
+    restartModel = normalizeModelOverride(model);
+    restartEffort = parseAgentEffortOverride(effort);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  return { ok: true, value: { model: restartModel, harness, effort: restartEffort, graceful, message, force } };
 }
 
 /**

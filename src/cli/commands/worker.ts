@@ -19,6 +19,7 @@ import { resolve } from 'node:path';
 
 import type { Command } from 'commander';
 import { Effect } from 'effect';
+import { EFFORT_LEVELS, isEffortLevel } from '@overdeck/contracts';
 
 import { exitCli } from '../exit.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
@@ -174,6 +175,7 @@ export interface WorkerRunOptions {
   detach?: boolean;
   timeout?: string;
   stopAfterReport?: boolean;
+  effort?: string;
 }
 
 export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCliDeps): Promise<number> {
@@ -187,6 +189,10 @@ export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCl
   }
   if (options.harness && !HARNESSES.includes(options.harness as RuntimeName)) {
     deps.stderr(`Unknown --harness ${options.harness}; expected one of ${HARNESSES.join(', ')}.`);
+    return WORKER_EXIT.usage;
+  }
+  if (options.effort && !isEffortLevel(options.effort)) {
+    deps.stderr(`Unknown --effort ${options.effort}; expected one of ${EFFORT_LEVELS.join(', ')}.`);
     return WORKER_EXIT.usage;
   }
   const timeoutMs = parseSeconds(options.timeout, '--timeout', deps);
@@ -223,6 +229,7 @@ export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCl
       readOnly: options.readOnly === true,
       cwd: options.cwd,
       name: options.name,
+      effort: options.effort,
     });
   } catch (error) {
     const workerId = (error as { workerId?: string }).workerId;
@@ -437,6 +444,7 @@ export function registerWorkerCommands(program: Command, deps: () => WorkerCliDe
     .option('--brief <file>', 'The brief, from a file')
     .option('--model <model>', 'Model override (default: roles.worker.model)')
     .option('--harness <harness>', 'Harness override (default: routed from the model)')
+    .option('--effort <level>', 'Reasoning effort: low | medium | high | xhigh | max (defaults to roles.worker.effort)')
     .option('--read-only', 'Run in the issue workspace with git writes blocked')
     .option('--cwd <path>', 'Working directory inside the issue workspace')
     .option('--parent <id>', 'Spawning agent or conversation (default: $OVERDECK_AGENT_ID, then $OVERDECK_CONVERSATION)')

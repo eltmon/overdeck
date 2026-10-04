@@ -1,3 +1,4 @@
+import type { EffortLevel } from '@overdeck/contracts';
 import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
@@ -94,6 +95,8 @@ export type RecoverAgentResult =
 export interface RestartAgentOptions {
   model?: string;
   harness?: RuntimeName;
+  /** Explicit operator-chosen effort only — pins the relaunch as 'explicit' (PAN-4256). */
+  effort?: EffortLevel;
   graceful?: boolean;
   message?: string;
   force?: boolean;
@@ -191,7 +194,7 @@ export async function restartAgent(
   deps: RestartAgentDeps = {},
 ): Promise<RestartAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
-  const { graceful = true, model: rawNewModel, harness: newHarness, message, force = false } = opts;
+  const { graceful = true, model: rawNewModel, harness: newHarness, effort: effortOverride, message, force = false } = opts;
   const newModel = normalizeModelOverride(rawNewModel);
   const readAgentState = deps.getAgentStateSync ?? getAgentState;
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
@@ -293,8 +296,12 @@ export async function restartAgent(
     agentState.model = newModel;
   }
   agentState.harness = effectiveHarness;
-  const relaunchEffort = resolveRelaunchEffort(agentState, { model: effectiveModel, harness: effectiveHarness });
+  const relaunchEffort = resolveRelaunchEffort(
+    effortOverride ? { ...agentState, effort: effortOverride, effortSource: 'explicit' } : agentState,
+    { model: effectiveModel, harness: effectiveHarness },
+  );
   if (relaunchEffort.warning) logLifecycle(normalizedId, `relaunch effort: ${relaunchEffort.warning}`);
+  logLifecycle(normalizedId, `restartAgent effort: ${relaunchEffort.effort} (${relaunchEffort.source})`);
   agentState.effort = relaunchEffort.effort;
   agentState.effortSource = relaunchEffort.source;
   agentState.status = 'starting';

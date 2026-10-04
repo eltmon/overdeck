@@ -7,6 +7,7 @@
 
 import { Data, Effect } from 'effect';
 import { spawnRun } from '../agents.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getPrFacts } from './pr-facts.js';
 import { clearTestVerdictArtifact } from './test-verdict.js';
@@ -102,8 +103,17 @@ export const dispatchTestAgentAndNotify = (
       return { delivered: false, notified: false, reason: 'no-open-pr' as const };
     }
 
+    const testEffort = yield* Effect.sync(() => resolveEffort({ role: 'test', issueId }));
+    if (testEffort.warning) console.warn(`[test-dispatch] ${testEffort.warning}`);
+
     const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
-      try: () => spawnRun(issueId, 'test', { workspace, prompt, startedBy: 'test-agent-queue' }),
+      try: () => spawnRun(issueId, 'test', {
+        workspace,
+        prompt,
+        startedBy: 'test-agent-queue',
+        effort: testEffort.effort,
+        effortSource: testEffort.source,
+      }),
       catch: (cause) => {
         const msg = cause instanceof Error ? cause.message : String(cause);
         return new TestDispatchError({ issueId, message: msg, cause });

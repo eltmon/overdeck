@@ -21,6 +21,11 @@ const prFacts = vi.hoisted(() => ({
 }));
 vi.mock('../pr-facts.js', () => prFacts);
 
+const resolveEffortMock = vi.hoisted(() => ({
+  resolveEffort: vi.fn(() => ({ effort: 'high', source: 'default', requested: 'high', clamped: false })),
+}));
+vi.mock('../../agents/resolve-effort.js', () => resolveEffortMock);
+
 import { spawnRun } from '../../agents.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
 import { buildTestRolePrompt, dispatchTestAgentAndNotify } from '../test-agent-queue.js';
@@ -28,6 +33,7 @@ import { buildTestRolePrompt, dispatchTestAgentAndNotify } from '../test-agent-q
 describe('test role dispatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resolveEffortMock.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
   });
 
   it('builds a test role prompt that folds UAT into the test role', () => {
@@ -99,6 +105,27 @@ describe('test role dispatch', () => {
       'agent-pan-503',
       expect.stringContaining('The test role has been dispatched automatically'),
     );
+  });
+
+  it('resolves roles.test.effort and threads it into spawnRun (PAN-4256)', async () => {
+    resolveEffortMock.resolveEffort.mockReturnValue({ effort: 'low', source: 'role', requested: 'low', clamped: false });
+
+    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503'));
+
+    expect(resolveEffortMock.resolveEffort).toHaveBeenCalledWith({ role: 'test', issueId: 'PAN-503' });
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'test', expect.objectContaining({
+      effort: 'low',
+      effortSource: 'role',
+    }));
+  });
+
+  it('falls back to the default effort when no role or project effort is configured (PAN-4256)', async () => {
+    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'test', expect.objectContaining({
+      effort: 'high',
+      effortSource: 'default',
+    }));
   });
 
   it('does not spawn when no project is configured', async () => {

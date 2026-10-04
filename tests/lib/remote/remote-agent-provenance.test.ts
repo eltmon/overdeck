@@ -10,13 +10,19 @@ const mocks = vi.hoisted(() => ({
   failPushDaemon: false,
   launcherOptions: undefined as Record<string, unknown> | undefined,
   remoteFiles: new Map<string, string>(),
+  getStatus: vi.fn(() => Effect.succeed('running')),
+  effortConfig: {} as Record<string, unknown>,
 }));
 
 vi.mock('../../../src/lib/remote/fly-provider.js', () => ({
   createFlyProvider: () => ({
-    getStatus: () => Effect.succeed('running'),
+    getStatus: mocks.getStatus,
     ssh: () => Effect.succeed({ stdout: '', stderr: '', exitCode: 0 }),
   }),
+}));
+
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfigSync: () => ({ config: mocks.effortConfig }),
 }));
 
 vi.mock('../../../src/lib/agents/provider-env.js', () => ({
@@ -77,6 +83,9 @@ describe('remote agent provenance', () => {
     mocks.failPushDaemon = false;
     mocks.launcherOptions = undefined;
     mocks.remoteFiles.clear();
+    mocks.getStatus.mockClear();
+    mocks.getStatus.mockReturnValue(Effect.succeed('running'));
+    mocks.effortConfig = {};
     home = mkdtempSync(join(tmpdir(), 'remote-agent-provenance-'));
     previousHome = process.env.HOME;
     process.env.HOME = home;
@@ -241,5 +250,79 @@ describe('remote agent provenance', () => {
     expect(mocks.determineModelCalls).toEqual([{ model: undefined, role: 'work' }]);
     expect(mocks.launcherOptions?.model).toBe('routed-work-model');
     expect(state.model).toBe('routed-work-model');
+  });
+
+  // PAN-4256: the remote work agent resolves roles.work.effort instead of
+  // launching with no effort flag at all.
+  it('resolves roles.work.effort and passes it as the launcher extraArgs', async () => {
+    mocks.effortConfig = { roles: { work: { effort: 'medium' } } };
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+
+    await spawnRemoteAgent({
+      issueId: 'PAN-3116',
+      workspace: {
+        id: 'remote-pan-3116',
+        issue: 'PAN-3116',
+        provider: 'fly',
+        vmName: 'pan-3116-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      prompt: 'implement the issue',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:dashboard',
+      tier: 'ephemeral',
+    });
+
+    expect(mocks.launcherOptions?.extraArgs).toBe('--effort medium');
+  });
+
+  it('appends an explicit --effort to the direct remote command without a prompt', async () => {
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+    await spawnRemoteAgent({
+      issueId: 'PAN-3117',
+      workspace: {
+        id: 'remote-pan-3117',
+        issue: 'PAN-3117',
+        provider: 'fly',
+        vmName: 'pan-3117-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:dashboard',
+      tier: 'ephemeral',
+      effort: 'low',
+    });
+
+    const launch = mocks.commands.find(command =>
+      command.includes('new-session') && command.includes('agent-pan-3117'),
+    );
+    expect(launch).toContain('--effort low');
+  });
+
+  it('rejects an invalid --effort before any Fly VM status call', async () => {
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+
+    await expect(spawnRemoteAgent({
+      issueId: 'PAN-3118',
+      workspace: {
+        id: 'remote-pan-3118',
+        issue: 'PAN-3118',
+        provider: 'fly',
+        vmName: 'pan-3118-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:dashboard',
+      tier: 'ephemeral',
+      effort: 'ultra',
+    })).rejects.toThrow('Invalid effort level');
+
+    expect(mocks.getStatus).not.toHaveBeenCalled();
   });
 });
