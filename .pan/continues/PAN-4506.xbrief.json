@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T03:02:28.798Z",
+  "updated": "2026-10-04T03:02:42.340Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "docs-dispatch-failed-and-herdr-text.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:02:28.798Z"
+    },
+    "docs-dispatch-failed-and-herdr-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:02:42.340Z"
     }
   }
 }
