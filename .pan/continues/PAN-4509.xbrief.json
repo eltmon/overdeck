@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4509",
   "created": "2026-10-04T02:10:08.078Z",
-  "updated": "2026-10-04T02:21:46.039Z",
+  "updated": "2026-10-04T02:21:57.860Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "cli.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T02:21:46.039Z"
+    },
+    "fix-currency.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:57.860Z"
     }
   }
 }
