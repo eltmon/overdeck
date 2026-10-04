@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:58:16.721Z",
+  "updated": "2026-10-04T03:58:28.422Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "reconciler-effort.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T03:58:16.721Z"
+    },
+    "collectors-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:58:28.422Z"
     }
   }
 }
