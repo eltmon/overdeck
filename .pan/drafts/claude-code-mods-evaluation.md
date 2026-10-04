@@ -6,6 +6,8 @@
 
 Evidence verified at commit a53af5777c3
 
+Published copy: https://claude.ai/artifact/JevxSris6qA2X34rjXxxdc
+
 ## Executive summary
 
 Claude Code 2.1.287 added mods: plugins that run TypeScript inside the Claude Code process, draw bands and panes, and can rewrite or answer tool calls, prompts and turns. Overdeck could use them to replace parts of how it reaches into Claude Code from outside, but three limits shape every idea. A mod cannot listen on a socket, cannot redraw the permission prompt, and can be unloaded without warning (a remote switch, worker crashes, `disableAllHooks`). It also runs only in Claude Code, while Overdeck runs several harnesses.
