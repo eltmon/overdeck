@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T04:33:52.920Z",
+  "updated": "2026-10-04T04:34:05.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -83,6 +83,10 @@
     "w1-runtime-command-producers.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T04:33:52.920Z"
+    },
+    "w2-codex-home-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:34:05.403Z"
     }
   }
 }
