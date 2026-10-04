@@ -28,6 +28,14 @@ export function stripDiffSearchParams<T extends Record<string, unknown>>(
   return rest as Omit<T, 'diff' | 'diffTurnId' | 'diffFilePath'>
 }
 
+/** Build a diff fetch URL: `base` plus non-empty query params (PAN-4503). */
+export function buildDiffFetchUrl(base: string, params: Record<string, string | null | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value)
+  const query = search.toString()
+  return query ? `${base}?${query}` : base
+}
+
 export function parseDiffRouteSearch(search: Record<string, unknown>): DiffRouteSearch {
   const diff = isDiffOpenValue(search.diff) ? '1' : undefined
   const diffTurnId = diff ? normalizeSearchString(search.diffTurnId) : undefined

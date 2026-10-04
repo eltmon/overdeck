@@ -12,6 +12,7 @@ import {
   Columns2,
   ExternalLink,
   Rows3,
+  Space,
   WrapText,
   X,
 } from 'lucide-react'
@@ -26,7 +27,7 @@ import {
 import { cn } from '../lib/utils'
 import { useTheme } from '../hooks/useTheme'
 import { useDiffPreferences } from '../hooks/useDiffPreferences'
-import { parseDiffRouteSearch } from '../lib/diffRouteSearch'
+import { buildDiffFetchUrl, parseDiffRouteSearch } from '../lib/diffRouteSearch'
 import { buildPatchCacheKey, resolveDiffThemeName } from '../lib/diffRendering'
 import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './DiffPanelShell'
@@ -357,6 +358,7 @@ export function DiffPanel({
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
   const diffRenderMode = diffPrefs.diffRenderMode
   const diffWordWrap = diffPrefs.diffWordWrap
+  const ignoreWhitespace = diffPrefs.ignoreWhitespace
   const patchViewportRef = useRef<HTMLDivElement>(null)
   const turnStripRef = useRef<HTMLDivElement>(null)
   const [canScrollTurnStripLeft, setCanScrollTurnStripLeft] = useState(false)
@@ -435,19 +437,17 @@ export function DiffPanel({
 
   const { data: diffResponse, isLoading: isLoadingDiff } = useQuery({
     queryKey: isVsMain
-      ? ['diff-vs-main', agentId, selectedFilePath ?? null]
+      ? ['diff-vs-main', agentId, selectedFilePath ?? null, ignoreWhitespace]
       : selectedTurn
-        ? ['diff-turn', agentId, selectedTurn.turnId, selectedFilePath ?? null]
-        : ['diff-full', agentId, selectedFilePath ?? null],
+        ? ['diff-turn', agentId, selectedTurn.turnId, selectedFilePath ?? null, ignoreWhitespace]
+        : ['diff-full', agentId, selectedFilePath ?? null, ignoreWhitespace],
     queryFn: async () => {
-      let url = isVsMain
+      const path = isVsMain
         ? `${baseUrl}/vs-main`
         : selectedTurn
           ? `${baseUrl}/${encodeURIComponent(selectedTurn.turnId)}`
           : `${baseUrl}/full`
-      if (selectedFilePath) {
-        url += `?file=${encodeURIComponent(selectedFilePath)}`
-      }
+      const url = buildDiffFetchUrl(path, { file: selectedFilePath, ignoreWhitespace: ignoreWhitespace ? '1' : null })
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch diff')
       return res.json() as Promise<{ diff?: string; files?: TurnDiffFileChange[] }>
@@ -698,6 +698,14 @@ export function DiffPanel({
           title={diffWordWrap ? 'Disable line wrapping' : 'Enable line wrapping'}
         >
           <WrapText className="size-3" />
+        </ToggleButton>
+        <ToggleButton
+          pressed={ignoreWhitespace}
+          onPressedChange={(v) => updateDiffPrefs({ ignoreWhitespace: v })}
+          ariaLabel={ignoreWhitespace ? 'Show whitespace changes' : 'Ignore whitespace changes'}
+          title={ignoreWhitespace ? 'Show whitespace changes' : 'Ignore whitespace changes'}
+        >
+          <Space className="size-3" />
         </ToggleButton>
         {mode === 'inline' && (
           <button
