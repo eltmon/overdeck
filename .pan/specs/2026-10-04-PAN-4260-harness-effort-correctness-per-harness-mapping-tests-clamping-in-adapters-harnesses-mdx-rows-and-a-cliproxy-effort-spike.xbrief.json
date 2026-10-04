@@ -1,0 +1,813 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:18:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4260: Harness effort correctness: per-harness mapping tests, clamping in adapters, harnesses.mdx rows, and a CLIProxy --effort spike",
+    "updated": "2026-10-04T02:27:02.695Z"
+  },
+  "plan": {
+    "id": "pan-4260",
+    "title": "Harness effort correctness: per-harness mapping tests, clamping in adapters, harnesses.mdx rows, and a CLIProxy --effort spike",
+    "status": "proposed",
+    "uid": "855b7ebc-b146-45d7-92e7-eaea1388b1b8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T02:18:54Z",
+    "updated": "2026-10-04T02:27:02.695Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4260",
+        "label": "PAN-4260",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (program PRD + audit)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "harness",
+      "codex",
+      "acp",
+      "kimi",
+      "pi",
+      "muse",
+      "cliproxy",
+      "docs",
+      "lint"
+    ],
+    "metadata": {
+      "sizeJustification": "27 files across 5 subsystems (src/lib plus four individual doc/script files). Each adapter fallback removal must land with its producers and with the test fixtures that build that launch, otherwise the launch either throws (D2) or silently changes effort; 14 of the 27 files are one-to-three-line edits or test fixtures. Splitting by harness would put the shared launcher-generator.ts, launcher-generator.test.ts and model-capabilities.ts edits into several issues that must serialize anyway.",
+      "canonicalFilename": "2026-10-04-PAN-4260-harness-effort-correctness-per-harness-mapping-tests-clamping-in-adapters-harnesses-mdx-rows-and-a-cliproxy-effort-spike.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "After PAN-4249, effort resolves through resolveEffort, but seven harness adapters still invent their own default (`?? 'high'` in runtimes/codex.ts, acp/host.ts, codex/app-server-host.ts, launcher-generator.ts x2, launcher-codex-command.ts, and the `effort = 'high'` default in kimi-effort.ts) and two copy the level list. Planning also found four live bugs: codex work-TUI agents write the raw (unresolved) effort into config.toml so role/sub-role effort is lost (F2); OhmypiRuntime.spawnAgent drops the resolved effort crash-respawn and session-rotation pass (F3); clamping kimi-code/k3 against its native-level row turns medium into low and xhigh into high before translation (F4); gpt-5.5 has no effort list so max reaches Codex although Codex does not advertise it (F5). No harness has a test that proves the native value for all five levels, and the harness docs do not state each mechanism or whether CLIProxy-routed GPT honors --effort.",
+      "Proposal": "Producers resolve, emitters never default (PRD D1/D2/D3). Every producer that builds a launch config or host argv calls resolveEffort({ explicit, model, harness[, role] }) (OpenCode variants pass through, D4). Emitters drop every fallback and level-list copy; where a harness always received a value, a missing one throws a named `... requires <field>` error. Fix the kimi-code/k3 rows to list canonical levels (translation narrows, D5) and give gpt-5.5 low..xhigh (D6). Keep the pi and muse harness rows at low..xhigh (D7). Add one five-level mapping table per harness in the existing test files (D10). The CLIProxy spike was answered during planning: Claude Code sends output_config.effort with adaptive thinking, and CLIProxy v7.3.16 maps it to Codex reasoning.effort, so --effort is honored and no follow-up issue is needed (F7, D11). Document each harness's mechanism and mapping in configuration/harnesses.mdx, align harness-landscape.mdx and effort.mdx, and drop the five adapter rows from scripts/lint-effort.sh.",
+      "NonGoals": "- No change to the ohmypi or muse HarnessBehavior.effortLevels rows (stay low..xhigh).\n- No edit to packages/pi-extension or packages/ohmypi-extension, and no other OMP-specific work (PAN-4003).\n- No handling of Codex-native non-canonical values (for example `ultra`) synced back from the TUI via thread/settings/updated.\n- No prime-agent mapping test or code change (documented only).\n- No CLIProxy code change and no CLIProxy follow-up issue.\n- No change to role launch surfaces, tier slots, planning effort semantics, or effort display (PAN-4256, PAN-4257, PAN-4258, PAN-4259); spawn.ts, spawn-prep.ts and spawn-planning-session.ts get exactly one museEffort line plus one import each.\n- No xhigh or max default anywhere, and no `?? DEFAULT_EFFORT` or default-parameter substitute for a removed fallback.\n- No emitter (launcher-generator.ts, launcher-codex-command.ts, acp/host.ts, codex/app-server-host.ts, kimi-effort.ts) imports resolve-effort.ts.\n- No new model rows; only the gpt-5.5, kimi-code/k3 and kimi-code/k3-256k effortLevels values change.\n- No CLIProxy request logging enabled on the shared sidecar."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve in producers; emitters never default. Where a harness always received an effort, a missing value throws `<harness> launcher requires <field>`.",
+        "rationale": "The issue says 'values resolved upstream'. Omitting the flag instead would silently hand the choice to each harness's own default (Kimi's and Codex's are not high), breaking PAN-4249 NFR-1 and the no-hardcoded-fallback principle; throwing matches the existing '... launcher requires X' errors in launcher-generator.ts."
+      },
+      {
+        "summary": "Fix kimi-code/k3 and kimi-code/k3-256k effortLevels to all five canonical levels.",
+        "rationale": "With upstream clamping, the native-level row turns medium into low and xhigh into high before kimi-effort.ts translates (verified against clampEffort). PAN-4249 D6 says translation stays in adapters; the k3/k3[1m] ACP rows already list all five."
+      },
+      {
+        "summary": "Give gpt-5.5 effortLevels low..xhigh.",
+        "rationale": "Codex 0.159's own model catalog (~/.codex/models_cache.json supported_reasoning_levels) advertises gpt-5.5 without max; Codex's protocol treats effort as a per-model string, so the model row is where the restriction belongs."
+      },
+      {
+        "summary": "Keep the ohmypi and muse harness rows at low..xhigh although omp 17.4.1, pi 0.85.0 and muse 1.4.2 parse max.",
+        "rationale": "The issue's acceptance criterion asks for max clamping on pi and muse; CLI parsing does not prove the routed models honor max; PAN-4249 D8 set these rows. Relaxing them is a separate operator decision, recorded as a non-goal."
+      },
+      {
+        "summary": "Do not edit the pi/ohmypi extension ThinkingLevel unions; re-label their lint rows as native-vocabulary matches.",
+        "rationale": "They model the Pi runtime's own API (off/minimal), not EFFORT_LEVELS; the operator is removing OMP support (PAN-4003) and asked that no time go into OMP-specific code."
+      },
+      {
+        "summary": "Close the CLIProxy spike during planning with no follow-up issue.",
+        "rationale": "A local capture showed Claude Code sends output_config.effort with adaptive thinking for gpt-5.6-luna; CLIProxyAPI v7.3.16 (the installed 7.3.16/c404af96) maps it to Codex reasoning.effort in internal/translator/codex/claude/codex_claude_request.go. The question is answered without live model calls."
+      },
+      {
+        "summary": "Put the mapping tables in existing test files rather than one new mapping-test file.",
+        "rationale": "The existing files already hold the fixtures (fake codex home, fake app-server manager, ACP stub runtime) and many must change anyway for the required-effort fixtures; this keeps the file surface smaller."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-runtime-command-producers",
+        "title": "runtime-command.ts launcher-field producers always return a resolved effort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "w2-codex-home-effort",
+            "w5-kimi-effort",
+            "w6-acp-host-effort"
+          ],
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/runtime-command-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/runtime-command-effort.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "runtime-command-effort.test.ts passes including the codex-hoist, claude-code five-level, and ACP/kimi-code producer cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/agents/runtime-command.ts: (1) getCodexLauncherFields computes `const codexEffort = resolveEffort({ explicit: effort, role, model, harness: 'codex' }).effort;` once and passes it to initCodexHome as `effort: codexEffort` and returns it as `codexEffort` (fixes F2: work-TUI config.toml used the raw effort). (2) getAcpLauncherFields renames `_role` to `role`, computes the harness once, and always returns `acpEffort: harness === 'opencode' && effort && !isEffortLevel(effort) ? effort : resolveEffort({ explicit: effort, role, model, harness }).effort` (return field becomes required `acpEffort: string`). (3) getKimiCodeLauncherFields always returns `kimiCodeEffort: resolveEffort({ explicit: effort, model: kimiCodeModel, harness: 'kimi-code' }).effort` (required field). Tests in runtime-command-effort.test.ts per PRD W1 step 4: codex hoist with roles.review.effort low and an initCodexHome spy; claude-code table over EFFORT_LEVELS on claude-fable-5 and the claude-sonnet-4-6 xhigh->high row via getRoleRuntimeBaseCommand(model, name, 'review', 'claude-code', undefined, level); kimi-code default high; OpenCode variant pass-through; ACP k3 default high. Mock initCodexHome and loadYamlConfig so no real ~/.overdeck path is written."
+        },
+        "items": [
+          {
+            "id": "w1-runtime-command-producers.ac1",
+            "title": "Given roles.review.effort is low and no explicit effort, when getCodexLauncherFields runs for role review, then it returns codexEffort 'low' and the initCodexHome spy receives effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-runtime-command-producers.ac2",
+            "title": "Given each level in EFFORT_LEVELS, getRoleRuntimeBaseCommand for claude-fable-5 on claude-code returns a command containing ` --effort <level>`, and for claude-sonnet-4-6 an xhigh request emits ` --effort high`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-runtime-command-producers.ac3",
+            "title": "getKimiCodeLauncherFields('kimi-code/k3') returns kimiCodeEffort 'high'; getAcpLauncherFields for an opencode/ model with effort 'custom-variant' returns acpEffort 'custom-variant'; for model k3 with no effort it returns acpEffort 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-codex-home-effort",
+        "title": "initCodexHome requires effort and CodexRuntime.spawnAgent resolves it; gpt-5.5 row stops at xhigh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "codex.test.ts passes including the gpt-5.6-sol and gpt-5.5 five-level tables",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. src/lib/runtimes/codex.ts: InitCodexHomeOpts.effort becomes required `effort: string`; initCodexHome loses its `= {}` default; line 294 writes `model_reasoning_effort = ${JSON.stringify(opts.effort)}` with no fallback; spawnAgent (grep `// 1. Create the private CODEX_HOME structure`) calls `initCodexHome(codexHomeDir, { effort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'codex' }).effort })` importing resolveEffort from '../agents/resolve-effort.js'. src/lib/model-capabilities.ts: add `effortLevels: ['low', 'medium', 'high', 'xhigh'],` to the 'gpt-5.5' entry (line ~598) with the comment from the PRD; edit in place. codex.test.ts describe('initCodexHome'): pass `effort: 'high'` wherever a call omits it; replace the undefined-effort rows with two it.each(EFFORT_LEVELS) tables (gpt-5.6-sol identity; gpt-5.5 max->xhigh) that compute the value with resolveEffort({ explicit: level, model, harness: 'codex' }) and assert the config.toml line; keep the context-window assertions."
+        },
+        "items": [
+          {
+            "id": "w2-codex-home-effort.ac1",
+            "title": "`rg -n \"\\?\\? 'high'\" src/lib/runtimes/codex.ts` prints nothing and InitCodexHomeOpts.effort is a required string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-codex-home-effort.ac2",
+            "title": "Given gpt-5.6-sol and each level in EFFORT_LEVELS resolved for harness codex, initCodexHome writes `model_reasoning_effort = \"<level>\"` to config.toml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-codex-home-effort.ac3",
+            "title": "Given gpt-5.5 and a max request resolved for harness codex, initCodexHome writes `model_reasoning_effort = \"xhigh\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-codex-app-server-effort",
+        "title": "Codex app-server launcher and host use the resolved effort with no default",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-codex-command.ts",
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-host.test.ts src/lib/__tests__/launcher-generator.test.ts src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+            "npm run typecheck",
+            "wc -l < src/lib/codex/app-server-host.ts"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors",
+            "app-server-host.ts line count is 1000 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. launcher-codex-command.ts app-server block: first line `if (!config.codexEffort) throw new Error('codex app-server launcher requires codexEffort');`, tokens use `shellQuote(config.codexEffort)`. app-server-host.ts: CodexAppServerHostOptions.effort required; constructor `this.effort = options.effort;`; set-effort validates with `isEffortLevel(body.effort)` from @overdeck/contracts (drop the literal list and the redundant typeof check); main() throws `codex app-server host requires --effort <level>` when args.effort is missing. Keep `private effort: string` (TUI sync may set native values; non-goal). Tests: makeHost fixture gains `effort: 'high'`; rename the 'uses High by default…' test to 'starts at the launch effort…'; add it.each(EFFORT_LEVELS) set-effort -> per-turn effort table; 'ultra' and 'invalid' return 400; parseArgs(['--effort','xhigh']); launch-argv table via generateLauncherScript with codexMode 'app-server' and codexEffort from resolveEffort (gpt-5.6-sol identity, gpt-5.5 max->xhigh); missing codexEffort throws. In launcher-generator.test.ts add `codexEffort: 'high'` to every codexMode 'app-server' fixture (lines ~1812-1850). Keep app-server-host.ts at 1000 lines or less."
+        },
+        "items": [
+          {
+            "id": "w3-codex-app-server-effort.ac1",
+            "title": "`rg -n \"\\?\\? 'high'|'low', 'medium'\" src/lib/codex/app-server-host.ts src/lib/launcher-codex-command.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-codex-app-server-effort.ac2",
+            "title": "Given each level in EFFORT_LEVELS, host set-effort returns 200 and the next turn's startTurn options carry that effort; set-effort 'ultra' and 'invalid' return 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-codex-app-server-effort.ac3",
+            "title": "Given codexMode app-server and a resolved codexEffort, generateLauncherScript emits `codex-app-server-host.js' --effort '<level>'` (gpt-5.5 max emits 'xhigh'), and with no codexEffort it throws 'codex app-server launcher requires codexEffort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-runtime-spawn-producers",
+        "title": "Runtime spawnAgent producers (ohmypi, muse, kimi-code, acp) pass a resolved effort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/ohmypi.ts",
+            "src/lib/runtimes/muse.ts",
+            "src/lib/runtimes/kimi-code.ts",
+            "src/lib/runtimes/acp.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "rg -c \"resolveEffort\\(\\{ explicit: config.effort\" src/lib/runtimes/ohmypi.ts src/lib/runtimes/muse.ts src/lib/runtimes/kimi-code.ts src/lib/runtimes/acp.ts",
+            "npx vitest run src/lib/__tests__/muse-support.test.ts src/lib/runtimes/__tests__/kimi-code.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "rg reports one match in each of the four files",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Each file imports `resolveEffort` from '../agents/resolve-effort.js'. ohmypi.ts: add `piEffort: resolveEffort({ explicit: config.effort, model: config.model, harness: 'ohmypi' }).effort,` to the generateLauncherScript config near line 344 (fixes F3: crash respawn and session rotation effort was dropped). muse.ts line 95: museEffort from resolveEffort({ explicit: config.effort, model: config.model, harness: 'muse' }). kimi-code.ts line 577: kimiCodeEffort from resolveEffort({ explicit: config.effort, model, harness: 'kimi-code' }). acp.ts lines 199-205: compute `const effort = resolveEffort({ explicit: config.effort, model: config.model, harness: this.name }).effort;` once; opencode always pushes `--effort`; the kimi branch passes `effort` to resolveKimiNativeEffort. If lint:circular reports a new cycle, stop and report via pan tell instead of restructuring imports."
+        },
+        "items": [
+          {
+            "id": "w4-runtime-spawn-producers.ac1",
+            "title": "`rg -c \"resolveEffort\\(\\{ explicit: config.effort\" src/lib/runtimes/{ohmypi,muse,kimi-code,acp}.ts` prints a count of 1 for each of the four files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-runtime-spawn-producers.ac2",
+            "title": "npm run lint:circular exits 0 with no new cycle after the four imports are added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-runtime-spawn-producers.ac3",
+            "title": "OhmypiRuntime.spawnAgent passes a piEffort field to generateLauncherScript (rg -n \"piEffort: resolveEffort\" src/lib/runtimes/ohmypi.ts returns one line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-kimi-effort",
+        "title": "Kimi translation requires a resolved effort and K3 rows list canonical levels",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/kimi-effort.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/__tests__/kimi-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/kimi-effort.test.ts src/lib/__tests__/settings-api.test.ts src/lib/__tests__/config-yaml-roles.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. kimi-effort.ts: signature `resolveKimiNativeEffort(model: string, effort: string | undefined)` (no default); for a K3 id, `if (effort === undefined) throw new Error(`Kimi K3 launch for \"${model}\" requires a resolved effort level.`)`; non-K3 ids still return undefined; header comment says callers pass a resolveEffort result and this only translates. model-capabilities.ts lines ~896-897: kimi-code/k3 and kimi-code/k3-256k effortLevels become ['low', 'medium', 'high', 'xhigh', 'max'] with the comment `// Canonical levels; src/lib/kimi-effort.ts translates to native low/high/max.` (fixes F4: clamping turned medium into low and xhigh into high). kimi-effort.test.ts: replace the 'defaults %s to high' test with a 'requires a resolved effort' test; add the kimi-code table (five rows, model kimi-code/k3, value from resolveEffort harness kimi-code, assert `export KIMI_MODEL_THINKING_EFFORT='<native>'`) and the ACP table (model k3, harness acp, assert acp-host `--effort '<native>'`). Expected native: low->low, medium->high, high->high, xhigh->max, max->max."
+        },
+        "items": [
+          {
+            "id": "w5-kimi-effort.ac1",
+            "title": "resolveKimiNativeEffort('k3', undefined) throws 'requires a resolved effort level' and resolveKimiNativeEffort('kimi-code/kimi-for-coding', undefined) returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-kimi-effort.ac2",
+            "title": "Given model kimi-code/k3 and each canonical level resolved for harness kimi-code, the launcher exports KIMI_MODEL_THINKING_EFFORT as low, high, high, max, max respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-kimi-effort.ac3",
+            "title": "Given model k3 on harness acp and each canonical level, the acp-host argv carries --effort low, high, high, max, max respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-acp-host-effort",
+        "title": "ACP host sets OpenCode and Kimi effort from the launch value with no default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/acp/__tests__/host.test.ts src/lib/acp/__tests__/opencode.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "host.test.ts and opencode.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. acp/host.ts lines ~165-173: when the OpenCode model exposes an `effort` config option, throw `OpenCode launch requires --effort when the model exposes an effort setting.` if this.options.effort is missing, else setConfigOption('effort', this.options.effort) (no `?? \"high\"`). The `else if (effort && effort !== 'high') throw` branch stays. The Kimi branch is unchanged in code; after w5 a K3 host without --effort throws from resolveKimiNativeEffort. host.test.ts: OpenCode table over EFFORT_LEVELS asserting setConfigOption('effort', level) (add a capture to the stub if it lacks one); a 'custom-variant' value passes through; OpenCode-with-option and no effort rejects start(); extend the K3 test at line ~405 to all five canonical levels mapped through resolveKimiNativeEffort('k3', level) and assert stub.setThinking equals [native]; add effort: 'high' to any K3 or OpenCode-with-option fixture that omits it."
+        },
+        "items": [
+          {
+            "id": "w6-acp-host-effort.ac1",
+            "title": "`rg -n '\\?\\? \"high\"' src/lib/acp/host.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-acp-host-effort.ac2",
+            "title": "Given an OpenCode model exposing an effort option and each level in EFFORT_LEVELS (plus 'custom-variant'), the host applies setConfigOption('effort', <same value>); with no effort, start() rejects with 'OpenCode launch requires --effort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-acp-host-effort.ac3",
+            "title": "Given a K3 ACP host launched with the native value for each canonical level, the stub records setConfigOption('thinking', native) with low, high, high, max, max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-pi-launcher-effort",
+        "title": "Pi launcher emits --thinking from the resolved effort and throws when it is missing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts",
+            "src/lib/__tests__/launcher-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts src/lib/__tests__/launcher-context.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "wc -l < src/lib/launcher-generator.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "file-size guard passes",
+            "launcher-generator.ts line count is 1000 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. launcher-generator.ts buildOhmypiCommand: add `if (!config.piEffort) throw new Error('ohmypi launcher requires piEffort');` to the validation block after the piSessionDir check; line 772 becomes `tokens.push('--thinking', shellQuote(config.piEffort));`. Net +1 line; the file must end at 1000 lines or less (no new comments). launcher-generator.test.ts: add `piEffort: 'high',` to every harness 'ohmypi' fixture (lines ~1452, 1669, 1701, 1716, 1732); add a pi table over EFFORT_LEVELS on claude-fable-5 with piEffort from resolveEffort({ explicit: level, model, harness: 'ohmypi' }) asserting `--thinking '<expected>'` where max -> xhigh; add the missing-piEffort throw test. launcher-context.test.ts line ~56: add `piEffort: 'high',`."
+        },
+        "items": [
+          {
+            "id": "w7-pi-launcher-effort.ac1",
+            "title": "Given claude-fable-5 on harness ohmypi, levels low, medium, high, xhigh, max emit --thinking low, medium, high, xhigh, xhigh respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-pi-launcher-effort.ac2",
+            "title": "generateLauncherScript for harness ohmypi without piEffort throws 'ohmypi launcher requires piEffort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-pi-launcher-effort.ac3",
+            "title": "`wc -l < src/lib/launcher-generator.ts` prints 1000 or less and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-muse-effort",
+        "title": "Muse producers resolve effort and the muse launcher drops its default and level guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/__tests__/muse-support.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/muse-support.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. launcher-generator.ts lines ~988-989 become `const effort = config.museEffort;` and `if (!effort) throw new Error('muse launcher requires museEffort');` (net 0 lines; removes the default and the level-list guard, which upstream clamping makes unreachable). Producers, one line plus the resolveEffort import each, nothing else in these sibling-owned files: spawn.ts line ~333 `museEffort: resolveEffort({ explicit: options.effort, role, model: selectedModel, harness: 'muse' }).effort,`; spawn-prep.ts line ~735 `museEffort: resolveEffort({ explicit: opts.effort, role: launchRole, model, harness: 'muse' }).effort,`; spawn-planning-session.ts line ~621 `museEffort: resolveEffort({ explicit: effort, role: 'plan', model: planningModel, harness: 'muse' }).effort`. Do not edit conversation-runtime.ts (already resolved). muse-support.test.ts: add museEffort 'high' to the 'launches %s interactively' test; add a muse table over EFFORT_LEVELS on muse-spark-1.3 (max -> xhigh); add the missing-museEffort throw test; the explicit-model test still throws its model error first."
+        },
+        "items": [
+          {
+            "id": "w8-muse-effort.ac1",
+            "title": "Given muse-spark-1.3, levels low, medium, high, xhigh, max emit --reasoning-effort low, medium, high, xhigh, xhigh respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-muse-effort.ac2",
+            "title": "generateLauncherScript for harness muse with a supported model and no museEffort throws 'muse launcher requires museEffort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-muse-effort.ac3",
+            "title": "`rg -n \"museEffort: (options|opts)\\.effort|museEffort: effort\\b\" src/lib/agents/spawn.ts src/lib/agents/spawn-prep.ts src/lib/planning/spawn-planning-session.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-docs",
+        "title": "Harness effort table and CLIProxy finding in harnesses.mdx; align harness-landscape.mdx and effort.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "configuration/effort.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rg -n '### How each harness receives effort|CLIProxy' configuration/harnesses.mdx",
+            "rg -n 'issues/4260|never accept `max`' configuration/effort.mdx",
+            "rg -n 'saved Medium launches as High' reference/harness-landscape.mdx"
+          ],
+          "expected_outputs": [
+            "harnesses.mdx shows the new heading and CLIProxy lines",
+            "effort.mdx prints no match",
+            "harness-landscape.mdx prints one match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. configuration/harnesses.mdx: under `## Context and reasoning effort` add `### How each harness receives effort` with the nine-row table from the PRD (Claude Code, Codex TUI, Codex app-server, OpenCode, Kimi K3 ACP, Kimi K3 native, Pi, Muse Code, Prime Agent; columns Mechanism, low, medium, high, xhigh, max) and three paragraphs: resolve/clamp before launch and the `requires …Effort` failure instead of a harness default; Pi/Muse CLIs parse max (omp 17.4.1, pi 0.85.0, muse 1.4.2) but Overdeck sends at most xhigh; GPT through Claude Code via CLIProxy v7.3.16 honors --effort (output_config.effort with adaptive thinking -> Codex reasoning.effort, clamped), and Overdeck always passes --effort so CLIProxy's own xhigh/medium fallbacks do not apply. reference/harness-landscape.mdx Kimi K3 paragraph: add the sentence from PRD W9 step 2. configuration/effort.mdx: rewrite the `## Clamping` pi/muse paragraph per PRD W9 step 3 and link the new harnesses section; add the adapter bullet to `## What honors it today`; delete the #4260 row from the sibling table."
+        },
+        "items": [
+          {
+            "id": "w9-docs.ac1",
+            "title": "configuration/harnesses.mdx renders a `### How each harness receives effort` section whose table lists all nine harness routes with a value for each of the five levels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac2",
+            "title": "configuration/harnesses.mdx contains a CLIProxy paragraph stating that CLIProxy v7.3.16 maps Claude Code's output_config.effort to Codex reasoning.effort, so GPT via Claude Code honors --effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac3",
+            "title": "configuration/effort.mdx no longer contains `issues/4260` or `never accept \\`max\\``, and its Clamping section states that Kimi K3 translates medium to high and xhigh to max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-lint-effort-baseline",
+        "title": "Drop the five PAN-4260 adapter rows from scripts/lint-effort.sh and re-label the extension rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:18:54Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effort.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-effort.sh",
+            "rg -n 'PAN-4260' scripts/lint-effort.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint:effort exits 0 with no 'note: lower BASELINE' line",
+            "rg prints nothing",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. In scripts/lint-effort.sh delete the BASELINE rows for src/lib/runtimes/codex.ts, src/lib/acp/host.ts, src/lib/codex/app-server-host.ts, src/lib/launcher-generator.ts and src/lib/launcher-codex-command.ts. Keep packages/pi-extension/src/index.ts=1 and packages/ohmypi-extension/src/index.ts=1 but replace their `# PAN-4260` comments with `# Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header` and name both rows in the header's false-match sentence. Change the header's sibling list `#4253, #4255-#4260` to `#4253, #4255-#4259`. Run bash scripts/lint-effort.sh and npm run lint."
+        },
+        "items": [
+          {
+            "id": "w10-lint-effort-baseline.ac1",
+            "title": "bash scripts/lint-effort.sh exits 0 and prints no `note: lower BASELINE` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-lint-effort-baseline.ac2",
+            "title": "`rg -n 'PAN-4260' scripts/lint-effort.sh` prints nothing and the BASELINE table has no row for any of the five adapter files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-runtime-command-producers",
+        "to": "w2-codex-home-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-runtime-command-producers",
+        "to": "w5-kimi-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-runtime-command-producers",
+        "to": "w6-acp-host-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-codex-home-effort",
+        "to": "w5-kimi-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-runtime-spawn-producers",
+        "to": "w5-kimi-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-runtime-spawn-producers",
+        "to": "w6-acp-host-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-runtime-spawn-producers",
+        "to": "w7-pi-launcher-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-runtime-spawn-producers",
+        "to": "w8-muse-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-kimi-effort",
+        "to": "w6-acp-host-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-codex-app-server-effort",
+        "to": "w7-pi-launcher-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-pi-launcher-effort",
+        "to": "w8-muse-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-codex-home-effort",
+        "to": "w10-lint-effort-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-codex-app-server-effort",
+        "to": "w10-lint-effort-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-acp-host-effort",
+        "to": "w10-lint-effort-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-pi-launcher-effort",
+        "to": "w10-lint-effort-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-muse-effort",
+        "to": "w10-lint-effort-baseline",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
