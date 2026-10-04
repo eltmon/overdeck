@@ -135,7 +135,10 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
-    expect(screen.getByText(/Effort and max agents apply on the next tick — no restart needed\./)).toBeInTheDocument();
+    expect(screen.getByText(/Max agents applies on the next tick — no restart needed\./)).toBeInTheDocument();
+    expect(screen.getByText(
+      /Effort applies the next time the Flywheel starts; a paused Flywheel resumes at the effort it started with\./,
+    )).toBeInTheDocument();
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);

@@ -45,7 +45,6 @@ declare -A BASELINE=(
   ["src/cli/commands/plan.ts"]=1                                 # PAN-4258
   ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
-  ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
 )
 
 PATTERNS=(
