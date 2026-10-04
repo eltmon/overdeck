@@ -161,8 +161,11 @@ index and `ready.json` in `session-start-hook`, title capture and activity
 events in `user-prompt-submit-hook`, `pre-tool-hook`, `heartbeat-hook`,
 `stop-hook`, `notification-hook`, `permission-event-hook`, the compaction
 hooks, and `ask-user-question-hook` (its deny message is what lets the
-dashboard surface AskUserQuestion). The guard hooks (`auto-approve-hook`,
-`gh-issue-trailer-hook`, `tmux-send-keys-guard`) also stay on.
+dashboard surface AskUserQuestion; since PAN-4514 it first rejects
+non-decision calls — empty, placeholder, or status-only questions — with a
+decisions-only message that never reaches the dashboard). The guard hooks
+(`auto-approve-hook`, `gh-issue-trailer-hook`, `tmux-send-keys-guard`) also
+stay on.
 
 Two consequences to know. A managed Codex session runs in a private
 `CODEX_HOME`, so Overdeck normally re-delivers the user's `~/.codex/AGENTS.md`
@@ -181,6 +184,40 @@ memory in a bare conversation; those are not Overdeck layers. The separate
 ([env vars](https://code.claude.com/docs/en/env-vars)). Overdeck does not use
 `claude --bare` or `--safe-mode`: both skip the settings hooks, which would drop
 the observing hooks and the ready signal. `--bare` also refuses OAuth login.
+
+## Choosing skills for one conversation
+
+The **New conversation with options…** dialog's Skills field lists every
+non-core skill and every pack skill with an Inherit / On / Off choice. Only an
+explicit On or Off is stored, on `conversations.skill_overrides` (PAN-4486);
+Inherit removes the key and lets the usual override chain (issue, project,
+global, then default on) decide at launch. Each row shows the skill's name,
+the first line of its `SKILL.md` description (hover the description for the
+full text), and the state it would inherit with its source. The filter box
+matches a skill's name or its description.
+
+Rows are grouped into collapsible sections by where the skill's catalog entry
+came from, in this order:
+
+| Group | Root(s) |
+| --- | --- |
+| Project skills | `<projectRoot>/.pan/skills` |
+| Overdeck | `~/.overdeck/skills` |
+| Personal | `~/.claude/skills`, `~/.agents/skills` |
+| *(one group per pack, named for the pack)* | that pack's own skills |
+
+A skill name present under more than one root is listed once, under the first
+root that has it, checked in the order `~/.overdeck/skills`,
+`~/.claude/skills`, `~/.agents/skills`, `<projectRoot>/.pan/skills` — the same
+precedence `listSkillCatalog()` uses server-side. `GET /api/skills/overrides`
+reports each native skill's root as `origin` (`overdeck`, `personal`, or
+`project`); the dialog groups by that field rather than re-deriving it.
+
+Each group header shows a `<on> on · <total>` count. Groups start
+collapsed, except a group holding a row with an explicit choice made in this
+dialog, which starts open. Typing in the filter opens every group with a
+matching row and hides every group without one; clearing the filter returns
+each group to its prior open/closed state.
 
 ## Respecting your existing context
 

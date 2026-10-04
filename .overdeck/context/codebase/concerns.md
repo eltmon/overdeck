@@ -143,6 +143,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   read and write passes through it, so a field added only to `interface AgentState` is silently
   dropped on save. `foreman`, `modelSpawnKey` and `workspaceId` are dropped today (PAN-4487). Add
   new fields to `cleanAgentState` and cover them with a save→read round-trip test.
+- **`spawnRun`/`spawnAgent` never resolve effort** (`src/lib/agents/spawn.ts`) — they persist and
+  thread a caller-supplied `effort`/`effortSource` only (PAN-4253 D5). A new launch path must call
+  `resolveEffort()` (`src/lib/agents/resolve-effort.ts`) itself or it silently launches at the role
+  file's `effort: high` and ignores `roles.<role>.effort`. `pan spawn` builds its pane argv without a
+  harness binary (#4511).
 - **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
   `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
   `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker
@@ -382,6 +387,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
+- AskUserQuestion modal = deny-reason markers: `scanPendingInputs`
+  (`src/lib/agent-enrichment.ts`) treats an `is_error` AUQ tool_result as pending
+  only if it contains `PAN-1520` or `surfaced to the operator`. Any hook deny that
+  must NOT surface (the PAN-4514 junk guard) must omit both strings; any that must
+  surface must keep one.
 - Text that reaches Herdr must be well-formed UTF-16 (PAN-4506) — a lone
   surrogate (e.g. from a naive `.slice(0, N)` cut through an emoji) makes
   `JSON.stringify` emit an unpaired `\udXXX` escape, and Herdr's `serde_json`
@@ -389,4 +399,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   escape`, silently killing a review kickoff. Use `truncateWellFormed` /
   `toWellFormedText` from `src/lib/well-formed-text.ts` for any text (a
   truncated preview, a paste payload) that is heading to a Herdr request.
+- **Two runtime maps, neither replayed at boot before PAN-4522** — the read
+  model's `agentRuntimeById` (`read-model.ts`, served in snapshots) booted `{}`,
+  and `syncSnapshot` replaced the client's map wholesale, so a restart showed
+  each agent's spawn-time `state.json` `lastActivity` until its next hook beat
+  (God View drew busy issues `1h idle`). `AgentStateService` keeps a separate map
+  seeded from pane `stateSince`, not from events. Its `RUNTIME_EVENT_TYPES` list
+  omits `agent.channel_reply` and `agent.heartbeat_dead`, both of which write
+  `agentRuntimeById` in the shared reducer. `state.json` `lastActivity` is live
+  only for codex (`recordAgentActivity`, every 5 s); codex posts no
+  `agent.activity_changed`, so the God View's row-stamp fallback is codex's only
+  liveness signal.
 <!-- last-verified: 2026-10-04 -->

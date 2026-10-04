@@ -23,8 +23,8 @@ const { overdeckHome } = await vi.hoisted(async () => {
 
 vi.mock('../catalog.js', () => ({
   listSkillCatalog: vi.fn(async () => [
-    { name: 'grilling', description: '' },
-    { name: 'codebase-design', description: '' },
+    { name: 'grilling', description: '', origin: 'overdeck' },
+    { name: 'codebase-design', description: '', origin: 'overdeck' },
   ]),
   listPackCatalog: vi.fn(async () => [
     {
@@ -304,7 +304,7 @@ describe('pack states (PAN-4334)', () => {
     writeFileSync(path, 'issue: TST-1\nskills:\n  grilling: false\n  mattpocock/tdd: false\npacks:\n  mattpocock: true\n');
     const list = await listSkillStates({ issueId: 'tst-1' });
     expect(list.skills.map(skill => Object.keys(skill).sort())).toEqual(
-      list.skills.map(() => ['core', 'description', 'enabled', 'global', 'issue', 'name', 'project', 'projectSkill', 'source']),
+      list.skills.map(() => ['core', 'description', 'enabled', 'global', 'issue', 'name', 'origin', 'project', 'projectSkill', 'source']),
     );
     expect(list.skills.find(skill => skill.name === 'grilling')).toMatchObject({ enabled: false, source: 'issue' });
     expect(list.packs[0]).toMatchObject({ issue: true, enabled: true, source: 'issue', inherited: { enabled: false, source: 'default' } });

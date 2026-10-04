@@ -1,0 +1,1051 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T04:46:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4529: Evaluate Claude Code mods for Overdeck: in-depth report (evaluation only, no adoption)",
+    "updated": "2026-10-04T04:47:52.465Z"
+  },
+  "plan": {
+    "id": "pan-4529",
+    "title": "Evaluate Claude Code mods for Overdeck: in-depth report (evaluation only, no adoption)",
+    "status": "running",
+    "uid": "d17b1452-a529-4873-9c91-705a0330eaa6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T04:46:44Z",
+    "updated": "2026-10-04T04:47:52.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4529",
+        "label": "PAN-4529",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4529.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/claude-code-mods-research.md",
+        "label": "Research brief (input)",
+        "type": "document"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/plugins/mods/overview",
+        "label": "Mods overview",
+        "type": "documentation"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/plugins/mods/reference",
+        "label": "Mods reference",
+        "type": "documentation"
+      },
+      {
+        "uri": "https://github.com/anthropics/claude-code/issues/92533",
+        "label": "Claude Code #92533",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "research",
+      "claude-code",
+      "mods",
+      "evaluation",
+      "report"
+    ],
+    "metadata": {
+      "docsJustification": "This change alters no documented surface: it adds an evaluation report under .pan/drafts/ and no user or developer doc describes a mods integration. The report itself is the documentation deliverable, and the PR body states this.",
+      "sizeJustification": "Thirteen serial items all edit one report file; they are sections of one indivisible deliverable.",
+      "canonicalFilename": "2026-10-04-PAN-4529-evaluate-claude-code-mods-for-overdeck-in-depth-report-evaluation-only-no-adoption.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Claude Code 2.1.287 added mods (in-process function-hook plugins that draw panes, bands and status entries and can rewrite or answer tool calls, prompts and turns). Overdeck reaches into Claude Code from outside today: shell settings hooks, keystroke/paste delivery, pane scraping, transcript markers and a bash status line. The operator needs an in-depth, review-ready evaluation of where mods could replace or improve these paths, their hard limits and risks, and what to adopt first, with no adoption in this issue.",
+      "Proposal": "Write a Markdown report (source of truth) and a self-contained HTML copy under .pan/drafts/, built on the verified research brief and the PRD's verified evidence map. Seven candidate sections follow a fixed table template (capability, Overdeck evidence with path:line anchors, parity, risk, size, sources, verdict) so acceptance is mechanically checkable. A throwaway band-mod probe runs only claude plugin validate and test in /tmp/pan-4529-mods-scratch. The report ends with a ranked recommendation and one or two proposed follow-up issues, then is published as an artifact when the tool exists.",
+      "NonGoals": "- No change to production code, configuration, sync sources, installed plugins, settings hooks or ~/.claude\n- No mod loaded into any live session; nothing written under ~/.claude/dev-mods/; no --plugin-dir, /reload-plugins or nested claude -p\n- No follow-up issues filed (proposed only)\n- No live probe of the peer-socket protocol or Herdr fullscreen behavior; both stay UNVERIFIED open questions\n- No edits to .pan/drafts/claude-code-mods-research.md\n- No messages to live agents and no POSTs to the dashboard"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build the plan on the Flywheel-supplied research brief and commit it unmodified with the report",
+        "rationale": "The Flywheel relayed this on the operator's request mid-planning; the planner verified its load-bearing claims against the cited sources (PRD table) so re-research would waste the work agent's time."
+      },
+      {
+        "summary": "Markdown is the source of truth; HTML is rendered from the finished Markdown",
+        "rationale": "One source prevents the two deliverables drifting, and the PR review reads the Markdown."
+      },
+      {
+        "summary": "Serial item chain over one report file",
+        "rationale": "Every item mutates the same file; edges encode that shared mutation. Read-only research subagents may still run ahead."
+      },
+      {
+        "summary": "Prototype limited to claude plugin validate and claude plugin test in /tmp/pan-4529-mods-scratch",
+        "rationale": "The work session is a managed session; writing to ~/.claude/dev-mods would load the mod into it, and a nested claude -p would trip Overdeck's own hooks. Both are forbidden by the issue."
+      },
+      {
+        "summary": "Scope Claude Code bug #92533 to Agent isolation: worktree subagents",
+        "rationale": "The bug body shows it is triggered by Claude Code's own worktree isolation for subagents; Overdeck prompts do not request that isolation (grep), but agents can choose it, so it blocks a Bash tool.call git-guard mod."
+      },
+      {
+        "summary": "Fixed nine-row candidate template and a path:line + anchor checker script",
+        "rationale": "Makes FR-1..FR-3 mechanically checkable by review and test roles without judgment calls."
+      }
+    ],
+    "items": [
+      {
+        "id": "commit-research-brief",
+        "title": "Verify and commit the Flywheel research brief unmodified",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-research.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sha256sum .pan/drafts/claude-code-mods-research.md",
+            "git ls-files .pan/drafts/claude-code-mods-research.md"
+          ],
+          "expected_outputs": [
+            "19d8b2cf44914b3edad8741445219d75b7a77b7d47dc91450726a9ad1a8a8be7",
+            ".pan/drafts/claude-code-mods-research.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-1a. Before anything else, run `sha256sum .pan/drafts/claude-code-mods-research.md` and compare with 19d8b2cf44914b3edad8741445219d75b7a77b7d47dc91450726a9ad1a8a8be7. If it matches, `git add` only that file and commit it unmodified with an Item: commit-research-brief trailer. If it is missing or differs, stop and run `pan tell flywheel-orchestrator` asking for the original; do not reconstruct it."
+        },
+        "items": [
+          {
+            "id": "commit-research-brief.ac1",
+            "title": "Given the workspace, when `sha256sum .pan/drafts/claude-code-mods-research.md` runs, then it prints 19d8b2cf44914b3edad8741445219d75b7a77b7d47dc91450726a9ad1a8a8be7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-research-brief.ac2",
+            "title": "`git ls-files .pan/drafts/claude-code-mods-research.md` prints the path and `git log -1 --format=%B -- .pan/drafts/claude-code-mods-research.md` contains `Item: commit-research-brief`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "report-skeleton",
+        "title": "Create the report skeleton with the capability summary and hard limits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^## Candidate [1-7]: ' .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "7"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "prototype-probe",
+            "candidate-1-operator-state-band",
+            "candidate-2-message-delivery",
+            "candidate-3-liveness-signals",
+            "candidate-4-auq-permissions",
+            "candidate-5-flywheel-pane",
+            "candidate-6-review-worker-bands",
+            "candidate-7-other-uses",
+            "cross-cutting-security",
+            "ranked-recommendation",
+            "html-report"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-1 in the PRD (the brief itself is committed by commit-research-brief). Create .pan/drafts/claude-code-mods-evaluation.md with: title; the line `Evidence verified at commit <short SHA>`; placeholder Executive summary; How to read this report (template + UNVERIFIED convention); What a mod is and what it can do (from brief sections 1-7, every claim cited to the plugin-authoring skill and a docs/changelog URL); Hard limits (PRD 'Cross-cutting sections'); empty headings Candidate 1..7 with their titles, Security and supply chain, Managed Claude home and sync targets, Ranked adoption recommendation, Proposed follow-up issues, Appendix A: Prototype probe, Appendix B: Sources. Save the AC-4 checker script from the PRD to /tmp/pan-4529-check-refs.sh."
+        },
+        "items": [
+          {
+            "id": "report-skeleton.ac1",
+            "title": "`grep -cE '^## Candidate [1-7]: ' .pan/drafts/claude-code-mods-evaluation.md` prints 7 and `grep -c '^Evidence verified at commit ' .pan/drafts/claude-code-mods-evaluation.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-skeleton.ac2",
+            "title": "The Hard limits section contains the permission prompt, the 10 s hook budget, the absence of a listening socket API, and the remote kill switch #99130",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-skeleton.ac3",
+            "title": "Given the capability summary section, when read, then every sentence that states a Claude Code behavior contains a citation to the plugin-authoring skill, a code.claude.com docs URL, or the CHANGELOG, or carries the word UNVERIFIED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prototype-probe",
+        "title": "Run a throwaway band-mod probe in /tmp/pan-4529-mods-scratch with validate and test only, and record it in Appendix A",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e /tmp/pan-4529-mods-scratch",
+            "grep -c 'does not prove a socket round trip' .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "exit 0",
+            "1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-2. Follow the PRD 'Prototype probe (WI-2) — rules' exactly. Never write to ~/.claude/dev-mods/, never --plugin-dir, /reload-plugins or a nested claude -p. Write the band mod to /tmp/pan-4529-mods-scratch/overdeck-band/, run `claude plugin validate --json` and `claude plugin test` on it, paste the outputs into Appendix A, state that the probe does not prove a socket round trip, then `rm -rf /tmp/pan-4529-mods-scratch` (literal path). If the test reports mods off remotely (#99130), record the exact output and continue."
+        },
+        "items": [
+          {
+            "id": "prototype-probe.ac1",
+            "title": "Given Appendix A, when read, then it contains `claude plugin validate --json` output with a calls: entry listing fs.read and http.fetch, and the output of `claude plugin test` (pass, fail, or the remote-off message verbatim)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prototype-probe.ac2",
+            "title": "Appendix A contains the literal phrase `does not prove a socket round trip`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prototype-probe.ac3",
+            "title": "After the item, `test ! -e /tmp/pan-4529-mods-scratch` exits 0 and `ls -d ~/.claude/dev-mods/*/overdeck-band 2>/dev/null` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-1-operator-state-band",
+        "title": "Candidate 1: operator state in the agent's own pane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 1: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-3 in the PRD. Fill the `## Candidate 1:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 1'. Evaluate a band (AbovePrompt) and a $.ui.status entry showing issue, pipeline phase, verification and review state, and Needs-you, fed by $.clock.every plus $.http.fetch or $.fs.read. Carry: Overdeck sets no fullscreen flag so tmux sessions are main-screen and panes open inline; Herdr fullscreen behavior is UNVERIFIED and is listed as an open question; mod drawings reach the dashboard terminal panel through the PTY stream; compare with the shipped bash status line (src/lib/sync.ts:614); note #99354. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-1-operator-state-band.ac1",
+            "title": "Given the finished section, when the AC-3 awk/grep command runs for N=1, then it prints 9 (all template rows present)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-1-operator-state-band.ac2",
+            "title": "The Candidate 1 section contains the word UNVERIFIED next to the Herdr fullscreen question and cites src/lib/sync.ts:614 as an evidence ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-1-operator-state-band.ac3",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-2-message-delivery",
+        "title": "Candidate 2: reliable in-session message delivery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 2: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-4 in the PRD. Fill the `## Candidate 2:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 2'. Evaluate exactly three shapes: (a) pull via $.clock.every + $.http.fetch then $.prompt.submit (acknowledged at turn start) and $.session.append isMeta rows as the steer equivalent; (b) session.receive over the peer uds socket, marked UNVERIFIED and an implementation checkpoint for a follow-up; (c) the existing opt-in Channels MCP bridge. Weigh against PAN-4506 (lone-surrogate rejection by Herdr's JSON API) and PAN-4492 (unverifiable Enter). Note #96336 is Desktop-only. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-2-message-delivery.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=2, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-2-message-delivery.ac2",
+            "title": "The Candidate 2 section contains all three shapes with the labels (a), (b), (c) and cites src/lib/agents/delivery.ts:377, src/lib/terminal-backends/herdr.ts:807 and src/lib/agents/supervisor-channels.ts:290",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-2-message-delivery.ac3",
+            "title": "The section contains the links PAN-4506 and PAN-4492 and marks the peer-socket protocol UNVERIFIED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-2-message-delivery.ac4",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-3-liveness-signals",
+        "title": "Candidate 3: liveness and activity signals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 3: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-5 in the PRD. Fill the `## Candidate 3:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 3'. Evaluate turn.start/turn.step/turn.complete/session.end and $.session.usage() as activity, idle and thinking signals, compared with the settings-hook heartbeat (pan-hook-lib.sh:343) and liveness.ts. State that an unloaded mod (3 worker crashes, remote switch #99130, disableAllHooks) goes silent, so a mod cannot be the only liveness source. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-3-liveness-signals.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=3, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-3-liveness-signals.ac2",
+            "title": "The Candidate 3 section contains evidence refs src/lib/agents/liveness.ts:173 and src/lib/agents/liveness.ts:363 and contains #99130 as a failure mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-3-liveness-signals.ac3",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-4-auq-permissions",
+        "title": "Candidate 4: AskUserQuestion and permission prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 4: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-6 in the PRD. Fill the `## Candidate 4:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 4'. Evaluate tool.call on AskUserQuestion (hold and answer with {result}), the AskUserQuestion render site, and tool.check {decision} for permission decisions. Carry: the 10 s budget excludes $ calls except $.clock.sleep, so holding needs one long-poll $.http.fetch; the permission prompt itself cannot be redrawn; mod approvals bypass ask rules and, without sec-default, non-managed PreToolUse blocks (security finding). Compare with the PAN-1520 deny hook and the pane parser. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-4-auq-permissions.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=4, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-4-auq-permissions.ac2",
+            "title": "The Candidate 4 section contains evidence refs src/lib/agents/permission-prompt.ts:105 and sync-sources/hooks/ask-user-question-hook:4 and a sentence stating that the permission prompt cannot be redrawn by a mod",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-4-auq-permissions.ac3",
+            "title": "The section contains the phrase long-poll and explains the 10 s hook budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-4-auq-permissions.ac4",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-5-flywheel-pane",
+        "title": "Candidate 5: Flywheel and gauntlet loop pane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 5: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-7 in the PRD. Fill the `## Candidate 5:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 5'. Evaluate a Pane drawn from $.state fed by the dashboard, plus a registered /flywheel command, compared with the flywheel-tick: transcript marker (tick-marker.ts:19, derive-status.ts:257). Decide whether a mod replaces or only mirrors the harness-neutral marker. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-5-flywheel-pane.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=5, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-5-flywheel-pane.ac2",
+            "title": "The Candidate 5 section contains the evidence ref src/lib/flywheel/tick-marker.ts:19 and a sentence stating whether the mod replaces or mirrors the tick marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-5-flywheel-pane.ac3",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-6-review-worker-bands",
+        "title": "Candidate 6: reviewer and worker progress bands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 6: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-8 in the PRD. Fill the `## Candidate 6:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 6'. Evaluate a band or status entry in reviewer and worker panes showing convoy and verification progress, citing review-convoy.ts:315 and verification-runner.ts:297, and weigh value given the dashboard reviewer tree is the operator surface. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-6-review-worker-bands.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=6, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-6-review-worker-bands.ac2",
+            "title": "The Candidate 6 section contains evidence refs src/lib/cloister/review-convoy.ts:315 and src/lib/cloister/verification-runner.ts:297",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-6-review-worker-bands.ac3",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "candidate-7-other-uses",
+        "title": "Candidate 7: other uses (git guard, prompt.compose, agent.spawn, redaction, usage)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Candidate 7: /{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | grep -cE '^\\| (What it would do|Mod capability|Replaces or improves|Overdeck evidence|Harness parity|Risk|Size|Sources|Verdict) \\|'",
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "9",
+            "no BAD lines; checked=<n> on stderr"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-9 in the PRD. Fill the `## Candidate 7:` section using the fixed template table (rows What it would do, Mod capability, Replaces or improves, Overdeck evidence, Harness parity, Risk, Size, Sources, Verdict) plus 1-4 analysis paragraphs. Follow PRD lead 'Candidate 7'. Evaluate exactly the five listed uses, each with its Overdeck file: tool.call on Bash replacing the git guard (blocked by #92533 for worktree-isolated subagents, scoped per PRD D-5); prompt.compose/prompt.context for context layers; agent.spawn {model} for Cloister routing of subagents; session.append redaction; $.session.usage() for cost and quota (note #94424). The table's Verdict row summarizes; each use gets one short subsection. Evidence refs use the form `path:line` — `anchor` and must pass the AC-4 checker."
+        },
+        "items": [
+          {
+            "id": "candidate-7-other-uses.ac1",
+            "title": "Given the finished section, when the AC-3 command runs for N=7, then it prints 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-7-other-uses.ac2",
+            "title": "The Candidate 7 section contains #92533, launcher-git-guard.ts, and a sentence stating that the bug affects Agent isolation: worktree subagents, not Overdeck workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-7-other-uses.ac3",
+            "title": "The Candidate 7 section contains five ### subsections, one per listed use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "candidate-7-other-uses.ac4",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-cutting-security",
+        "title": "Write the security/supply-chain and managed-Claude-home sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md",
+            "grep -c 'claude plugin validate --json' .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "no BAD lines",
+            ">= 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-10. Fill `## Security and supply chain` and `## Managed Claude home and sync targets` per the PRD 'Cross-cutting sections': mods unsandboxed, no install-time consent, validate as the review tool; claude-plugins-provision.ts:83 already installs plugins at user scope so a pan sync mod reaches every Claude session on the machine; claude-settings-overlay.ts:109 deny rules do not bind a mod's $.fs/$.process; propose a CI ratchet on `claude plugin validate --json` calls; delivery routes (user-scope install, --plugin-dir per launch reversing mount.ts:13, CLAUDE_CODE_PLUGIN_DIRS) and scoping to managed sessions via OVERDECK_AGENT_ID or per-launch --plugin-dir."
+        },
+        "items": [
+          {
+            "id": "cross-cutting-security.ac1",
+            "title": "The Security section cites src/lib/claude-plugins-provision.ts:83 and src/lib/claude-settings-overlay.ts:109 and quotes the admin-docs statement that a mod can still read a file a Read deny rule covers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-cutting-security.ac2",
+            "title": "The Security section proposes a CI check that runs `claude plugin validate --json` and fails when the calls set grows beyond an allowlist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-cutting-security.ac3",
+            "title": "The Managed home section names all three delivery routes and cites src/lib/skill-packs/mount.ts:13 as a decision that per-launch --plugin-dir mods would reverse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-cutting-security.ac4",
+            "title": "Given the report, when `bash /tmp/pan-4529-check-refs.sh .pan/drafts/claude-code-mods-evaluation.md` runs, then it prints no BAD line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ranked-recommendation",
+        "title": "Write the ranked adoption recommendation, the follow-up issue proposals and the executive summary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Executive summary/{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | wc -w"
+          ],
+          "expected_outputs": [
+            "<= 250"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-11. Rank all seven candidates in a table (rank, candidate, verdict, size, one reason). Propose one or two follow-up issues under `## Proposed follow-up issues`, each a `### <title>` with one scope paragraph; do not file them (no gh issue create). Then write the executive summary (250 words or fewer) from the finished sections."
+        },
+        "items": [
+          {
+            "id": "ranked-recommendation.ac1",
+            "title": "`## Ranked adoption recommendation` contains a Markdown table with exactly 7 data rows, one per candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranked-recommendation.ac2",
+            "title": "`## Proposed follow-up issues` has 1 or 2 `### ` subheadings, each followed by one scope paragraph, and `gh issue list -R eltmon/overdeck --search 'in:title mods created:>=2026-10-04' --state open --json number --jq 'map(select(.number != 4529)) | length'` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranked-recommendation.ac3",
+            "title": "`awk '/^## Executive summary/{f=1;next} /^## /{f=0} f' .pan/drafts/claude-code-mods-evaluation.md | wc -w` prints a number of 250 or fewer and the summary names the top-ranked candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "html-report",
+        "title": "Render the finished Markdown as a self-contained HTML report",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -ci '<script' .pan/drafts/claude-code-mods-evaluation.html",
+            "grep -oE 'id=\"candidate-[1-7]\"' .pan/drafts/claude-code-mods-evaluation.html | sort -u | wc -l"
+          ],
+          "expected_outputs": [
+            "0",
+            "7"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-12. Write .pan/drafts/claude-code-mods-evaluation.html with the same content as the Markdown. If it will be published as an artifact, load the artifact-design skill first and follow its page contract (2-4 word title, color tokens on :root, dark mode via prefers-color-scheme plus [data-theme] overrides, explicit body background). Inline CSS only; no <script>, no stylesheet links, no web fonts. Each candidate section carries id=\"candidate-N\". Any converter script lives only in /tmp/pan-4529-mods-scratch and is removed with `rm -rf /tmp/pan-4529-mods-scratch` afterwards."
+        },
+        "items": [
+          {
+            "id": "html-report.ac1",
+            "title": "`grep -ci '<script' .pan/drafts/claude-code-mods-evaluation.html` prints 0 and `grep -ciE '<link[^>]*stylesheet|@import|fonts.googleapis' .pan/drafts/claude-code-mods-evaluation.html` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "html-report.ac2",
+            "title": "`grep -c 'prefers-color-scheme: dark' .pan/drafts/claude-code-mods-evaluation.html` prints 1 or more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "html-report.ac3",
+            "title": "`grep -oE 'id=\"candidate-[1-7]\"' .pan/drafts/claude-code-mods-evaluation.html | sort -u | wc -l` prints 7 and the HTML contains the executive summary text and the ranked table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "publish-handoff",
+        "title": "Publish the artifact if possible, record the link, and add the PR-body addendum",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T04:46:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4529",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/claude-code-mods-evaluation.md",
+            ".pan/drafts/claude-code-mods-evaluation.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff origin/main --name-only | grep -v '^\\.pan/' | wc -l",
+            "grep -c '^Published copy: ' .pan/drafts/claude-code-mods-evaluation.md"
+          ],
+          "expected_outputs": [
+            "0",
+            "1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-13. If the Artifact tool exists, publish .pan/drafts/claude-code-mods-evaluation.html (icon report), set the Markdown header line `Published copy: <url>`, and post one comment on PAN-4529 with the link via `gh issue comment 4529 -R eltmon/overdeck`. Otherwise set `Published copy: not published from the work session; the Flywheel will publish it.` Write the PR addendum to /tmp/pan-4529-pr-addendum.md with `This change alters no documented surface.`, the artifact status and links to both report files; after `pan done` opens the PR, append it with gh pr view/gh pr edit --body-file as the PRD describes, then `rm -f /tmp/pan-4529-pr-addendum.md /tmp/pan-4529-pr-body.md /tmp/pan-4529-check-refs.sh`."
+        },
+        "items": [
+          {
+            "id": "publish-handoff.ac1",
+            "title": "`grep -c '^Published copy: ' .pan/drafts/claude-code-mods-evaluation.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-handoff.ac2",
+            "title": "`git diff origin/main --name-only | grep -v '^\\.pan/'` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-handoff.ac3",
+            "title": "After pan done, `gh pr view --json body --jq .body` contains `This change alters no documented surface.` and either an artifact URL or the sentence that the Flywheel will publish it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "commit-research-brief",
+        "to": "report-skeleton",
+        "type": "blocks"
+      },
+      {
+        "from": "report-skeleton",
+        "to": "prototype-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "prototype-probe",
+        "to": "candidate-1-operator-state-band",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-1-operator-state-band",
+        "to": "candidate-2-message-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-2-message-delivery",
+        "to": "candidate-3-liveness-signals",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-3-liveness-signals",
+        "to": "candidate-4-auq-permissions",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-4-auq-permissions",
+        "to": "candidate-5-flywheel-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-5-flywheel-pane",
+        "to": "candidate-6-review-worker-bands",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-6-review-worker-bands",
+        "to": "candidate-7-other-uses",
+        "type": "blocks"
+      },
+      {
+        "from": "candidate-7-other-uses",
+        "to": "cross-cutting-security",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-cutting-security",
+        "to": "ranked-recommendation",
+        "type": "blocks"
+      },
+      {
+        "from": "ranked-recommendation",
+        "to": "html-report",
+        "type": "blocks"
+      },
+      {
+        "from": "html-report",
+        "to": "publish-handoff",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -38,7 +38,7 @@ metadata names `role: work`.
   terminal-backend pane:
 
   ```bash
-  pan spawn --issue <id> --item <item-id> --model <model> [--harness <h>]
+  pan spawn --issue <id> --item <item-id> --model <model> [--harness <h>] [--effort <level>]
   ```
 
   This creates a worker pane in its own item worktree

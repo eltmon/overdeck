@@ -26,12 +26,15 @@ import { join } from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { Effect } from 'effect';
+import { EFFORT_LEVELS, type EffortLevel } from '@overdeck/contracts';
 
 import { exitCli } from '../exit.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { createItemWorktree } from '../../lib/workspaces/item-worktree.js';
+import { resolveEffort, InvalidEffortError, type EffortConfigSlice } from '../../lib/agents/resolve-effort.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
 // launch.js registers both adapters at import time and owns the one backend
 // resolution (policy + Herdr availability probe, PAN-3956).
 import { resolveLaunchBackend } from '../../lib/terminal-backends/launch.js';
@@ -47,6 +50,7 @@ export interface SpawnOptions {
   model?: string;
   harness?: string;
   shared?: boolean;
+  effort?: string;
 }
 
 export interface SpawnDeps {
@@ -56,6 +60,21 @@ export interface SpawnDeps {
   readonly createWorktree?: (workspacePath: string, itemId: string) => Promise<string>;
   /** The caller's environment. Injected by the test. */
   readonly env?: NodeJS.ProcessEnv;
+  /** Pre-loaded effort config slice. Injected by the test so resolution never reads the developer's live config. */
+  readonly effortConfig?: EffortConfigSlice;
+}
+
+/**
+ * The argv flags that make a harness launch at the resolved effort. Only
+ * claude-code and codex have a mapping (#4511: pan spawn builds its pane
+ * argv without a harness binary, so an unmapped harness just launches
+ * without an effort flag rather than failing).
+ */
+export function spawnWorkerEffortArgs(harness: string, effort: EffortLevel): string[] {
+  if (harness === 'claude-code') return ['--effort', effort];
+  if (harness === 'codex') return ['-c', `model_reasoning_effort=${effort}`];
+  console.error(chalk.yellow(`pan spawn: harness '${harness}' has no --effort mapping; launching without one.`));
+  return [];
 }
 
 /**
@@ -109,6 +128,28 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   }
 
   const harness = options.harness ?? 'claude-code';
+
+  let workerEffort: ReturnType<typeof resolveEffort>;
+  try {
+    workerEffort = resolveEffort({
+      explicit: options.effort,
+      itemEffort: item.metadata?.effort,
+      planEffort: doc?.plan.metadata?.effort,
+      role: 'worker',
+      issueId,
+      model: options.model,
+      harness: harness as RuntimeName,
+      config: deps.effortConfig,
+    });
+  } catch (error) {
+    if (error instanceof InvalidEffortError) {
+      console.error(chalk.red(`Unknown --effort ${options.effort}; expected one of ${EFFORT_LEVELS.join(', ')}.`));
+      return exitCli(1);
+    }
+    throw error;
+  }
+  if (workerEffort.warning) console.warn(chalk.yellow(workerEffort.warning));
+
   const cwd = options.shared
     ? workspacePath
     : await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id);
@@ -138,7 +179,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   const pane = await Effect.runPromise(
     backend.startAgent(workspace, {
       kind: harness,
-      argv: ['--model', options.model],
+      argv: ['--model', options.model, ...spawnWorkerEffortArgs(harness, workerEffort.effort)],
       env: { OVERDECK_ISSUE_ID: issueId, OVERDECK_ITEM_ID: item.id, OVERDECK_CLAIM_ID: agentName },
       tokens: { issue: issueId, role: 'worker', harness, model: options.model },
       name: agentName,
@@ -161,6 +202,7 @@ export function registerSpawnCommand(program: Command): void {
     .requiredOption('--item <item>', 'xBRIEF item the worker takes')
     .requiredOption('--model <model>', 'Model the worker runs on')
     .option('--harness <harness>', 'Coding-agent harness (default: claude-code)')
+    .option('--effort <level>', 'Reasoning effort: low | medium | high | xhigh | max (defaults to the item/plan metadata, then roles.worker.effort)')
     .option('--shared', 'Run the worker in the issue workspace instead of an item worktree (foreman/operator only; serial use)')
     .action(async (options: SpawnOptions) => spawnCommand(options));
 }

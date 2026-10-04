@@ -41,7 +41,6 @@ declare -A BASELINE=(
   ["packages/pi-extension/src/index.ts"]=1                       # PAN-4260
   ["packages/ohmypi-extension/src/index.ts"]=1                   # PAN-4260
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
-  ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
 )
 
 PATTERNS=(

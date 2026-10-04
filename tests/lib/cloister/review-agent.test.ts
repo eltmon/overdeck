@@ -680,6 +680,33 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     }
   });
 
+  it('resolves roles.review.effort for a fresh spawn (PAN-4256)', async () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { effort: 'medium' } }, tieredExecution: { tiers: {} } },
+    });
+
+    await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    const [, , options] = mockSpawnRun.mock.calls[0] as [string, string, { effort?: string; effortSource?: string }];
+    expect(options.effort).toBe('medium');
+    expect(options.effortSource).toBe('role');
+  });
+
+  it('skips resolveEffort on the resumeAgent branch (PAN-4256)', async () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { effort: 'medium' } }, tieredExecution: { tiers: {} } },
+    });
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? { id, status: 'running' } : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result.message).toContain('Review resumed');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
   it('rewrites reviewDispatchedAt on a resumed parent with the time before resumeAgent', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {

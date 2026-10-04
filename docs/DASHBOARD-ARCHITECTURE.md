@@ -93,6 +93,18 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   inventory answers for (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
   A row served `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
+- The snapshot's runtime map (`agentRuntimeById`) survives a dashboard restart
+  (PAN-4522). At boot the read model seeds it from the event store: for each agent
+  in `agentsById`, every retained event of the runtime event types
+  (`RUNTIME_SEED_EVENT_TYPES` in `src/dashboard/server/services/runtime-seed.ts`,
+  queried by `queryRuntimeHistory`) is replayed through the shared reducer, and
+  only the runtime map is kept. On the client, `syncSnapshot` merges the snapshot's
+  runtime map per agent (`mergeSnapshotRuntimeById` in
+  `packages/contracts/src/agent-runtime-merge.ts`): a held entry with a strictly
+  newer `lastActivity` (or, on equal stamps, a higher `updatedAtSequence`) is
+  kept, and an agent the snapshot omits keeps its entry.
+  The God View's idle age therefore comes from the agent's last runtime event, not
+  from the spawn-time `state.json` `lastActivity`.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
 - Store: Zustand with shared reducers from `@overdeck/contracts`
