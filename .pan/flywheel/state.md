@@ -66,3 +66,17 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Learning: right after a `pan reload`, the God View and any other
   `agentRuntimeById` consumer under-report activity. Do not diagnose agent
   idleness from them in the first minutes after a restart.
+
+### Stale verification worker fails a fixed head → PAN-4527 (2026-10-04, needs-handoff)
+
+- PAN-4498's re-review after a fix push joined a verification worker started
+  on the previous head, which then failed the new head with the old head's CI
+  result ("The CI test job already failed on this head (c9994b06)") although
+  CI on the new head had passed. Root cause:
+  `src/lib/cloister/verification-worker-supervisor.ts` line 178 treats every
+  review-verification worker as `sameHead`, and `verification-runner.ts`
+  reads CI for the launch-time `headShort`. Review machinery (TENET-10), so
+  filed `needs-handoff`, not started.
+- Instance recovery: told the agent the failure was stale and to re-request
+  review on its current head. Tell: a `verification.failed` whose gate record
+  names a different head than its `head8`, or a test gate at `0ms`, is this bug.
