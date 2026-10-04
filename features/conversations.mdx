@@ -590,6 +590,30 @@ After it continues, the conversation opens on this machine as a normal conversat
 See [Session Vault: Continue on another machine](/configuration/session-vault#continue-on-another-machine)
 for the CLI path instead of repeating it.
 
+## Reviewing changes in the diff panel
+
+Open the diff panel from a conversation to review what changed. Besides
+**All turns**, **vs main** and the per-turn chips, it has a **Compare…** view
+for any two points in the conversation's repository. It works in a local-only
+repository too: no remote and no pull request are needed.
+
+1. Click **Compare…**.
+2. Pick a **base** and a **head**. Each box suggests branches, tags and recent
+   commits, and accepts any ref you type, such as a SHA or `HEAD~2`.
+3. Choose **A..B** to see every difference between the two, or **A...B** to see
+   only the head's changes since the two diverged.
+4. Click **Compare** (or press Enter), then pick a file to read its diff.
+
+The selection is part of the page URL. Use the pop-out button to open the
+comparison in its own window, and bookmark that URL to come back to the same
+comparison later.
+
+The **ignore whitespace** toggle in the panel header hides changes that only
+re-indent or re-space lines, so a reformatted block no longer hides the real
+change. It applies to the diff in every view, and the panel remembers it in this
+browser. A turn's file list can still name a file whose only change was
+whitespace; opening it then shows no net changes.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations

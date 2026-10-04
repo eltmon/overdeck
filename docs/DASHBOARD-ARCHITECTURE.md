@@ -521,6 +521,53 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Diff compare and ignore-whitespace (PAN-4503)
+
+The diff panel can compare any two refs of a local repository, with no remote
+and no PR. Two routes in `src/dashboard/server/routes/diff-compare.ts` serve it,
+backed by `src/lib/diffs/compare.ts`:
+
+- `GET /api/diffs/compare?repo=&base=&head=&mode=&file=&ignoreWhitespace=`
+  returns `{ repoRoot, mode, base: { ref, sha }, head: { ref, sha }, mergeBase,
+  files, diff? }`. `files` is always present; `diff` (the patch) is present only
+  when `file=` names one file, the same contract the panel already renders for
+  vs-main and all-turns. `mode` is `two-dot` (default: `git diff <base> <head>`,
+  every difference) or `three-dot` (`git diff $(git merge-base base head) head`,
+  only head's changes since the branches diverged; `mergeBase` is set).
+- `GET /api/diffs/refs?repo=` returns `{ repoRoot, head, branches, tags,
+  commits }` for the ref picker. It reads only `refs/heads`, `refs/remotes` and
+  `refs/tags`, so checkpoint refs under `refs/pan/turn/` never appear.
+
+Failures return 400 with `{ code, error }`: `INVALID_REPO`, `REPO_NOT_ALLOWED`,
+`NOT_A_GIT_REPO`, `INVALID_REF`, `UNKNOWN_REF`, `INVALID_MODE`, `NO_MERGE_BASE`.
+
+**Allowed roots.** `repo` must be an absolute path whose realpath is inside a
+registered project's `path`, inside that project's workspaces dir, or **exactly
+equal** to the cwd of an unarchived conversation. Conversation cwds are
+exact-match only, so a conversation started in the home directory does not open
+every repository under home. Anything else is `REPO_NOT_ALLOWED`, decided before
+any git process starts.
+
+**Refs.** Each ref is shape-checked before any git call (no leading `-`, no `..`,
+no whitespace or `:`, at most 256 characters), then resolved with
+`git rev-parse --verify --quiet --end-of-options <ref>^{commit}`. Every later git
+command receives the resolved SHAs, never the user's string. All git calls are
+`execFile` argument arrays.
+
+**Ignore whitespace.** `ignoreWhitespace=1` (or `true`) maps to `git -w` on the
+patch and numstat of every diff route: the compare route, the agent turn, full
+and vs-main routes, and the conversation full and turn routes. The turn-summary
+lists (`GET /api/agents/:id/diffs`, `GET /api/conversations/:name/diffs`) ignore
+it. The panel stores the toggle per browser in `overdeck.ui.diff.preferences`.
+The helpers live in `src/lib/diffs/diff-output.ts` (`DiffOptions`,
+`diffOptionArgs`, `diffOptionsFromSearchParams`).
+
+**URL state.** The Compare view lives in `diffTurnId=compare`, `diffBase`,
+`diffHead` and `diffMode` (plus the usual `diffFilePath`). `DiffPanel` shows the
+"Compare…" chip only when it gets a `repoPath` prop: `ConversationPanel` passes
+the conversation cwd, and the `/popout/diff` route passes its `repo` param. The
+panel's pop-out button carries `repo` and the compare keys.
+
 ## CPU weight and the runaway patrol (PAN-4311)
 
 The dashboard runs in its own transient systemd unit started with

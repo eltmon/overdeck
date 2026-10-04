@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let testRoot: string;
@@ -101,5 +103,70 @@ describe('getConversationDiffTurn', () => {
     expect(fullDiff).toContain('diff --git a/README.md b/README.md');
     expect(fullDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
     expect(fullDiff).toContain('+External change');
+  });
+});
+
+describe('ignoreWhitespace in the conversation diff views (PAN-4503)', () => {
+  const emptyDeps = (sessionFile: string) => ({
+    resolveSessionFile: async () => sessionFile,
+    getCachedMessages: async () => ({ messages: [] }),
+  });
+
+  async function createReindentConversation(name: string): Promise<string> {
+    const repo = createRepo(`${name}-repo`, 'a.js', 'if (x) {\nfoo()\n}\n');
+    writeFileSync(join(repo, 'b.txt'), 'hi\n');
+    git(repo, ['add', 'b.txt']);
+    git(repo, ['commit', '--quiet', '-m', 'add b']);
+    const sessionFile = join(testRoot, `${name}.jsonl`);
+    writeFileSync(sessionFile, '');
+
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    createConversation({ name, tmuxSession: `conv-${name}`, cwd: repo });
+    writeFileSync(join(repo, 'a.js'), 'if (x) {\n    foo()\n}\n');
+    writeFileSync(join(repo, 'b.txt'), 'hi\nthere\n');
+    return sessionFile;
+  }
+
+  it('drops the re-indent-only file from the all-turns and vs-main patches', async () => {
+    const sessionFile = await createReindentConversation('ws-fns');
+    const { getConversationDiffFull, getConversationDiffTurn } = await import(
+      '../../../../src/lib/overdeck/conversation-diffs.js'
+    );
+    const deps = emptyDeps(sessionFile);
+
+    const ignored = (await getConversationDiffFull('ws-fns', deps, { ignoreWhitespace: true })).body as { diff: string };
+    expect(ignored.diff).toContain('b.txt');
+    expect(ignored.diff).not.toContain('a.js');
+
+    const plain = (await getConversationDiffFull('ws-fns', deps)).body as { diff: string };
+    expect(plain.diff).toContain('b.txt');
+    expect(plain.diff).toContain('a.js');
+
+    const turn = (await getConversationDiffTurn('ws-fns', 'vs-main', undefined, deps, { ignoreWhitespace: true }))
+      .body as { diff: string };
+    expect(turn.diff).toContain('b.txt');
+    expect(turn.diff).not.toContain('a.js');
+  });
+
+  it('serves /diffs/full?ignoreWhitespace=1 without the re-indent-only file', async () => {
+    await createReindentConversation('ws-route');
+    const { conversationDiffRoutes } = await import(
+      '../../../../src/dashboard/server/routes/conversation-diffs.js'
+    );
+    const request = HttpServerRequest.fromWeb(
+      new Request('http://overdeck.localhost/api/conversations/ws-route/diffs/full?ignoreWhitespace=1'),
+    );
+    const response = await Effect.runPromise(
+      Effect.scoped(
+        Effect.flatMap(HttpRouter.toHttpEffect(conversationDiffRoutes), (app) =>
+          Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+        ),
+      ),
+    );
+    expect(response.status).toBe(200);
+    const responseBody = response.body as { body?: Uint8Array } | null;
+    const body = JSON.parse(new TextDecoder().decode(responseBody?.body)) as { diff: string };
+    expect(body.diff).toContain('b.txt');
+    expect(body.diff).not.toContain('a.js');
   });
 });

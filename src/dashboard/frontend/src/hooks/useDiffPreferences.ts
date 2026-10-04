@@ -30,6 +30,8 @@ export interface DiffPreferences {
   disableLineNumbers: boolean
   /** Enable multi-line selection with shift-click. Default: false */
   enableLineSelection: boolean
+  /** Re-request diffs with git -w (PAN-4503). Default: false */
+  ignoreWhitespace: boolean
 }
 
 const DEFAULTS: DiffPreferences = {
@@ -43,6 +45,7 @@ const DEFAULTS: DiffPreferences = {
   lineHoverHighlight: 'disabled',
   disableLineNumbers: false,
   enableLineSelection: false,
+  ignoreWhitespace: false,
 }
 
 function load(): DiffPreferences {
