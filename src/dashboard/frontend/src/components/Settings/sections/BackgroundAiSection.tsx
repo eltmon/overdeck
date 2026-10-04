@@ -4,11 +4,21 @@ import {
   BACKGROUND_AI_FEATURE_META,
   type BackgroundAiConfig,
   type BackgroundAiFeature,
+  type JevSettingsInput,
+  type JevSettingsView,
+  type JevUsageView,
   type ModelId,
   type SettingsConfig,
 } from '../types';
 import { EMBEDDING_MODELS_BY_PROVIDER } from '../embeddingModels';
 import { BG_FEATURE_COST_SOURCE } from '../settingsPageConstants';
+import { JevSettingsPanel } from './JevSettingsPanel';
+
+const JEV_FEATURE_KEYS: readonly BackgroundAiFeature[] = [
+  'jevTurnEndAssessment',
+  'jevAcceptanceCriteriaReview',
+  'jevMemoryRelevance',
+];
 
 interface BackgroundAiSectionProps {
   backgroundCost?: {
@@ -17,6 +27,12 @@ interface BackgroundAiSectionProps {
   chatModelOptionEls: ReactNode;
   formData: SettingsConfig;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
+  jev?: {
+    settings?: JevSettingsView;
+    usage?: JevUsageView | null;
+    serverError: string | null;
+    onSave: (next: JevSettingsInput, opts?: { debounce?: boolean }) => void;
+  };
 }
 
 export function BackgroundAiSection({
@@ -24,6 +40,7 @@ export function BackgroundAiSection({
   chatModelOptionEls,
   formData,
   onSettingsChange,
+  jev,
 }: BackgroundAiSectionProps) {
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
@@ -218,15 +235,15 @@ export function BackgroundAiSection({
           );
         })}
 
-        {/* PAN-4369: key for the optional Jev toggles. TypeSafe is not a model provider, so the
-            slot lives here rather than in Providers. Model and endpoint stay config.yaml-only. */}
+        {/* PAN-4508: key for the optional Jev toggles. TypeSafe is not a model provider, so the
+            slot lives here rather than in Providers. Route, model and timeout are editable
+            below (jev: in config.yaml) via the dedicated settings door; api_key_ref stays
+            config.yaml-only. */}
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg">
           <div className="min-w-0">
             <span className="text-sm font-medium text-foreground">TypeSafe API key (Jev)</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Used by the Jev toggles above. Accepts a TypeSafe console key or an OpenCode Zen key. The
-              model and endpoint are set under <code className="font-mono">jev:</code> in config.yaml — see
-              the Jev configuration docs.
+              Used by the Jev toggles above. Accepts a TypeSafe console key or an OpenCode Zen key.
             </p>
           </div>
           <input
@@ -244,6 +261,17 @@ export function BackgroundAiSection({
           />
         </div>
       </div>
+      {jev?.settings && (
+        <JevSettingsPanel
+          settings={jev.settings}
+          anyJevToggleOn={
+            !(formData.background_ai?.cheap_mode ?? false) &&
+            JEV_FEATURE_KEYS.some((key) => formData.background_ai?.features?.[key] ?? true)
+          }
+          serverError={jev.serverError}
+          onSave={jev.onSave}
+        />
+      )}
       <p className="text-[11px] text-muted-foreground mt-3 px-4">
         You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the
         choice is saved and takes effect when the feature runs, but a model shown under a

@@ -58,3 +58,26 @@ describe('BackgroundAiSection TypeSafe key (PAN-4369)', () => {
     expect(screen.getByText('Jev: memory relevance filter')).toBeTruthy();
   });
 });
+
+describe('BackgroundAiSection Jev settings panel (PAN-4508)', () => {
+  it('renders no JevSettingsPanel when the jev prop is absent', () => {
+    renderSection(settings());
+    expect(screen.queryByTestId('jev-settings-panel')).toBeNull();
+  });
+
+  it('renders JevSettingsPanel when jev.settings is provided', () => {
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={settings()}
+        onSettingsChange={vi.fn()}
+        jev={{
+          settings: { configured: true, route: 'zen', model: 'jev-1.13-free', timeoutMs: 2000, apiKeyRef: 'TYPESAFE_API_KEY' },
+          serverError: null,
+          onSave: vi.fn(),
+        }}
+      />,
+    );
+    expect(screen.getByTestId('jev-settings-panel')).toBeTruthy();
+  });
+});
