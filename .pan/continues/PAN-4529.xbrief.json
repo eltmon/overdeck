@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:14:14.882Z",
+  "updated": "2026-10-04T05:14:26.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "report-skeleton.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:14:14.882Z"
+    },
+    "prototype-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:26.875Z"
     }
   }
 }
