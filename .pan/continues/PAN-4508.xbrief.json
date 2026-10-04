@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4508",
+  "created": "2026-10-04T02:15:51.137Z",
+  "updated": "2026-10-04T02:15:51.137Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "jev-settings-validation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:15:51.137Z"
+    }
+  }
+}
