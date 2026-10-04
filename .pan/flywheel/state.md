@@ -115,3 +115,15 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Learning: overnight throughput is bounded by the serialized gate queue,
   not by agents. Check `~/.overdeck/verification-workers/admission/owner.json`
   before calling a long verification "stuck".
+
+### Restart during verification loses the review dispatch → PAN-4532 (2026-10-04, needs-handoff)
+
+- Verification workers survive a dashboard restart, but the waiter that
+  dispatches review after `passed` dies with the old process; the deacon's
+  re-request then ignores the finished result
+  (`verification-worker-supervisor.ts` line 174 joins only result-less
+  workers) and re-runs every gate. PAN-4515 lost a passed verification this
+  way after the 04:21 deploy.
+- Run rule until PAN-4532 lands: never approve a dashboard restart while any
+  `dist/verification-worker.js` process is alive. Deploy in a gap between
+  verifications.
