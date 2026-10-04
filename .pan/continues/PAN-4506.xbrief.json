@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T03:00:03.390Z",
+  "updated": "2026-10-04T03:00:17.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "spawn-kickoff-rejection.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:00:03.390Z"
+    },
+    "spawn-kickoff-rejection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:00:17.005Z"
     }
   }
 }
