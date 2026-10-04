@@ -62,6 +62,13 @@ describe('summarizePipelineEntry', () => {
     }))).toBe('agent-pan-4383-review-security needs you — silent again after re-dispatch (pane pane-dead)');
   });
 
+  it('names the never-started reviewer and the kickoff error (PAN-4506)', () => {
+    expect(summarizePipelineEntry(entry('review.dispatch-failed', {
+      reviewer: 'agent-pan-4383-review',
+      error: 'invalid_request: x',
+    }))).toBe('agent-pan-4383-review never started — invalid_request: x; request review again once fixed');
+  });
+
   it('names the item and its blockers of a blocker declaration (PAN-4451)', () => {
     expect(summarizePipelineEntry(entry('blocked.declared', { item: 'PAN-1-a', blockers: ['PAN-2', 'eltmon/overdeck#7'] })))
       .toBe('PAN-1-a waits on PAN-2, eltmon/overdeck#7');

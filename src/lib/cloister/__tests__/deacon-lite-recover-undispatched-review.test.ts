@@ -118,6 +118,19 @@ describe('recoverUndispatchedReviews', () => {
     expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
   });
 
+  // PAN-4506: a rejected kickoff never started, so there is no "undispatched
+  // review" to re-request — the dispatch-failed entry is the dead end, and
+  // the tail check (tail must itself be verification.passed) already skips it.
+  it('never calls the route when a review.dispatch-failed entry tails an aged request-review pass', async () => {
+    journal([
+      { type: 'verification.passed', minutesAgo: 10, source: 'request-review', data: { head: HEAD } },
+      { type: 'review.dispatch-failed', minutesAgo: 1, source: 'review-agent', data: { reviewer: 'agent-pan-4221-review', error: 'invalid_request: x' } },
+    ]);
+
+    expect(await recoverUndispatchedReviews(NOW)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
   it('never calls the route for a verification.passed tail sourced from merge-verify', async () => {
     passedTail(10, { source: 'merge-verify' });
 
