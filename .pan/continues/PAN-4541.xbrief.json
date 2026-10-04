@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4541",
+  "created": "2026-10-04T08:22:14.052Z",
+  "updated": "2026-10-04T08:22:14.053Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "reword-jev-comment": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4541",
+      "claimedAt": "2026-10-04T08:22:14.052Z"
+    }
+  }
+}
