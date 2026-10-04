@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T02:48:12.990Z",
+  "updated": "2026-10-04T02:48:19.965Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4257",
       "claimedAt": "2026-10-04T02:45:53.060Z",
       "doneAt": "2026-10-04T02:48:12.990Z"
+    },
+    "effort-first-engine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4257",
+      "claimedAt": "2026-10-04T02:48:19.965Z"
     }
   }
 }
