@@ -390,6 +390,7 @@ describe("AcpHost", () => {
       provider: "kimi",
       workspace: process.cwd(),
       model: "k3[1m]",
+      effort: "high",
       overdeckHome,
       runtime: stub.runtime,
     });
@@ -447,6 +448,7 @@ describe("AcpHost", () => {
       provider: "kimi",
       workspace: process.cwd(),
       model: "kimi-code/k3",
+      effort: "high",
       overdeckHome,
       runtime: {
         ...stub.runtime,
@@ -486,7 +488,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-invalid-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/k3", overdeckHome, runtime: stub.runtime,
+      model: "kimi-code/k3", effort: "high", overdeckHome, runtime: stub.runtime,
     });
     hosts.push(host);
     await host.start();
@@ -512,7 +514,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-rejected-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/k3", overdeckHome,
+      model: "kimi-code/k3", effort: "high", overdeckHome,
       runtime: {
         ...stub.runtime,
         setConfigOption: (id, value) => value === "low"
