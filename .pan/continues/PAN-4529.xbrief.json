@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:22:46.241Z",
+  "updated": "2026-10-04T05:22:58.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -268,6 +268,9 @@
     "publish-handoff.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:22:46.240Z"
+    },
+    "commit-research-brief.ac2": {
+      "status": "cancelled"
     }
   }
 }
