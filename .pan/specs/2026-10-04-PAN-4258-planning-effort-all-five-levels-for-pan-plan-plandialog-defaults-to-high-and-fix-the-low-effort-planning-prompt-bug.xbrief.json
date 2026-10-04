@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:11:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4258: Planning effort: all five levels for pan plan, PlanDialog defaults to high, and fix the 'LOW effort planning' prompt bug",
-    "updated": "2026-10-04T02:15:21.839Z"
+    "updated": "2026-10-04T02:16:06.687Z"
   },
   "plan": {
     "id": "pan-4258",
     "title": "Planning effort: all five levels for pan plan, PlanDialog defaults to high, and fix the 'LOW effort planning' prompt bug",
-    "status": "proposed",
+    "status": "running",
     "uid": "90d96f7d-a9d6-4a4b-949f-815cc5da460b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:11:53Z",
-    "updated": "2026-10-04T02:15:21.839Z",
+    "updated": "2026-10-04T02:16:06.687Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4258",
@@ -627,5 +627,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
