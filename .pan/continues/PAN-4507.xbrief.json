@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:38:18.419Z",
+  "updated": "2026-10-04T02:38:31.460Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
       "claimedBy": "agent-pan-4507",
       "claimedAt": "2026-10-04T02:28:20.109Z",
       "doneAt": "2026-10-04T02:38:18.418Z"
+    },
+    "reset-poll-cadence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:38:31.460Z"
     }
   }
 }
