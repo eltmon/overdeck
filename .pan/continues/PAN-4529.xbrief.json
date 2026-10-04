@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:16:42.117Z",
+  "updated": "2026-10-04T05:16:54.514Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "candidate-3-liveness-signals.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T05:16:42.117Z"
+    },
+    "candidate-3-liveness-signals.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:54.513Z"
     }
   }
 }
