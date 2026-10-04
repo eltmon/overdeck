@@ -30,6 +30,9 @@ import type { XBriefDocument } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { withGitHubCaller } from '../../../lib/github-quota/caller-context.js';
 import { patRestPauseDelayMs, recordOctokitFailure, recordOctokitPage } from '../../../lib/github-quota/rest-meter.js';
+import { displayStatusForCanonical, getCanonicalStatus, mapRallyStateToCanonical, shouldRefreshPlanningStateForIssue } from './issue-status-mapping.js';
+export { displayStatusForCanonical, getCanonicalStatus, shouldRefreshPlanningStateForIssue } from './issue-status-mapping.js';
+import { POLL_INTERVALS, computePollDelay, type PollIntervalReason } from './poll-cadence.js';
 
 /**
  * Compute task progress counts from a cached plan document.
@@ -41,77 +44,6 @@ export function computeTaskCounts(doc: XBriefDocument | null): { completed: numb
   return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };
 }
 
-/**
- * Map a raw status string to its canonical state.
- * Exported for testing.
- */
-export function getCanonicalStatus(status: string | undefined, stateType?: string): string {
-  if (!status) return 'backlog';
-  const normalized = status.toLowerCase();
-  // Direct backlog mappings
-  if (normalized === 'backlog' || normalized === 'triage' || normalized === 'unknown') {
-    return 'backlog';
-  }
-  // Other canonical states
-  if (normalized === 'todo' || normalized === 'to do' || normalized === 'ready' || normalized === 'unstarted') {
-    return 'todo';
-  }
-  if (normalized === 'in progress' || normalized === 'in_progress' || normalized === 'started' || normalized === 'active' || normalized === 'in planning') {
-    return 'in_progress';
-  }
-  if (normalized === 'in review' || normalized === 'in_review' || normalized === 'review' || normalized === 'qa' || normalized === 'testing') {
-    return 'in_review';
-  }
-  if (normalized === 'verifying' || normalized === 'verifying on main' || normalized === 'verifying_on_main') {
-    return 'verifying_on_main';
-  }
-  if (normalized === 'done' || normalized === 'completed' || normalized === 'closed') {
-    return 'done';
-  }
-  if (normalized === 'canceled' || normalized === 'cancelled' || normalized === 'duplicate' || normalized === "won't do" || normalized === 'wontfix') {
-    return 'canceled';
-  }
-  // Fallback: use Linear stateType if available (handles custom status names)
-  if (stateType) {
-    const typeMap: Record<string, string> = {
-      backlog: 'backlog',
-      unstarted: 'todo',
-      started: 'in_progress',
-      completed: 'done',
-      canceled: 'canceled',
-      cancelled: 'canceled',
-    };
-    if (typeMap[stateType]) return typeMap[stateType];
-  }
-  return 'backlog'; // Default fallback
-}
-
-export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
-  const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
-  return canonical !== 'done' && canonical !== 'canceled';
-}
-
-/**
- * Display status for a canonical state — the same mapping the GitHub/Linear
- * fetch formatters apply inline, extracted for the PAN-3659 backfill adapter.
- */
-export function displayStatusForCanonical(canonical: string): string {
-  return canonical === 'todo' ? 'Todo' :
-    canonical === 'in_progress' ? 'In Progress' :
-    canonical === 'in_review' ? 'In Review' :
-    canonical === 'verifying_on_main' ? 'Verifying' :
-    canonical === 'done' ? 'Done' :
-    canonical === 'canceled' ? 'Canceled' :
-    canonical === 'backlog' ? 'Backlog' : 'Todo';
-}
-
-// Poll intervals (ms)
-const POLL_INTERVALS = {
-  github:  { default: 30_000, min: 15_000, max: 300_000 },
-  linear:  { default: 30_000, min: 15_000, max: 300_000 },
-  rally:   { default: 120_000, min: 60_000, max: 600_000 },
-};
-
 // Linear full refresh interval (safety net)
 const LINEAR_FULL_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -121,6 +53,12 @@ interface TrackerState {
   lastFetchedIssues: any[];
   lastError: string | null;
   lastFetchedAt: string | null;
+  /** Consecutive unchanged scheduled polls (PAN-4507); only GitHub advances it. */
+  unchangedStreak: number;
+  intervalReason: PollIntervalReason;
+  nextPollAt: number | null;
+  /** Bumped by resetPollCadence so an in-flight poll does not advance the streak. */
+  cadenceGeneration: number;
 }
 
 interface GetIssuesCacheEntry {
@@ -148,19 +86,6 @@ function issuesChanged(newIssues: any[], oldIssues: any[]): boolean {
     if (issue.updatedAt && issue.updatedAt > oldMax) oldMax = issue.updatedAt;
   }
   return newMax !== oldMax;
-}
-
-/**
- * Map normalized IssueState (open/in_progress/closed) to canonical dashboard status.
- * The Rally tracker already normalizes raw Rally states to IssueState in rally.ts.
- */
-function mapRallyStateToCanonical(issueState: string): string {
-  if (!issueState) return 'todo';
-  const stateLower = issueState.toLowerCase();
-  if (stateLower === 'in_progress') return 'in_progress';
-  if (stateLower === 'closed') return 'done';
-  // 'open' and anything unrecognized → 'todo'
-  return 'todo';
 }
 
 /**
@@ -334,6 +259,10 @@ export class IssueDataService {
         lastFetchedIssues: [],
         lastError: null,
         lastFetchedAt: null,
+        unchangedStreak: 0,
+        intervalReason: 'default',
+        nextPollAt: null,
+        cadenceGeneration: 0,
       };
     }
   }
@@ -416,6 +345,26 @@ export class IssueDataService {
       this.pollRally(),
     ]);
     this.pushSnapshot();
+    for (const tracker of ['github', 'linear', 'rally']) this.resetPollCadence(tracker);
+  }
+
+  /**
+   * PAN-4507: return a tracker to its default cadence. Zeroes the unchanged streak and
+   * re-arms the timer only when the armed poll is further away than the default
+   * interval, so repeated resets never postpone a due poll. Never polls and never
+   * touches the cache, so stored ETags keep conditional requests free.
+   */
+  resetPollCadence(tracker: string): void {
+    const state = this.trackers[tracker];
+    const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
+    if (!state || !intervals) return;
+    state.unchangedStreak = 0;
+    state.cadenceGeneration++;
+    if (this.started && state.timer && state.nextPollAt !== null && state.nextPollAt - Date.now() > intervals.default) {
+      clearTimeout(state.timer);
+      state.timer = null;
+      this.scheduleNext(tracker);
+    }
   }
 
   /**
@@ -636,6 +585,7 @@ export class IssueDataService {
     }
 
     this.pushSnapshot();
+    if (state) state.unchangedStreak = 0;
     this.scheduleNext(tracker);
   }
 
@@ -656,6 +606,9 @@ export class IssueDataService {
         suspendedUntil: suspendMs > 0 ? new Date(Date.now() + suspendMs).toISOString() : null,
         rateLimited: suspendMs > 0,
         pollInterval: state.currentInterval,
+        pollIntervalReason: state.intervalReason,
+        unchangedStreak: state.unchangedStreak,
+        nextPollAt: state.nextPollAt === null ? null : new Date(state.nextPollAt).toISOString(),
         lastFetched: state.lastFetchedAt,
         lastError: state.lastError,
         issueCount: state.lastFetchedIssues.length,
@@ -676,34 +629,50 @@ export class IssueDataService {
     const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
     if (!intervals) return;
 
+    // At most one armed timer per tracker.
+    if (state.timer) clearTimeout(state.timer);
     let delayMs: number;
     try {
-      const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
-      const effectiveInterval = Math.min(
-        Math.max(intervals.default + backoffMs, intervals.min),
-        intervals.max
-      );
-
-      // If the tracker is exhausted, suspend polling until the rate-limit window resets.
-      // This bypasses intervals.max so we don't wake up before the quota resets.
-      const suspendMs = this.cache.getSuspensionMs(tracker);
-      delayMs = effectiveInterval;
-      if (suspendMs > 0) {
-        delayMs = Math.min(suspendMs, 3_600_000);
+      // PAN-4507: unchanged backoff vs rate-limit backoff, then suspension (waits for the
+      // rate-limit reset, past intervals.max) and the PAN-4264 PAT REST pause.
+      const next = computePollDelay({
+        intervals,
+        unchangedStreak: state.unchangedStreak,
+        rateBackoffMs: this.cache.getBackoffMs(tracker, intervals.default),
+        suspendMs: this.cache.getSuspensionMs(tracker),
+        quotaPauseMs: tracker === 'github' ? patRestPauseDelayMs() : 0,
+      });
+      delayMs = next.delayMs;
+      state.intervalReason = next.reason;
+      if (next.reason === 'rate-limit-suspended') {
         console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
       }
     } catch (err: any) {
       console.error(`[IssueDataService] Cache read failed for ${tracker}; falling back to default interval:`, err.message);
       delayMs = intervals.default;
+      state.intervalReason = 'default';
+      const pauseMs = tracker === 'github' ? patRestPauseDelayMs() : 0;
+      if (pauseMs > delayMs) {
+        delayMs = pauseMs;
+        state.intervalReason = 'quota-pause';
+      }
     }
-    // PAN-4264: while the PAT REST bucket is paused, the GitHub poll waits for the pause end.
-    if (tracker === 'github') delayMs = Math.max(delayMs, patRestPauseDelayMs());
     state.currentInterval = delayMs;
+    state.nextPollAt = Date.now() + delayMs;
 
     state.timer = setTimeout(async () => {
+      state.timer = null;
+      state.nextPollAt = null;
+      const generation = state.cadenceGeneration;
       try {
         switch (tracker) {
-          case 'github': await this.pollGitHub(); break;
+          case 'github': {
+            // Only scheduled polls move the streak; a skipped poll (null) or a throw leaves it.
+            const changed = await this.pollGitHub();
+            if (changed === true) state.unchangedStreak = 0;
+            else if (changed === false && state.cadenceGeneration === generation) state.unchangedStreak++;
+            break;
+          }
           case 'linear': await this.pollLinear(); break;
           case 'rally': await this.pollRally(); break;
         }
@@ -1067,17 +1036,18 @@ export class IssueDataService {
   // GitHub polling — uses Octokit REST + ETags (304 = FREE)
   // ---------------------------------------------------------------
 
-  private async pollGitHub(): Promise<void> {
+  /** Resolves to whether the issue list changed, or null when the poll was skipped. */
+  private async pollGitHub(): Promise<boolean | null> {
     // PAN-4264: the issue poller is non-essential — skip GitHub during a PAT REST pause.
-    if (patRestPauseDelayMs() > 0) return;
+    if (patRestPauseDelayMs() > 0) return null;
     return withGitHubCaller('issue-poller', () => this.pollGitHubRepos());
   }
 
-  private async pollGitHubRepos(): Promise<void> {
+  private async pollGitHubRepos(): Promise<boolean | null> {
     const config = getGitHubConfig();
     if (!config) {
       this.trackers.github.lastFetchedIssues = [];
-      return;
+      return null;
     }
 
     const allIssues: any[] = [];
@@ -1120,6 +1090,7 @@ export class IssueDataService {
       this.pushUpdated();
       this.pushMeta();
     }
+    return changed;
   }
 
   private async fetchGitHubRepoIssues(

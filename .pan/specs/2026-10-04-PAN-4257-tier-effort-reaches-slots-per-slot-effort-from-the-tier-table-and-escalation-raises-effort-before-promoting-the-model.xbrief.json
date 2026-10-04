@@ -1,0 +1,771 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:16:46Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4257: Tier effort reaches slots: per-slot effort from the tier table, and escalation raises effort before promoting the model",
+    "updated": "2026-10-04T02:21:31.588Z"
+  },
+  "plan": {
+    "id": "pan-4257",
+    "title": "Tier effort reaches slots: per-slot effort from the tier table, and escalation raises effort before promoting the model",
+    "status": "running",
+    "uid": "c7035f36-3f9b-4ff6-88cf-a6f8f77e4166",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:16:46Z",
+    "updated": "2026-10-04T02:21:31.588Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4257",
+        "label": "PAN-4257",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (program PRD + foundation)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4512",
+        "label": "PAN-4512 (follow-up: live escalation trigger)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "tiered-execution",
+      "staffing",
+      "swarm",
+      "escalation",
+      "settings-ui"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4257.md",
+      "canonicalFilename": "2026-10-04-PAN-4257-tier-effort-reaches-slots-per-slot-effort-from-the-tier-table-and-escalation-raises-effort-before-promoting-the-model.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Tier effort (tiered_execution.tiers.<t>.effort, added by PAN-4249) never reaches a launch. spawnRun forwards one caller effort to every swarm slot (spawn.ts:173-174) and spawnAgent stages the caller effort that pan start computed without a tier (spawn.ts:705, :810). Staffing has no effort field. The tier supervisor and merge-train re-review record no effort. Escalation has no effort concept, and its decision engine was deleted (PAN-4014) after the Cut removed its triggers. Settings drops tier effort on save because crews dedupe on model+harness, and sub-role cards cannot set effort.",
+      "Proposal": "resolveStaffing returns effort and effortSource from resolveEffort (item > plan > tier > roles.work > project > default; no tier for implicit staffing). Tier spawn params carry it. A new leaf launch-effort.ts picks the launch effort: an explicit caller effort wins, else the staffed effort, else the caller value; spawn.ts applies it in the slot branch and in spawnAgent. The tier supervisor and merge-train re-review resolve at the callsite. escalation.effort_first is validated (omitted when unset). A pure decideEscalation is restored with one new step before promotion (raise effort one supported level, once per difficulty), plus a pure applyEscalationAction; applyEffectiveDifficulty overlays the raised effort so staffing sees it at the item layer. Settings gains a per-crew effort select (crews key on effort), an effort-first switch that edits preserve, and a per-sub-role effort select. configuration/effort.mdx documents all of it and says no automatic escalation trigger fires yet (PAN-4512).",
+      "NonGoals": "- No live escalation trigger and no continue-file writer for tierOverrides (PAN-4512).\n- No new EffortSource value; an escalated effort resolves as source 'item'.\n- No general effort default for role runs in spawnRun (review parent, test, worker, sequencer, knowledge, plan) — PAN-4256.\n- No edits to src/lib/cloister/deacon-swarm.ts (at its file-size cap, needs no change) or src/lib/cloister/swarm-foreman.ts (covered through spawnAgent).\n- No change to the lint:effort baseline or the local `type Effort` copy in RolesPanel.tsx (PAN-4256 owns that row).\n- No effort display in Agents rows, issue view or pan status (PAN-4259).\n- No file-size allowlist row added or raised.\n- No xhigh or max default anywhere."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Escalation has no live trigger since the Cut; restore a pure decideEscalation + applyEscalationAction and prove the path through resolveStaffing in tests, filing PAN-4512 for the trigger.",
+        "rationale": "docs/THE-CUT.md:131-132 records the triggers as deliberately dropped and PAN-4014 deleted the dead engine. Re-wiring a trigger is a separate design decision outside this slice; the issue's acceptance criterion is a test of the escalation sequence."
+      },
+      {
+        "summary": "A caller effort overrides staffing only when its source is 'explicit' (or absent); otherwise the staffed, tier-aware effort wins.",
+        "rationale": "pan start always passes a tier-less resolved effort with a source; staffing's chain is a superset of that chain, so replacing non-explicit values loses nothing while pan start --effort still wins."
+      },
+      {
+        "summary": "Implicit staffing passes no tierName to resolveEffort.",
+        "rationale": "Its tierName 'default' is a label, not a configured tier; a configured tier named 'default' must not leak into non-tiered issues."
+      },
+      {
+        "summary": "The raised effort is overlaid as item metadata.effort, so staffing reports source 'item'; no new EffortSource value.",
+        "rationale": "Matches how promotions already overlay metadata.difficulty, and avoids changing a contracts union that PAN-4253/4255 persist and display."
+      },
+      {
+        "summary": "Effort-first inserts one step between retry and promote, once per difficulty, to the next level the model supports; it does not count toward max_promotions, and promotion clears it.",
+        "rationale": "Literal reading of 'raise effort one level before promoting the model'; keeps PAN-3858's block/retry order intact so existing semantics are unchanged with effort_first off."
+      },
+      {
+        "summary": "ValidatedEscalationConfig.effort_first is present only when the raw config sets it.",
+        "rationale": "Keeps existing toEqual assertions on the escalation shape (settings-api, tier-table, swarm-tiered-hooks tests) green without editing them."
+      },
+      {
+        "summary": "Tier supervisor and merge-train re-review resolve effort at their callsites instead of a general spawnRun role-run default.",
+        "rationale": "The general role-run default is PAN-4256's scope (review parent, test, worker); callsite resolution covers this issue's named sites and composes with PAN-4256."
+      },
+      {
+        "summary": "Keep the Settings UI in this issue rather than splitting it into a sibling.",
+        "rationale": "The issue scopes it explicitly, the projected surface is 25 files (at the finalize cap, not over), and splitting would leave a window where a Settings save drops tier effort and effort_first."
+      }
+    ],
+    "items": [
+      {
+        "id": "staffing-effort",
+        "title": "Staffing returns the tier-aware effort and its source",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "tier-params-effort",
+            "launch-effort-slots",
+            "effort-first-engine"
+          ],
+          "files_scope": [
+            "src/lib/agents/staffing.ts",
+            "src/lib/agents/__tests__/staffing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/staffing.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "staffing.test.ts passes including the new 'staffing effort (PAN-4257)' cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Add effort: EffortLevel and effortSource: EffortSource to Staffing (src/lib/agents/staffing.ts:35). Add a private staffedEffort(item, tierName, model, harness, config, options) helper that calls resolveEffort({ itemEffort: item.metadata?.effort, planEffort: options.planMetadata?.effort, tierName, role: 'work', issueId: options.issueId, model, harness, config }). Use it at the distribution return (:120, with the picked entry's model/harness), the single-tier return (:122, with the overlaid effectiveItem and tier.tierName), and resolveImplicitStaffing (with tierName undefined). resolveImplicitStaffing gains optional item/options parameters and its config Pick adds 'tieredExecution'; resolveStaffing passes item and options to it. Add the six test cases from PRD W1 step 4 using models that support all five levels and no issueId."
+        },
+        "items": [
+          {
+            "id": "staffing-effort.ac1",
+            "title": "Given tier cheap with effort low and a trivial item, when resolveStaffing runs with tiered execution enabled, then it returns effort 'low' and effortSource 'tier'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-effort.ac2",
+            "title": "Given item metadata.effort xhigh (or plan.metadata.effort medium) and tier effort low, when resolveStaffing runs, then it returns the item value with source 'item' (or the plan value with source 'plan')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-effort.ac3",
+            "title": "Given tiered execution disabled and a configured tier named 'default' with effort low, when resolveStaffing falls to implicit staffing, then it returns effort 'high' with source 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-effort.ac4",
+            "title": "Given no effort keys anywhere in config, when resolveStaffing runs, then it returns effort 'high' with source 'default' and every pre-existing staffing.test.ts case passes unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-params-effort",
+        "title": "Slot and single-work tier spawn params carry the staffed effort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/__tests__/dispatch-tier.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/dispatch-tier.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "dispatch-tier.test.ts passes",
+            "typecheck completes without errors",
+            "lint:file-size exits 0 with spawn-prep.ts at or under 1128 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Add effort?: EffortLevel and effortSource?: EffortSource to SlotTierSpawnParams (src/lib/agents/spawn-prep.ts:189); extend the contracts type import at :22. Add effort: staffing.effort, effortSource: staffing.effortSource to the staffed returns of resolveSlotTierSpawnParams (near :290) and resolveSingleWorkTierSpawnParams (near :540). Leave the explicit-model and {} returns without effort (D5). Update the dispatch-tier.test.ts toEqual expectations listed in PRD W2 step 5 and add one tier-effort case."
+        },
+        "items": [
+          {
+            "id": "tier-params-effort.ac1",
+            "title": "Given a tier with effort low and tiered execution enabled, when resolveSlotTierSpawnParams runs for its item, then it returns effort 'low' and effortSource 'tier'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-params-effort.ac2",
+            "title": "Given an explicit model argument, when resolveSlotTierSpawnParams or resolveSingleWorkTierSpawnParams runs, then the returned object has no effort key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-params-effort.ac3",
+            "title": "Given the branch after this item, when wc -l src/lib/agents/spawn-prep.ts runs, then it prints at most 1128 and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-effort-slots",
+        "title": "Slots and single-work agents launch at the staffed effort unless the caller's effort is explicit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/launch-effort.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/__tests__/launch-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/launch-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "launch-effort.test.ts passes including the trivial-low / expert-high launch string case",
+            "typecheck completes without errors",
+            "lint:file-size exits 0 with spawn.ts at or under 1089 lines",
+            "lint:effort exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. Create src/lib/agents/launch-effort.ts exporting LaunchEffort and pickLaunchEffort(caller, staffed) exactly as in PRD W3 step 1 (type-only imports). In spawn.ts spawnRunWithoutConsentClaim, hoist let slotEffort = { effort: options.effort, effortSource: options.effortSource } next to slotHarness, set slotEffort = pickLaunchEffort(slotEffort, tierParams) inside if (slot), and replace lines 173-174 with slotEffort.effort / slotEffort.effortSource. In spawnAgent, after singleTierParams (:659), add const launchEffort = pickLaunchEffort({ effort: options.effort, effortSource: options.effortSource }, singleTierParams) and use it at :705 (spawnEffortFields) and :810 (buildAgentLaunchConfig effort). Do not touch the role-run branch. Write launch-effort.test.ts per PRD W3 step 6, with OVERDECK_HOME pointed at an mkdtemp directory for roleSystemPromptInjection."
+        },
+        "items": [
+          {
+            "id": "launch-effort-slots.ac1",
+            "title": "Given a trivial-tier item whose tier sets effort low and a caller effort { high, role }, when staffing, pickLaunchEffort and roleSystemPromptInjection(roleAgentDefinitionPath('work'), effort) run, then the launch string contains ' --effort low' and not ' --effort high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-effort-slots.ac2",
+            "title": "Given an expert-tier item whose tier sets effort high, when the same chain runs, then the launch string contains ' --effort high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-effort-slots.ac3",
+            "title": "Given a caller effort with source 'explicit' (or no source) and a staffed effort, when pickLaunchEffort runs, then it returns the caller effort; given an empty staffed value, it returns the caller value unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-effort-slots.ac4",
+            "title": "Given the branch after this item, when wc -l src/lib/agents/spawn.ts runs, then it prints at most 1089 and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-callsite-effort",
+        "title": "Tier supervisor and merge-train re-review pass their resolved effort to spawnRun",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-supervisor.ts",
+            "src/lib/cloister/merge-train-deps.ts",
+            "src/lib/agents/__tests__/tier-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-supervisor.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "tier-supervisor.test.ts passes including the effort case",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In spawnTierSupervisor (src/lib/agents/tier-supervisor.ts:127-141) call resolveEffort({ role: 'review', subRole: SUPERVISOR_SUB_ROLE, issueId, model: supervisor.model, harness: supervisor.harness }) and pass effort/effortSource to spawnRun. In merge-train-deps.ts reDispatchVerification (:55-63) call resolveEffort({ role: 'review', issueId }) and pass effort/effortSource. Leave dispatchConflictResolver unchanged. In tier-supervisor.test.ts mock ../resolve-effort.js and assert the call arguments and the spawnRun options."
+        },
+        "items": [
+          {
+            "id": "review-callsite-effort.ac1",
+            "title": "Given resolveEffort mocked to return { effort: 'medium', source: 'sub-role' }, when spawnTierSupervisor runs, then spawnRun receives effort 'medium' and effortSource 'sub-role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-callsite-effort.ac2",
+            "title": "Given spawnTierSupervisor('PAN-9999', supervisor), when it runs, then resolveEffort is called with role 'review', subRole 'supervisor', issueId 'PAN-9999' and the supervisor's model and harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-callsite-effort.ac3",
+            "title": "Given the merge-train re-review dispatch, when npm run typecheck runs, then the spawnRun(issueId, 'review', ...) call in merge-train-deps.ts passes effort and effortSource from resolveEffort and typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-first-config",
+        "title": "Validate tiered_execution.escalation.effort_first",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-table-types.ts",
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-table.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-table.test.ts passes including the effort_first cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. Add effort_first?: boolean to TieredEscalationConfig and ValidatedEscalationConfig (src/lib/agents/tier-table-types.ts:82-92). In validateEscalationConfig (src/lib/agents/tier-table.ts:299) throw TieredExecutionConfigError('tiered_execution.escalation.effort_first must be a boolean') for a non-boolean value and spread effort_first into the result only when the raw config sets it. Leave the default object at :62-66 unchanged. Add the three tier-table.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "effort-first-config.ac1",
+            "title": "Given escalation.effort_first: true, when validateTieredExecutionConfig runs, then the validated escalation has effort_first true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-config.ac2",
+            "title": "Given escalation.effort_first: 'yes', when validateTieredExecutionConfig runs, then it rejects the config with TieredExecutionConfigError 'tiered_execution.escalation.effort_first must be a boolean'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-config.ac3",
+            "title": "Given no effort_first key, when validateTieredExecutionConfig runs, then the validated escalation has no effort_first key and the existing assertion at tier-table.test.ts:324 passes unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-first-engine",
+        "title": "Restore the pure escalation engine with an effort-first step before promotion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-escalation.ts",
+            "src/lib/xbrief/continue-state.ts",
+            "src/lib/agents/__tests__/tier-escalation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-escalation.test.ts",
+            "npx vitest run src/lib/agents/__tests__/staffing.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "tier-escalation.test.ts passes including the effort-first staffing sequence",
+            "staffing.test.ts still passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In continue-state.ts add TierEffortRaiseHistoryEntry { at, kind: 'effort', from, to, reason }, add effectiveEffort?: EffortLevel to TierOverride, and widen history to the union. In tier-escalation.ts: add the raise-effort action variant; make applyEffectiveDifficulty also overlay metadata.effort = override.effectiveEffort; add EscalationEffortContext; restore decideEscalation and triggerReason from `git show 100ead187f5^:src/lib/agents/tier-escalation.ts`, importing TIERED_EXECUTION_DIFFICULTIES from ./tier-table-types.js, and insert the D9 step 5 effort raise (next supported level above the current effort, only when effort_first === true and no effectiveEffort yet); add the pure applyEscalationAction from PRD W6 step 2; add the module-header paragraph naming PAN-4512. Write tier-escalation.test.ts per PRD W6 step 3, including the AC-2 sequence through resolveStaffing."
+        },
+        "items": [
+          {
+            "id": "effort-first-engine.ac1",
+            "title": "Given effort_first true, a medium item at its tier's medium effort and no prior raise, when the first escalation is decided and applied, then resolveStaffing keeps model claude-sonnet-5-5 and returns effort 'high' with source 'item'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-engine.ac2",
+            "title": "Given the overrides from the first escalation, when the second escalation is decided and applied, then decideEscalation returns promote medium->complex and resolveStaffing returns model claude-opus-5-5 on tier 'strong'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-engine.ac3",
+            "title": "Given effort_first unset, or no higher supported level (current max, or supported ['low','medium','high'] at high), when decideEscalation runs past its retries, then it returns promote",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-engine.ac4",
+            "title": "Given a promote action, when applyEscalationAction runs, then the returned override increments promotions, sets effectiveDifficulty, has no effectiveEffort key, and the input map is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-first-engine.ac5",
+            "title": "Given missing difficulty, promotions at max_promotions, or difficulty expert, when decideEscalation runs, then it returns block; given attempts below retries_at_tier, it returns retry with attempt + 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-crew-effort",
+        "title": "Settings crews carry a tier effort select that survives save",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "tiered-crews.test.ts passes including the effort round-trip cases",
+            "typecheck completes without errors",
+            "lint:effort exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. In Settings/types.ts add effort?: EffortLevel to the TieredExecutionConfig tier value type and effort_first?: boolean to escalation (import EffortLevel from @overdeck/contracts). In tiered-crews.ts add effort to Crew, include it in staffingKey (single and mix keys), copy it in importCrews, write it in serializeCrews only when set. In CrewRow.tsx add a select labeled Effort with aria-label 'Crew effort': an 'inherit' option (value '') then EFFORT_LEVELS from @overdeck/contracts; onChange sets crew.effort or clears it. Add the four tiered-crews.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "settings-crew-effort.ac1",
+            "title": "Given a tier with effort low, when importCrews then serializeCrews run, then the serialized tier has effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-crew-effort.ac2",
+            "title": "Given two tiers with the same model and harness but efforts low and high, when importCrews runs, then it returns two crews",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-crew-effort.ac3",
+            "title": "Given a crew without effort, when serializeCrews runs, then the tier has no effort key; given a config with a tier effort low, renderYamlPreview output contains 'effort: low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-effort-first-switch",
+        "title": "Settings escalation panel shows an effort-first switch that other edits preserve",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx passes including the effort-first cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "acJustification": "The item is one switch plus one preservation fix; two criteria cover both behaviors."
+        },
+        "narrative": {
+          "Action": "PRD W8. In TieredExecutionSection.tsx handleEscalationPatch (:346-359) carry next.escalation.effort_first when defined. Add a second switch row in the Escalation details body (:700-740) with aria-label 'Raise effort before promoting the model', aria-checked from config.escalation.effort_first, toggling it through handleEscalationPatch, plus the one-line note naming PAN-4512. Add the two TieredExecutionSection.test.tsx cases."
+        },
+        "items": [
+          {
+            "id": "settings-effort-first-switch.ac1",
+            "title": "Given escalation without effort_first, when the 'Raise effort before promoting the model' switch is clicked, then onSettingsChange receives tiered_execution.escalation.effort_first true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-effort-first-switch.ac2",
+            "title": "Given formData with escalation.effort_first true, when the Retries at tier input changes, then onSettingsChange receives an escalation that still has effort_first true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-subrole-effort",
+        "title": "Settings Roles panel sets effort per sub-role",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "RolesPanel.test.tsx passes including the sub-role effort cases",
+            "typecheck completes without errors",
+            "lint:effort exits 0 with RolesPanel.tsx still at its baseline of 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ],
+          "acJustification": "One select with set and clear paths; two criteria cover both."
+        },
+        "narrative": {
+          "Action": "PRD W9. Add effort?: Effort to RoleSubConfig (RolesPanel.tsx:16-18). In saveRoleConfig's sub branch (grep 'model: patch.model as ModelRef,') merge model only when defined and effort when the key is present, deleting effort when the patch sets it undefined. Add an effort select after each sub-role ModelPicker with aria-label `${role.name} ${subRole.name} effort`, options 'inherit' ('') plus EFFORT_LEVELS from @overdeck/contracts. Do not edit the local type Effort line or the lint:effort baseline. Add the two RolesPanel.test.tsx cases."
+        },
+        "items": [
+          {
+            "id": "settings-subrole-effort.ac1",
+            "title": "Given the review role expanded, when 'low' is chosen on the security sub-role effort select, then the settings PUT body has roles.review.sub.security.effort 'low' and an unchanged roles.review.sub.security.model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-subrole-effort.ac2",
+            "title": "Given a sub-role with effort low, when 'inherit' is chosen, then the settings PUT body's roles.review.sub.security object has no effort key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-effort-tiers",
+        "title": "Document tier slot effort and effort-first escalation in configuration/effort.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:16:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rg -n '^## Tier escalation' configuration/effort.mdx",
+            "rg -n 'effort_first' configuration/effort.mdx",
+            "rg -c 'issues/4257' configuration/effort.mdx || true"
+          ],
+          "expected_outputs": [
+            "the Tier escalation heading is found",
+            "effort_first appears in the page",
+            "the issues/4257 sibling-table row count is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "acJustification": "A single docs page; two criteria cover the new section and the updated honors list."
+        },
+        "narrative": {
+          "Action": "PRD W10. In configuration/effort.mdx: add the two 'What honors it today' bullets (tier slots + single work agent with the staffing precedence; supervisor and merge-train re-review); remove 'per-slot tier staffing' from the 'Everything else' sentence (:190-192) and the #4257 row (:198); add a '## Tier escalation' section after Clamping with the effort_first YAML example, the D9 order, the one-supported-level rule, one raise per tier not counted toward max_promotions, and the sentence that no automatic trigger fires escalation yet with a link to #4512; extend the Config keys tiered_execution example with escalation.effort_first; mention the Settings crew effort select, effort-first switch and sub-role effort select."
+        },
+        "items": [
+          {
+            "id": "docs-effort-tiers.ac1",
+            "title": "Given the docs change, when configuration/effort.mdx renders, then it contains a '## Tier escalation' section that shows the effort_first key and states that no automatic trigger fires escalation yet with a link to issue 4512",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-effort-tiers.ac2",
+            "title": "Given the docs change, when the 'What honors it today' section renders, then it lists swarm slots, pan start, the swarm foreman and the merge-train conflict resolver launching at their staffed effort, and the sibling table has no #4257 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "staffing-effort",
+        "to": "tier-params-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-params-effort",
+        "to": "launch-effort-slots",
+        "type": "blocks"
+      },
+      {
+        "from": "staffing-effort",
+        "to": "effort-first-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-first-config",
+        "to": "effort-first-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-crew-effort",
+        "to": "settings-effort-first-switch",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

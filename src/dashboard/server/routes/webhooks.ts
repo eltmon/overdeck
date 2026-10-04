@@ -30,6 +30,7 @@ import {
   isTrackedRepository,
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 
 const WEBHOOK_SECRET_PATH = join(homedir(), '.overdeck', 'github-app', 'webhook-secret');
 
@@ -106,6 +107,11 @@ async function dispatchWebhook(eventType: string, payload: WebhookPayload): Prom
       break;
     case 'status':
       await handleStatus(payload);
+      break;
+    case 'issues':
+      // PAN-4507: an issue changed upstream — bring a backed-off GitHub poll forward.
+      // Not invalidateTracker: that deletes the ETags that keep polls free.
+      getSharedIssueService().resetPollCadence('github');
       break;
     default:
       // Unknown events are silently accepted (GitHub expects 200)

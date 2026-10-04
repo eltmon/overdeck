@@ -35,13 +35,14 @@ export type PipelineJournalEntryType =
   | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.halted' | 'review.verdict'
   | 'review.verdict-refused' | 'review.aborted' | 'review.synthesis-gave-up'
   | 'review.verdict-deferred' | 'review.verdict-replay-gave-up'
-  | 'review.stalled' | 'review.stall-escalated'
+  | 'review.stalled' | 'review.stall-escalated' | 'review.dispatch-failed'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
   | 'conflict.repair-requested' | 'conflict.repair-escalated'
   | 'blocked.declared' | 'blocked.woken'
-  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned';
+  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
+  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */

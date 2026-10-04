@@ -32,7 +32,6 @@ EXCLUDE_FILES=(
 
 # <path> => count. See the header comment above for what removes each row.
 declare -A BASELINE=(
-  ["src/cli/commands/strike.ts"]=1                              # PAN-4259
   ["src/lib/runtimes/codex.ts"]=1                                # PAN-4260
   ["src/lib/acp/host.ts"]=1                                      # PAN-4260
   ["src/lib/codex/app-server-host.ts"]=2                         # PAN-4260
@@ -41,9 +40,6 @@ declare -A BASELINE=(
   ["src/lib/launcher-codex-command.ts"]=1                        # PAN-4260
   ["packages/pi-extension/src/index.ts"]=1                       # PAN-4260
   ["packages/ohmypi-extension/src/index.ts"]=1                   # PAN-4260
-  ["src/lib/planning/spawn-planning-session.ts"]=2               # PAN-4258
-  ["src/cli/commands/plan.ts"]=1                                 # PAN-4258
-  ["src/dashboard/frontend/src/components/PlanDialog.tsx"]=2     # PAN-4258
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
 )
 

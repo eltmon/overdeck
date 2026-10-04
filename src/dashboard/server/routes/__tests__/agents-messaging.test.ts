@@ -20,6 +20,13 @@ vi.mock('../../../../lib/agents.js', () => ({
   messageAgent: agentMocks.messageAgent,
 }));
 
+const decisionMocks = vi.hoisted(() => ({
+  closeOpenDecisionOnOperatorMessage: vi.fn(() => false),
+}));
+vi.mock('../../../../lib/cloister/operator-decision.js', () => ({
+  closeOpenDecisionOnOperatorMessage: decisionMocks.closeOpenDecisionOnOperatorMessage,
+}));
+
 import { handleAgentMessage } from '../agents/messaging.js';
 
 function decodeJsonResponse(response: { body: unknown }) {
@@ -188,5 +195,28 @@ describe('handleAgentMessage steer (PAN-4292)', () => {
       success: true,
       steerDegraded: 'supervisor predates steer; delivered as a normal submit',
     });
+  });
+});
+
+describe('handleAgentMessage closes an open operator decision (PAN-4383)', () => {
+  it('closes the decision with dashboard-message after a delivered message', async () => {
+    agentMocks.messageAgent.mockResolvedValueOnce({ delivered: true, queuedToMail: false });
+
+    const response = await handleAgentMessage('agent-pan-42', 'Yes, rotate it');
+
+    expect(response.status).toBe(200);
+    expect(decisionMocks.closeOpenDecisionOnOperatorMessage).toHaveBeenCalledWith(
+      'agent-pan-42',
+      'Yes, rotate it',
+      'dashboard-message',
+    );
+  });
+
+  it('does not close the decision when the message was not delivered', async () => {
+    agentMocks.messageAgent.mockResolvedValueOnce({ delivered: false, queuedToMail: true });
+
+    await handleAgentMessage('agent-pan-42', 'Yes, rotate it');
+
+    expect(decisionMocks.closeOpenDecisionOnOperatorMessage).not.toHaveBeenCalled();
   });
 });

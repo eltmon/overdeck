@@ -50,7 +50,7 @@ import {
   type TierRetriesMap,
 } from './continue-state.js';
 
-export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRetriesMap, TierRetryEntry } from './continue-state.js';
+export type { TierEffortRaiseHistoryEntry, TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRetriesMap, TierRetryEntry } from './continue-state.js';
 
 /**
  * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.

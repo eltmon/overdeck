@@ -17,6 +17,7 @@
  * model, without callers special-casing it.
  */
 
+import type { EffortLevel, EffortSource } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { XBriefItem } from '../xbrief/types.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
@@ -28,6 +29,7 @@ import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
 import type { TierOverridesMap } from '../xbrief/io.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { resolveTier } from './resolve-tier.js';
+import { resolveEffort } from './resolve-effort.js';
 import { resolveTieredExecutionEnabled, type TierDistributionEntry } from './tier-table.js';
 
 export const IMPLICIT_TIER_NAME = 'default';
@@ -38,6 +40,10 @@ export interface Staffing {
   harness: RuntimeName;
   /** true when staffing came from the implicit roles.work-derived tier. */
   implicit: boolean;
+  /** Reasoning effort for the staffed model (PAN-4257), via resolveEffort's precedence chain. */
+  effort: EffortLevel;
+  /** Which precedence layer supplied {@link Staffing.effort}. */
+  effortSource: EffortSource;
 }
 
 export interface ResolveStaffingOptions {
@@ -71,18 +77,46 @@ function providerDefaultHarnessSync(
   return config.providerHarnesses?.[provider] ?? getBuiltInDefaultHarness(provider);
 }
 
+/** Resolves the effort for a staffed bead via resolveEffort's precedence
+ * chain (PAN-4257): explicit > item > plan > tier > sub-role > role >
+ * project > default. Always resolves against role 'work'. */
+function staffedEffort(
+  item: Pick<XBriefItem, 'metadata'> | undefined,
+  tierName: string | undefined,
+  model: string,
+  harness: RuntimeName,
+  config: Pick<NormalizedConfig, 'tieredExecution' | 'roles'>,
+  options: ResolveStaffingOptions,
+): Pick<Staffing, 'effort' | 'effortSource'> {
+  const resolved = resolveEffort({
+    itemEffort: item?.metadata?.effort,
+    planEffort: options.planMetadata?.effort,
+    tierName,
+    role: 'work',
+    issueId: options.issueId,
+    model,
+    harness,
+    config,
+  });
+  return { effort: resolved.effort, effortSource: resolved.source };
+}
+
 /** The implicit tier: roles.work resolution as a Staffing. Fails loudly when
  * the work role is unresolvable — never a hardcoded fallback. */
 export function resolveImplicitStaffing(
-  config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'providerHarnesses'>,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'providerHarnesses' | 'tieredExecution'>,
   spawnKey?: string,
+  item?: Pick<XBriefItem, 'metadata'>,
+  options: ResolveStaffingOptions = {},
 ): Staffing {
   const model = requireModelOverride(resolveModel('work', undefined, config, spawnKey));
+  const harness = providerDefaultHarnessSync(model, config);
   return {
     tierName: IMPLICIT_TIER_NAME,
     model,
-    harness: providerDefaultHarnessSync(model, config),
+    harness,
     implicit: true,
+    ...staffedEffort(item, undefined, model, harness, config, options),
   };
 }
 
@@ -117,16 +151,28 @@ export function resolveStaffing(
       const distribution = tiered.tiers?.[tier.tierName]?.distribution;
       if (distribution && distribution.length > 0) {
         const entry = pickDistributionEntry(distribution, `${options.spawnKey ?? ''}:${item.id}`);
-        return { tierName: tier.tierName, model: entry.model, harness: entry.harness, implicit: false };
+        return {
+          tierName: tier.tierName,
+          model: entry.model,
+          harness: entry.harness,
+          implicit: false,
+          ...staffedEffort(effectiveItem, tier.tierName, entry.model, entry.harness, config, options),
+        };
       }
-      return { tierName: tier.tierName, model: tier.model, harness: tier.harness, implicit: false };
+      return {
+        tierName: tier.tierName,
+        model: tier.model,
+        harness: tier.harness,
+        implicit: false,
+        ...staffedEffort(effectiveItem, tier.tierName, tier.model, tier.harness, config, options),
+      };
     } catch {
       // Explicit table cannot place this bead — fall through to the implicit
       // tier (historical role-default behavior, now uniform).
     }
   }
 
-  return resolveImplicitStaffing(config, options.spawnKey);
+  return resolveImplicitStaffing(config, options.spawnKey, item, options);
 }
 
 /** Deterministic weighted pick (D6): FNV-1a of the selection key → bucket in

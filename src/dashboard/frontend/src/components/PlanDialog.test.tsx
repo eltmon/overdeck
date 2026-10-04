@@ -233,4 +233,30 @@ describe('PlanDialog — XTerminal rendering', () => {
       await screen.findByText('Settings default (claude-opus-4-7)'),
     ).toBeInTheDocument();
   });
+
+  it('sends effort: high by default without the operator touching the picker', async () => {
+    const fetchMock = makeFetchMock('planning-pan-503', false);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+    await clickPlanAutomatically();
+
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ effort: 'high' }));
+  });
+
+  it('renders five effort buttons and sends effort: max when max is selected', async () => {
+    const fetchMock = makeFetchMock('planning-pan-503', false);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+
+    for (const level of ['low', 'medium', 'high', 'xhigh', 'max']) {
+      expect(await screen.findByRole('button', { name: level })).toBeInTheDocument();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'max' }));
+    await clickPlanAutomatically();
+
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ effort: 'max' }));
+  });
 });

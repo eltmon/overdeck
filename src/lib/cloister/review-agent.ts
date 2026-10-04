@@ -66,6 +66,8 @@ import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { getAgentState } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
+import { isKickoffRejection } from '../agents/kickoff-rejection.js';
+import { recordReviewDispatchFailure } from './review-dispatch-failure.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
@@ -665,6 +667,9 @@ async function spawnReviewRoleForIssueBody(
     // be killed here.
     const teardownError = await teardownFailedReviewSpawn(reviewSessionName, dispatchStartedAtMs);
     const spawnError = err instanceof Error ? err.message : String(err);
+    if (isKickoffRejection(err)) {
+      await recordReviewDispatchFailure({ issueId: opts.issueId, workspace: opts.workspace, reviewer: reviewSessionName, error: spawnError });
+    }
     return {
       success: false,
       message: 'Failed to spawn review role',

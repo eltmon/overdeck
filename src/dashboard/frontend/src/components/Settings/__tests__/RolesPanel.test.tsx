@@ -204,6 +204,64 @@ describe('RolesPanel', () => {
     expect(body.roles.plan.model).toBe('workhorse:expensive');
   });
 
+  // PAN-4257 (settings-subrole-effort)
+  it('ac1: choosing an effort on a sub-role writes it without touching the model', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const cards = await screen.findAllByTestId('role-card');
+    await user.click(within(cards[3]).getByRole('button', { name: /show sub-roles/i }));
+    await user.selectOptions(await screen.findByLabelText('Review Security effort'), 'low');
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
+    });
+
+    const putCall = vi.mocked(global.fetch).mock.calls.find(([url, init]) => (
+      url.toString() === '/api/settings' && init?.method === 'PUT'
+    ));
+    const body = JSON.parse(putCall?.[1]?.body as string);
+    expect(body.roles.review.sub.security.effort).toBe('low');
+    expect(body.roles.review.sub.security.model).toBe('workhorse:expensive');
+  });
+
+  // PAN-4257 (settings-subrole-effort)
+  it('ac2: choosing inherit clears a sub-role effort', async () => {
+    const user = userEvent.setup();
+    installFetchMock({
+      settings: {
+        ...settingsPayload,
+        roles: {
+          ...settingsPayload.roles,
+          review: {
+            ...settingsPayload.roles.review,
+            sub: {
+              ...settingsPayload.roles.review.sub,
+              security: { model: 'workhorse:expensive', effort: 'low' },
+            },
+          },
+        },
+      } as unknown as typeof settingsPayload,
+    });
+    renderPanel();
+
+    const cards = await screen.findAllByTestId('role-card');
+    await user.click(within(cards[3]).getByRole('button', { name: /show sub-roles/i }));
+    const effortSelect = await screen.findByLabelText('Review Security effort');
+    expect(effortSelect).toHaveValue('low');
+    await user.selectOptions(effortSelect, '');
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
+    });
+
+    const putCall = vi.mocked(global.fetch).mock.calls.find(([url, init]) => (
+      url.toString() === '/api/settings' && init?.method === 'PUT'
+    ));
+    const body = JSON.parse(putCall?.[1]?.body as string);
+    expect('effort' in body.roles.review.sub.security).toBe(false);
+  });
+
   // PAN-1696 settings-scope-ux: the scope select and its copy must be reachable
   // without any expansion interaction — the flywheel config block is gated on
   // role.id === 'flywheel', not on isExpanded (which gates sub-roles only).
