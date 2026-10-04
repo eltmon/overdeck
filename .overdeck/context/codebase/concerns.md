@@ -143,6 +143,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   read and write passes through it, so a field added only to `interface AgentState` is silently
   dropped on save. `foreman`, `modelSpawnKey` and `workspaceId` are dropped today (PAN-4487). Add
   new fields to `cleanAgentState` and cover them with a save→read round-trip test.
+- **`spawnRun`/`spawnAgent` never resolve effort** (`src/lib/agents/spawn.ts`) — they persist and
+  thread a caller-supplied `effort`/`effortSource` only (PAN-4253 D5). A new launch path must call
+  `resolveEffort()` (`src/lib/agents/resolve-effort.ts`) itself or it silently launches at the role
+  file's `effort: high` and ignores `roles.<role>.effort`. `pan spawn` builds its pane argv without a
+  harness binary (#4511).
 - **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
   `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
   `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker
@@ -391,6 +396,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
+- AskUserQuestion modal = deny-reason markers: `scanPendingInputs`
+  (`src/lib/agent-enrichment.ts`) treats an `is_error` AUQ tool_result as pending
+  only if it contains `PAN-1520` or `surfaced to the operator`. Any hook deny that
+  must NOT surface (the PAN-4514 junk guard) must omit both strings; any that must
+  surface must keep one.
 - Text that reaches Herdr must be well-formed UTF-16 (PAN-4506) — a lone
   surrogate (e.g. from a naive `.slice(0, N)` cut through an emoji) makes
   `JSON.stringify` emit an unpaired `\udXXX` escape, and Herdr's `serde_json`

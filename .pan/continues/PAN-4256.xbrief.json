@@ -1,0 +1,243 @@
+{
+  "version": "1",
+  "issueId": "PAN-4256",
+  "created": "2026-10-04T02:23:15.134Z",
+  "updated": "2026-10-04T05:19:50.354Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "review-parent-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T02:23:15.134Z",
+      "doneAt": "2026-10-04T02:29:21.842Z"
+    },
+    "role-file-effort-e2e-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T02:29:39.779Z",
+      "doneAt": "2026-10-04T02:35:33.745Z"
+    },
+    "test-queue-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T02:35:45.341Z",
+      "doneAt": "2026-10-04T02:47:33.898Z"
+    },
+    "review-pipeline-test-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T02:47:45.481Z",
+      "doneAt": "2026-10-04T02:58:25.309Z"
+    },
+    "start-worker-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T02:58:38.029Z",
+      "doneAt": "2026-10-04T03:08:21.503Z"
+    },
+    "worker-run-effort-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T03:08:34.822Z",
+      "doneAt": "2026-10-04T03:26:44.676Z"
+    },
+    "pan-spawn-effort-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T03:26:56.348Z",
+      "doneAt": "2026-10-04T03:35:43.191Z"
+    },
+    "flywheel-role-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T03:35:54.639Z",
+      "doneAt": "2026-10-04T03:57:02.128Z"
+    },
+    "roles-panel-flywheel-copy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T03:57:15.667Z",
+      "doneAt": "2026-10-04T04:13:30.840Z"
+    },
+    "remote-fly-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T04:13:43.084Z",
+      "doneAt": "2026-10-04T04:29:58.086Z"
+    },
+    "dashboard-start-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T04:30:11.489Z",
+      "doneAt": "2026-10-04T04:44:20.527Z"
+    },
+    "dashboard-restart-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T04:44:35.236Z",
+      "doneAt": "2026-10-04T05:03:52.187Z"
+    },
+    "docs-effort-surfaces": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4256",
+      "claimedAt": "2026-10-04T05:04:05.935Z",
+      "doneAt": "2026-10-04T05:09:22.280Z"
+    },
+    "review-parent-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:11:30.465Z"
+    },
+    "review-parent-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:16.121Z"
+    },
+    "role-file-effort-e2e-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:28.644Z"
+    },
+    "role-file-effort-e2e-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:41.202Z"
+    },
+    "test-queue-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:53.140Z"
+    },
+    "test-queue-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:04.809Z"
+    },
+    "review-pipeline-test-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:16.427Z"
+    },
+    "review-pipeline-test-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:29.035Z"
+    },
+    "start-worker-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:41.458Z"
+    },
+    "start-worker-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:53.467Z"
+    },
+    "start-worker-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:07.796Z"
+    },
+    "worker-run-effort-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:19.802Z"
+    },
+    "worker-run-effort-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:32.082Z"
+    },
+    "worker-run-effort-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:44.181Z"
+    },
+    "pan-spawn-effort-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:56.334Z"
+    },
+    "pan-spawn-effort-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:08.950Z"
+    },
+    "pan-spawn-effort-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:21.655Z"
+    },
+    "pan-spawn-effort-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:33.400Z"
+    },
+    "flywheel-role-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:45.374Z"
+    },
+    "flywheel-role-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:57.356Z"
+    },
+    "flywheel-role-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:08.823Z"
+    },
+    "roles-panel-flywheel-copy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:21.632Z"
+    },
+    "roles-panel-flywheel-copy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:34.121Z"
+    },
+    "roles-panel-flywheel-copy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:46.321Z"
+    },
+    "remote-fly-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:58.474Z"
+    },
+    "remote-fly-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:10.821Z"
+    },
+    "remote-fly-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:22.599Z"
+    },
+    "remote-fly-effort.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:33.641Z"
+    },
+    "dashboard-start-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:45.425Z"
+    },
+    "dashboard-start-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:17:57.064Z"
+    },
+    "dashboard-start-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:08.994Z"
+    },
+    "dashboard-restart-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:21.507Z"
+    },
+    "dashboard-restart-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:34.038Z"
+    },
+    "dashboard-restart-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:45.878Z"
+    },
+    "docs-effort-surfaces.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:57.902Z"
+    },
+    "docs-effort-surfaces.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:11.013Z"
+    },
+    "docs-effort-surfaces.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:23.996Z"
+    },
+    "review-parent-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:50.353Z"
+    }
+  }
+}

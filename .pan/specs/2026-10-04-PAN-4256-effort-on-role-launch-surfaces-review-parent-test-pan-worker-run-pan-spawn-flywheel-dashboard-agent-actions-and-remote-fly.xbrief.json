@@ -1,0 +1,923 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:14:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4256: Effort on role launch surfaces: review parent, test, pan worker run, pan spawn, flywheel, dashboard agent actions, and remote Fly",
+    "updated": "2026-10-04T02:22:58.390Z"
+  },
+  "plan": {
+    "id": "pan-4256",
+    "title": "Effort on role launch surfaces: review parent, test, pan worker run, pan spawn, flywheel, dashboard agent actions, and remote Fly",
+    "status": "running",
+    "uid": "aaf0be78-260d-481d-afbf-3cbdb4e16a2c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:14:06Z",
+    "updated": "2026-10-04T02:22:58.390Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4256",
+        "label": "PAN-4256",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4511",
+        "label": "#4511 pan spawn argv defect",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "launch-surfaces",
+      "roles",
+      "pan-4249-sibling"
+    ],
+    "metadata": {
+      "sizeJustification": "S4 of the already eight-way-decomposed PAN-4249 effort program. Every code change is the same one mechanism (the caller calls resolveEffort and passes effort/effortSource, or forwards an explicit flag), each under ~15 lines, across 13 small items with 3 dependency edges. The file count is inflated by one test file per surface (the issue's AC requires a per-surface test) and the subsystem count by the lint treating each top-level doc file as its own subsystem. Splitting further would produce sibling issues of two or three files each.",
+      "canonicalFilename": "2026-10-04-PAN-4256-effort-on-role-launch-surfaces-review-parent-test-pan-worker-run-pan-spawn-flywheel-dashboard-agent-actions-and-remote-fly.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "roles.<role>.effort is validated for every role but most role launch surfaces ignore it: the review parent, the test role, pan worker run, pan spawn and remote Fly launch at role-file or hardcoded high (or with no effort at all), the Flywheel hardcodes high and never reads roles.flywheel.effort while its Settings copy claims the value applies next tick, and the dashboard agent start/restart routes cannot request a level.",
+      "Proposal": "Apply PAN-4253's caller-resolves pattern to each surface: call resolveEffort (role, sub-role, issue, and model/harness when held) and pass effort + effortSource to spawnRun or the launcher; add an explicit --effort / body effort where the surface has an input (pan worker run, pan spawn, pan start --remote, POST /api/agents, POST /api/agents/:id/restart). spawnRun itself stays pass-through. Fix the RolesPanel copy and enum copy, and document every surface in configuration/effort.mdx and the CLI docs.",
+      "NonGoals": "- No change to src/lib/agents/spawn.ts (spawnRun/spawnAgent stay pass-through)\n- No fix for pan spawn's missing harness binary (#4511)\n- No tier/slot/swarm/foreman/tier-supervisor/merge-train effort (PAN-4257) and no planning-spawn effort (PAN-4258)\n- No effort on RemoteAgentState, Agents rows, pan status/show, cost ledger or sessions.json (PAN-4259)\n- No per-harness adapter fallback removal or mapping changes (PAN-4260)\n- No --effort on pan flywheel start or POST /api/flywheel/start\n- No effort override on restart-fresh, resume, recover, restart-all or restart-with-current-config; no change to switch-model (permanent 409)\n- No dashboard UI effort picker for agent start or restart\n- No change to review resume or review convoy lanes\n- No change to sequencer-agent.ts, knowledge.ts, review-synthesis-recovery.ts or service-reactive.ts:326\n- No xhigh or max default anywhere"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Callers resolve effort; spawnRun stays pass-through",
+        "rationale": "PAN-4253 D5 explicitly assigned resolution to spawnRun callers in this slice and kept spawnRun a persist-and-thread primitive; spawn.ts also has only 15 lines of file-size headroom."
+      },
+      {
+        "summary": "Review resume branch unchanged; only the fresh review spawn resolves",
+        "rationale": "Resume relaunches under the PAN-4253 pin rule, which already re-applies and re-clamps the persisted effort."
+      },
+      {
+        "summary": "pan spawn resolves with item and plan metadata layers and role 'worker'",
+        "rationale": "The command already holds the xBRIEF doc and item, and its pane token role is 'worker'; tier effort is PAN-4257."
+      },
+      {
+        "summary": "pan spawn passes effort as --effort for claude-code and -c model_reasoning_effort for codex, nothing for other harnesses",
+        "rationale": "These are the two harness CLIs pan spawn can address directly; the missing binary is a separate pre-existing defect filed as #4511."
+      },
+      {
+        "summary": "Flywheel pre-resolves roles.flywheel.effort and passes it as explicit to the conversation spawn; no CLI/API --effort",
+        "rationale": "spawnConversationSession resolves without a role, so it would ignore roles.flywheel.effort; the AC names config as the input."
+      },
+      {
+        "summary": "Flywheel resume keeps the effort it started with",
+        "rationale": "Resume relaunches from the stored conversations.effort (PAN-4254); the RolesPanel copy says so."
+      },
+      {
+        "summary": "Dashboard start forwards only an explicit body effort",
+        "rationale": "Same principle as PAN-3857 for --model: forwarding a resolved default would be stamped as explicit; pan start already resolves roles.work.effort."
+      },
+      {
+        "summary": "Dashboard restart accepts an explicit effort; other lifecycle routes do not; switch-model unchanged",
+        "rationale": "Restart is the operator relaunch action; the others relaunch under the pin rule or pan start's own resolution, and switch-model is a permanent 409 that launches nothing."
+      },
+      {
+        "summary": "Restart body parsing extracted into shared.ts",
+        "rationale": "lifecycle-restart.ts has one line of file-size headroom and agents may not raise caps."
+      },
+      {
+        "summary": "RemoteAgentState gains no effort field",
+        "rationale": "Persisting/displaying remote effort belongs to PAN-4259."
+      }
+    ],
+    "items": [
+      {
+        "id": "review-parent-effort",
+        "title": "Review parent resolves roles.review.effort on a fresh spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/__tests__/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/review-agent.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "review-agent.test.ts passes including the new PAN-4256 case",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/cloister/review-agent.ts, in the fresh-spawn block (before `const dispatchedAt = new Date().toISOString();`), dynamically import resolveEffort from '../agents/resolve-effort.js', resolve `{ role: 'review', issueId: opts.issueId, model: opts.model, harness: opts.harness }`, console.warn any warning with the [review-agent] tag, and add `effort: reviewEffort.effort, effortSource: reviewEffort.source` to the `spawnRun(opts.issueId, 'review', {...})` literal. Do not touch the resumeAgent branch (PAN-4253 pin rule covers it). Test: wrap the real resolveEffort in a vi.mock that injects config `{ roles: { review: { effort: 'medium' } }, tieredExecution: { tiers: {} } }` and assert spawnRun options."
+        },
+        "items": [
+          {
+            "id": "review-parent-effort.ac1",
+            "title": "Given roles.review.effort is medium, when a fresh review dispatch runs, then spawnRun receives options with effort 'medium' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-parent-effort.ac2",
+            "title": "Given a saved resumable review session, when the review is re-dispatched, then the resumeAgent branch runs unchanged and resolveEffort is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-parent-effort.ac3",
+            "title": "With review-agent.ts changed, npm run lint:effort and npm run lint:file-size each exits 0 (no new `?? 'high'` fallback, file at or below 1000 lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-file-effort-e2e-test",
+        "title": "End-to-end test: role-file runs given an effort launch with it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "agents-spawn-supervisor.test.ts passes including the three PAN-4256 it.each rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Test-only. Add it.each(['review','test','worker']) to src/lib/__tests__/agents-spawn-supervisor.test.ts calling spawnRun('PAN-1405', role, { workspace, model: 'claude-sonnet-4-6', effort: 'medium', effortSource: 'role' }) (worker also passes agentId 'agent-pan-1405-worker-1' and registerConversation: false). Read <tmpHome>/agents/<id>/launcher.sh and state.json. This proves the roleSystemPromptInjection path emits the explicit effort instead of the role-file frontmatter high."
+        },
+        "items": [
+          {
+            "id": "role-file-effort-e2e-test.ac1",
+            "title": "Given spawnRun is called for role review, test or worker with effort 'medium', then the written launcher.sh contains '--effort medium' and does not contain '--effort high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-file-effort-e2e-test.ac2",
+            "title": "Given the same spawn, then state.json persists effort 'medium' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-queue-effort",
+        "title": "Cloister test dispatch resolves roles.test.effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/test-agent-queue.ts",
+            "src/lib/cloister/__tests__/test-agent-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/test-agent-queue.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "test-agent-queue.test.ts passes including the new PAN-4256 case",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In src/lib/cloister/test-agent-queue.ts resolve `resolveEffort({ role: 'test', issueId })` before spawnProgram and pass `effort` and `effortSource` in the spawnRun(issueId, 'test', {...}) options at ~:106. Use a static import from '../agents/resolve-effort.js'; if lint:circular flags a cycle, switch to a dynamic import inside Effect.promise. Test with the wrapped-resolveEffort mock injecting roles.test.effort 'low'."
+        },
+        "items": [
+          {
+            "id": "test-queue-effort.ac1",
+            "title": "Given roles.test.effort is low, when dispatchTestAgentAndNotify spawns the test role, then spawnRun is called with options containing effort 'low' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-queue-effort.ac2",
+            "title": "Given no roles.test.effort and no project effort, then spawnRun receives effort 'high' with effortSource 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-pipeline-test-effort",
+        "title": "Manual test re-dispatch route resolves roles.test.effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-route.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "review-pipeline-route.test.ts passes including the new PAN-4256 case",
+            "review-pipeline.ts stays at or below 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/dashboard/server/routes/workspaces/review-pipeline.ts at the manual test re-dispatch (~:664, grep `const testRun = await spawnRun(issueId, 'test', {`), dynamically import resolveEffort next to the existing agents.js import, resolve `{ role: 'test', issueId }`, and add effort/effortSource to the spawnRun literal. Add at most 6 lines (978 -> <=984)."
+        },
+        "items": [
+          {
+            "id": "review-pipeline-test-effort.ac1",
+            "title": "Given roles.test.effort is medium and an approved PR whose checks are not green, when the route re-dispatches the test role, then spawnRun receives effort 'medium' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-pipeline-test-effort.ac2",
+            "title": "wc -l src/dashboard/server/routes/workspaces/review-pipeline.ts prints a count at or below 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-worker-effort",
+        "title": "startWorker resolves effort with roles.worker.effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/worker/start.ts",
+            "src/lib/agents/worker/__tests__/start.test.ts",
+            "src/lib/planning/__tests__/plan-critic-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/worker/__tests__/start.test.ts src/lib/planning/__tests__/plan-critic-dispatch.test.ts"
+          ],
+          "expected_outputs": [
+            "start.test.ts passes including the three PAN-4256 cases",
+            "plan-critic-dispatch.test.ts passes with effortConfig injected into startWorkerDeps"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/lib/agents/worker/start.ts add `effort?: string` to StartWorkerOptions, `effort?: EffortLevel; effortSource?: EffortSource` to the SpawnRunForWorker options type, and `effortConfig?: EffortConfigSlice` to StartWorkerDeps. Before allocateWorkerId, call resolveEffort({ explicit: options.effort, role: 'worker', issueId, model: options.model, harness: options.harness, config: deps.effortConfig }); InvalidEffortError propagates. Pass effort and effortSource to spawnRun. Also add `effortConfig: { roles: {}, tieredExecution: { tiers: {} } }` to the startWorkerDeps in src/lib/planning/__tests__/plan-critic-dispatch.test.ts (:69-70), which runs the real startWorker, so it never reads the developer's config."
+        },
+        "items": [
+          {
+            "id": "start-worker-effort.ac1",
+            "title": "Given effortConfig roles.worker.effort medium and no explicit effort, when startWorker runs, then the injected spawnRun receives effort 'medium' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-worker-effort.ac2",
+            "title": "Given options.effort 'low', then spawnRun receives effort 'low' and effortSource 'explicit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-worker-effort.ac3",
+            "title": "Given options.effort 'ultra', then startWorker rejects with InvalidEffortError and allocateWorkerId is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-run-effort-flag",
+        "title": "pan worker run accepts --effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/worker.ts",
+            "tests/unit/cli/worker-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/worker-command.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "worker-command.test.ts passes including the two PAN-4256 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In src/cli/commands/worker.ts add `effort?: string` to WorkerRunOptions; after the --harness check reject a non-canonical value with `Unknown --effort <v>; expected one of ${EFFORT_LEVELS.join(', ')}.` and return WORKER_EXIT.usage; pass effort to deps.startWorker; register `.option('--effort <level>', ...)` after --harness. Import isEffortLevel and EFFORT_LEVELS from @overdeck/contracts."
+        },
+        "items": [
+          {
+            "id": "worker-run-effort-flag.ac1",
+            "title": "Given pan worker run --effort xhigh with a valid issue and prompt, then startWorker is called with effort 'xhigh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-run-effort-flag.ac2",
+            "title": "Given --effort ultra, then workerRunCommand returns exit code 1, writes 'Unknown --effort ultra' to stderr, and never calls startWorker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-run-effort-flag.ac3",
+            "title": "pan worker run --help prints the --effort <level> option with its default chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-spawn-effort-flag",
+        "title": "pan spawn resolves effort and appends it to the worker pane argv",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/spawn.ts",
+            "tests/unit/cli/commands/spawn.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/spawn.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "spawn.test.ts passes including the five PAN-4256 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. In src/cli/commands/spawn.ts add `effort?: string` to SpawnOptions and `effortConfig?: EffortConfigSlice` to SpawnDeps; export spawnWorkerEffortArgs(harness, effort) returning ['--effort', e] for claude-code, ['-c', `model_reasoning_effort=${e}`] for codex, [] otherwise (with a yellow stderr note). Before creating the worktree, resolve resolveEffort({ explicit: options.effort, itemEffort: item.metadata?.effort, planEffort: doc?.plan.metadata?.effort, role: 'worker', issueId, model: options.model, harness, config: deps.effortConfig }); on InvalidEffortError print the five-level message and exitCli(1). Append the effort args to argv. Register the --effort option. Do NOT add the missing harness binary (#4511)."
+        },
+        "items": [
+          {
+            "id": "pan-spawn-effort-flag.ac1",
+            "title": "Given --effort medium and harness claude-code, then the startAgent spec argv ends with '--effort', 'medium'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-spawn-effort-flag.ac2",
+            "title": "Given no flag and item metadata.effort 'low', then argv contains '--effort', 'low'; given neither flag nor metadata and effortConfig roles.worker.effort 'medium', then argv contains '--effort', 'medium'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-spawn-effort-flag.ac3",
+            "title": "Given --harness codex --effort high, then argv contains '-c', 'model_reasoning_effort=high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-spawn-effort-flag.ac4",
+            "title": "Given --effort ultra, then the command exits 1 and neither createWorktree nor startAgent is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-role-effort",
+        "title": "Flywheel start launches at roles.flywheel.effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/actions.ts",
+            "tests/unit/lib/flywheel/actions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/flywheel/actions.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "actions.test.ts passes including the three PAN-4256 cases",
+            "rg -n \"'high'\" src/lib/flywheel/actions.ts prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. In src/lib/flywheel/actions.ts replace defaultResolveModelAndHarness with exported resolveFlywheelLaunch(opts, config?) that returns { model, harness, effort, effortSource } using resolveEffort({ role: 'flywheel', model, harness, config }). The resolveModelAndHarness dep returns effort too; spawnSession gains a 6th `effort` parameter and defaultSpawnSession passes it instead of the literal 'high'; startFlywheel passes effort to createConversation (replacing effort: 'high') and to spawnSession, and returns it in FlywheelStartResult. Update depsFor in the test to return effort 'high'."
+        },
+        "items": [
+          {
+            "id": "flywheel-role-effort.ac1",
+            "title": "Given config roles.flywheel { model: 'claude-opus-4-8', effort: 'medium' }, when resolveFlywheelLaunch({ harness: 'claude-code' }, config) runs, then it returns effort 'medium' and effortSource 'role'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-role-effort.ac2",
+            "title": "Given the resolver returns effort 'medium', when startFlywheel runs, then createConversation receives effort 'medium' and spawnSession receives 'medium' as its effort argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-role-effort.ac3",
+            "title": "Given no roles.flywheel.effort, then resolveFlywheelLaunch returns effort 'high' with effortSource 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "roles-panel-flywheel-copy",
+        "title": "RolesPanel states when Flywheel effort applies and drops its effort enum copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
+            "scripts/lint-effort.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "(cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/__tests__/RolesPanel.test.tsx)",
+            "npm run lint:effort",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RolesPanel.test.tsx passes with the new copy",
+            "lint:effort prints '✓ lint:effort passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. In RolesPanel.tsx delete `type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';`, import type EffortLevel from @overdeck/contracts, and use it at the two former Effort sites. Replace the sentence 'Effort and max agents apply on the next tick — no restart needed.' with 'Max agents applies on the next tick — no restart needed. Effort applies the next time the Flywheel starts; a paused Flywheel resumes at the effort it started with.' Keep the flywheel-scope-timing span. Delete the RolesPanel.tsx BASELINE row from scripts/lint-effort.sh. Update RolesPanel.test.tsx:138."
+        },
+        "items": [
+          {
+            "id": "roles-panel-flywheel-copy.ac1",
+            "title": "Given the Roles settings panel renders, then it shows 'Effort applies the next time the Flywheel starts; a paused Flywheel resumes at the effort it started with.' and no longer shows 'Effort and max agents apply on the next tick'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-panel-flywheel-copy.ac2",
+            "title": "rg -n \"RolesPanel\" scripts/lint-effort.sh prints nothing and npm run lint:effort exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-panel-flywheel-copy.ac3",
+            "title": "rg -n \"'low' \\| 'medium'\" src/dashboard/frontend/src/components/Settings/RolesPanel.tsx prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-fly-effort",
+        "title": "Remote Fly work agents launch with a resolved --effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "src/cli/commands/start.ts",
+            "tests/lib/remote/remote-agent-provenance.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/remote/remote-agent-provenance.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "remote-agent-provenance.test.ts passes including the three PAN-4256 cases",
+            "launcher-generator.test.ts passes including the remote extraArgs case",
+            "src/cli/commands/start.ts is at or below 1283 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. In src/lib/remote/remote-agents.ts add `effort?: string` to SpawnRemoteAgentOptions; in spawnRemoteAgentWithoutConsentClaim after determineModel resolve resolveEffort({ explicit: options.effort, role: 'work', issueId, model, harness: 'claude-code' }); add `extraArgs: `--effort ${e}`` to the generateLauncherScript call and append ` --effort ${e}` after `--model ${model}` in the no-prompt claudeCmd; add effort to the [claude-invoke] log. In src/cli/commands/start.ts:438 add exactly one line `effort: options.effort,` to the spawnRemoteAgent literal. Add a launcher-generator.test.ts case: generateLauncherScript({ ...DEFAULT_CONFIG, role: 'work', spawnMode: 'remote', workingDir: '/workspace', setRemotePath: true, promptFile: '/workspace/.pan/prompts/agent.md', baseCommand: 'claude', model: 'claude-sonnet-4-6', changeDir: false, extraArgs: '--effort medium' }) contains '--effort medium' (the provenance test mocks the generator)."
+        },
+        "items": [
+          {
+            "id": "remote-fly-effort.ac1",
+            "title": "Given roles.work.effort medium and a prompt, when spawnRemoteAgent runs, then generateLauncherScript receives extraArgs '--effort medium', and a remote-mode generateLauncherScript call with that extraArgs produces a script that contains '--effort medium'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-fly-effort.ac2",
+            "title": "Given effort 'low' and no prompt, then the remote tmux new-session command contains '--effort low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-fly-effort.ac3",
+            "title": "Given effort 'ultra', then spawnRemoteAgent rejects with InvalidEffortError before any Fly VM status call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-fly-effort.ac4",
+            "title": "wc -l src/cli/commands/start.ts prints a count at or below 1283",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-start-effort",
+        "title": "POST /api/agents accepts an explicit effort and forwards it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents/spawn-helpers.ts",
+            "src/dashboard/server/routes/__tests__/agents-start-args.test.ts",
+            "src/dashboard/server/routes/__tests__/spawn-container-claim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-start-args.test.ts src/dashboard/server/routes/__tests__/spawn-container-claim.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "agents-start-args.test.ts passes including the three PAN-4256 cases",
+            "spawn-container-claim.test.ts passes including the container-path effort case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. In shared.ts add parseAgentEffortOverride(value) (undefined for undefined/null/''; the level for a canonical value; throws `Invalid effort \"<v>\"; expected one of ${EFFORT_LEVELS.join(', ')}` otherwise) and an `effort?: EffortLevel | null` input to buildPanStartArgs emitting ['--effort', effort] after --harness. In routes/agents/spawn.ts parse body.effort after the role check (400 on throw) and pass it to buildPanStartArgs (~:868) and handleRemoteAgentSpawn (~:660). In spawn-helpers.ts thread `effort` into spawnRemoteAgent. Forward only an explicit value; never a resolved default. handleContainerOrchestration (devcontainer start path, spawn-helpers.ts ~:433) also gains an `effort` input forwarded to its buildPanStartArgs call; routes/agents/spawn.ts passes bodyEffort to it (~:837)."
+        },
+        "items": [
+          {
+            "id": "dashboard-start-effort.ac1",
+            "title": "Given buildPanStartArgs({ issueId: 'PAN-1', effort: 'low' }), then the args contain '--effort', 'low'; given no effort, then the args contain no '--effort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-start-effort.ac2",
+            "title": "Given parseAgentEffortOverride('ultra'), then it throws a message naming low, medium, high, xhigh, max; given undefined, null or '', then it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-start-effort.ac3",
+            "title": "Given handleContainerOrchestration is called with effort 'low', when its background job spawns, then buildPanStartArgs receives effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-restart-effort",
+        "title": "POST /api/agents/:id/restart accepts an explicit effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+            "src/lib/agents/__tests__/restart-effort.test.ts",
+            "src/dashboard/server/routes/__tests__/agent-restart-body.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/restart-effort.test.ts src/dashboard/server/routes/__tests__/agent-restart-body.test.ts",
+            "npm run lint:file-size",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "restart-effort.test.ts and agent-restart-body.test.ts pass",
+            "lint:file-size passes with lifecycle-restart.ts at or below 1018 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12. In recovery.ts add `effort?: EffortLevel` to RestartAgentOptions and call resolveRelaunchEffort(opts.effort ? { ...agentState, effort: opts.effort, effortSource: 'explicit' } : agentState, {...}); log the effort in the restartAgent lifecycle line. In shared.ts add parseAgentRestartBody(body) doing today's destructure (graceful=true, force=false), normalizeModelOverride and parseAgentEffortOverride, returning { ok:false, error } on throw. In lifecycle-restart.ts /api/agents/:id/restart replace the destructure + `let restartModel` + model try/catch with the three-line parse shown in the PRD and add `effort: restartEffort` to both restartAgent calls. Grep the handler for later raw `model` uses first."
+        },
+        "items": [
+          {
+            "id": "dashboard-restart-effort.ac1",
+            "title": "Given an agent pinned at effort high with source role, when restartAgent(id, { graceful: false, effort: 'low' }) runs, then the relaunch uses effort 'low' and state.json saves effort 'low' with effortSource 'explicit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-restart-effort.ac2",
+            "title": "Given parseAgentRestartBody({}), then it returns ok with graceful true and force false; given { effort: 'ultra' }, then it returns ok false with a message naming the five levels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-restart-effort.ac3",
+            "title": "wc -l src/dashboard/server/routes/agents/lifecycle-restart.ts prints a count at or below 1018 and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-effort-surfaces",
+        "title": "Document effort on the role launch surfaces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:14:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4256",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "reference/workers.mdx",
+            "sync-sources/skills/pan-worker/SKILL.md",
+            "docs/FOREMAN.md",
+            "sync-sources/skills/pan-foreman/SKILL.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! rg -n \"issues/4256|#4256\" configuration/effort.mdx",
+            "rg -n \"\\-\\-effort\" reference/workers.mdx docs/FOREMAN.md sync-sources/skills/pan-foreman/SKILL.md sync-sources/skills/pan-worker/SKILL.md",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "the negated rg exits 0 (no #4256 table row or link remains)",
+            "the second rg prints a --effort line in each of the four files",
+            "lint:skills reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W13. Edit exactly these files: configuration/effort.mdx 'What honors it today' gains bullets for the review parent, test role, pan worker run --effort, pan spawn --effort (item -> plan -> roles.worker.effort -> high; claude-code and codex panes only), Flywheel (roles.flywheel.effort at next start; resume keeps the start level), POST /api/agents and /restart body effort, and remote Fly (pan start --remote --effort); remove the #4256 row from the ad hoc table and drop its surfaces from the sentence above it (an inline (PAN-4256) citation is fine). docs/MODEL-CONTEXT-AUDIT.md '## Effort' no longer lists specialist/worker/remote as pending. reference/workers.mdx and sync-sources/skills/pan-worker/SKILL.md add --effort. docs/FOREMAN.md and sync-sources/skills/pan-foreman/SKILL.md synopsis adds [--effort <level>]. docs/FLYWHEEL.md pan flywheel start row says it launches at roles.flywheel.effort (default high) and resume keeps the start level."
+        },
+        "items": [
+          {
+            "id": "docs-effort-surfaces.ac1",
+            "title": "configuration/effort.mdx 'What honors it today' contains bullets for the review parent, test role, pan worker run, pan spawn, Flywheel, dashboard start/restart and remote Fly with their config keys, and rg -n \"issues/4256|#4256\" configuration/effort.mdx prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-effort-surfaces.ac2",
+            "title": "reference/workers.mdx, docs/FOREMAN.md, sync-sources/skills/pan-foreman/SKILL.md and sync-sources/skills/pan-worker/SKILL.md each contains the --effort <level> flag in its synopsis or flag list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-effort-surfaces.ac3",
+            "title": "docs/FLYWHEEL.md's pan flywheel start row contains a sentence that the run launches at roles.flywheel.effort (default high) and that resume preserves the start level",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "start-worker-effort",
+        "to": "worker-run-effort-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-fly-effort",
+        "to": "dashboard-start-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-start-effort",
+        "to": "dashboard-restart-effort",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -20,6 +20,8 @@
 # signal, but a future copy-edit that drops both will silently break pending-input
 # detection and the dashboard AskUserQuestion popup. Update
 # tests/lib/auq-hook-detector-contract.test.ts if the contract changes.
+# The PAN-4514 guard deny below (for non-decision calls) deliberately omits both
+# markers, so the detector treats it as answered rather than pending.
 #
 # Never breaks Claude Code: on any error the hook exits 0 silently (which
 # lets the original AskUserQuestion call through — preserving the prior
@@ -36,6 +38,36 @@ fi
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
 if [ "$TOOL_NAME" != "AskUserQuestion" ]; then
+  exit 0
+fi
+
+# PAN-4514 — reject non-decision calls (placeholders, status-only "questions")
+# before anything reaches the dashboard. The reason below MUST NOT contain the
+# PAN-1520 marker or the 'surfaced to the operator' phrase, or the detector in
+# src/lib/agent-enrichment.ts would treat the call as pending and show a modal.
+GUARD_REASON=$(echo "$INPUT" | jq -r '
+  def norm: (. // "") | tostring | gsub("^\\s+|\\s+$"; "");
+  def status_only_re: "no action (is )?(needed|required)|status (check|update) only|informational only|(this is|purely|just) (informational|an fyi|fyi)|not a decision( point)?|nothing to decide|no decision (is )?(needed|required)";
+  def question_reject:
+    (.question | norm) as $q
+    | (.header | norm) as $h
+    | (.options // []) as $opts
+    | ($opts | map(.label | norm | ascii_downcase)) as $labels
+    | if ($q | length) <= 3 or (["placeholder","test","todo","tbd","foo","xxx","n/a","..."] | index($q | ascii_downcase)) != null then "placeholder question text"
+      elif ($h != "") and (($h | length) <= 1 or (["placeholder","todo","tbd","foo","xxx"] | index($h | ascii_downcase)) != null) then "placeholder header"
+      elif ($opts | length) < 2 then "fewer than two options"
+      elif ($labels | unique | length) < ($labels | length) then "duplicate option labels"
+      elif ($opts | all((.label | norm | length) <= 1 and ((.description | norm) == ""))) then "single-letter options with no descriptions"
+      elif (($q + " " + $h) | test(status_only_re; "i")) then "status-only text, not a decision"
+      else empty end;
+  (.tool_input.questions) as $qs
+  | if ($qs | type) != "array" or ($qs | length) == 0 then "no questions"
+    else ([$qs[] | question_reject] | first // empty) end
+' 2>/dev/null)
+
+if [ -n "$GUARD_REASON" ]; then
+  jq -n --arg reason "AskUserQuestion is for decisions only (PAN-4514). Rejected: ${GUARD_REASON}. To wait for a background task or Monitor, end your turn; its notification wakes you. To report status, write it as text." \
+    '{ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason } }'
   exit 0
 fi
 

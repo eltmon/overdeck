@@ -32,6 +32,7 @@ import {
 } from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from '../agents/provenance.js';
 import { determineModel } from '../agents/provider-env.js';
+import { resolveEffort } from '../agents/resolve-effort.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
@@ -493,6 +494,7 @@ export interface SpawnRemoteAgentOptions {
   startedBy: string;
   autoSpawnConsentRequired?: boolean;
   tier?: 'ephemeral' | 'durable';
+  effort?: string;
 }
 
 /**
@@ -565,6 +567,14 @@ async function spawnRemoteAgentWithoutConsentClaim(
   // No explicit model → the configured work-role routing, same as a local
   // spawn. Throws when routing cannot resolve; never a literal model ID.
   const model = determineModel({ model: options.model, role: 'work' });
+  const workEffort = resolveEffort({
+    explicit: options.effort,
+    role: 'work',
+    issueId,
+    model,
+    harness: 'claude-code',
+  });
+  if (workEffort.warning) console.warn(`[remote-agents] ${workEffort.warning}`);
   const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;
@@ -625,6 +635,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
       baseCommand: 'claude',
       permissionFlags: getClaudePermissionFlags(),
       extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
+      extraArgs: `--effort ${workEffort.effort}`,
       model,
     });
     await writeRemoteFile(fly, vmName, launcherScript, launcherContent);
@@ -635,10 +646,10 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model}`;
+    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model} --effort ${workEffort.effort}`;
   }
 
-  console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
+  console.log(`[claude-invoke] purpose=remote-agent | model=${model} | effort=${workEffort.effort} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
 
   await ensureRemoteTmuxContext(fly, vmName);
 

@@ -102,6 +102,10 @@ describe('pan worker run', () => {
     expect(await workerRunCommand({ issue: 'PAN-9' }, makeDeps().deps)).toBe(WORKER_EXIT.usage);
     expect(await workerRunCommand({ issue: 'PAN-9', prompt: 'x', brief: 'b.md' }, makeDeps().deps)).toBe(WORKER_EXIT.usage);
     expect(await workerRunCommand({ issue: 'PAN-9', prompt: 'x', harness: 'nope' }, makeDeps().deps)).toBe(WORKER_EXIT.usage);
+    const badEffort = makeDeps();
+    expect(await workerRunCommand({ issue: 'PAN-9', prompt: 'x', effort: 'ultra' }, badEffort.deps)).toBe(WORKER_EXIT.usage);
+    expect(badEffort.err.join('\n')).toContain('Unknown --effort ultra');
+    expect(badEffort.deps.startWorker).not.toHaveBeenCalled();
     const failing = makeDeps({
       startWorker: vi.fn(async () => { throw Object.assign(new Error('kickoff failed'), { workerId: ID }); }),
     });
@@ -114,6 +118,12 @@ describe('pan worker run', () => {
     await workerRunCommand({ issue: 'PAN-9', brief: 'brief.md', readOnly: true }, deps);
     expect(deps.readFile).toHaveBeenCalledWith('brief.md');
     expect(deps.startWorker).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'brief from file', readOnly: true }));
+  });
+
+  it('passes --effort through to startWorker (PAN-4256)', async () => {
+    const { deps } = makeDeps();
+    expect(await workerRunCommand({ issue: 'PAN-9', prompt: 'x', effort: 'xhigh' }, deps)).toBe(WORKER_EXIT.done);
+    expect(deps.startWorker).toHaveBeenCalledWith(expect.objectContaining({ effort: 'xhigh' }));
   });
 
   it('--detach prints only the worker id', async () => {
@@ -236,5 +246,14 @@ describe('registration', () => {
     const worker = program.commands.find((command) => command.name() === 'worker')!;
     expect(worker.commands.map((command) => command.name())).toEqual(['run', 'wait', 'report', 'list', 'register']);
     expect(worker.helpInformation()).toContain('run');
+  });
+
+  it('pan worker run --help prints --effort <level> with its default chain (PAN-4256)', () => {
+    const program = new Command();
+    registerWorkerCommands(program, () => makeDeps().deps);
+    const worker = program.commands.find((command) => command.name() === 'worker')!;
+    const run = worker.commands.find((command) => command.name() === 'run')!;
+    expect(run.helpInformation()).toContain('--effort <level>');
+    expect(run.helpInformation()).toContain('defaults to roles.worker.effort');
   });
 });

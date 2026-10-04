@@ -161,8 +161,11 @@ index and `ready.json` in `session-start-hook`, title capture and activity
 events in `user-prompt-submit-hook`, `pre-tool-hook`, `heartbeat-hook`,
 `stop-hook`, `notification-hook`, `permission-event-hook`, the compaction
 hooks, and `ask-user-question-hook` (its deny message is what lets the
-dashboard surface AskUserQuestion). The guard hooks (`auto-approve-hook`,
-`gh-issue-trailer-hook`, `tmux-send-keys-guard`) also stay on.
+dashboard surface AskUserQuestion; since PAN-4514 it first rejects
+non-decision calls — empty, placeholder, or status-only questions — with a
+decisions-only message that never reaches the dashboard). The guard hooks
+(`auto-approve-hook`, `gh-issue-trailer-hook`, `tmux-send-keys-guard`) also
+stay on.
 
 Two consequences to know. A managed Codex session runs in a private
 `CODEX_HOME`, so Overdeck normally re-delivers the user's `~/.codex/AGENTS.md`

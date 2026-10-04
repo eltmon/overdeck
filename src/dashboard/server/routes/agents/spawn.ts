@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 
+import type { EffortLevel } from '@overdeck/contracts';
 import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -56,6 +57,7 @@ import {
   getProjectPath,
   invalidateAgentsCache,
   isInternalAgentRequest,
+  parseAgentEffortOverride,
   readJsonBody,
   resolveRequestedStartedBy,
   resolveWorkSpawnRequestedModel,
@@ -299,6 +301,10 @@ export const postAgentsRoute = HttpRouter.add(
     if (role !== 'work') {
       return jsonResponse({ error: `Unsupported agent role "${String(role)}". POST /api/agents only starts role: 'work'.` }, { status: 400 });
     }
+
+    let bodyEffort: EffortLevel | undefined;
+    try { bodyEffort = parseAgentEffortOverride((body as any).effort); }
+    catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
 
     // Reject bare numeric IDs (e.g. "484") — they have no project prefix, so tracker
     // routing and workspace naming both fail. Require "PAN-484" style.
@@ -667,6 +673,7 @@ export const postAgentsRoute = HttpRouter.add(
             projectPath,
             spawnGuardrails,
             lifecycle,
+            effort: bodyEffort,
           })),
           isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
       }));
@@ -838,6 +845,7 @@ export const postAgentsRoute = HttpRouter.add(
       startedBy,
       allowHost,
       explicitModel,
+      effort: bodyEffort,
       spawnGuardrails,
       projectPath,
       eventStore,
@@ -870,6 +878,7 @@ export const postAgentsRoute = HttpRouter.add(
           issueId,
           model: explicitModel,
           harness: effectiveHarness,
+          effort: bodyEffort,
           allowHost,
           offBook,
         }),

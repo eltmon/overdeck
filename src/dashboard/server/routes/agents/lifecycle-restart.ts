@@ -40,6 +40,7 @@ import {
   appendAgentLifecycleLog,
   buildPanStartArgs,
   invalidateAgentsCache,
+  parseAgentRestartBody,
   readJsonBody,
   spawnPanCommandDetached,
 } from './shared.js';
@@ -261,19 +262,9 @@ export const postAgentRestartRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    const { model, harness, graceful = true, message, force = false } = body as {
-      model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
-      graceful?: boolean;
-      message?: string;
-      force?: boolean;
-    };
-    let restartModel: string | undefined;
-    try {
-      restartModel = normalizeModelOverride(model);
-    } catch (err) {
-      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
-    }
+    const parsedBody = parseAgentRestartBody(body);
+    if (!parsedBody.ok) return jsonResponse({ error: parsedBody.error }, { status: 400 });
+    const { model: restartModel, harness, effort: restartEffort, graceful, message, force } = parsedBody.value;
 
     const agentState = getAgentState(id);
     if (!agentState) {
@@ -314,7 +305,7 @@ export const postAgentRestartRoute = HttpRouter.add(
             payload: { agentId: id, issueId: agentState.issueId },
           }));
 
-          const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
+          const result = await restartAgent(id, { model: restartModel, harness, effort: restartEffort, graceful: true, message, force });
 
           if (result.success || result.code === 'pending-operator-decision') {
             const updatedState = result.success ? getAgentState(id) : agentState;
@@ -361,7 +352,7 @@ export const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message, force }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, effort: restartEffort, graceful: false, message, force }));
 
     if (result.success) {
       const updatedState = getAgentState(id);

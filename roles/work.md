@@ -99,6 +99,10 @@ mechanically rejects agent code pushes to main.
 
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
 
+## Waiting on background work
+
+To wait for a background task or a Monitor you started, end your turn — its notification wakes you. Do not poll, `sleep`, or call `AskUserQuestion` to idle. `AskUserQuestion` is only for real operator decisions; every call reaches the operator as a modal. Report status as plain text.
+
 ## Ask the operator with `pan ask`
 
 When you need an operator decision before you can continue (a blocking question), raise it with:
