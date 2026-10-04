@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const deliverAgentMessage = vi.hoisted(() => vi.fn());
-vi.mock('../../../../src/lib/agents.js', () => ({ deliverAgentMessage }));
+vi.mock('../../../../src/lib/agents.js', () => ({
+  deliverAgentMessage,
+  getProviderAuthMode: vi.fn(async () => 'apikey'),
+}));
 
 import {
   FLYWHEEL_REPORT_REQUEST,
@@ -9,6 +12,7 @@ import {
   abortFlywheel,
   pauseFlywheel,
   requestFlywheelReport,
+  resolveFlywheelLaunch,
   resumeFlywheel,
   startFlywheel,
   stopFlywheel,
@@ -46,7 +50,7 @@ function depsFor(state: State, overrides: FlywheelActionDeps = {}) {
     getConversation: () => (state === 'idle' ? null : conv({ status: state === 'running' ? 'active' : 'ended' })),
     sessionAlive: async () => state === 'running',
     tmuxSessionExists: async () => state === 'running',
-    resolveModelAndHarness: async (opts) => ({ model: opts.model ?? 'resolved-model', harness: 'claude-code' }),
+    resolveModelAndHarness: async (opts) => ({ model: opts.model ?? 'resolved-model', harness: 'claude-code', effort: 'high', effortSource: 'default' }),
     resolveProjectPath: (dir) => dir,
     resolvePlanHome: (dir) => dir,
     readTranscript: async () => [],
@@ -60,11 +64,43 @@ describe('startFlywheel (PAN-3964 FR-5, D5)', () => {
   it('creates the conversation, spawns it, and sends the skill with the book', async () => {
     const { deps, calls } = depsFor('idle');
     const result = await startFlywheel({ cwd: '/repos/overdeck', orders: 'book-1' }, deps);
-    expect(result).toEqual({ session: 'conv-flywheel', harness: 'claude-code', model: 'resolved-model', prompt: '/pan-flywheel book-1', cwd: '/repos/overdeck' });
-    expect(calls.createConversation).toHaveBeenCalledWith(expect.objectContaining({ name: 'conv-flywheel', cwd: '/repos/overdeck', model: 'resolved-model', harness: 'claude-code' }));
+    expect(result).toEqual({ session: 'conv-flywheel', harness: 'claude-code', model: 'resolved-model', effort: 'high', prompt: '/pan-flywheel book-1', cwd: '/repos/overdeck' });
+    expect(calls.createConversation).toHaveBeenCalledWith(expect.objectContaining({ name: 'conv-flywheel', cwd: '/repos/overdeck', model: 'resolved-model', harness: 'claude-code', effort: 'high' }));
     expect(calls.spawnSession).toHaveBeenCalled();
     expect(calls.waitReady).toHaveBeenCalledWith('conv-flywheel', 'claude-code', 'spawn');
     expect(calls.sendMessage.mock.calls).toEqual([['conv-flywheel', '/pan-flywheel book-1', 'pan flywheel start']]);
+  });
+
+  // PAN-4256: the flywheel's launch resolves its reasoning effort from
+  // roles.flywheel.effort instead of hardcoding 'high'.
+  it('resolveFlywheelLaunch resolves roles.flywheel.effort', async () => {
+    const resolved = await resolveFlywheelLaunch(
+      { harness: 'claude-code' },
+      { roles: { flywheel: { model: 'claude-opus-4-8', effort: 'medium' } }, tieredExecution: { tiers: {} } },
+    );
+
+    expect(resolved.effort).toBe('medium');
+    expect(resolved.effortSource).toBe('role');
+  });
+
+  it('resolveFlywheelLaunch falls back to the default effort when roles.flywheel.effort is unset', async () => {
+    const resolved = await resolveFlywheelLaunch({ harness: 'claude-code' }, { roles: {}, tieredExecution: { tiers: {} } });
+
+    expect(resolved.effort).toBe('high');
+    expect(resolved.effortSource).toBe('default');
+  });
+
+  it('threads a resolved effort into createConversation and spawnSession', async () => {
+    const { deps, calls } = depsFor('idle', {
+      resolveModelAndHarness: async (opts) => ({
+        model: opts.model ?? 'resolved-model', harness: 'claude-code', effort: 'medium', effortSource: 'role',
+      }),
+    });
+
+    await startFlywheel({ cwd: '/repos/overdeck' }, deps);
+
+    expect(calls.createConversation).toHaveBeenCalledWith(expect.objectContaining({ effort: 'medium' }));
+    expect(calls.spawnSession.mock.calls[0]?.at(-1)).toBe('medium');
   });
 
   it('refuses a running flywheel', async () => {
