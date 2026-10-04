@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:17:03.437Z",
+  "updated": "2026-10-04T02:17:31.152Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -19,6 +19,10 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4507",
       "claimedAt": "2026-10-04T02:17:03.437Z"
+    },
+    "extract-status-mapping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:17:31.151Z"
     }
   }
 }
