@@ -36,6 +36,7 @@ colleague.
 | **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw terminal of the same session (the native CLI for OpenCode and Codex) |
 | **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
+| **Bookmarks** | Mark a message by clicking the icon beside it, then reopen the list from the header to jump back to it |
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
@@ -242,6 +243,21 @@ vision-capable model (for example, MiMo V2.5) to include images.
 - Maximum attachment size: **5 MB** per file.
 - Maximum message length: **50,000** characters.
 - Unsupported or binary file types are rejected at selection time with a toast.
+
+## Bookmarks
+
+Click the icon beside an assistant or user message to bookmark it, using its
+first line as the label. The icon turns into a filled bookmark; clicking it
+again opens a popover to rename or remove the bookmark. The **Bookmarks**
+header button opens a list showing each bookmark's label and time — clicking
+a label scrolls the timeline to that message and outlines it briefly.
+
+Bookmarks survive reloads and new messages because they point at the
+transcript message's stable id, not its position in the list. They are
+stored by Overdeck and never written into the agent's own transcript, and
+they stay with this conversation — a handoff or fork does not copy them. If
+a bookmarked message is no longer in the loaded transcript, its row in the
+list shows "This message is not in the loaded transcript."
 
 ## Why hand off?
 

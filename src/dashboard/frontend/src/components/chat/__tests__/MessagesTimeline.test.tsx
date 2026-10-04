@@ -8,12 +8,14 @@
  * virtualizer relies on for measurement.
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage, WorkLogEntry } from '../chat-types';
 import { useConnectionState } from '../../../lib/connectionState';
+import { ConversationBookmarksProvider, useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 
 vi.mock('../ChatMarkdown', () => ({
   ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -656,5 +658,134 @@ describe('MessagesTimeline — Pi harness tool entries', () => {
     fireEvent.click(screen.getByText('edit'));
     expect(screen.getByText(/\/repo\/src\/a\.ts/)).toBeInTheDocument();
     expect(screen.getByText('oldText not found')).toBeInTheDocument();
+  });
+});
+
+describe('MessagesTimeline — bookmark jump (PAN-4498 WI-7)', () => {
+  const fetchMock = vi.fn();
+  const outlineOf = (el: HTMLElement) => `${el.style.outlineWidth} ${el.style.outlineStyle} ${el.style.outlineColor}`;
+  const expectedOutline = (() => {
+    const div = document.createElement('div');
+    div.style.outline = '2px solid var(--color-primary)';
+    return `${div.style.outlineWidth} ${div.style.outlineStyle} ${div.style.outlineColor}`;
+  })();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ bookmarks: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function JumpTrigger({ messageId }: { messageId: string }) {
+    const ctx = useConversationBookmarks();
+    return (
+      <>
+        <button onClick={() => ctx?.jumpTo(messageId)}>jump</button>
+        <span data-testid="missing">{ctx?.missingMessageId ?? ''}</span>
+      </>
+    );
+  }
+
+  function renderWithBookmarks(messages: ChatMessage[], opts: { bookmarksEnabled?: boolean } = {}) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <ConversationBookmarksProvider conversationName="conv-a">
+          <JumpTrigger messageId="target" />
+          <MessagesTimeline messages={messages} workLog={[]} streaming={false} bookmarksEnabled={opts.bookmarksEnabled ?? true} />
+        </ConversationBookmarksProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it('a jump request for a row inside the virtualized region scrolls it into view and outlines it', async () => {
+    const messages: ChatMessage[] = Array.from({ length: 12 }, (_, i) =>
+      makeMessage(i === 2 ? 'target' : `m${i}`, 'assistant', i * 1000, `text ${i}`));
+    renderWithBookmarks(messages);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(screen.getByText('jump'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    const row = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
+    expect(row).toBeTruthy();
+    expect(outlineOf(row)).toBe(expectedOutline);
+  });
+
+  it('the outline is removed after 1600 ms', async () => {
+    const messages: ChatMessage[] = [makeMessage('target', 'assistant', 0, 'hi')];
+    renderWithBookmarks(messages);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(screen.getByText('jump'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    const row = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
+    expect(outlineOf(row)).toBe(expectedOutline);
+
+    await act(() => vi.advanceTimersByTimeAsync(1600));
+
+    expect(outlineOf(row)).not.toBe(expectedOutline);
+  });
+
+  it('a jump request for an unknown message id calls resolveJump(nonce, false)', async () => {
+    const messages: ChatMessage[] = [makeMessage('m0', 'assistant', 0, 'hi')];
+    renderWithBookmarks(messages);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(screen.getByText('jump'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByTestId('missing')).toHaveTextContent('target');
+  });
+
+  it('the same nonce is not handled twice', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const messages: ChatMessage[] = [makeMessage('target', 'assistant', 0, 'hi')];
+    const tree = (msgs: ChatMessage[]) => (
+      <QueryClientProvider client={client}>
+        <ConversationBookmarksProvider conversationName="conv-a">
+          <JumpTrigger messageId="target" />
+          <MessagesTimeline messages={msgs} workLog={[]} streaming={false} bookmarksEnabled />
+        </ConversationBookmarksProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(messages));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(screen.getByText('jump'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    const row = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
+    expect(outlineOf(row)).toBe(expectedOutline);
+
+    await act(() => vi.advanceTimersByTimeAsync(1600));
+    expect(outlineOf(row)).not.toBe(expectedOutline);
+
+    // Same provider instance (same jump request/nonce), but a new `messages` array
+    // reference forces `rows` — and so the jump effect's deps — to recompute. The
+    // handled-nonce guard must still skip it: no re-flash.
+    rerender(tree([makeMessage('target', 'assistant', 0, 'hi')]));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    const rowAfterRerender = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
+    expect(outlineOf(rowAfterRerender)).not.toBe(expectedOutline);
+  });
+
+  it('bookmarksEnabled=false ignores jump requests', async () => {
+    const messages: ChatMessage[] = [makeMessage('target', 'assistant', 0, 'hi')];
+    renderWithBookmarks(messages, { bookmarksEnabled: false });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    fireEvent.click(screen.getByText('jump'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    const row = document.querySelector('[data-search-row-id="target"]') as HTMLElement;
+    expect(outlineOf(row)).not.toBe(expectedOutline);
+    expect(screen.getByTestId('missing')).toHaveTextContent('');
   });
 });
