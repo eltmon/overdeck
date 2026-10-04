@@ -66,6 +66,13 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   (`routes/conversation-companion-terminal.ts`) and rendered by `ConversationTerminalView.tsx`.
   The browser names only the conversation. See "Companion terminals" in
   [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md).
+- Conversation bookmarks (PAN-4498): operator annotations on transcript messages, stored in
+  `conversation_bookmarks` (`overdeck.db`) behind the door `src/lib/overdeck/conversation-bookmarks.ts`
+  — the only module that touches the table. Routes: `GET /api/conversations/:name/bookmarks` and
+  `PUT|DELETE /api/conversations/:name/bookmarks/:messageId` (`routes/conversation-bookmarks.ts`).
+  The client lives under `components/chat/bookmarks/` (`ConversationBookmarksProvider`, the role-icon
+  button/marker, the drawer). The main timeline opts in by passing `bookmarksEnabled` to
+  `MessagesTimeline`; every other `MessagesTimeline` mount (subagent transcript, etc.) never does.
 
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,

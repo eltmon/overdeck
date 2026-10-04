@@ -148,6 +148,10 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && url.endsWith('/api/conversations/pending-input')) {
     return Response.json([]);
   }
+  // PAN-4498 — ConversationBookmarksProvider fetches on every mount.
+  if (method === 'GET' && /^\/api\/conversations\/[^/]+\/bookmarks$/.test(url)) {
+    return Response.json({ bookmarks: [] });
+  }
   return undefined;
 }
 

@@ -227,6 +227,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/summary-fork',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.forkNewFile + RELOCATE spawn' },
   { surface: 'GET /api/conversations/:name/kickoff',                     kind: 'http', disposition: 'READ',        door: 'conversation-kickoff-store.readHeldKickoff (PAN-4499)' },
   { surface: 'POST /api/conversations/:name/kickoff',                    kind: 'http', disposition: 'WRITE',       door: 'conversation-kickoff.startHeldKickoff (PAN-4499)' },
+  { surface: 'GET /api/conversations/:name/bookmarks',                   kind: 'http', disposition: 'READ',        door: 'conversation-bookmarks.listConversationBookmarks (PAN-4498)' },
+  { surface: 'PUT /api/conversations/:name/bookmarks/:messageId',        kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.upsertConversationBookmark (PAN-4498)' },
+  { surface: 'DELETE /api/conversations/:name/bookmarks/:messageId',     kind: 'http', disposition: 'WRITE',       door: 'conversation-bookmarks.removeConversationBookmark (PAN-4498)' },
   { surface: 'POST /api/conversations/:name/plan-action',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.planAction' },
   { surface: 'POST /api/conversations/:name/companion-terminal/open',    kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.open (tmux companion session; generation stamped on the session, nothing stored; PAN-3974)' },
   { surface: 'POST /api/conversations/:name/companion-terminal/close',   kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.close (kills only the companion session; stale generation refused; PAN-3974)' },
@@ -556,6 +559,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/model-presets/:id/plan',                      kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via model-presets plan (read-only)' },
   { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
   { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
+
+  // ── jev.ts ────────────────────────────────────────────────────────────────
+  { surface: 'GET /api/jev/settings',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via jev settings door (PAN-4508)' },
+  { surface: 'PUT /api/jev/settings',                                kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via jev settings path-scoped write (PAN-4508)' },
+  { surface: 'GET /api/jev/usage',                                   kind: 'http', disposition: 'READ',        door: 'jev usage log summary, read-only (PAN-4508)' },
 
   // ── vault.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },

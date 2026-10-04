@@ -102,6 +102,52 @@ describe('tiered crews mapping', () => {
     expect(config.tiers.expert.harness).toBe('claude-code');
   });
 
+  // PAN-4257: a tier's configured effort round-trips through the crews model.
+  it('round-trips a tier effort through importCrews and serializeCrews', () => {
+    const config: TieredExecutionConfig = {
+      enabled: true,
+      tiers: { standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium'], effort: 'low' } },
+      by_kind: {},
+      replay_threshold: 0.5,
+    };
+    const imported = importCrews(config);
+    expect(imported.crews[0].effort).toBe('low');
+
+    const serialized = serializeCrews(imported.crews, imported.assign, imported.rest);
+    expect(serialized.tiers['medium'].effort).toBe('low');
+  });
+
+  it('keeps two tiers with the same model and harness but different efforts as separate crews', () => {
+    const config: TieredExecutionConfig = {
+      enabled: true,
+      tiers: {
+        'low-tier': { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['trivial'], effort: 'low' },
+        'high-tier': { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['expert'], effort: 'high' },
+      },
+      by_kind: {},
+      replay_threshold: 0.5,
+    };
+    const imported = importCrews(config);
+    expect(imported.crews).toHaveLength(2);
+    expect(imported.crews.map((crew) => crew.effort).sort()).toEqual(['high', 'low']);
+  });
+
+  it('omits the effort key when a crew has no effort set', () => {
+    const crew: Crew = { id: 'standard', model: 'claude-sonnet-5', harness: 'claude-code' };
+    const serialized = serializeCrews([crew], { medium: 'standard' }, { enabled: true, by_kind: {}, replay_threshold: 0.5 });
+    expect('effort' in serialized.tiers.medium).toBe(false);
+  });
+
+  it('renders a tier effort in the YAML preview', () => {
+    const config: TieredExecutionConfig = {
+      enabled: true,
+      tiers: { medium: { model: 'kimi-k2.7-code', harness: 'ohmypi', difficulties: ['medium'], effort: 'low' } },
+      by_kind: {},
+      replay_threshold: 0.5,
+    };
+    expect(renderYamlPreview(config)).toContain('effort: low');
+  });
+
   it('rejects unassigning the final difficulty from a kind-routed crew', () => {
     const imported = importCrews({
       enabled: true,

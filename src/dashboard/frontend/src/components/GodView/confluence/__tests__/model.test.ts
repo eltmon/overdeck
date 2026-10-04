@@ -88,6 +88,16 @@ describe('Confluence model', () => {
       expect(orbs.every((candidate) => candidate.tx < layout.portalX)).toBe(true);
     });
 
+    it('places a needs-you orb on the shelf row alongside shelf orbs (PAN-4383)', () => {
+      const layout = computeLayout(1680, 945);
+      const orbs = [orb('PAN-1', 'shelf'), orb('PAN-2', 'needs-you')];
+
+      for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, orbs.length);
+
+      expect(orbs[1].ty).toBe(layout.shelfY);
+      expect(orbs[1].tx).toBeGreaterThan(orbs[0].tx);
+    });
+
     it('spreads shelf orbs deterministically along the shelf', () => {
       const layout = computeLayout(1680, 945);
       const orbs = ['PAN-1', 'PAN-2', 'PAN-3'].map((id) => orb(id, 'shelf'));
@@ -103,7 +113,7 @@ describe('Confluence model', () => {
     const now = Date.parse('2026-08-01T12:00:00.000Z');
     const staleActivity = '2026-08-01T11:30:00.000Z';
 
-    it('classifies with merged-close-out-exit > shelf > failed > stale > active precedence', () => {
+    it('classifies with merged-close-out-exit > shelf > needs-you > failed > stale > active precedence', () => {
       expect(classifyOrb({
         paused: true,
         attention: 'stuck',
@@ -116,7 +126,8 @@ describe('Confluence model', () => {
       }, now)).toBe('shelf');
       expect(classifyOrb({ attention: 'stuck', lastActivity: staleActivity }, now)).toBe('failed');
       expect(classifyOrb({ attention: 'api-error', lastActivity: staleActivity }, now)).toBe('failed');
-      expect(classifyOrb({ attention: 'needs-you', lastActivity: staleActivity }, now)).toBe('stale');
+      // PAN-4383: waiting on the operator is never idle, however long it waits.
+      expect(classifyOrb({ attention: 'needs-you', lastActivity: staleActivity }, now)).toBe('needs-you');
       expect(classifyOrb({ lastActivity: staleActivity }, now)).toBe('stale');
       expect(classifyOrb({ lastActivity: '2026-08-01T11:30:00.001Z' }, now)).toBe('active');
       expect(classifyOrb({}, now)).toBe('active');
@@ -148,6 +159,12 @@ describe('Confluence model', () => {
         issueState: 'merged',
         lastActivity: staleActivity,
       }, now)).toBe('active');
+    });
+
+    it('keeps a needs-you orb out of the Doldrums after 17 hours, but a pause still shelves it (PAN-4383)', () => {
+      const seventeenHoursAgo = now - 17 * 60 * 60 * 1000;
+      expect(classifyOrb({ attention: 'needs-you', lastActivity: seventeenHoursAgo }, now)).toBe('needs-you');
+      expect(classifyOrb({ paused: true, attention: 'needs-you', lastActivity: seventeenHoursAgo }, now)).toBe('shelf');
     });
 
     it('uses the mockup acquire/drop radii and reverse draw order for picking', () => {

@@ -241,7 +241,7 @@ function createEngine(
   const anchorAll = () => {
     const current = list();
     const stale = Math.max(1, current.filter((orb) => orb.state === 'stale').length);
-    const shelf = Math.max(1, current.filter((orb) => orb.state === 'shelf').length);
+    const shelf = Math.max(1, current.filter((orb) => orb.state === 'shelf' || orb.state === 'needs-you').length);
     for (const orb of current) positionOrb(orb, current, layout, stale, shelf);
   };
   const orbAt = (issueId: string) => renderOrbs.get(issueId);
@@ -546,7 +546,7 @@ function createEngine(
   const drawOrbs = () => {
     const now = Date.now();
     const orbs = list();
-    const shelfCount = orbs.filter((candidate) => candidate.state === 'shelf').length;
+    const shelfCount = orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').length;
     const staleCount = orbs.filter((candidate) => candidate.state === 'stale').length;
     const measureText = (value: string) => fx.measureText(value).width;
     for (const orb of orbs) {
@@ -568,6 +568,16 @@ function createEngine(
       }
       if (orb.state === 'failed') {
         const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
+      }
+      if (orb.state === 'needs-you') {
+        // PAN-4383: the agent asked the operator (`pan ask`); a steady flare ring, not frost.
+        // PAN-4523: shares the shelf row with 'shelf' orbs (positionOrb), so its
+        // label also uses the fixed shelfLabelY row and the shared slot width —
+        // otherwise its orb-relative label would float free of the band and
+        // risk overprinting its shelf-row neighbours.
+        fx.fillStyle = hexA(SWEEP_FLARE_COLOR, 0.16); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(40,34,14,.92)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = hexA(SWEEP_FLARE_COLOR, 0.85); fx.lineWidth = 1.8; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke();
+        fx.font = '600 10px "JetBrains Mono"';
+        drawLabel(orb, fitText(`⚑ ${orb.id} · needs you ${fmtAge(orb.staleMin)}`, shelfSlotWidth(layout, shelfCount), measureText), hexA(SWEEP_FLARE_COLOR, 0.9), layout.shelfLabelY); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'shelf') {
         fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2);
@@ -660,7 +670,7 @@ function createEngine(
         orb.mergeDwell = dwell.remaining;
         if (dwell.shouldStart) startMerge(orb);
       }
-      if (orb.state === 'shelf') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
+      if (orb.state === 'shelf' || orb.state === 'needs-you') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
       if (orb.state === 'failed') { orb.y += Math.sin(simT * 0.5 + orb.wobA) * dt * 3; orb.x += Math.cos(simT * 0.4 + orb.wobB) * dt * 2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
       if (orb.state === 'stale') { orb.staleMin += dt * 2; orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
       const frost = advanceFrostAccrual(orb.idleMin, orb.frostHold, dt); orb.idleMin = frost.idleMinutes; orb.frost = frost.frost; orb.frostHold = frost.frostHoldSeconds; if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y); if (frost.sinkToDoldrums) { orb.state = 'stale'; orb.staleMin = Math.max(31, Math.round(orb.idleMin)); anchorAll(); ticker(`${orb.id} ❄ frozen`, ICE); continue; }
@@ -700,7 +710,7 @@ function createEngine(
   const draw = () => {
     fx.clearRect(0, 0, width, height);
     trail.globalCompositeOperation = 'destination-out'; trail.fillStyle = 'rgba(0,0,0,0.055)'; trail.fillRect(0, 0, width, height); trail.globalCompositeOperation = 'lighter';
-    for (const orb of list()) { if (orb.state === 'stale' || orb.state === 'shelf') continue; const color = roleColor(orb.role); const glow = trail.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, 5 + orb.heat * 8); glow.addColorStop(0, hexA(color, 0.5 * (0.25 + orb.heat))); glow.addColorStop(1, hexA(color, 0)); trail.fillStyle = glow; trail.beginPath(); trail.arc(orb.x, orb.y, 5 + orb.heat * 8, 0, 7); trail.fill(); }
+    for (const orb of list()) { if (orb.state === 'stale' || orb.state === 'shelf' || orb.state === 'needs-you') continue; const color = roleColor(orb.role); const glow = trail.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, 5 + orb.heat * 8); glow.addColorStop(0, hexA(color, 0.5 * (0.25 + orb.heat))); glow.addColorStop(1, hexA(color, 0)); trail.fillStyle = glow; trail.beginPath(); trail.arc(orb.x, orb.y, 5 + orb.heat * 8, 0, 7); trail.fill(); }
     drawRiver(); drawZones(); drawPortal(); drawSun();
     fx.globalCompositeOperation = 'lighter'; fx.drawImage(trailCanvas, 0, 0, width, height); fx.globalCompositeOperation = 'source-over';
     drawGateFlashes(); drawConvoys(); drawOrbs(); drawParticles(); drawPulses(); drawTickers(); drawTide(); drawSweepBeam(); drawFlares(); drawStageHeaders(); drawConstellation(); drawSequencer();
