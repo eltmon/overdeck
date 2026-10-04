@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T04:00:08.152Z",
+  "updated": "2026-10-04T04:00:15.503Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4260",
       "claimedAt": "2026-10-04T03:42:30.393Z",
       "doneAt": "2026-10-04T04:00:08.151Z"
+    },
+    "w8-muse-effort": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T04:00:15.503Z"
     }
   }
 }
