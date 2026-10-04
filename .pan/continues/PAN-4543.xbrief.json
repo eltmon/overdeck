@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:12:08.435Z",
+  "updated": "2026-10-04T10:12:19.440Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "close-out-stall-profile.ac5": {
       "status": "completed",
       "doneAt": "2026-10-04T10:12:08.435Z"
+    },
+    "docs-close-out-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:19.440Z"
     }
   }
 }
