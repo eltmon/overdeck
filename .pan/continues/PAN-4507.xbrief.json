@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:39:22.724Z",
+  "updated": "2026-10-04T02:42:22.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,10 @@
       "doneAt": "2026-10-04T02:39:09.592Z"
     },
     "issues-webhook-reset": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4507",
-      "claimedAt": "2026-10-04T02:39:22.724Z"
+      "claimedAt": "2026-10-04T02:39:22.724Z",
+      "doneAt": "2026-10-04T02:42:22.685Z"
     }
   }
 }
