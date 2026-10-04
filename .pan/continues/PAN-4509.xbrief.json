@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4509",
   "created": "2026-10-04T02:10:08.078Z",
-  "updated": "2026-10-04T02:22:50.643Z",
+  "updated": "2026-10-04T02:23:04.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "wire-lint.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T02:22:50.642Z"
+    },
+    "docs-releasing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:23:04.561Z"
     }
   }
 }
