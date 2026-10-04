@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:08:02.537Z",
+  "updated": "2026-10-04T10:08:13.338Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "merged-skip-finalize.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T10:08:02.537Z"
+    },
+    "merged-skip-finalize.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:13.337Z"
     }
   }
 }
