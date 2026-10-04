@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:40:24.147Z",
+  "updated": "2026-10-04T05:40:35.525Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "shelf-cap.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:40:24.147Z"
+    },
+    "shelf-cap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:35.524Z"
     }
   }
 }
