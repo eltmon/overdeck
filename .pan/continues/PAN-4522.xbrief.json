@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4522",
   "created": "2026-10-04T04:14:15.923Z",
-  "updated": "2026-10-04T05:41:15.394Z",
+  "updated": "2026-10-04T05:41:22.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4522",
       "claimedAt": "2026-10-04T05:27:04.811Z",
       "doneAt": "2026-10-04T05:41:15.394Z"
+    },
+    "docs-runtime-seed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T05:41:22.362Z"
     }
   }
 }
