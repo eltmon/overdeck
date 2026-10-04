@@ -396,6 +396,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
+- A Claude Code transcript's modified time is not activity: Claude's
+  `touchSessionTranscript` touches every running session's transcript at
+  startup and then hourly, adding no record. PAN-4515 makes conversation `lastActivityAt`
+  (`overdeck/conversation-list.ts`) take the last `user`/`assistant` record's
+  timestamp for live rows, with the modified time only as a fallback.
+  Never date conversation activity by transcript modified time.
 - AskUserQuestion modal = deny-reason markers: `scanPendingInputs`
   (`src/lib/agent-enrichment.ts`) treats an `is_error` AUQ tool_result as pending
   only if it contains `PAN-1520` or `surfaced to the operator`. Any hook deny that
