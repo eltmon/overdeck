@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T04:01:51.175Z",
+  "updated": "2026-10-04T04:02:04.722Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "effort-display-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T04:01:51.175Z"
+    },
+    "effort-display-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T04:02:04.722Z"
     }
   }
 }
