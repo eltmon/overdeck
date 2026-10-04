@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:33:09.081Z",
+  "updated": "2026-10-04T03:33:22.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "settings-subrole-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:33:09.080Z"
+    },
+    "docs-effort-tiers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:33:22.314Z"
     }
   }
 }
