@@ -544,6 +544,33 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect('effortSource' in raw).toBe(false);
   });
 
+  it.each(['review', 'test', 'worker'] as const)(
+    'role-file runs honor an explicit effort over the roles/%s.md frontmatter (PAN-4256)',
+    async (role) => {
+      writeSupervisorArtifact();
+      const { spawnRun } = await import('../agents.js');
+      const agentId = role === 'worker' ? 'agent-pan-1405-worker-1' : undefined;
+
+      await spawnRun('PAN-1405', role, {
+        workspace,
+        model: 'claude-sonnet-4-6',
+        effort: 'medium',
+        effortSource: 'role',
+        ...(agentId ? { agentId, registerConversation: false } : {}),
+      });
+
+      const resolvedAgentId = agentId ?? `agent-pan-1405-${role}`;
+      const agentDir = join(tmpHome, 'agents', resolvedAgentId);
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+      const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
+
+      expect(launcher).toContain('--effort medium');
+      expect(launcher).not.toContain('--effort high');
+      expect(persisted.effort).toBe('medium');
+      expect(persisted.effortSource).toBe('role');
+    },
+  );
+
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
     process.env.KIMI_API_KEY = 'test-kimi-key';
