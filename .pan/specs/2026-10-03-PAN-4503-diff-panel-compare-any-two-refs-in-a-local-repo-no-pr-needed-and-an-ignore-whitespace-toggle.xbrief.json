@@ -4,17 +4,17 @@
     "created": "2026-10-03T23:47:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4503: Diff panel: compare any two refs in a local repo (no PR needed), and an ignore-whitespace toggle",
-    "updated": "2026-10-03T23:53:16.381Z"
+    "updated": "2026-10-03T23:53:51.690Z"
   },
   "plan": {
     "id": "pan-4503",
     "title": "Diff panel: compare any two refs in a local repo (no PR needed), and an ignore-whitespace toggle",
-    "status": "proposed",
+    "status": "running",
     "uid": "098eb0ae-538d-49c3-b76b-30b702e16767",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-03T23:47:48Z",
-    "updated": "2026-10-03T23:53:16.381Z",
+    "updated": "2026-10-03T23:53:51.690Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4503",
@@ -1001,5 +1001,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
