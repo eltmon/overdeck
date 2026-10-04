@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:14:26.875Z",
+  "updated": "2026-10-04T05:14:39.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "prototype-probe.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:14:26.875Z"
+    },
+    "prototype-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:14:39.595Z"
     }
   }
 }
