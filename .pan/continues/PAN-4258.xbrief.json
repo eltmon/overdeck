@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T02:22:17.104Z",
+  "updated": "2026-10-04T02:22:24.118Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4258",
       "claimedAt": "2026-10-04T02:19:34.069Z",
       "doneAt": "2026-10-04T02:22:17.103Z"
+    },
+    "planning-prompt-rank-bands": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4258",
+      "claimedAt": "2026-10-04T02:22:24.118Z"
     }
   }
 }
