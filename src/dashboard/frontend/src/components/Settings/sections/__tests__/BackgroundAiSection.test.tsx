@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { BackgroundAiSection } from '../BackgroundAiSection';
-import type { JevSettingsView, SettingsConfig } from '../../types';
+import type { JevFeatureUsage, JevSettingsView, JevUsageView, SettingsConfig } from '../../types';
 
 function settings(typesafe?: string): SettingsConfig {
   return {
@@ -145,5 +145,81 @@ describe('BackgroundAiSection Jev toggle gating (PAN-4508)', () => {
     fireEvent.click(screen.getByLabelText('Toggle Jev: turn-end classification'));
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('jev-toggle-error')).toBeNull();
+  });
+});
+
+describe('BackgroundAiSection Jev usage readout (PAN-4508)', () => {
+  const emptyFeatureUsage: JevFeatureUsage = { calls24h: 0, lastCallAt: null, lastError: null };
+
+  function usage(overrides: Partial<Record<keyof JevUsageView['features'], JevFeatureUsage>> = {}): JevUsageView {
+    return {
+      hours: 24,
+      features: {
+        jevTurnEndAssessment: emptyFeatureUsage,
+        jevAcceptanceCriteriaReview: emptyFeatureUsage,
+        jevMemoryRelevance: emptyFeatureUsage,
+        ...overrides,
+      },
+    };
+  }
+
+  function renderWithUsage(usageView: JevUsageView | null) {
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={settings()}
+        onSettingsChange={vi.fn()}
+        jev={{
+          settings: { configured: true, route: 'zen', model: 'jev-1.13-free', timeoutMs: 2000, apiKeyRef: 'TYPESAFE_API_KEY' },
+          usage: usageView,
+          serverError: null,
+          onSave: vi.fn(),
+        }}
+      />,
+    );
+  }
+
+  it('renders "No calls yet" when lastCallAt is null', () => {
+    renderWithUsage(usage());
+    expect(screen.getByTestId('jev-usage-jevTurnEndAssessment')).toHaveTextContent('No calls yet');
+  });
+
+  it('renders call count, last call and last error', () => {
+    const lastCallAt = new Date(Date.now() - 60_000).toISOString();
+    const lastErrorAt = new Date(Date.now() - 120_000).toISOString();
+    renderWithUsage(
+      usage({
+        jevTurnEndAssessment: {
+          calls24h: 3,
+          lastCallAt,
+          lastError: { at: lastErrorAt, reason: 'auth-failed', status: 401 },
+        },
+      }),
+    );
+    const text = screen.getByTestId('jev-usage-jevTurnEndAssessment').textContent ?? '';
+    expect(text).toContain('3 calls in 24h');
+    expect(text).toContain('last call');
+    expect(text).toContain('last error: auth-failed (401)');
+  });
+
+  it('renders no readout on non-Jev rows', () => {
+    renderWithUsage(usage());
+    expect(screen.queryByTestId('jev-usage-conversationTitles')).toBeNull();
+  });
+
+  it('renders no readout at all when jev.usage is absent', () => {
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={settings()}
+        onSettingsChange={vi.fn()}
+        jev={{
+          settings: { configured: true, route: 'zen', model: 'jev-1.13-free', timeoutMs: 2000, apiKeyRef: 'TYPESAFE_API_KEY' },
+          serverError: null,
+          onSave: vi.fn(),
+        }}
+      />,
+    );
+    expect(screen.queryByTestId('jev-usage-jevTurnEndAssessment')).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import {
   BACKGROUND_AI_FEATURE_META,
   type BackgroundAiConfig,
   type BackgroundAiFeature,
+  type JevFeatureUsage,
   type JevSettingsInput,
   type JevSettingsView,
   type JevUsageView,
@@ -11,14 +12,29 @@ import {
   type SettingsConfig,
 } from '../types';
 import { EMBEDDING_MODELS_BY_PROVIDER } from '../embeddingModels';
+import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { BG_FEATURE_COST_SOURCE } from '../settingsPageConstants';
 import { JevSettingsPanel } from './JevSettingsPanel';
 
-const JEV_FEATURE_KEYS: readonly BackgroundAiFeature[] = [
-  'jevTurnEndAssessment',
-  'jevAcceptanceCriteriaReview',
-  'jevMemoryRelevance',
-];
+const JEV_FEATURE_KEYS = ['jevTurnEndAssessment', 'jevAcceptanceCriteriaReview', 'jevMemoryRelevance'] as const;
+
+type JevFeatureKey = (typeof JEV_FEATURE_KEYS)[number];
+
+function isJevFeatureKey(key: BackgroundAiFeature): key is JevFeatureKey {
+  return (JEV_FEATURE_KEYS as readonly string[]).includes(key);
+}
+
+/** 'No calls yet', or '<n> call(s) in 24h · last call <relative>[ · last error: <reason>[ (<status>)] <relative>]'. */
+function jevUsageText(usage: JevFeatureUsage, now: Date): string {
+  if (usage.lastCallAt === null) return 'No calls yet';
+  const callWord = usage.calls24h === 1 ? 'call' : 'calls';
+  let text = `${usage.calls24h} ${callWord} in 24h · last call ${formatRelativeTime(usage.lastCallAt, now)}`;
+  if (usage.lastError) {
+    const statusSuffix = usage.lastError.status !== undefined ? ` (${usage.lastError.status})` : '';
+    text += ` · last error: ${usage.lastError.reason}${statusSuffix} ${formatRelativeTime(usage.lastError.at, now)}`;
+  }
+  return text;
+}
 
 interface BackgroundAiSectionProps {
   backgroundCost?: {
@@ -45,6 +61,8 @@ export function BackgroundAiSection({
   // PAN-4508: a Jev feature toggle makes no request with jev.model blank, so turning one on
   // (never off) is blocked client-side with an inline error under that row.
   const [jevToggleError, setJevToggleError] = useState<{ key: BackgroundAiFeature; message: string } | null>(null);
+  // Taken once per render so every row's relative-time readout agrees.
+  const now = new Date();
 
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
@@ -207,6 +225,11 @@ export function BackgroundAiSection({
                   </span>
                 )}
                 <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+                {isJevFeatureKey(feature.key) && jev?.usage && (
+                  <p data-testid={`jev-usage-${feature.key}`} className="text-[11px] text-muted-foreground mt-0.5">
+                    {jevUsageText(jev.usage.features[feature.key], now)}
+                  </p>
+                )}
                 <div className="mt-1.5 flex items-center gap-2">
                   {backgroundModelControl(feature.key)}
                 </div>
