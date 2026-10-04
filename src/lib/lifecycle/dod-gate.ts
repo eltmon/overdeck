@@ -462,7 +462,8 @@ export async function checkVerificationRow(
   // An out-of-band merge never enters merge-ops, so the CI-green skip cannot
   // record its normal verification verdict. Once rows 4 and 6 prove the landed
   // work and main CI green, that evidence satisfies row 3 without an override.
-  const nonTerminal = Boolean(artifact) && outcome !== 'passed' && outcome !== 'failed';
+  // 'passed' returned above, so any present artifact that is not 'failed' is non-terminal.
+  const nonTerminal = Boolean(artifact) && outcome !== 'failed';
   if ((!artifact || nonTerminal) && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
     const stale = nonTerminal ? '; stale non-terminal artifact —' : ';';
     return result('verification', 'pass', `${observed}${stale} verification satisfied by green main CI after landing`);
