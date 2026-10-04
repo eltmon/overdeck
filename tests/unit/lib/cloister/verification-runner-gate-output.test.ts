@@ -63,6 +63,7 @@ vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
   readVerificationArtifact: vi.fn(() => null),
   writeVerificationArtifact: mockWriteArtifact,
   verificationArtifactPath: vi.fn(() => '/tmp/verification-latest.json'),
+  markRunningVerificationArtifactSkipped: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({

@@ -1,0 +1,665 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T09:25:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4543: pan close refuses landed, deployed issues: deploy probe times out on a stalled event loop; stale 'running' verification artifact blocks row 3",
+    "updated": "2026-10-04T09:42:04.288Z"
+  },
+  "plan": {
+    "id": "pan-4543",
+    "title": "pan close refuses landed, deployed issues: deploy probe times out on a stalled event loop; stale 'running' verification artifact blocks row 3",
+    "status": "running",
+    "uid": "878b80aa-7f42-4edf-bb29-78d420ce85c6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T09:25:15Z",
+    "updated": "2026-10-04T09:42:04.288Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4543",
+        "label": "PAN-4543",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "verification",
+      "deploy-row",
+      "event-loop"
+    ],
+    "narratives": {
+      "Problem": "pan close refused 8 landed, deployed issues on 2026-10-04 for two non-DoD reasons. Row 8 (deploy) probes /api/health once with a 3 s timeout, and the dashboard event loop stalled 4-5 s right after each successful close-out. Row 3 (verification) treats a stale 'running' verification-latest.json as a miss: a duplicate verification run finished its gates, hit the post-gate merged-skip in verification-runner.ts (line 592), and returned before the terminal artifact write, leaving 'running' on disk forever.",
+      "Proposal": "Retry the deploy health probe 3 times (5 s timeout, 2 s pause) via a new dod-deploy-probe.ts module; let row 3 settle a missing OR non-terminal artifact when landed work and main CI are green, saying so in the observed text; add a 'skipped' artifact outcome and make the merged-skip path rewrite a still-running latest artifact to 'skipped' (latest-only, never over a real verdict); render 'skipped' in the Lint node and gates panel; profile the post-close-out event-loop stall without restarting the dashboard and fix it or file a follow-up; document rows 3 and 8 in MERGE-WORKFLOW.md and fix the pan-close skill's row numbers. Full detail: .pan/drafts PRD for PAN-4543.",
+      "NonGoals": "- No change to the verification runner's infrastructure-error path (a non-merged error still leaves its last progress write)\n- No per-run file for 'skipped' artifacts\n- No change to row 3 handling of 'failed' artifacts\n- No raise of any scripts/file-size-allowlist.txt row; verification-runner.ts stays at 961 lines and dod-gate.ts at or under 1000\n- No dashboard restart, pan reload, pan up, or real pan close run by the work agent\n- No change to which events trigger membership refreshes unless WI-7's profile proves a sync blocker there\n- The post-deploy check (pan close PAN-4498 / PAN-4508 with no override) is operator/flywheel verification, not a work item\n- No change to why deacon-lite re-requested verification at 05:06 (the duplicate run); this issue only makes such a run end in a terminal artifact\n- No cleanup sweep of existing stale 'running' files in other workspaces; row 3's new rule settles them at close-out"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retry the deploy probe on any readJson rejection, not only timeouts",
+        "rationale": "Connection refused during a deploy restart and 5xx are as transient as a timeout; only three consecutive failures are a real signal. Worst case adds 19 s to a human-gated ceremony."
+      },
+      {
+        "summary": "Put the retry loop in a new src/lib/lifecycle/dod-deploy-probe.ts using setTimeout",
+        "rationale": "dod-gate.ts is 988 lines against the 1000-line ceiling; setTimeout keeps the AC's fake-timer test straightforward; retryTransientForgeOp only retries forge errors."
+      },
+      {
+        "summary": "Skipped artifact writes are latest-only and only replace a 'running' latest file",
+        "rationale": "Early merged-skip sites run before this run writes anything, so the latest file may hold a real earlier 'passed' that row 3 relies on; verification-cycles counts only failed per-run files."
+      },
+      {
+        "summary": "Finalize call lives in skipMergedVerification behind an optional workspacePath",
+        "rationale": "verification-runner.ts is at its 961-line allowlist cap, so call sites change in place with zero net lines."
+      },
+      {
+        "summary": "Profile the stall by opening the inspector on the running dashboard (kill -USR1) and re-sending the close-out refresh for an already-closed issue",
+        "rationale": "A restart with --cpu-prof is a deploy that non-flywheel agents must not do, and running pan close on a real issue is irreversible; re-sending an already-recorded event creates no new state."
+      },
+      {
+        "summary": "Keep 'pan close PAN-4498/PAN-4508 completes without overrides' as post-deploy verification, not an item AC",
+        "rationale": "It needs the merged build deployed and it closes real tracker issues with no dry run, so the work agent cannot satisfy it."
+      },
+      {
+        "summary": "Fix the pan-close skill's row numbering (deploy is row 8, add ship row 7) in the docs item",
+        "rationale": "It is the same documentation surface the change touches and the drift would mislead operators reading the new retry text."
+      }
+    ],
+    "items": [
+      {
+        "id": "artifact-skipped-outcome",
+        "title": "Add the 'skipped' verification outcome and markRunningVerificationArtifactSkipped",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-artifact.ts",
+            "tests/unit/lib/cloister/verification-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-artifact.test.ts reports all cases passing including the three markRunningVerificationArtifactSkipped cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "merged-skip-finalize",
+            "lint-node-skipped",
+            "gates-panel-skipped"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts (PAN-4543). In src/lib/cloister/verification-artifact.ts widen VerificationArtifact.outcome to 'running' | 'passed' | 'failed' | 'skipped', add optional skipReason, and add exported markRunningVerificationArtifactSkipped(workspacePath, reason, now = new Date()) which rewrites verification-latest.json to outcome 'skipped' (skipReason set, ranAt = now, currentGate/currentGateOutput removed, gates kept) ONLY when the current latest file exists with outcome 'running'; otherwise it writes nothing and returns null. Latest file only, never a per-run file. Add three real-temp-dir tests to tests/unit/lib/cloister/verification-artifact.test.ts."
+        },
+        "items": [
+          {
+            "id": "artifact-skipped-outcome.ac1",
+            "title": "Given a latest artifact with outcome 'running', markRunningVerificationArtifactSkipped returns an artifact with outcome 'skipped' and persists outcome 'skipped', the skipReason, and the original gates to verification-latest.json without currentGate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "artifact-skipped-outcome.ac2",
+            "title": "Given a latest artifact with outcome 'passed', the function returns null and preserves the file content byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "artifact-skipped-outcome.ac3",
+            "title": "Given no verification-latest.json, the function returns null and creates no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "artifact-skipped-outcome.ac4",
+            "title": "Given the skip write, no new file appears under .overdeck/verification/ (latest-only write)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-skip-finalize",
+        "title": "Merged-skip path rewrites a running latest artifact to skipped",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-escalation.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-escalation-merged-skip.test.ts",
+            "tests/unit/lib/cloister/verification-runner-merged.test.ts",
+            "tests/unit/lib/cloister/verification-runner-gate-output.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-escalation-merged-skip.test.ts tests/unit/lib/cloister/verification-runner-merged.test.ts tests/unit/lib/cloister/verification-runner-gate-output.test.ts tests/unit/lib/cloister/verification-tests-on-ci.test.ts tests/unit/lib/cloister/verification-runner-plan-integrity.test.ts",
+            "wc -l src/lib/cloister/verification-runner.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the five named vitest files report every case passing",
+            "wc prints 961 for verification-runner.ts",
+            "file-size guard prints its pass line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ],
+          "acJustification": "Six criteria: the helper contract (3), the post-gate call, the early-skip non-call that the plan critique required, and the line-budget check."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Give skipMergedVerification in src/lib/cloister/verification-escalation.ts an optional third parameter workspacePath; when the PR merged and workspacePath is set, call markRunningVerificationArtifactSkipped(workspacePath, MERGED_VERIFICATION_REASON) inside try/catch (log a warning on error, never change the return value). In src/lib/cloister/verification-runner.ts change ONLY the post-gate call at line 592 (const postGateMergedOutcome = await skipMergedVerification(issueId, logPrefix);) to pass workspacePath, in place with zero net lines (the file is at its 961-line allowlist cap). Leave the other 7 call sites with two arguments: before this run's own progress write the 'running' latest may belong to another run (PRD D4, critique response). Add markRunningVerificationArtifactSkipped to the verification-artifact.js mock factories in verification-runner-merged.test.ts and verification-runner-gate-output.test.ts. Create tests/unit/lib/cloister/verification-escalation-merged-skip.test.ts with real temp dirs and a mocked pr-facts getPrFacts. The new escalation test imports the real verification-escalation.ts; copy the mock block for agents.js, feedback-target.js, activity-logger.js and pr-facts.js from tests/unit/lib/cloister/verification-stuck-no-unpause.test.ts."
+        },
+        "items": [
+          {
+            "id": "merged-skip-finalize.ac1",
+            "title": "Given a merged PR and a workspace whose latest artifact is 'running', skipMergedVerification(issueId, prefix, workspacePath) returns { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON } and the latest file on disk contains outcome 'skipped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-skip-finalize.ac2",
+            "title": "Given an unmerged PR, skipMergedVerification returns null and preserves the 'running' latest file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-skip-finalize.ac3",
+            "title": "Given a merged PR and no workspacePath argument, skipMergedVerification preserves the 'running' latest file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-skip-finalize.ac4",
+            "title": "When the PR merges after the gates ran (runner post-gate merged-skip), the runner test records a markRunningVerificationArtifactSkipped call with (workspacePath, MERGED_VERIFICATION_REASON)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-skip-finalize.ac6",
+            "title": "Given a merged PR detected at the first (pre-gate) merged check, the runner returns skipped without calling markRunningVerificationArtifactSkipped, so a prior run's 'running' latest artifact is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-skip-finalize.ac5",
+            "title": "wc -l src/lib/cloister/verification-runner.ts prints 961 and scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-node-skipped",
+        "title": "Issue-tree Lint node renders a skipped verification artifact",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck-lint-node.ts",
+            "tests/unit/dashboard/command-deck-lint-node.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/command-deck-lint-node.test.ts"
+          ],
+          "expected_outputs": [
+            "command-deck-lint-node.test.ts reports every case passing, including the skipped-artifact case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In buildLintSessionNode (src/dashboard/server/routes/command-deck-lint-node.ts) map outcome 'skipped' to status 'skipped' (today anything not passed maps to 'failed'); presence stays 'ended' and endedAt is set because it is not running. After the 'Last run:' transcript line push 'Skipped: <skipReason>' when the outcome is skipped and skipReason exists. Add a skipped-artifact case to tests/unit/dashboard/command-deck-lint-node.test.ts."
+        },
+        "items": [
+          {
+            "id": "lint-node-skipped.ac1",
+            "title": "Given a skipped artifact, buildLintSessionNode returns status 'skipped', presence 'ended', and endedAt equal to ranAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-skipped.ac2",
+            "title": "Given a skipped artifact with a skipReason, the transcript contains 'QUALITY GATES SKIPPED' and the line 'Skipped: <reason>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-skipped.ac3",
+            "title": "Given a failed artifact, buildLintSessionNode still returns status 'failed' (existing case preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gates-panel-skipped",
+        "title": "Verification gates panel shows skipped in the muted color",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/VerificationGatesPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In VerificationGatesPanel.tsx widen the local artifact type's outcome union to include 'skipped' and change headingColor so a skipped outcome uses 'var(--muted-foreground)' instead of 'var(--destructive)'. The heading text 'Quality gates skipped' comes from the existing template; no other rendering change."
+        },
+        "items": [
+          {
+            "id": "gates-panel-skipped.ac1",
+            "title": "Given an artifact with outcome 'skipped', the panel renders the heading 'Quality gates skipped' in var(--muted-foreground)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-panel-skipped.ac2",
+            "title": "Given an artifact with outcome 'failed', the panel still renders the heading in var(--destructive)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-row-stale-artifact",
+        "title": "DoD row 3 settles a non-terminal artifact on landed work with green main CI",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "wc -l src/lib/lifecycle/dod-gate.ts"
+          ],
+          "expected_outputs": [
+            "dod-gate.test.ts reports every case passing including the four new row-3 cases",
+            "wc prints 1000 or fewer lines for dod-gate.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In checkVerificationRow (src/lib/lifecycle/dod-gate.ts) treat a present artifact whose outcome is neither 'passed' nor 'failed' as non-terminal and settle it like a missing one when settlement.landedWork is true and settlement.mainVerifyStatus === 'pass'; the observed text appends '; stale non-terminal artifact — verification satisfied by green main CI after landing'. Keep the strike check before it and keep the missing-artifact observed text unchanged. Update the doc comment above the function. dod-gate.ts must stay at or under 1000 lines. Add four cases to tests/unit/lib/lifecycle/dod-gate.test.ts."
+        },
+        "items": [
+          {
+            "id": "verification-row-stale-artifact.ac1",
+            "title": "Given a 'running' artifact at 2026-10-04T05:44:24Z with landedWork true and mainVerifyStatus 'pass', checkVerificationRow returns status 'pass' with observed 'verification artifact: running at 2026-10-04T05:44:24Z; stale non-terminal artifact — verification satisfied by green main CI after landing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-row-stale-artifact.ac2",
+            "title": "Given a 'running' artifact with mainVerifyStatus 'miss' and trackerClosed false, checkVerificationRow returns status 'miss'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-row-stale-artifact.ac3",
+            "title": "Given a 'running' artifact with landedWork false and mainVerifyStatus 'pass', checkVerificationRow returns status 'miss'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-row-stale-artifact.ac4",
+            "title": "Given a 'skipped' artifact with landed work and green main, checkVerificationRow returns status 'pass' with the stale non-terminal note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-row-stale-artifact.ac5",
+            "title": "Given no artifact with landed work and green main, the observed text stays 'no verification artifact in the workspace; verification satisfied by green main CI after landing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-probe-retry",
+        "title": "DoD row 8 retries the /api/health probe three times",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-deploy-probe.ts",
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-deploy-probe.test.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-deploy-probe.test.ts tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "wc -l src/lib/lifecycle/dod-gate.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both vitest files report every case passing",
+            "wc prints 1000 or fewer lines for dod-gate.ts",
+            "file-size guard prints its pass line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Create src/lib/lifecycle/dod-deploy-probe.ts exporting DEPLOY_PROBE_ATTEMPTS = 3, DEPLOY_PROBE_TIMEOUT_MS = 5000, DEPLOY_PROBE_PAUSE_MS = 2000 and readHealthWithRetry(readJson, url), which retries any rejection with a setTimeout pause between attempts and finally throws 'after 3 attempts: <last message>'. In dod-gate.ts import it, use DEPLOY_PROBE_TIMEOUT_MS in the default readJson AbortSignal.timeout, and call readHealthWithRetry(deps.readJson, url) in checkDeployRow. Net growth of dod-gate.ts must keep it at or under 1000 lines. Tests use vi.useFakeTimers + advanceTimersByTimeAsync (repo rule), including converting the existing unreachable-dashboard case. Also correct the stale 'Row 7 must agree' comment inside checkDeployRow to 'Row 8' (same line count)."
+        },
+        "items": [
+          {
+            "id": "deploy-probe-retry.ac1",
+            "title": "Given readJson rejects twice with a timeout error and then returns the health body, checkDeployRow returns status 'pass' after fake timers advance 4000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-probe-retry.ac2",
+            "title": "Given readJson rejects on every call, readHealthWithRetry calls it exactly 3 times and rejects with a message containing 'after 3 attempts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-probe-retry.ac3",
+            "title": "Given an unreachable dashboard, checkDeployRow returns status 'miss' with observed text containing 'dashboard not reachable' and 'after 3 attempts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-probe-retry.ac4",
+            "title": "The default readJson applies AbortSignal.timeout(DEPLOY_PROBE_TIMEOUT_MS) with DEPLOY_PROBE_TIMEOUT_MS = 5000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-stall-profile",
+        "title": "Profile the dashboard event-loop stall after close-out and fix or file it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "spike",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/pipeline-membership.ts",
+            "src/lib/pipeline-membership-gather.ts",
+            ".pan/drafts/PAN-4543.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'Stall profile findings (PAN-4543 WI-7)' .pan/drafts/*4543*.md",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep prints the findings heading line",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches no file any other item touches; it only reads the live dashboard (inspector + health sampler) and writes the findings section of the PRD draft."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 exactly. Run a 100 ms /api/health latency sampler, open the inspector on the RUNNING dashboard with kill -USR1 <pid> (never restart, reload, or pan up), and record a CDP CPU profile while triggering POST /api/pipeline/membership/refresh?project=overdeck (the operator Retry-membership route; never append an event via appendOnce or any event route), and passively during a natural operator/flywheel close-out. Identify the heaviest blocking frames. If the blocker is a sync child process or sync fs scan on a server-reachable path, convert it to async primitives with a unit test; otherwise file a follow-up with gh issue create. Record method, sampler numbers, file:line, and the fix commit or follow-up link in a '## Stall profile findings (PAN-4543 WI-7)' section of the existing PRD file (.pan/drafts/PAN-4543.md, or pan-4543.md if promotion renamed it; never create a second PRD file). Never run pan close on a real issue."
+        },
+        "items": [
+          {
+            "id": "close-out-stall-profile.ac1",
+            "title": "The PRD draft on the branch contains a '## Stall profile findings (PAN-4543 WI-7)' section that records the sampler's max /api/health latency and the profiling method used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-stall-profile.ac2",
+            "title": "The findings section names the blocking call with file:line and the commit that converts it to async, or contains a link to a follow-up GitHub issue created for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-stall-profile.ac3",
+            "title": "When the fix path is taken, a unit test covers the converted async path and no execSync/spawnSync/execFileSync call remains in the changed server-reachable function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-stall-profile.ac4",
+            "title": "Given the fallback (no inspector or no reproduced stall), the section records the attempts and still links a follow-up issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-stall-profile.ac5",
+            "title": "The profiling run appends no event to the dashboard event store: the findings section records that only the membership refresh route and passive observation were used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-close-out-rows",
+        "title": "Document the row 3 stale-artifact rule and row 8 retry; fix pan-close row numbers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T09:25:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4543",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-close/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'after 3 attempts' docs/MERGE-WORKFLOW.md",
+            "grep -n 'non-terminal' docs/MERGE-WORKFLOW.md",
+            "grep -n 'Row 8' sync-sources/skills/pan-close/SKILL.md",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "lint-skills completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. In docs/MERGE-WORKFLOW.md, after the close-out paragraph beginning \"Close-out's DoD row 5 (post-merge) asks the liveness oracle\", add one paragraph for row 3 (missing or non-terminal running/skipped verification-latest.json passes on landed work with green main, observed says 'stale non-terminal artifact'; a run cut short by a merge now writes skipped latest-only) and one for row 8 (probes /api/health up to 3 times, 5 s timeout each, 2 s apart, misses only when all fail, 'after 3 attempts'). In sync-sources/skills/pan-close/SKILL.md add '--accept-ship Row 7: version strings propagated', renumber deploy to Row 8 in the flag list and both example comments, and add one sentence on the three-attempt health probe."
+        },
+        "items": [
+          {
+            "id": "docs-close-out-rows.ac1",
+            "title": "The close-out section of docs/MERGE-WORKFLOW.md contains a paragraph stating that a running or skipped verification-latest.json passes row 3 when row 4 proves landed work and row 6 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-rows.ac2",
+            "title": "The close-out section of docs/MERGE-WORKFLOW.md contains a paragraph stating that row 8 probes /api/health up to 3 times with a 5 s timeout and a 2 s pause and reports 'after 3 attempts' only when all fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-rows.ac3",
+            "title": "sync-sources/skills/pan-close/SKILL.md contains --accept-ship as Row 7 and --accept-deploy as Row 8, and its example comments contain 'Row 8 deploy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "artifact-skipped-outcome",
+        "to": "merged-skip-finalize",
+        "type": "blocks"
+      },
+      {
+        "from": "artifact-skipped-outcome",
+        "to": "lint-node-skipped",
+        "type": "blocks"
+      },
+      {
+        "from": "artifact-skipped-outcome",
+        "to": "gates-panel-skipped",
+        "type": "blocks"
+      },
+      {
+        "from": "verification-row-stale-artifact",
+        "to": "deploy-probe-retry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4543-pan-close-refuses-landed-deployed-issues-deploy-probe-times-out-on-a-stalled-event-loop-stale-running-verification-artifact-blocks-row-3.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

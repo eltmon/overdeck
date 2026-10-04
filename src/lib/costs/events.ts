@@ -16,6 +16,7 @@ import {
   statSync,
   writeFileSync,
 } from 'fs';
+import { open } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { EffortLevel } from '@overdeck/contracts';
@@ -319,6 +320,54 @@ export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
   if (options.offset) paged = paged.slice(options.offset);
   if (options.limit) paged = paged.slice(0, options.limit);
   return paged;
+}
+
+/**
+ * PAN-4543: every event at or after `startDate`, for request paths. Same bounded,
+ * chunked scan as scanEventLinesSync, but each chunk read awaits, so the event
+ * loop keeps serving between chunks. Three synchronous scans of a ~400 MB log
+ * per /api/costs/summary request blocked the dashboard (and /api/health) ~4.8 s.
+ */
+export async function readEventsSince(startDate: string): Promise<CostEvent[]> {
+  const events: CostEvent[] = [];
+  const visit = (line: string): void => {
+    if (!line.trim()) return;
+    try {
+      const event = JSON.parse(line) as CostEvent;
+      if (!(event.ts < startDate)) events.push(event);
+    } catch {
+      console.warn('Skipping malformed event line:', line.slice(0, 100));
+    }
+  };
+  let handle;
+  try {
+    handle = await open(getEventsFile(), 'r');
+  } catch {
+    return events;
+  }
+  try {
+    const readBuffer = Buffer.allocUnsafe(EVENT_READ_CHUNK_BYTES);
+    let carry = Buffer.alloc(0);
+    let position = 0;
+    for (;;) {
+      const { bytesRead } = await handle.read(readBuffer, 0, readBuffer.length, position);
+      if (bytesRead === 0) break;
+      position += bytesRead;
+      const chunk = readBuffer.subarray(0, bytesRead);
+      const data = carry.length > 0 ? Buffer.concat([carry, chunk]) : chunk;
+      let lineStart = 0;
+      for (let newline = data.indexOf(0x0a); newline !== -1; newline = data.indexOf(0x0a, lineStart)) {
+        visit(data.subarray(lineStart, newline).toString('utf8'));
+        lineStart = newline + 1;
+      }
+      // Copy: readBuffer is reused by the next read.
+      carry = Buffer.from(data.subarray(lineStart));
+    }
+    if (carry.length > 0) visit(carry.toString('utf8'));
+  } finally {
+    await handle.close();
+  }
+  return events;
 }
 
 /**

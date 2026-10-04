@@ -107,6 +107,49 @@ describe('Definition-of-Done status rows', () => {
     });
   });
 
+  // PAN-4543: a duplicate run that found the PR merged after its gates left
+  // 'running' on disk. Landed work with green main CI settles that stale file.
+  it('accepts a stale running verification artifact when merged work is green on main', async () => {
+    const row = await checkVerificationRow(
+      issueId,
+      deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' })),
+      { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
+    );
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: 'verification artifact: running at 2026-10-04T05:44:24Z; stale non-terminal artifact — verification satisfied by green main CI after landing',
+    });
+  });
+
+  it('keeps a running verification artifact blocking until main CI is green', async () => {
+    const running = deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' }));
+
+    expect(await checkVerificationRow(issueId, running, {
+      trackerClosed: false, landedWork: true, mainVerifyStatus: 'miss',
+    })).toMatchObject({ status: 'miss' });
+  });
+
+  it('keeps a running verification artifact blocking when the work has not landed', async () => {
+    const running = deps(pr(), artifact({ outcome: 'running', ranAt: '2026-10-04T05:44:24Z' }));
+
+    expect(await checkVerificationRow(issueId, running, {
+      trackerClosed: false, landedWork: false, mainVerifyStatus: 'pass',
+    })).toMatchObject({ status: 'miss' });
+  });
+
+  it('accepts a skipped verification artifact when merged work is green on main', async () => {
+    const row = await checkVerificationRow(
+      issueId,
+      deps(pr(), artifact({ outcome: 'skipped', ranAt: '2026-10-04T06:00:00Z' })),
+      { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
+    );
+
+    expect(row.status).toBe('pass');
+    expect(row.observed).toContain('verification artifact: skipped at 2026-10-04T06:00:00Z');
+    expect(row.observed).toContain('stale non-terminal artifact');
+  });
+
   it('returns misses instead of throwing when there is no PR or a door fails', async () => {
     const empty = deps(null);
     const failing: DodStatusRowDeps = {
@@ -1024,16 +1067,44 @@ describe('Definition-of-Done deploy row', () => {
   });
 
   it('skips another project and misses an unreachable dashboard', async () => {
-    const otherProject = await checkDeployRow(ctx, merge, {
-      ...baseDeps,
-      readJson: async () => ({ repoRoot: '/repo/other', buildCommit: 'fedcba654321' }),
-    });
-    const unreachable = await checkDeployRow(ctx, merge, {
-      ...baseDeps,
-      readJson: async () => { throw new Error('connection refused'); },
-    });
-    expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
-    expect(unreachable).toMatchObject({ status: 'miss', observed: expect.stringContaining('dashboard not reachable') });
+    vi.useFakeTimers();
+    try {
+      const otherProject = await checkDeployRow(ctx, merge, {
+        ...baseDeps,
+        readJson: async () => ({ repoRoot: '/repo/other', buildCommit: 'fedcba654321' }),
+      });
+      const readJson = vi.fn(async () => { throw new Error('connection refused'); });
+      const pending = checkDeployRow(ctx, merge, { ...baseDeps, readJson });
+      await vi.advanceTimersByTimeAsync(4000);
+      const unreachable = await pending;
+      expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
+      expect(unreachable).toMatchObject({ status: 'miss' });
+      expect(unreachable.observed).toContain('dashboard not reachable');
+      expect(unreachable.observed).toContain('after 3 attempts');
+      expect(readJson).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // PAN-4543: the dashboard event loop stalls 4-5 s after a close-out; a probe
+  // that answers on a later attempt proves the deploy.
+  it('passes when the health probe answers on its third attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const readJson = async (url: string) => {
+        calls += 1;
+        if (calls < 3) throw new Error('The operation was aborted due to timeout');
+        return baseDeps.readJson(url);
+      };
+      const pending = checkDeployRow(ctx, merge, { ...baseDeps, readJson });
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(await pending).toMatchObject({ status: 'pass' });
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -16,6 +16,7 @@ import {
 } from '../overdeck/issue-projects.js';
 import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
+import { DEPLOY_PROBE_TIMEOUT_MS, readHealthWithRetry } from './dod-deploy-probe.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { readVerificationArtifact, type VerificationArtifact } from '../cloister/verification-artifact.js';
 import {
@@ -275,7 +276,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
 const defaultDeployRowDeps: DeployRowDeps = {
   dashboardUrl: getDashboardApiUrl,
   readJson: async url => {
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(DEPLOY_PROBE_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return response.json() as Promise<Record<string, unknown>>;
   },
@@ -436,8 +437,9 @@ export function checkTestsRow(
 
 /**
  * Row 3 reads the verification artifact the runner writes into the workspace
- * (FR-8). A missing artifact is a real miss: nothing ran, or the workspace is
- * already gone — in which case a landed, green main settles the row below.
+ * (FR-8). A missing or non-terminal ('running', 'skipped') artifact is no verdict:
+ * nothing ran, a run was cut short by the merge (PAN-4543), or the workspace is
+ * gone — so only a landed, green main settles the row below.
  */
 export async function checkVerificationRow(
   issueId: string,
@@ -460,8 +462,11 @@ export async function checkVerificationRow(
   // An out-of-band merge never enters merge-ops, so the CI-green skip cannot
   // record its normal verification verdict. Once rows 4 and 6 prove the landed
   // work and main CI green, that evidence satisfies row 3 without an override.
-  if (!artifact && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
-    return result('verification', 'pass', `${observed}; verification satisfied by green main CI after landing`);
+  // 'passed' returned above, so any present artifact that is not 'failed' is non-terminal.
+  const nonTerminal = Boolean(artifact) && outcome !== 'failed';
+  if ((!artifact || nonTerminal) && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
+    const stale = nonTerminal ? '; stale non-terminal artifact —' : ';';
+    return result('verification', 'pass', `${observed}${stale} verification satisfied by green main CI after landing`);
   }
   const negative = outcome === 'failed' ? 'failed' : undefined;
   return terminalVerdictSettlement('verification', negative, observed, settlement) ??
@@ -828,7 +833,7 @@ export async function checkDeployRow(
     // PAN-3188: row 6 (main-verify) skips whenever no merge commit is
     // resolvable — the no-durable-anchor landing class (e.g. GitLab-backed
     // landings whose row 4 evidence is the merge specialist's confirmation).
-    // Row 7 must agree: same missing anchor, same skip. Only when main-verify
+    // Row 8 must agree: same missing anchor, same skip. Only when main-verify
     // did NOT skip is the absent commit an integrity problem worth a miss.
     if (merge.mainVerifyRowStatus === 'skip') {
       return result(
@@ -843,7 +848,7 @@ export async function checkDeployRow(
   const baseUrl = deps.dashboardUrl().replace(/\/$/, '');
   let health: Record<string, unknown>;
   try {
-    health = await deps.readJson(`${baseUrl}/api/health`);
+    health = await readHealthWithRetry(deps.readJson, `${baseUrl}/api/health`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return result('deploy', 'miss', `dashboard not reachable at ${baseUrl} — a merged fix is not live if no server is serving it: ${message}`);

@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-4543",
+  "created": "2026-10-04T09:42:10.401Z",
+  "updated": "2026-10-04T10:12:41.973Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "artifact-skipped-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:42:10.401Z",
+      "doneAt": "2026-10-04T09:43:07.452Z"
+    },
+    "merged-skip-finalize": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:43:12.160Z",
+      "doneAt": "2026-10-04T09:44:31.846Z"
+    },
+    "lint-node-skipped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:44:32.871Z",
+      "doneAt": "2026-10-04T09:45:05.389Z"
+    },
+    "gates-panel-skipped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:45:06.397Z",
+      "doneAt": "2026-10-04T09:45:59.493Z"
+    },
+    "verification-row-stale-artifact": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:46:04.959Z",
+      "doneAt": "2026-10-04T09:46:53.797Z"
+    },
+    "deploy-probe-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:46:57.627Z",
+      "doneAt": "2026-10-04T09:47:55.218Z"
+    },
+    "docs-close-out-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:47:59.605Z",
+      "doneAt": "2026-10-04T09:48:33.850Z"
+    },
+    "close-out-stall-profile": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4543",
+      "claimedAt": "2026-10-04T09:50:40.191Z",
+      "doneAt": "2026-10-04T09:55:49.926Z"
+    },
+    "artifact-skipped-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:06:55.261Z"
+    },
+    "artifact-skipped-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:07:06.341Z"
+    },
+    "artifact-skipped-outcome.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:07:18.653Z"
+    },
+    "artifact-skipped-outcome.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:07:29.578Z"
+    },
+    "merged-skip-finalize.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:07:40.351Z"
+    },
+    "merged-skip-finalize.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:07:51.329Z"
+    },
+    "merged-skip-finalize.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:02.537Z"
+    },
+    "merged-skip-finalize.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:13.337Z"
+    },
+    "merged-skip-finalize.ac6": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:24.164Z"
+    },
+    "merged-skip-finalize.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:35.306Z"
+    },
+    "lint-node-skipped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:46.167Z"
+    },
+    "lint-node-skipped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:08:56.791Z"
+    },
+    "lint-node-skipped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:08.158Z"
+    },
+    "gates-panel-skipped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:19.306Z"
+    },
+    "gates-panel-skipped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:30.542Z"
+    },
+    "verification-row-stale-artifact.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:41.821Z"
+    },
+    "verification-row-stale-artifact.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:09:53.189Z"
+    },
+    "verification-row-stale-artifact.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:04.125Z"
+    },
+    "verification-row-stale-artifact.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:17.224Z"
+    },
+    "verification-row-stale-artifact.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:28.869Z"
+    },
+    "deploy-probe-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:39.814Z"
+    },
+    "deploy-probe-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:10:51.180Z"
+    },
+    "deploy-probe-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:01.871Z"
+    },
+    "deploy-probe-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:12.751Z"
+    },
+    "close-out-stall-profile.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:24.188Z"
+    },
+    "close-out-stall-profile.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:35.034Z"
+    },
+    "close-out-stall-profile.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:46.064Z"
+    },
+    "close-out-stall-profile.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:11:57.580Z"
+    },
+    "close-out-stall-profile.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:08.435Z"
+    },
+    "docs-close-out-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:19.440Z"
+    },
+    "docs-close-out-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:30.742Z"
+    },
+    "docs-close-out-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:41.973Z"
+    }
+  }
+}

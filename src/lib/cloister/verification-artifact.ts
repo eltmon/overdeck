@@ -27,7 +27,9 @@ export interface VerificationGateRecord {
 export interface VerificationArtifact {
   issueId: string;
   ranAt: string;
-  outcome: 'running' | 'passed' | 'failed';
+  outcome: 'running' | 'passed' | 'failed' | 'skipped';
+  /** Why a run ended without a verdict — only present when outcome is 'skipped'. */
+  skipReason?: string;
   /** Gate currently executing — only present while outcome is 'running'. */
   currentGate?: string;
   /** Rolling tail of the running gate's stdout/stderr (ANSI-stripped). */
@@ -164,4 +166,24 @@ export function readVerificationArtifact(workspacePath: string): VerificationArt
   } catch {
     return null;
   }
+}
+
+/**
+ * PAN-4543: a run that ends without a verdict (the PR merged mid-run) must not
+ * leave its last progress write ('running') as the latest artifact. Rewrites
+ * the latest file to 'skipped' only when it is still 'running', so a real
+ * earlier verdict is never erased. Latest-only: no per-run file.
+ */
+export function markRunningVerificationArtifactSkipped(
+  workspacePath: string,
+  reason: string,
+  now: Date = new Date(),
+): VerificationArtifact | null {
+  const current = readVerificationArtifact(workspacePath);
+  if (!current || current.outcome !== 'running') return null;
+  const skipped: VerificationArtifact = { ...current, outcome: 'skipped', skipReason: reason, ranAt: now.toISOString() };
+  delete skipped.currentGate;
+  delete skipped.currentGateOutput;
+  writeFileSync(verificationArtifactPath(workspacePath), JSON.stringify(skipped, null, 2));
+  return skipped;
 }

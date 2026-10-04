@@ -589,7 +589,7 @@ export async function runVerificationForIssueInProcess(
       }]
       : localGateResults;
 
-    const postGateMergedOutcome = await skipMergedVerification(issueId, logPrefix);
+    const postGateMergedOutcome = await skipMergedVerification(issueId, logPrefix, workspacePath);
     if (postGateMergedOutcome) return postGateMergedOutcome;
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);

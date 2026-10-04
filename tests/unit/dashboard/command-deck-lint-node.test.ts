@@ -95,6 +95,32 @@ describe('buildLintSessionNode', () => {
     expect(node?.transcript).toContain('▶ test running…');
   });
 
+  // PAN-4543: a run cut short by the merge ends without a verdict — not a failure.
+  it('returns a skipped ended node with the skip reason from a skipped artifact', () => {
+    writeArtifact({
+      issueId: 'PAN-2665',
+      ranAt: RAN_AT,
+      outcome: 'skipped',
+      skipReason: 'The pull request already merged; pre-merge verification no longer applies.',
+      gates: [{
+        name: 'lint',
+        passed: true,
+        required: true,
+        durationMs: 1_000,
+      }],
+    });
+
+    const node = build();
+
+    expect(node).toMatchObject({
+      status: 'skipped',
+      presence: 'ended',
+      endedAt: RAN_AT,
+    });
+    expect(node?.transcript).toContain('QUALITY GATES SKIPPED');
+    expect(node?.transcript).toContain('Skipped: The pull request already merged; pre-merge verification no longer applies.');
+  });
+
   it('omits the transcript when transcripts are not requested', () => {
     writeArtifact({
       issueId: 'PAN-2665',
