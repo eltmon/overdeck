@@ -221,6 +221,8 @@ const getIssuesRoute = HttpRouter.add(
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
 
     const issueDataService = getIssueDataService();
+    // PAN-4507: someone is reading the issue list — bring a backed-off GitHub poll forward.
+    issueDataService.resetPollCadence('github');
     const issues = issueDataService.getIssues({ cycle, includeCompleted });
     const projects = new Map<string, NonNullable<ReturnType<typeof getProjectSync>>>();
     const projectPathByIssue = new Map<string, string>();
