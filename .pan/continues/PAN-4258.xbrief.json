@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T02:56:59.815Z",
+  "updated": "2026-10-04T02:57:04.938Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4258",
       "claimedAt": "2026-10-04T02:54:00.701Z",
       "doneAt": "2026-10-04T02:56:59.815Z"
+    },
+    "lint-effort-baseline-lower": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4258",
+      "claimedAt": "2026-10-04T02:57:04.938Z"
     }
   }
 }
