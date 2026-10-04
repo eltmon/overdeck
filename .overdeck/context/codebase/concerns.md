@@ -382,4 +382,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
+- **Cost and session-index writers copy fields by explicit list** — a new
+  field on a cost event or a `sessions.json` line is silently dropped unless it
+  is added to every copy: `normalizeSessionEntry` (`session-history.ts`),
+  `toCostArchiveEvent` (`overdeck/infra.ts`), the `CostWriter.record` insert and
+  `recent()` mapper (`overdeck/cost.ts`), `insertCostEvent`'s column list
+  (`overdeck/cost-sync.ts`), and both `toOverdeckCostEvent` copies
+  (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
+  way. A new `cost_events` column also needs the init SQL plus a
+  `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
 <!-- last-verified: 2026-10-03 -->
