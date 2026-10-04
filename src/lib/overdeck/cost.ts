@@ -17,6 +17,7 @@ import {
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
 import { getOverdeckHome } from '../paths.js';
+import { readLaunchEfforts } from '../session-history.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 import { recordSkipVerdict } from '../costs/skip-cache.js';
 import { collectCodexCostEvents } from '../costs/codex-collector.js';
@@ -756,6 +757,7 @@ export const CostWriterLive = Layer.effect(
 
         for (const root of roots) {
           const sessionFiles = yield* Effect.sync(() => walkJsonl(root.root));
+          const effortFor = root.agentName === 'pi-global' ? () => undefined : readLaunchEfforts(root.agentName);
 
           for (const sessionFile of sessionFiles) {
             sessionsScanned++;
@@ -807,6 +809,7 @@ export const CostWriterLive = Layer.effect(
                   requestId:   usage.requestId,
                   sourceFile:  sessionFile,
                   warnings:    eventWarnings.length > 0 ? eventWarnings : undefined,
+                  effort:      effortFor(usage.sessionId) ?? null,
                 };
 
                 if (yield* record(event, { dryRun: opts?.dryRun })) {

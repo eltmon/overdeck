@@ -7,6 +7,8 @@ import { parsePrimeAgentCostEvents } from '../cost-parsers/prime-agent-parser.js
 import type { IssueId } from '../overdeck/issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { listPrimeAgentSessionFiles } from '../runtimes/storage/prime-agent.js';
+import { readLaunchEfforts } from '../session-history.js';
+import type { EffortLevel } from '@overdeck/contracts';
 import { join } from 'node:path';
 
 export interface PrimeAgentCollectedCostEvent {
@@ -24,6 +26,7 @@ export interface PrimeAgentCollectedCostEvent {
   cost: number;
   requestId: string;
   sourceFile: string;
+  effort: EffortLevel | null;
 }
 
 function issueIdFromAgentName(name: string): IssueId | null {
@@ -53,6 +56,7 @@ export async function collectPrimeAgentCostEvents(home = getOverdeckHome()): Pro
       skipped.push({ file, reason: 'no-usage' });
       continue;
     }
+    const effortFor = readLaunchEfforts(agentId);
     for (const event of usage) {
       events.push({
         ts: new Date(event.timestamp),
@@ -69,6 +73,7 @@ export async function collectPrimeAgentCostEvents(home = getOverdeckHome()): Pro
         cost: event.cost,
         requestId: event.requestId,
         sourceFile: file,
+        effort: effortFor(event.sessionId) ?? null,
       });
     }
   }
