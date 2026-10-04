@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:19:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4259: Show effort everywhere and record it in cost data: Agents rows, issue view, pan status/show, cost ledger, and sessions.json",
-    "updated": "2026-10-04T02:19:58.507Z"
+    "updated": "2026-10-04T02:20:38.490Z"
   },
   "plan": {
     "id": "pan-4259",
     "title": "Show effort everywhere and record it in cost data: Agents rows, issue view, pan status/show, cost ledger, and sessions.json",
-    "status": "proposed",
+    "status": "running",
     "uid": "5e4156ab-06e8-49fb-8386-9ac29c6c1965",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:19:33Z",
-    "updated": "2026-10-04T02:19:58.507Z",
+    "updated": "2026-10-04T02:20:38.490Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4259",
@@ -830,5 +830,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
