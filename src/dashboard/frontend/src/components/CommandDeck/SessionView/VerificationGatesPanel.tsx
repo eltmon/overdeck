@@ -27,7 +27,7 @@ interface VerificationResponse {
   /** PAN-3917 (FR-8): the workspace artifact is the only source — no status row. */
   artifact: {
     ranAt: string;
-    outcome: 'running' | 'passed' | 'failed';
+    outcome: 'running' | 'passed' | 'failed' | 'skipped';
     currentGate?: string;
     currentGateOutput?: string;
     failedCheck?: string;
@@ -100,7 +100,9 @@ export function VerificationGatesPanel({ issueId, fallbackTranscript }: { issueI
     ? 'var(--info)'
     : artifact.outcome === 'passed'
       ? 'var(--success)'
-      : 'var(--destructive)';
+      : artifact.outcome === 'skipped'
+        ? 'var(--muted-foreground)'
+        : 'var(--destructive)';
   const failing = artifact.gates.filter((gate) => !gate.passed && (gate.output || gate.error));
 
   return (
