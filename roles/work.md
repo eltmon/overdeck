@@ -99,6 +99,10 @@ mechanically rejects agent code pushes to main.
 
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
 
+## Waiting on background work
+
+To wait for a background task or a Monitor you started, end your turn — its notification wakes you. Do not poll, `sleep`, or call `AskUserQuestion` to idle. `AskUserQuestion` is only for real operator decisions; every call reaches the operator as a modal. Report status as plain text.
+
 ## Signal the flywheel before you stall
 
 If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park:
