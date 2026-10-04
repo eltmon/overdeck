@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T02:44:44.214Z",
+  "updated": "2026-10-04T02:57:32.688Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-04T02:44:36.263Z"
     },
     "w2-codex-home-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4260",
-      "claimedAt": "2026-10-04T02:44:44.214Z"
+      "claimedAt": "2026-10-04T02:44:44.214Z",
+      "doneAt": "2026-10-04T02:57:32.688Z"
     }
   }
 }
