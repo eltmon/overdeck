@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T02:26:27.780Z",
+  "updated": "2026-10-04T02:26:35.057Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4258",
       "claimedAt": "2026-10-04T02:22:24.118Z",
       "doneAt": "2026-10-04T02:26:27.780Z"
+    },
+    "spawn-planning-resolve-effort": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4258",
+      "claimedAt": "2026-10-04T02:26:35.057Z"
     }
   }
 }
