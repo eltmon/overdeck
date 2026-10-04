@@ -117,4 +117,15 @@ describe('planCommand', () => {
       probe: true,
     });
   });
+
+  it('sends effort: max when --effort max is provided', async () => {
+    const { planCommand } = await import('../plan.js');
+
+    await planCommand('PAN-123', { effort: 'max' });
+
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(body).toMatchObject({
+      effort: 'max',
+    });
+  });
 });
