@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:13:01.930Z",
+  "updated": "2026-10-04T05:13:50.133Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "commit-research-brief.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:13:01.930Z"
+    },
+    "report-skeleton.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:50.133Z"
     }
   }
 }
