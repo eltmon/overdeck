@@ -4,17 +4,17 @@
     "created": "2026-10-04T09:25:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4543: pan close refuses landed, deployed issues: deploy probe times out on a stalled event loop; stale 'running' verification artifact blocks row 3",
-    "updated": "2026-10-04T09:41:27.995Z"
+    "updated": "2026-10-04T09:42:04.288Z"
   },
   "plan": {
     "id": "pan-4543",
     "title": "pan close refuses landed, deployed issues: deploy probe times out on a stalled event loop; stale 'running' verification artifact blocks row 3",
-    "status": "proposed",
+    "status": "running",
     "uid": "878b80aa-7f42-4edf-bb29-78d420ce85c6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T09:25:15Z",
-    "updated": "2026-10-04T09:41:27.995Z",
+    "updated": "2026-10-04T09:42:04.288Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4543",
@@ -661,5 +661,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
