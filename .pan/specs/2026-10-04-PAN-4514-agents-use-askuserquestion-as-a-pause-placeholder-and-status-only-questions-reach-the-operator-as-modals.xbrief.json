@@ -1,0 +1,375 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:43:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4514: Agents use AskUserQuestion as a pause: placeholder and 'status only' questions reach the operator as modals",
+    "updated": "2026-10-04T02:49:51.911Z"
+  },
+  "plan": {
+    "id": "pan-4514",
+    "title": "Agents use AskUserQuestion as a pause: placeholder and 'status only' questions reach the operator as modals",
+    "status": "proposed",
+    "uid": "320a6afc-af90-47c7-8fd4-2c362be49cba",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T02:43:30Z",
+    "updated": "2026-10-04T02:49:51.911Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4514",
+        "label": "PAN-4514",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4514.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "hooks",
+      "ask-user-question",
+      "prompts",
+      "work-role"
+    ],
+    "narratives": {
+      "Problem": "The PreToolUse ask-user-question-hook (PAN-1520) answers every AskUserQuestion call with a deny whose reason carries the PAN-1520 marker; the detector in src/lib/agent-enrichment.ts treats that as a pending operator question and the dashboard shows a modal. Work agents waiting on a background task or Monitor have no legal way to idle (the kickoff prompt bans sleep and bans ending the turn), so they call AskUserQuestion with empty, filler, or 'status only' content, and each of those reaches the operator as a junk modal.",
+      "Proposal": "Add a jq classifier to the hook that runs before any side effect and rejects junk calls (no questions, filler question or header text, fewer than two options, duplicate labels, all one-character labels with no descriptions, status-only phrasing) with a decisions-only deny reason that omits both detector markers, so the detector treats the call as answered and nothing surfaces. Real questions keep today's behavior byte-for-byte. Pin the detector side with a contract test. Fix the prompt contradiction: the kickoff prompt and roles/work.md say that ending the turn while a Monitor or background task runs is the correct wait, and that AskUserQuestion is only for real operator decisions. Document the behavior in docs/CONTEXT-LAYERS.md and the hook header.",
+      "NonGoals": "- No change to src/lib/agent-enrichment.ts, the frontend AskUserQuestionDialog, or pendingAskUserQuestion plumbing.\n- No guard for the ohmypi `ask` tool or Codex question tools.\n- No change to roles/review.md or roles/test.md.\n- No removal or redesign of the PAN-1520 surface deny for real questions.\n- No new event kind or dashboard notice for rejected calls.\n- No loosening of the junk rules to keep a junk-shaped test fixture passing; replace the fixture instead."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Guard lives only in the bash hook; detector and frontend are untouched.",
+        "rationale": "The issue names the hook as the fix point, and scanPendingInputs already marks an is_error tool_result without the PAN-1520 marker or 'surfaced to the operator' phrase as answered, so a marker-free deny never becomes a modal."
+      },
+      {
+        "summary": "One-character-label rule is narrow: reject only when every label is at most one character AND no option has a description.",
+        "rationale": "The existing contract fixture and common real questions use 'A'/'B' labels with descriptions; the incident payload's 'a'/'b' had none and is also caught by the filler question and header rules."
+      },
+      {
+        "summary": "Status-only detection uses fixed phrases (e.g. 'no action needed', 'informational only', 'this is informational', 'not a decision point'), never the bare word 'informational'.",
+        "rationale": "Prototyped in jq: catches the incident text while 'Should the default log level be informational or debug?' still surfaces."
+      },
+      {
+        "summary": "The classifier fails open: a jq error or empty output takes the existing surface path.",
+        "rationale": "A false negative reproduces today's behavior; a false positive would silently suppress a real operator decision."
+      },
+      {
+        "summary": "Prompt change covers the work role only: roles/work.md and src/lib/cloister/prompts/work.md.",
+        "rationale": "The issue scopes review/test to 'if they share it'; neither roles/review.md nor roles/test.md has waiting-on-background guidance. The kickoff prompt line 286 ('do NOT end your turn') is the contradiction that pushed the agent to AskUserQuestion, so it must carry the carve-out."
+      },
+      {
+        "summary": "The existing 'emits a dashboard event' hook test fixture (question 'Q', labels 'A'/'B', no descriptions) is replaced with a real question.",
+        "rationale": "That fixture is junk under the new rules; the test's subject is event emission for real questions."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4514.md",
+      "sizeJustification": "Seven files total (one hook, its two test files, one kickoff prompt plus its test, one role file, one doc). The subsystem count is high only because tests, prompts, roles, and docs live in separate top-level trees; the change is one small fix for one incident, and splitting it into sibling issues would ship a hook guard without the prompt fix that removes its cause.",
+      "canonicalFilename": "2026-10-04-PAN-4514-agents-use-askuserquestion-as-a-pause-placeholder-and-status-only-questions-reach-the-operator-as-modals.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "hook-guard",
+        "title": "Reject non-decision AskUserQuestion calls in the hook before surfacing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:43:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4514",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "detector-contract"
+          ],
+          "files_scope": [
+            "sync-sources/hooks/ask-user-question-hook*",
+            "tests/scripts/ask-user-question-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/ask-user-question-hook.test.ts",
+            "bash -n sync-sources/hooks/ask-user-question-hook"
+          ],
+          "expected_outputs": [
+            "tests/scripts/ask-user-question-hook.test.ts passes including the new junk-rejection and real-question cases",
+            "bash -n exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In sync-sources/hooks/ask-user-question-hook, after the TOOL_NAME check and before the SCRIPT_DIR/event-emission block, add the GUARD_REASON jq classifier from the PRD (rules R1-R6 plus the empty-questions check). When it prints a non-empty reason, print the guard deny JSON (permissionDecision deny, reason 'AskUserQuestion is for decisions only (PAN-4514). Rejected: <reason>. To wait for a background task or Monitor, end your turn; its notification wakes you. To report status, write it as text.', no additionalContext) and exit 0. A jq error or empty output falls through to the unchanged surface path. Add one sentence to the header comment's REASON-contract paragraph saying the guard deny omits both detector markers on purpose. Extend tests/scripts/ask-user-question-hook.test.ts with the cases listed in PRD WI-1 and replace the 'emits a dashboard event' fixture with a real question."
+        },
+        "items": [
+          {
+            "id": "hook-guard.ac1",
+            "title": "Given each of the three incident payloads (empty questions; header 'x' with options 'a'/'b'; 'Status check only (no action needed)' text), the hook returns a deny whose reason contains 'AskUserQuestion is for decisions only' and contains neither 'PAN-1520' nor 'surfaced to the operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-guard.ac2",
+            "title": "When the hook rejects a junk call, the stub event log records no ask_user_question_blocked event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-guard.ac3",
+            "title": "Given the 'How do we stop the spam?' question, an 'A'/'B'-with-descriptions question, and a log-level question containing the word 'informational', the hook returns the surface deny with reason matching 'surfaced to the operator' and additionalContext that contains the question text and option labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-guard.ac4",
+            "title": "The test file covers named cases for single-letter options without descriptions, duplicate option labels, 'no action needed' status text, and a real question, and npx vitest run tests/scripts/ask-user-question-hook.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-guard.ac5",
+            "title": "Given malformed stdin or a non-AskUserQuestion tool_name, the hook exits 0 with the same output as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detector-contract",
+        "title": "Pin that the detector treats a guard-denied AskUserQuestion as answered",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:43:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4514",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/auq-hook-detector-contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/auq-hook-detector-contract.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/lib/auq-hook-detector-contract.test.ts passes with the new guard-deny case and both existing cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In tests/lib/auq-hook-detector-contract.test.ts, change runHook() to runHook(payload = <its current hard-coded 'Choose a strategy' payload>) so existing tests keep their input. Add a test that runs the real hook with the incident-2 payload (header 'x', question 'placeholder', options 'a'/'b'), asserts the returned reason contains neither 'PAN-1520' nor 'surfaced to the operator', writes a JSONL with writeJsonlSession using askToolUse('t2') followed by toolResult('t2', reason, true), and asserts getPendingQuestions returns an empty array."
+        },
+        "items": [
+          {
+            "id": "detector-contract.ac1",
+            "title": "Given a JSONL holding an AskUserQuestion tool_use followed by an is_error tool_result carrying the real hook's guard-deny reason, getPendingQuestions returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detector-contract.ac2",
+            "title": "The existing surface-deny case still returns exactly one pending question with toolId 't1', and npx vitest run tests/lib/auq-hook-detector-contract.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kickoff-prompt-wait",
+        "title": "Kickoff work prompt allows ending the turn to wait for background tasks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:43:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4514",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/work.md",
+            "tests/unit/lib/cloister/work-prompt-background-wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/work-prompt-background-wait.test.ts tests/unit/lib/cloister/work-prompt-git-rules.test.ts",
+            "npm run lint:prompts",
+            "npm run lint:source-introspection"
+          ],
+          "expected_outputs": [
+            "both prompt test files pass",
+            "lint:prompts and lint:source-introspection exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/lib/cloister/prompts/work.md, replace the '**CRITICAL: NEVER stop working without calling `pan done`.**' paragraph with the PRD's version that adds the exception: while a Monitor or background task you started is still running, ending your turn is the correct way to wait and its notification wakes you. In the 'NEVER do any of these' list, right after the `sleep` bullet, add the bullet forbidding AskUserQuestion to pause, wait, or report status. Add tests/unit/lib/cloister/work-prompt-background-wait.test.ts asserting both phrases exist in the raw file."
+        },
+        "items": [
+          {
+            "id": "kickoff-prompt-wait.ac1",
+            "title": "src/lib/cloister/prompts/work.md contains 'ending your turn is the correct way to wait' inside the NEVER-stop-working paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-prompt-wait.ac2",
+            "title": "The 'NEVER do any of these' list contains a bullet starting 'Call `AskUserQuestion` to pause, wait, or report status' directly after the sleep bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kickoff-prompt-wait.ac3",
+            "title": "work-prompt-background-wait.test.ts and work-prompt-git-rules.test.ts both pass, and npm run lint:prompts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-work-wait",
+        "title": "Work role file gains a 'Waiting on background work' section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:43:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4514",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run lint:prompt-trailer",
+            "npx vitest run src/lib/__tests__/role-definitions.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:prompts and lint:prompt-trailer exit 0",
+            "role-definitions.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Insert the '## Waiting on background work' section from the PRD into roles/work.md immediately before '## Signal the flywheel before you stall'. The commit message body must include a 'Prompt-Change: work role says to end the turn to wait for background tasks; AskUserQuestion is decisions-only' trailer line, because scripts/check-prompt-change-trailer.sh fails any PR touching roles/*.md without one."
+        },
+        "items": [
+          {
+            "id": "role-work-wait.ac1",
+            "title": "roles/work.md contains a '## Waiting on background work' section stating that ending the turn is how to wait for a background task or Monitor and that AskUserQuestion is only for real operator decisions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-work-wait.ac2",
+            "title": "The item commit contains a 'Prompt-Change:' trailer and npm run lint:prompt-trailer exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-context-layers",
+        "title": "Document the decisions-only rejection in CONTEXT-LAYERS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:43:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4514",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONTEXT-LAYERS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4514' docs/CONTEXT-LAYERS.md"
+          ],
+          "expected_outputs": [
+            "grep prints the updated ask-user-question-hook sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "acJustification": "Single-sentence doc edit; one observable AC covers it."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In docs/CONTEXT-LAYERS.md, replace the parenthetical after `ask-user-question-hook` ('its deny message is what lets the dashboard surface AskUserQuestion') with the PRD's wording, which adds that since PAN-4514 the hook first rejects non-decision calls (empty, filler, or status-only questions) with a decisions-only message that never reaches the dashboard."
+        },
+        "items": [
+          {
+            "id": "docs-context-layers.ac1",
+            "title": "docs/CONTEXT-LAYERS.md contains a sentence stating that ask-user-question-hook rejects empty, filler, or status-only AskUserQuestion calls with a decisions-only message that never reaches the dashboard, citing PAN-4514",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hook-guard",
+        "to": "detector-contract",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
