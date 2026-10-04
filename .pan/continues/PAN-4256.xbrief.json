@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:16:46.321Z",
+  "updated": "2026-10-04T05:16:58.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "roles-panel-flywheel-copy.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:16:46.321Z"
+    },
+    "remote-fly-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:58.474Z"
     }
   }
 }
