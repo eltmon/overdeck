@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:58:51.698Z",
+  "updated": "2026-10-04T03:59:02.633Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "collectors-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:58:51.698Z"
+    },
+    "effort-cost-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:59:02.633Z"
     }
   }
 }
