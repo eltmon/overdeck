@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:20:52.455Z",
+  "updated": "2026-10-04T03:26:47.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4257",
       "claimedAt": "2026-10-04T03:19:20.560Z",
       "doneAt": "2026-10-04T03:20:52.455Z"
+    },
+    "staffing-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:26:47.626Z"
     }
   }
 }
