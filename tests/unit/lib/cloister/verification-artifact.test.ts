@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  markRunningVerificationArtifactSkipped,
   pruneVerificationRunArtifacts,
   readVerificationArtifact,
   verificationArtifactPath,
@@ -175,5 +176,49 @@ describe('immutable per-run verification artifacts (PAN-3847)', () => {
       expect(doc.gates[0].output).toBe('failure evidence');
       expect(doc.outcome).toBe('failed');
     }
+  });
+
+  describe('markRunningVerificationArtifactSkipped (PAN-4543)', () => {
+    const now = new Date('2026-10-04T06:00:00.000Z');
+
+    it('rewrites a running latest artifact to skipped, keeping its gates', () => {
+      writeVerificationArtifact(workspace, 'PAN-4498', [gate({ name: 'typecheck' }), gate({ name: 'lint' })], {
+        currentGate: 'build',
+        currentGateOutput: 'tail of build output',
+      });
+
+      const result = markRunningVerificationArtifactSkipped(workspace, 'PR merged before verification finished', now);
+
+      expect(result?.outcome).toBe('skipped');
+      expect(result?.skipReason).toBe('PR merged before verification finished');
+      const onDisk = JSON.parse(readFileSync(verificationArtifactPath(workspace), 'utf-8'));
+      expect(onDisk.outcome).toBe('skipped');
+      expect(onDisk.skipReason).toBe('PR merged before verification finished');
+      expect(onDisk.ranAt).toBe('2026-10-04T06:00:00.000Z');
+      expect(onDisk.currentGate).toBeUndefined();
+      expect(onDisk.currentGateOutput).toBeUndefined();
+      expect(onDisk.gates.map((g: { name: string }) => g.name)).toEqual(['typecheck', 'lint']);
+      // Latest-only: a skipped run writes no immutable per-run file.
+      expect(existsSync(join(workspace, '.overdeck', 'verification'))).toBe(false);
+    });
+
+    it('leaves a passed latest artifact byte-for-byte unchanged', () => {
+      writeVerificationArtifact(workspace, 'PAN-4498', [gate({ name: 'lint' })], {
+        ranAt: '2026-10-04T05:00:00.000Z',
+        head8: 'abcd1234',
+      });
+      const before = readFileSync(verificationArtifactPath(workspace), 'utf-8');
+      const runsBefore = readdirSync(join(workspace, '.overdeck', 'verification'));
+
+      expect(markRunningVerificationArtifactSkipped(workspace, 'merged', now)).toBeNull();
+      expect(readFileSync(verificationArtifactPath(workspace), 'utf-8')).toBe(before);
+      expect(readdirSync(join(workspace, '.overdeck', 'verification'))).toEqual(runsBefore);
+    });
+
+    it('returns null and creates no file when there is no latest artifact', () => {
+      expect(markRunningVerificationArtifactSkipped(workspace, 'merged', now)).toBeNull();
+      expect(existsSync(verificationArtifactPath(workspace))).toBe(false);
+      expect(existsSync(join(workspace, '.overdeck'))).toBe(false);
+    });
   });
 });
