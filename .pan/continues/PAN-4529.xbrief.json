@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:21:57.453Z",
+  "updated": "2026-10-04T05:22:08.657Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -260,6 +260,10 @@
     "publish-handoff.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:21:57.453Z"
+    },
+    "publish-handoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:22:08.657Z"
     }
   }
 }
