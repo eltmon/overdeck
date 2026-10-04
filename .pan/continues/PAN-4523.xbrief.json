@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:40:07.578Z",
+  "updated": "2026-10-04T05:40:24.147Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "stage-live.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:40:07.578Z"
+    },
+    "shelf-cap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:40:24.147Z"
     }
   }
 }
