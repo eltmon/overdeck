@@ -36,6 +36,7 @@ import { PanOpenInPicker } from '../PanOpenInPicker';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
+import { BookmarksToggle, BookmarksDrawer } from './bookmarks/BookmarksDrawer';
 import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
@@ -798,6 +799,8 @@ export function ConversationPanel({
                 <span>Tools</span>
               </button>
 
+              <BookmarksToggle />
+
               {showPiAbort && (
                 <button
                   className={`${styles.conversationAboutToggle} ${abortMutation.isPending ? styles.conversationAboutToggleActive : ''}`}
@@ -1017,6 +1020,8 @@ export function ConversationPanel({
           onRefresh={() => refreshAboutMutation.mutate()}
         />
       )}
+
+      {!embedded && <BookmarksDrawer />}
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
