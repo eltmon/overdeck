@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:19:07.559Z",
+  "updated": "2026-10-04T05:19:20.527Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "candidate-7-other-uses.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:19:07.559Z"
+    },
+    "candidate-7-other-uses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:20.527Z"
     }
   }
 }
