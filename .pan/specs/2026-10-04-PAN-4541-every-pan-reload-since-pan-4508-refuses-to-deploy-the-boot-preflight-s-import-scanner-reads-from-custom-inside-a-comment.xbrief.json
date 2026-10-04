@@ -1,0 +1,296 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T08:12:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4541: Every pan reload since PAN-4508 refuses to deploy: the boot preflight's import scanner reads 'from \"custom\"' inside a comment",
+    "updated": "2026-10-04T08:21:25.270Z"
+  },
+  "plan": {
+    "id": "pan-4541",
+    "title": "Every pan reload since PAN-4508 refuses to deploy: the boot preflight's import scanner reads 'from \"custom\"' inside a comment",
+    "status": "proposed",
+    "uid": "eefd77df-e9b3-4db5-9fcc-3f8eefac57f4",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T08:12:05Z",
+    "updated": "2026-10-04T08:21:25.270Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4541",
+        "label": "PAN-4541",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deploy",
+      "pan-reload",
+      "boot-preflight",
+      "bundle-imports",
+      "regression"
+    ],
+    "narratives": {
+      "Problem": "unresolvedBundleImports (src/lib/bundle-imports.ts) finds imports in the built dashboard bundle with a regex that also matches comments. PAN-4508 added the JSDoc 'distinguishes the \"zen\" route from \"custom\"' in src/lib/jev/settings-validation.ts; rolldown keeps JSDoc, so dist/dashboard/server.js contains it, the regex reports 'custom' as an unresolvable package, and dashboardServerBootFailure aborts every pan reload. The live build is stuck at 906978556d7.",
+      "Proposal": "WI-1 rewords the PAN-4508 comment so the currently installed (regex) CLI can deploy the merge. WI-2 replaces the regex with es-module-lexer (initSync + parse, keep records whose n is a string, existing bare-specifier filter and resolve logic unchanged), declared as a root devDependency and inlined into every bundle via deps.alwaysBundle in both tsdown configs, with a new tests/unit/lib/bundle-imports.test.ts. WI-3 documents the preflight in docs/MERGE-WORKFLOW.md and docs/BUILD.md. Full detail, snippets and verify commands: .pan/drafts/PAN-4541.md.",
+      "NonGoals": "- Scanning chunk files other than the entry bundle (server.js, pty-supervisor.js)\n- Scanning CommonJS require() calls or the bundler __require shim\n- Changing the preflight error message, the signature of unresolvedBundleImports, or any of its callers (dashboard-bundle-integrity.ts, pty-supervisor-locate.ts, reload.ts, restart.ts)\n- Any behavior change to Jev route handling in settings-validation.ts\n- Adding es-module-lexer (or any parser) to dependencies, or moving typescript to runtime\n- Catching es-module-lexer ParseError inside unresolvedBundleImports\n- A test that reads repository source files to check the comment text\n- Running pan reload from the work agent; the post-merge deploy is the flywheel's step"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use es-module-lexer 2.3.2, declared as a root devDependency and inlined via deps.alwaysBundle in both tsdown configs; no runtime dependency is added.",
+        "rationale": "No parser is declared in any package.json (es-module-lexer is only transitive via vitest; typescript is a ~9 MB devDependency). Inlining means the preflight that detects an incomplete node_modules does not itself need node_modules, and lint:dist-externals fails the build if it is ever left external. Planning probe: same specifier set as the regex on the live 3.1 MB server.js, lexed in 14 ms."
+      },
+      {
+        "summary": "Do not catch es-module-lexer ParseError; let it propagate.",
+        "rationale": "A rolldown bundle that cannot be tokenized is a packaging defect Node would also reject. In reload.ts the throw lands in the existing try/catch and the old dashboard keeps running (fail closed); readFileSync can already throw under the same contract."
+      },
+      {
+        "summary": "The issue's post-merge AC (pan reload passes, /api/health buildCommit contains the merge) is attached to WI-1's outcome and verified by the flywheel after merge; the work agent proves the equivalent pre-merge on its own build output.",
+        "rationale": "The reload that deploys this merge runs the already-installed regex CLI, so only the comment reword unblocks it, and a work agent cannot reload origin/main before its PR merges."
+      },
+      {
+        "summary": "The issue's AC 'docs/MERGE-WORKFLOW.md deploy / pan reload section' is met by a new '### Boot preflight before switchover' subsection under '## Deploy progress on the project row', plus one sentence in docs/BUILD.md.",
+        "rationale": "MERGE-WORKFLOW.md has no preflight section today; 'Deploy progress on the project row' is its only pan reload section. BUILD.md already documents the build-time twin of this rule (lint-dist-externals)."
+      }
+    ],
+    "items": [
+      {
+        "id": "reword-jev-comment",
+        "title": "Reword the PAN-4508 JSDoc in settings-validation.ts so it has no from-quote text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T08:12:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/jev/settings-validation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE \"(from|import)\\s*\\(?\\s*[\\\"'][^\\\"'\\n]+[\\\"']\" src/lib/jev/settings-validation.ts",
+            "npx vitest run src/lib/jev",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep prints 1 (only the real import type line 7 remains)",
+            "vitest run for src/lib/jev exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/jev/settings-validation.ts line 9 replace the comment text 'distinguishes the \"zen\" route from \"custom\".' with 'distinguishes the \"zen\" route and the \"custom\" route.' Change nothing else in the file. This is what unblocks the first pan reload after merge, because that reload still runs the installed CLI with the old regex scanner (PRD D3). See PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "reword-jev-comment.ac1",
+            "title": "Given the edited src/lib/jev/settings-validation.ts, when grep -c 'from \"custom\"' runs on it, then it prints 0 and the JSDoc on JEV_ZEN_BASE_URL reads 'distinguishes the \"zen\" route and the \"custom\" route.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reword-jev-comment.ac2",
+            "title": "Given the diff for this item, when reviewed, then it changes only the comment on line 9 and the existing src/lib/jev tests pass (exit 0) with no behavior change to routeForBaseUrl or the route validation errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lexer-scanner",
+        "title": "Replace the regex in unresolvedBundleImports with inlined es-module-lexer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T08:12:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/bundle-imports.ts",
+            "tests/unit/lib/bundle-imports.test.ts",
+            "package.json",
+            "bun.lock",
+            "tsdown.config.ts",
+            "src/dashboard/server/tsdown.config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/bundle-imports.test.ts tests/unit/lib/deploy/dashboard-bundle-integrity.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build",
+            "npm run lint:dist-externals",
+            "grep -rlE \"from ['\\\"]es-module-lexer['\\\"]|import\\(['\\\"]es-module-lexer['\\\"]\\)\" dist --include=*.js",
+            "npx vitest run src/lib/channels/__tests__/pty-supervisor-locate.test.ts",
+            "npx tsx -e \"import { unresolvedBundleImports } from './src/lib/bundle-imports.ts'; console.log(JSON.stringify(unresolvedBundleImports('dist/dashboard/server.js')))\"",
+            "node -e \"const fs=require('fs'),{createRequire}=require('module'),p=require('path').resolve('dist/dashboard/server.js'),r=createRequire(p),s=fs.readFileSync(p,'utf8'),re=/\\b(?:from|import)\\s*\\(?\\s*([\\\"'])([^\\\"'\\n]+)\\1/g,pk=/^(?:@[a-z0-9-~][a-z0-9-._~]*\\/)?[a-z0-9-~][a-z0-9-._~]*(?:\\/[^\\s]*)?$/,miss=new Set();for(const m of s.matchAll(re)){const n=m[2];if(!pk.test(n))continue;try{r.resolve(n)}catch(e){if(/MODULE_NOT_FOUND/.test(e.code))miss.add(n)}}console.log(JSON.stringify([...miss]))\"",
+            "npx tsdown src/lib/bundle-imports.ts --no-config -d .tmp/pan-4541-lexer-probe --format esm --platform node && node -e \"const fs=require('fs'),path=require('path'),d='.tmp/pan-4541-lexer-probe',f=fs.readdirSync(d).find(n=>/^bundle-imports\\.m?js$/.test(n)),src=fs.readFileSync(path.join(d,f),'utf8');if(/from ['\\\"]es-module-lexer['\\\"]/.test(src))throw new Error('es-module-lexer left external');import(path.resolve(d,f)).then(m=>console.log(JSON.stringify(m.unresolvedBundleImports('dist/dashboard/server.js'))))\""
+          ],
+          "expected_outputs": [
+            "bundle-imports.test.ts (5 cases) and dashboard-bundle-integrity.test.ts pass",
+            "typecheck and lint complete without errors",
+            "npm run build exits 0",
+            "lint:dist-externals exits 0",
+            "the es-module-lexer grep over dist prints nothing",
+            "pty-supervisor-locate.test.ts passes against the freshly built dist/pty-supervisor.js",
+            "the tsx one-liner prints []",
+            "the old-regex scan (the pre-PAN-4541 scanner the installed CLI still runs) prints [] for the branch build of dist/dashboard/server.js",
+            "the standalone tsdown bundle of src/lib/bundle-imports.ts (lexer inlined, WASM from the embedded base64) prints [] for dist/dashboard/server.js and contains no bare es-module-lexer import"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Six ACs: the extra one guards the bootstrap order (PRD D3) — the first reload after merge still runs the old regex scanner against this build."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. (1) package.json: add \"es-module-lexer\": \"^2.3.2\" to devDependencies between effect-acp and eslint; run bun install; commit bun.lock. Never add it to dependencies. (2) tsdown.config.ts: append || id === 'es-module-lexer' to deps.alwaysBundle with a one-line comment (the preflight that detects an incomplete node_modules must not need node_modules, PAN-4541). (3) src/dashboard/server/tsdown.config.ts: alwaysBundle: [/^@overdeck\\//, 'es-module-lexer']. (4) src/lib/bundle-imports.ts: delete IMPORT_SOURCE_PATTERN and its JSDoc; import { initSync, parse } from 'es-module-lexer'; in unresolvedBundleImports call initSync(), then const [imports] = parse(source), loop over imports using n as the specifier, skip when n is undefined or fails PACKAGE_SPECIFIER_PATTERN; keep the resolve and MODULE_NOT_FOUND/ERR_MODULE_NOT_FOUND handling and the signature unchanged; do not catch ParseError. Add a header paragraph in words saying the source is tokenized so comments and strings never count (PAN-4541). Never write example syntax that pairs from/import with a quoted package name in any comment (NFR-3): the old CLI still regex-scans the new server.js on the first reload. (5) Create tests/unit/lib/bundle-imports.test.ts with the five cases listed in PRD WI-2, building fixture strings in the test and never reading repo source files. Implementation checkpoint: if the build leaves es-module-lexer external, switch the alwaysBundle entry to a RegExp /^es-module-lexer$/ (server) or keep the function form (root); never move it to dependencies. Also run the inlined-lexer check from PRD WI-2: bundle src/lib/bundle-imports.ts alone with tsdown --no-config into .tmp/pan-4541-lexer-probe (gitignored) and call unresolvedBundleImports from that output; it must print [] — this is the only check that executes the inlined WASM init path the deployed CLI and server will run."
+        },
+        "items": [
+          {
+            "id": "lexer-scanner.ac1",
+            "title": "Given a bundle whose comments, string literals, template literals and regex literals contain from \"nonexistent-pkg\" and import(\"nonexistent-pkg\") and whose real imports resolve, when unresolvedBundleImports runs, then it returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lexer-scanner.ac2",
+            "title": "Given a bundle with a real import x from \"really-missing-pkg\", when unresolvedBundleImports runs, then it returns [\"really-missing-pkg\"]; a literal dynamic import and an export-from of a missing package are also reported, and import.meta or import(name) are not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lexer-scanner.ac3",
+            "title": "Given npm run build has completed on the branch, when npm run lint:dist-externals and the es-module-lexer grep over dist run, then lint exits 0 and the grep prints nothing, showing the lexer is inlined and not a bare import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lexer-scanner.ac4",
+            "title": "Given the freshly built dist/dashboard/server.js, when unresolvedBundleImports is called on it from source (tsx one-liner) and from a standalone tsdown bundle with the lexer inlined (PRD WI-2 checkpoint), then both print [] and pty-supervisor-locate.test.ts passes against the built dist/pty-supervisor.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lexer-scanner.ac6",
+            "title": "Given the final branch build of dist/dashboard/server.js, when the old-regex scan one-liner (PRD WI-2 checkpoint, the scanner the installed CLI still runs) executes, then it prints [] — no comment or string added by this change reads as a missing package",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lexer-scanner.ac5",
+            "title": "Given the diff, when reviewed, then package.json lists es-module-lexer under devDependencies only, unresolvedBundleImports keeps the signature (scriptPath: string): string[], and dashboard-bundle-integrity.ts, pty-supervisor-locate.ts, reload.ts and restart.ts are not modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-boot-preflight",
+        "title": "Document that the boot preflight resolves real import specifiers only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T08:12:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/BUILD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Boot preflight before switchover' docs/MERGE-WORKFLOW.md",
+            "grep -n 'es-module-lexer' docs/MERGE-WORKFLOW.md docs/BUILD.md",
+            "grep -n 'src/lib/bundle-imports.ts' docs/BUILD.md"
+          ],
+          "expected_outputs": [
+            "the heading grep prints one line located after '## Deploy progress on the project row' and before '## What This Replaces'",
+            "es-module-lexer appears in both docs",
+            "BUILD.md names src/lib/bundle-imports.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In docs/MERGE-WORKFLOW.md add '### Boot preflight before switchover' at the end of '## Deploy progress on the project row' (before '## What This Replaces'), in plain prose covering: pan reload builds origin/main into the idle generation and refuses to switch when the PTY supervisor or the dashboard server bundle cannot resolve its external packages (supervisorDeploymentFailure, dashboardServerBootFailure; PAN-3172, PAN-3264), leaving the old dashboard running; the check tokenizes the bundle with es-module-lexer, so static imports, export-from and literal dynamic imports count while a package name in a comment or string never does (PAN-4541); the lexer is bundled into dist so the check needs nothing from node_modules; the reload that deploys a change runs the already-installed CLI, so a scanner fix protects deploys from the next reload on. In docs/BUILD.md, after the '- ES module syntax only' bullet of the PAN-3209 section, add one sentence that the deploy-time boot preflight (src/lib/bundle-imports.ts) applies the same rule at runtime with es-module-lexer, inlined via deps.alwaysBundle and therefore a devDependency."
+        },
+        "items": [
+          {
+            "id": "docs-boot-preflight.ac1",
+            "title": "Given docs/MERGE-WORKFLOW.md, when read, then a '### Boot preflight before switchover' subsection under '## Deploy progress on the project row' states that the preflight resolves real import specifiers only and ignores package names in comments and strings, citing PAN-4541",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-boot-preflight.ac2",
+            "title": "Given the same subsection, when read, then it states that a refused reload leaves the old dashboard running and that the reload deploying a change runs the already-installed CLI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-boot-preflight.ac3",
+            "title": "Given docs/BUILD.md, when grep runs for src/lib/bundle-imports.ts and es-module-lexer, then both appear in the PAN-3209 externals section and the text says the lexer is inlined via deps.alwaysBundle as a devDependency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reword-jev-comment",
+        "to": "lexer-scanner",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "9 files and one small change: the 8 \"subsystems\" are path prefixes, not domains — the dependency declaration (package.json, bun.lock), the two tsdown configs that must inline the lexer, the scanner and its test, the one-line Jev comment, and two docs. Splitting them would ship a scanner whose parser is not declared or not inlined, which breaks the build or the deploy.",
+      "canonicalFilename": "2026-10-04-PAN-4541-every-pan-reload-since-pan-4508-refuses-to-deploy-the-boot-preflight-s-import-scanner-reads-from-custom-inside-a-comment.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
