@@ -48,7 +48,7 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
   return 'backlog'; // Default fallback
 }
 
-export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
+export function shouldRefreshPlanningStateForIssue(issue: { status?: string; stateType?: string; [key: string]: unknown } | null | undefined): boolean {
   const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
   return canonical !== 'done' && canonical !== 'canceled';
 }
