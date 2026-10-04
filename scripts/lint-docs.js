@@ -8,8 +8,8 @@
 // the start of a JSX tag and rejects a digit there, so the safe spelling is `&lt;`.
 // findMdxProblems below flags both; see docs/RELEASING.md for the author-facing rule.
 import { fileURLToPath } from 'node:url';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 const DOLLAR_MESSAGE = 'dollar sign in prose renders as math on Mintlify — write &#36; instead';
 const LT_DIGIT_MESSAGE = 'bare "<" before a digit breaks strict MDX — write &lt; instead';
@@ -77,14 +77,74 @@ function checkDocsFiles(docsDir) {
   return { files, errors };
 }
 
+// Recursively collect every page path reached under docsJson.navigation through
+// tabs, groups and pages arrays. A pages entry may itself be a { group, pages }
+// object (a nested group), so pages arrays are walked recursively.
+export function collectPublishedPages(docsJson) {
+  const pages = [];
+  const walkPages = (list) => {
+    for (const entry of list ?? []) {
+      if (typeof entry === 'string') {
+        pages.push(entry);
+      } else if (entry && Array.isArray(entry.pages)) {
+        walkPages(entry.pages);
+      }
+    }
+  };
+  for (const tab of docsJson?.navigation?.tabs ?? []) {
+    for (const group of tab.groups ?? []) {
+      walkPages(group.pages);
+    }
+  }
+  return pages;
+}
+
+function parseArgs(argv) {
+  let root = process.cwd();
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--root' && argv[i + 1] !== undefined) {
+      root = argv[i + 1];
+      i++;
+    }
+  }
+  return { root };
+}
+
+function checkPublishedPages(root) {
+  const docsJson = JSON.parse(readFileSync(join(root, 'docs.json'), 'utf-8'));
+  const pages = collectPublishedPages(docsJson);
+  let errors = 0;
+
+  for (const page of pages) {
+    const mdxPath = join(root, `${page}.mdx`);
+    const mdPath = join(root, `${page}.md`);
+    const pagePath = existsSync(mdxPath) ? mdxPath : existsSync(mdPath) ? mdPath : null;
+
+    if (!pagePath) {
+      console.error(`docs.json lists "${page}" but no ${page}.mdx or ${page}.md exists`);
+      errors++;
+      continue;
+    }
+
+    const content = readFileSync(pagePath, 'utf-8');
+    for (const problem of findMdxProblems(content)) {
+      console.error(`${relative(root, pagePath)}:${problem.line}: ${problem.message}`);
+      errors++;
+    }
+  }
+
+  return { pages, errors };
+}
+
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
-  const docsDir = join(process.cwd(), 'docs');
-  const { files, errors } = checkDocsFiles(docsDir);
+  const { root } = parseArgs(process.argv.slice(2));
+  const { files, errors: docsErrors } = checkDocsFiles(join(root, 'docs'));
+  const { pages, errors: pageErrors } = checkPublishedPages(root);
 
-  if (errors > 0) {
+  if (docsErrors + pageErrors > 0) {
     process.exit(1);
   }
 
-  console.log(`docs lint passed (${files.length} files)`);
+  console.log(`docs lint passed (${files.length} docs files, ${pages.length} published pages)`);
 }

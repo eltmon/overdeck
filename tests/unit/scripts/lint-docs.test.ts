@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { collectPublishedPages, findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
 
 const DOLLAR = '&#36;';
 const LT = '&lt;';
+
+const SCRIPT = new URL('../../../scripts/lint-docs.js', import.meta.url).pathname;
 
 describe('findMdxProblems', () => {
   it('flags a dollar sign in prose', () => {
@@ -98,5 +104,93 @@ describe('stripInlineCode', () => {
 
   it('leaves an unmatched backtick run as literal text', () => {
     expect(stripInlineCode('oops ` unmatched')).toContain('`');
+  });
+});
+
+describe('collectPublishedPages', () => {
+  it('flattens a nested { group, pages } object inside a pages array', () => {
+    const docsJson = {
+      navigation: {
+        tabs: [
+          {
+            tab: 'Guides',
+            groups: [
+              {
+                group: 'Guides',
+                pages: ['top-level', { group: 'Nested', pages: ['nested-one', 'nested-two'] }],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(collectPublishedPages(docsJson)).toEqual(['top-level', 'nested-one', 'nested-two']);
+  });
+});
+
+describe('lint-docs CLI', () => {
+  const roots: string[] = [];
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  function makeRoot(): string {
+    const root = mkdtempSync(join(tmpdir(), 'lint-docs-'));
+    roots.push(root);
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'ok.md'), 'Some docs content.\n');
+    return root;
+  }
+
+  function writeDocsJson(root: string, pages: unknown[]): void {
+    writeFileSync(
+      join(root, 'docs.json'),
+      JSON.stringify({ navigation: { tabs: [{ tab: 'T', groups: [{ group: 'G', pages }] }] } }),
+    );
+  }
+
+  function run(root: string): { ok: boolean; output: string } {
+    try {
+      const output = execFileSync('node', [SCRIPT, '--root', root], { encoding: 'utf-8' });
+      return { ok: true, output };
+    } catch (err) {
+      const error = err as { stdout?: string; stderr?: string };
+      return { ok: false, output: [error.stdout ?? '', error.stderr ?? ''].join('\n') };
+    }
+  }
+
+  it('fails and names the file and line when a published page has a currency dollar in prose', () => {
+    const root = makeRoot();
+    writeFileSync(join(root, 'bad.mdx'), 'line one\nline two\nPrice: $2/M\n');
+    writeDocsJson(root, ['bad']);
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('bad.mdx:3:');
+    expect(output).toContain(DOLLAR);
+  });
+
+  it('passes on a clean fixture', () => {
+    const root = makeRoot();
+    writeFileSync(join(root, 'good.mdx'), `Price: ${DOLLAR}2/M\n`);
+    writeDocsJson(root, ['good']);
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(true);
+    expect(output).toContain('docs lint passed');
+  });
+
+  it('fails and names a page listed in docs.json with no matching file', () => {
+    const root = makeRoot();
+    writeDocsJson(root, ['missing']);
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('missing');
   });
 });
