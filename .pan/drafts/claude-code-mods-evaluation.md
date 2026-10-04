@@ -207,7 +207,25 @@ These limits apply to every candidate below. Each one comes from the docs refere
 
 ## Candidate 5: Flywheel and gauntlet loop pane
 
-To be written (spec item `candidate-5-flywheel-pane`).
+| Field | Finding |
+| --- | --- |
+| What it would do | Show the Flywheel's state (tick, pick, phase, in-flight issues, Needs-you) inside the Flywheel conversation's own pane, and give the operator a `/flywheel` command there; optionally emit each tick as a structured event instead of a transcript line. The same shape would serve gauntlet lane orchestrators. |
+| Mod capability | `$.ui.open` plus a `ui.render` hook on `Pane` (or a band on `AbovePrompt`) drawn from `$.state`; `$.clock.every` plus `$.http.fetch` to the dashboard's Flywheel status; `$.command.register` and a `command.run` hook for `/flywheel`; `turn.complete` or `session.append` to see the tick marker as it is written. |
+| Replaces or improves | Mirrors the dashboard's Flywheel page inside the pane. It does not replace the tick marker, which stays the only channel from the loop to the page. |
+| Overdeck evidence | `src/lib/flywheel/tick-marker.ts:19` — `export const TICK_MARKER_PREFIX = 'flywheel-tick:';`; `src/lib/flywheel/derive-status.ts:257` — `const lastTick = findLastTick(messages);`; `sync-sources/skills/pan-flywheel/SKILL.md:232` — `flywheel-tick: tick=3 pick=PAN-3964 phase=watch`; `docs/FLYWHEEL.md:40` — `## Tick marker contract` |
+| Harness parity | The Flywheel can start on any harness (`pan flywheel start --harness`), and the marker works on all of them because it is plain transcript text. A mod covers only a Claude Code Flywheel. |
+| Risk | Low for a mirror pane; it reads only, and its loss costs nothing. Using the mod as the tick channel would create stored status beside the transcript and would break the Flywheel on other harnesses. |
+| Size | S for a band or pane that mirrors the existing Flywheel status; M if the `/flywheel` command also starts, pauses or stops the loop through the existing routes. |
+| Sources | plugin-authoring skill: reference.md "Drawing: ui.render" (`isFullscreen`, panes inline on the main screen) and "Work that outlives a dispatch" (`$.command.register` example), types/claude-code.d.ts line 1582; docs: https://code.claude.com/docs/en/plugins/mods/interface (S9), https://code.claude.com/docs/en/plugins/mods/reference (S3); research brief §5 and §7. |
+| Verdict | adopt-later: a mirror pane is cheap once Candidate 1's packaging exists, but the operator already watches the Flywheel page, so the gain is small. |
+
+**The marker is the contract.** The `pan-flywheel` skill ends every tick with one line, and "the marker is the only channel from the loop to the page — there is no status endpoint and nothing is stored" (`src/lib/flywheel/tick-marker.ts:19` — `export const TICK_MARKER_PREFIX = 'flywheel-tick:';`). The dashboard and the CLI parse the newest marker from the conversation's transcript (`src/lib/flywheel/derive-status.ts:257` — `const lastTick = findLastTick(messages);`). This matches Overdeck's rule that it stores no status it can derive.
+
+**Replace or mirror.** A mod could see each marker as the model writes it (`turn.complete` carries the answer; `session.append` sees every stored row) and post it as a structured event. That would make the dashboard update the moment a tick ends, but it would add a second, stored copy of the loop's status and would exist only for a Claude Code Flywheel. So the mod mirrors the marker and does not replace it: the transcript marker stays the contract, and a mod may at most draw what the dashboard already derives from it.
+
+**Where a pane would show.** Under tmux, Claude Code runs on the main screen, so a `Pane` opens inline above the prompt and takes rows from the transcript; it docks beside the transcript only in the fullscreen layout ([skill] reference.md "Drawing: ui.render"; [skill] types/claude-code.d.ts line 1582). Under Herdr the layout is **UNVERIFIED** (brief §11). A band or a `/flywheel` command that prints one summary row is the better fit for an inline layout. The operator mostly watches the Flywheel page and its live agents list (`docs/FLYWHEEL.md:40` — `## Tick marker contract`), so this candidate ranks below the ones that change pipeline behavior.
+
+**Gauntlet lanes.** Lane orchestrators (`pan lane`) have the same shape: status lives in reports and transcripts, and the operator reads it in the dashboard. The same mirror band would work there, with the same limits, and adds nothing a lane needs to run.
 
 ## Candidate 6: Reviewer and worker progress bands
 
