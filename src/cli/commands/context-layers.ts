@@ -31,6 +31,7 @@ import {
 import { syncContextLayers } from '../../lib/sync.js';
 import { isDevMode } from '../../lib/paths.js';
 import { findProjectByPath, registerProject } from '../../lib/projects.js';
+import { inferProjectGithubRepo } from '../../lib/projects/infer-tracker.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 
 type LayerName = 'global' | 'project' | 'workspace';
@@ -264,6 +265,8 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
         registerProject(key, { name: key, path });
         ensureProjectLayer(path);
         console.log(chalk.green(`  ✓ registered ${key} → ${path}`));
+        const githubRepo = await inferProjectGithubRepo(key, { name: key, path }).catch(() => null);
+        if (githubRepo) console.log(chalk.green(`    github_repo ${githubRepo} (from its origin remote)`));
       } else if (!interactive) {
         console.log(chalk.dim(`  • ${path} — register with: pan projects add ${path}`));
       }

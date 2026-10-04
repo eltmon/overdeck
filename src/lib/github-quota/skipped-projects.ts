@@ -55,7 +55,7 @@ export function recordMembershipTrackerSkip(project: { name?: string; path: stri
       const mtime = projectsYamlMtimeMs();
       if (loggedAtMtime.get(project.path) !== mtime) {
         loggedAtMtime.set(project.path, mtime);
-        console.log(`[resource-discovery] skipping membership for ${name}: no tracker configured (set tracker: or issue_prefix: in projects.yaml)`);
+        console.log(`[resource-discovery] skipping membership for ${name}: no tracker configured and no GitHub origin remote detected (set github_repo: owner/repo or tracker: in projects.yaml)`);
       }
       if (!skipped.has(project.path)) {
         skipped.set(project.path, { name, path: project.path });

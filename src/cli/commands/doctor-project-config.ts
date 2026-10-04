@@ -32,6 +32,6 @@ export function checkProjectTrackerConfig(
     name: 'Project Tracker Config',
     status: 'warn',
     message: `No tracker configured for ${unresolved.join(', ')}; pipeline membership skips ${unresolved.length === 1 ? 'it' : 'them'}`,
-    fix: 'Set tracker: (or issue_prefix: / github_repo:) for each named project in ~/.overdeck/projects.yaml',
+    fix: 'Run `pan sync` to detect a GitHub origin remote; where Overdeck cannot detect one, set github_repo: owner/repo (GitHub) or tracker: for each named project in ~/.overdeck/projects.yaml',
   };
 }

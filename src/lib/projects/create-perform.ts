@@ -47,6 +47,7 @@ import {
   ProjectCreateFailureError,
   MAX_DETAIL_BYTES,
 } from './create-errors.js';
+import { inferProjectGithubRepo } from './infer-tracker.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -319,6 +320,14 @@ export async function finishProjectSetup(args: {
   }
 
   await excludeWorkspacesDir(canonicalRegistered, config.workspace?.workspaces_dir || 'workspaces');
+
+  // Creation records the tracker it detected; a registration that predates that
+  // (or came from elsewhere) gets `github_repo` from its GitHub origin here.
+  try {
+    await inferProjectGithubRepo(args.key, config);
+  } catch {
+    // Non-fatal: the dashboard and `pan sync` retry the same detection.
+  }
 
   const existingMain = getMainWorkspace(args.key);
   if (existingMain) {

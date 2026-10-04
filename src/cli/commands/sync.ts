@@ -27,6 +27,7 @@ import { executeAgentSkills, planAgentSkills } from '../../lib/harness-skill-syn
 import { SYNC_TARGET, SYNC_SOURCES, isDevMode, isDeploymentGenerationRoot, packageRoot } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
+import { inferMissingProjectTrackers } from '../../lib/projects/infer-tracker.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migrateOverdeckToPan } from '../../lib/workspace-manager.js';
@@ -500,6 +501,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     renderHerdrReport(herdrSpinner, await timeAsync('herdr', () => ensureHerdr({ mode: 'sync' })));
   } catch (error) {
     herdrSpinner.warn(`Herdr verification failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // A project with no tracker config gets `github_repo` from its GitHub origin
+  // remote, so pipeline membership and the Issues panel work without hand edits.
+  try {
+    for (const project of await inferMissingProjectTrackers()) {
+      console.log(chalk.green(`✓ Configured ${project.name}: github_repo ${project.githubRepo} (from its origin remote)`));
+    }
+  } catch (error) {
+    console.log(chalk.yellow(`  ⚠ Tracker auto-detection failed: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   const projects = listProjectsSync();

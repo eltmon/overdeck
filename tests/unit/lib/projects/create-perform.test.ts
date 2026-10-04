@@ -123,6 +123,10 @@ beforeEach(() => {
   __resetRemoteProbeMemoForTests();
   spawnMock.mockReset();
   execFileMock.mockReset();
+  // finishProjectSetup reads the origin remote; a mock that never calls back would hang it.
+  execFileMock.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb?: Function) => {
+    cb?.(new Error('no git in this test'));
+  });
   workspaceMocks.getMainWorkspace.mockReturnValue(null);
   workspaceMocks.resolveWorkspaceCreateIntent.mockResolvedValue({ findings: [] });
   workspaceMocks.performWorkspaceCreate.mockResolvedValue({ id: 'ws-main', path: '' });
@@ -327,6 +331,21 @@ describe('finishProjectSetup — repeatable setup (D-9)', () => {
     expect(exclude).toContain('*.log\n');
     expect(exclude).toContain('workspaces/');
     expect(exclude).not.toContain('*.logworkspaces');
+  });
+
+  it('records github_repo from a GitHub origin when the entry has no tracker', async () => {
+    const dir = join(TEST_HOME, 'untracked');
+    mkdirSync(join(dir, '.git'), { recursive: true });
+    registerAt('untracked', dir);
+    execFileMock.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+      if (args.includes('get-url')) cb(null, { stdout: 'git@github.com:acme/untracked.git\n', stderr: '' });
+      else cb(new Error('unexpected command'));
+    });
+
+    await finishProjectSetup({ key: 'untracked', expectedPath: dir });
+
+    invalidateProjectsConfigCache();
+    expect(getProjectSync('untracked')?.github_repo).toBe('acme/untracked');
   });
 
   it('does not add a second workspaces/ line when one is already there', async () => {

@@ -92,7 +92,7 @@ function refreshMembershipSnapshot(
   const trackerUnresolvable = tryResolveProjectTrackerType(project) === null;
   recordMembershipTrackerSkip(project, trackerUnresolvable);
   if (trackerUnresolvable) {
-    snapshot.lastError = `No tracker configured for ${project.name ?? project.path} (set tracker: or issue_prefix: in projects.yaml)`;
+    snapshot.lastError = `No tracker configured for ${project.name ?? project.path}: Overdeck could not detect a GitHub origin remote (set github_repo: owner/repo for a GitHub project, or tracker:, in projects.yaml)`;
     snapshot.lastErrorReason = 'tracker_unconfigured';
     snapshot.lastErrorAt = now();
     return Promise.resolve();

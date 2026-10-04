@@ -596,6 +596,28 @@ void whenDashboardListening()
   })
   .catch((err) => console.warn('[overdeck] Legacy TLDR daemon stop failed (non-fatal):', err));
 
+// A project registered without any tracker config gets `github_repo` from its
+// GitHub origin remote, so the Issues panel works without a hand-edited
+// projects.yaml. Off the boot path; peer dashboards never write the config.
+if (!isPeerDashboard) {
+  void whenDashboardListening()
+    .then(async () => {
+      const { inferMissingProjectTrackers } = await import('../../lib/projects/infer-tracker.js');
+      const configured = await inferMissingProjectTrackers();
+      if (configured.length === 0) return;
+      // The GitHub issue poller reads its repo list from this startup cache.
+      await initTrackerConfigCache();
+      const { getProjectPipelineMembership } = await import('./services/pipeline-membership.js');
+      for (const project of configured) {
+        console.log(`[overdeck] Configured ${project.name}: github_repo ${project.githubRepo} (from its origin remote)`);
+        getProjectPipelineMembership.invalidate(project.path);
+      }
+      // Poll the newly tracked repos now rather than at the next scheduled poll.
+      await getSharedIssueService().invalidateTracker('github');
+    })
+    .catch((err) => console.warn('[overdeck] Tracker auto-detection failed (non-fatal):', err));
+}
+
 void (async () => {
   const store = await initEventStore();
   // Request serving comes first. Resource convergence starts only after the
