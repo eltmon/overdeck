@@ -279,6 +279,74 @@ describe('useConfluenceOrbs', () => {
   });
 });
 
+describe('orb stage counts only live agents (PAN-4523)', () => {
+  it('does not report PLAN when the plan agent has stopped and a work agent is live', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-110-plan': agent({ id: 'agent-pan-110-plan', issueId: 'PAN-110', role: 'plan', status: 'stopped' }),
+        'agent-pan-110-work': agent({ id: 'agent-pan-110-work', issueId: 'PAN-110', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-110', identifier: 'PAN-110', title: 'Plan stopped', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-110']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-110')).toMatchObject({ stage: 'WORK' });
+  });
+
+  it('does not report REVIEW when the review agent has stopped and a work agent is live', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-111-review': agent({ id: 'agent-pan-111-review', issueId: 'PAN-111', role: 'review', status: 'stopped' }),
+        'agent-pan-111-work': agent({ id: 'agent-pan-111-work', issueId: 'PAN-111', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-111', identifier: 'PAN-111', title: 'Review stopped', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-111']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-111')).toMatchObject({ stage: 'WORK' });
+  });
+
+  it('does not report TEST when the test agent has stopped on an in-review issue', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-112-test': agent({ id: 'agent-pan-112-test', issueId: 'PAN-112', role: 'test', status: 'stopped' }),
+        'agent-pan-112-work': agent({ id: 'agent-pan-112-work', issueId: 'PAN-112', role: 'work' }),
+      },
+      issuesRaw: [{ id: 'PAN-112', identifier: 'PAN-112', title: 'Test stopped', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-112': { issueId: 'PAN-112', state: 'in-review' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-112']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-112')).toMatchObject({ stage: 'REVIEW' });
+  });
+
+  it('still reports PLAN when the plan agent is live (regression)', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-113-plan': agent({ id: 'agent-pan-113-plan', issueId: 'PAN-113', role: 'plan' }),
+      },
+      issuesRaw: [{ id: 'PAN-113', identifier: 'PAN-113', title: 'Planning live', labels: [] }],
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-113']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-113')).toMatchObject({ stage: 'PLAN' });
+  });
+});
+
 describe('useHookStream', () => {
   it('keeps the 60 second event window, preserves hook names, and decays family rates', async () => {
     useDashboardStore.setState({

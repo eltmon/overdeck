@@ -307,9 +307,9 @@ const STAGE_BY_PHASE: Record<PipelineIssuePhase, Stage> = {
 
 function orbStage(agents: readonly AgentSnapshot[], derived: DerivedIssueState | undefined): Stage {
   const stage = STAGE_BY_PHASE[getPipelineIssuePhase(derived ?? null)];
-  if (stage === 'REVIEW' && agents.some((agent) => agent.role === 'test')) return 'TEST';
-  if (stage === 'WORK' && agents.some((agent) => agent.role === 'plan')) return 'PLAN';
-  if (stage === 'WORK' && agents.some((agent) => agent.role === 'review' || agent.id.includes('-review'))) return 'REVIEW';
+  if (stage === 'REVIEW' && agents.some((agent) => agent.role === 'test' && activeStatus(agent.status))) return 'TEST';
+  if (stage === 'WORK' && agents.some((agent) => agent.role === 'plan' && activeStatus(agent.status))) return 'PLAN';
+  if (stage === 'WORK' && agents.some((agent) => (agent.role === 'review' || agent.id.includes('-review')) && activeStatus(agent.status))) return 'REVIEW';
   return stage;
 }
 
