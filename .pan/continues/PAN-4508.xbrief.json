@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T02:39:17.822Z",
+  "updated": "2026-10-04T02:39:34.488Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4508",
       "claimedAt": "2026-10-04T02:34:34.242Z",
       "doneAt": "2026-10-04T02:39:17.822Z"
+    },
+    "jev-usage-log": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4508",
+      "claimedAt": "2026-10-04T02:39:34.488Z"
     }
   }
 }
