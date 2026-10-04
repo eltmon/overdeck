@@ -38,6 +38,7 @@ import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';
 import { runAgentId } from './spawn-prep.js';
 import { spawnRun } from './spawn.js';
+import { resolveEffort } from './resolve-effort.js';
 import type {
   TieredExecutionSubscription,
   TieredExecutionSupervisorConfig,
@@ -129,6 +130,13 @@ export async function spawnTierSupervisor(
   supervisor: TieredExecutionSupervisorConfig,
   options: SpawnTierSupervisorOptions = {},
 ): Promise<AgentState> {
+  const resolvedEffort = resolveEffort({
+    role: 'review',
+    subRole: SUPERVISOR_SUB_ROLE,
+    issueId,
+    model: supervisor.model,
+    harness: supervisor.harness,
+  });
   return spawnRun(issueId, 'review', {
     agentId: supervisorAgentId(issueId),
     subRole: SUPERVISOR_SUB_ROLE,
@@ -137,6 +145,8 @@ export async function spawnTierSupervisor(
     workspace: options.workspace,
     prompt: options.prompt ?? buildSupervisorPrompt(issueId, supervisor.subscribe),
     startedBy: 'tier-supervisor',
+    effort: resolvedEffort.effort,
+    effortSource: resolvedEffort.source,
   });
 }
 

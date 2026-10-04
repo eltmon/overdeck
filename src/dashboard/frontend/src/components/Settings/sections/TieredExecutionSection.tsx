@@ -353,6 +353,9 @@ export function TieredExecutionSection({
           enabled: next.escalation?.enabled ?? false,
           retries_at_tier: next.escalation?.retries_at_tier ?? 0,
           max_promotions: next.escalation?.max_promotions ?? 0,
+          // PAN-4257: carry an existing effort_first forward so an unrelated
+          // escalation edit (e.g. retries_at_tier) does not silently drop it.
+          ...(next.escalation?.effort_first !== undefined ? { effort_first: next.escalation.effort_first } : {}),
           ...patch,
         },
       },
@@ -715,6 +718,24 @@ export function TieredExecutionSection({
                   }`} />
                 </button>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-medium text-foreground">Raise effort before promoting</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={config?.escalation?.effort_first ?? false}
+                  aria-label="Raise effort before promoting the model"
+                  onClick={() => handleEscalationPatch({ effort_first: !(config?.escalation?.effort_first ?? false) })}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                    config?.escalation?.effort_first ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    config?.escalation?.effort_first ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  }`} />
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">PAN-4512: when on, an escalation raises reasoning effort one level before promoting the item to the next tier's model.</p>
               <div className="grid gap-3 grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Retries at tier</span>

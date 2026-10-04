@@ -297,10 +297,14 @@ function validateFeedConfig(config?: TieredExecutionFeedConfig): ValidatedTiered
 }
 
 function validateEscalationConfig(config?: TieredEscalationConfig): ValidatedEscalationConfig {
+  if (config?.effort_first !== undefined && typeof config.effort_first !== 'boolean') {
+    throw new TieredExecutionConfigError('tiered_execution.escalation.effort_first must be a boolean');
+  }
   return {
     enabled: config?.enabled ?? false,
     retries_at_tier: validateNonNegativeInteger(config?.retries_at_tier, 'tiered_execution.escalation.retries_at_tier', 0),
     max_promotions: validateNonNegativeInteger(config?.max_promotions, 'tiered_execution.escalation.max_promotions', 0),
+    ...(config?.effort_first !== undefined ? { effort_first: config.effort_first } : {}),
   };
 }
 
