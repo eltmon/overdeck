@@ -32,6 +32,7 @@ import { withGitHubCaller } from '../../../lib/github-quota/caller-context.js';
 import { patRestPauseDelayMs, recordOctokitFailure, recordOctokitPage } from '../../../lib/github-quota/rest-meter.js';
 import { displayStatusForCanonical, getCanonicalStatus, mapRallyStateToCanonical, shouldRefreshPlanningStateForIssue } from './issue-status-mapping.js';
 export { displayStatusForCanonical, getCanonicalStatus, shouldRefreshPlanningStateForIssue } from './issue-status-mapping.js';
+import { POLL_INTERVALS, computePollDelay, type PollIntervalReason } from './poll-cadence.js';
 
 /**
  * Compute task progress counts from a cached plan document.
@@ -43,13 +44,6 @@ export function computeTaskCounts(doc: XBriefDocument | null): { completed: numb
   return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };
 }
 
-// Poll intervals (ms)
-const POLL_INTERVALS = {
-  github:  { default: 30_000, min: 15_000, max: 300_000 },
-  linear:  { default: 30_000, min: 15_000, max: 300_000 },
-  rally:   { default: 120_000, min: 60_000, max: 600_000 },
-};
-
 // Linear full refresh interval (safety net)
 const LINEAR_FULL_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -59,6 +53,12 @@ interface TrackerState {
   lastFetchedIssues: any[];
   lastError: string | null;
   lastFetchedAt: string | null;
+  /** Consecutive unchanged scheduled polls (PAN-4507); only GitHub advances it. */
+  unchangedStreak: number;
+  intervalReason: PollIntervalReason;
+  nextPollAt: number | null;
+  /** Bumped by resetPollCadence so an in-flight poll does not advance the streak. */
+  cadenceGeneration: number;
 }
 
 interface GetIssuesCacheEntry {
@@ -259,6 +259,10 @@ export class IssueDataService {
         lastFetchedIssues: [],
         lastError: null,
         lastFetchedAt: null,
+        unchangedStreak: 0,
+        intervalReason: 'default',
+        nextPollAt: null,
+        cadenceGeneration: 0,
       };
     }
   }
@@ -561,6 +565,7 @@ export class IssueDataService {
     }
 
     this.pushSnapshot();
+    if (state) state.unchangedStreak = 0;
     this.scheduleNext(tracker);
   }
 
@@ -601,34 +606,50 @@ export class IssueDataService {
     const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
     if (!intervals) return;
 
+    // At most one armed timer per tracker.
+    if (state.timer) clearTimeout(state.timer);
     let delayMs: number;
     try {
-      const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
-      const effectiveInterval = Math.min(
-        Math.max(intervals.default + backoffMs, intervals.min),
-        intervals.max
-      );
-
-      // If the tracker is exhausted, suspend polling until the rate-limit window resets.
-      // This bypasses intervals.max so we don't wake up before the quota resets.
-      const suspendMs = this.cache.getSuspensionMs(tracker);
-      delayMs = effectiveInterval;
-      if (suspendMs > 0) {
-        delayMs = Math.min(suspendMs, 3_600_000);
+      // PAN-4507: unchanged backoff vs rate-limit backoff, then suspension (waits for the
+      // rate-limit reset, past intervals.max) and the PAN-4264 PAT REST pause.
+      const next = computePollDelay({
+        intervals,
+        unchangedStreak: state.unchangedStreak,
+        rateBackoffMs: this.cache.getBackoffMs(tracker, intervals.default),
+        suspendMs: this.cache.getSuspensionMs(tracker),
+        quotaPauseMs: tracker === 'github' ? patRestPauseDelayMs() : 0,
+      });
+      delayMs = next.delayMs;
+      state.intervalReason = next.reason;
+      if (next.reason === 'rate-limit-suspended') {
         console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
       }
     } catch (err: any) {
       console.error(`[IssueDataService] Cache read failed for ${tracker}; falling back to default interval:`, err.message);
       delayMs = intervals.default;
+      state.intervalReason = 'default';
+      const pauseMs = tracker === 'github' ? patRestPauseDelayMs() : 0;
+      if (pauseMs > delayMs) {
+        delayMs = pauseMs;
+        state.intervalReason = 'quota-pause';
+      }
     }
-    // PAN-4264: while the PAT REST bucket is paused, the GitHub poll waits for the pause end.
-    if (tracker === 'github') delayMs = Math.max(delayMs, patRestPauseDelayMs());
     state.currentInterval = delayMs;
+    state.nextPollAt = Date.now() + delayMs;
 
     state.timer = setTimeout(async () => {
+      state.timer = null;
+      state.nextPollAt = null;
+      const generation = state.cadenceGeneration;
       try {
         switch (tracker) {
-          case 'github': await this.pollGitHub(); break;
+          case 'github': {
+            // Only scheduled polls move the streak; a skipped poll (null) or a throw leaves it.
+            const changed = await this.pollGitHub();
+            if (changed === true) state.unchangedStreak = 0;
+            else if (changed === false && state.cadenceGeneration === generation) state.unchangedStreak++;
+            break;
+          }
           case 'linear': await this.pollLinear(); break;
           case 'rally': await this.pollRally(); break;
         }
@@ -992,17 +1013,18 @@ export class IssueDataService {
   // GitHub polling — uses Octokit REST + ETags (304 = FREE)
   // ---------------------------------------------------------------
 
-  private async pollGitHub(): Promise<void> {
+  /** Resolves to whether the issue list changed, or null when the poll was skipped. */
+  private async pollGitHub(): Promise<boolean | null> {
     // PAN-4264: the issue poller is non-essential — skip GitHub during a PAT REST pause.
-    if (patRestPauseDelayMs() > 0) return;
+    if (patRestPauseDelayMs() > 0) return null;
     return withGitHubCaller('issue-poller', () => this.pollGitHubRepos());
   }
 
-  private async pollGitHubRepos(): Promise<void> {
+  private async pollGitHubRepos(): Promise<boolean | null> {
     const config = getGitHubConfig();
     if (!config) {
       this.trackers.github.lastFetchedIssues = [];
-      return;
+      return null;
     }
 
     const allIssues: any[] = [];
@@ -1045,6 +1067,7 @@ export class IssueDataService {
       this.pushUpdated();
       this.pushMeta();
     }
+    return changed;
   }
 
   private async fetchGitHubRepoIssues(
