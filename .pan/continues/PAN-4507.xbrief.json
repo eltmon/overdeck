@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4507",
   "created": "2026-10-04T02:14:09.588Z",
-  "updated": "2026-10-04T02:44:11.879Z",
+  "updated": "2026-10-04T02:44:26.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
       "claimedBy": "agent-pan-4507",
       "claimedAt": "2026-10-04T02:43:21.438Z",
       "doneAt": "2026-10-04T02:44:11.879Z"
+    },
+    "docs-caching.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:44:26.155Z"
     }
   }
 }
