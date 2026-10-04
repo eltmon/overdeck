@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:22:58.960Z",
+  "updated": "2026-10-04T05:23:24.151Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Report-only change: the diff is .pan/drafts Markdown/HTML plus plan state, no code or test subject changed; the gate matched 'test' in a glossary role list. No test applies; evidence refs were checked with the PRD's ref checker (checked=75, no BAD) at 480f50ea7a0.",
+      "recordedAt": "2026-10-04T05:23:24.151Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
