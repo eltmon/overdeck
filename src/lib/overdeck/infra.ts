@@ -122,6 +122,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // pull-request sync sweep). Mirrors the init migration for existing DBs.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_pull_requests` (`conversation_id` text NOT NULL, `host` text NOT NULL, `repository` text NOT NULL, `number` integer NOT NULL, `url` text NOT NULL, `source` text NOT NULL, `linked_at` integer NOT NULL, `dismissed_at` integer, `snapshot_json` text, PRIMARY KEY(`conversation_id`, `host`, `repository`, `number`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
+  // PAN-4498: operator bookmarks on transcript messages. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_bookmarks` (`conversation_id` text NOT NULL, `message_id` text NOT NULL, `label` text NOT NULL, `message_created_at` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`conversation_id`, `message_id`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   // Gauntlet lanes: launch-time facts written once by the lane door (.pan/drafts/pan-4223.md).
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `parent_conversation_id` text REFERENCES `conversations`(`id`)');
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `gauntlet_run` text');
