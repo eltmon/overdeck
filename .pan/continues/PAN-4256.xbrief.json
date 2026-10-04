@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T04:13:43.085Z",
+  "updated": "2026-10-04T04:29:58.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-04T04:13:30.840Z"
     },
     "remote-fly-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4256",
-      "claimedAt": "2026-10-04T04:13:43.084Z"
+      "claimedAt": "2026-10-04T04:13:43.084Z",
+      "doneAt": "2026-10-04T04:29:58.086Z"
     }
   }
 }
