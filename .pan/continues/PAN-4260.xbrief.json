@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T04:12:23.028Z",
+  "updated": "2026-10-04T04:14:20.145Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-10-04T04:12:12.899Z"
     },
     "w9-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4260",
-      "claimedAt": "2026-10-04T04:12:23.028Z"
+      "claimedAt": "2026-10-04T04:12:23.028Z",
+      "doneAt": "2026-10-04T04:14:20.144Z"
     }
   }
 }
