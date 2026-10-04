@@ -83,6 +83,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageIndex,
   targetMessageNonce,
   onTargetMessageHandled,
+  bookmarksEnabled = false,
 }: MessagesTimelineProps) {
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -511,6 +512,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                       onConfirmCommand={onConfirmCommand}
                       onOpenTerminal={onOpenTerminal}
                       onPaneChoiceAnswered={onPaneChoiceAnswered}
+                      bookmarkable={bookmarksEnabled}
                     />
                     {markersForRow?.map((marker) => (
                       <RoundDivider
@@ -554,6 +556,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 onConfirmCommand={onConfirmCommand}
                 onOpenTerminal={onOpenTerminal}
                 onPaneChoiceAnswered={onPaneChoiceAnswered}
+                bookmarkable={bookmarksEnabled}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider

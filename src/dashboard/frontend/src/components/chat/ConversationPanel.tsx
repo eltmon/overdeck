@@ -1471,6 +1471,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           targetMessageIndex={targetMessageIndex}
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
+          bookmarksEnabled
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a
