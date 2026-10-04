@@ -8,6 +8,7 @@
 export {
   appendCostEvent,
   readEvents,
+  readEventsSince,
   tailEvents,
   readEventsFromLine,
   getLastEventMetadata,

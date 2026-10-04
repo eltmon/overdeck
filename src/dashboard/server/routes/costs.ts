@@ -22,6 +22,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   readEvents,
+  readEventsSince,
   tailEvents,
   migrateAllSessions,
   rebuildCache,
@@ -59,13 +60,14 @@ const getCostsSummaryRoute = HttpRouter.add(
     const urlOpt = HttpServerRequest.toURL(request);
     const projectPrefix = (Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('project') : null)?.toUpperCase() ?? null;
 
-    return yield* Effect.try({
-      try: () => {
+    return yield* Effect.tryPromise({
+      try: async () => {
         const today = new Date().toISOString().split('T')[0];
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         type Entry = {
+          ts?: string;
           issueId?: string;
           cost?: number;
           input?: number;
@@ -79,9 +81,12 @@ const getCostsSummaryRoute = HttpRouter.add(
             ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
             : entries;
 
-        const todayEntries = scope(readEvents({ startDate: today }));
-        const weekEntries = scope(readEvents({ startDate: weekAgo }));
-        const monthEntries = scope(readEvents({ startDate: monthAgo }));
+        // PAN-4543: one async scan of the month window; week and today are
+        // subsets. Three sync full-log scans stalled the event loop ~4.8 s.
+        const monthEntries = scope(await readEventsSince(monthAgo));
+        const since = (start: string) => (e: Entry) => e.ts === undefined || e.ts >= start;
+        const weekEntries = monthEntries.filter(since(weekAgo));
+        const todayEntries = weekEntries.filter(since(today));
 
         const summarize = (entries: Entry[]) => ({
           totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
