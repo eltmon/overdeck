@@ -127,3 +127,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Run rule until PAN-4532 lands: never approve a dashboard restart while any
   `dist/verification-worker.js` process is alive. Deploy in a gap between
   verifications.
+- Recovery for a restart-lost dispatch (until PAN-4532 lands): when the
+  journal shows `verification.passed` but no reviewer spawned, and the newest
+  `.overdeck/verification/*.json` `head8` equals both the workspace HEAD and
+  the PR `headRefOid` with a clean tree, run `pan review restart <id>`. It
+  dispatches the reviewer without re-verifying. Letting the deacon re-request
+  instead re-runs every gate. Used on PAN-4257 (2026-10-04 04:57).
