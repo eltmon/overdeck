@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4514",
   "created": "2026-10-04T02:58:32.050Z",
-  "updated": "2026-10-04T03:20:32.129Z",
+  "updated": "2026-10-04T03:20:48.866Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "hook-guard.ac5": {
       "status": "completed",
       "doneAt": "2026-10-04T03:20:32.128Z"
+    },
+    "detector-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:20:48.865Z"
     }
   }
 }
