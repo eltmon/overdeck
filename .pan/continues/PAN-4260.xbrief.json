@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T03:09:57.243Z",
+  "updated": "2026-10-04T03:10:04.371Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4260",
       "claimedAt": "2026-10-04T02:58:03.517Z",
       "doneAt": "2026-10-04T03:09:57.242Z"
+    },
+    "w4-runtime-spawn-producers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T03:10:04.371Z"
     }
   }
 }
