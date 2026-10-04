@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4506",
   "created": "2026-10-04T02:08:07.398Z",
-  "updated": "2026-10-04T02:58:58.563Z",
+  "updated": "2026-10-04T02:59:11.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "tier1-preview-truncation.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T02:58:58.562Z"
+    },
+    "tier1-preview-truncation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:59:11.799Z"
     }
   }
 }
