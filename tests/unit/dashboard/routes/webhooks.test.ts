@@ -34,6 +34,12 @@ vi.mock('../../../../src/lib/webhook-handlers.js', () => ({
   isTrackedRepository: vi.fn(() => true),
 }));
 
+const { resetPollCadence } = vi.hoisted(() => ({ resetPollCadence: vi.fn() }));
+
+vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
+  getSharedIssueService: () => ({ resetPollCadence }),
+}));
+
 const mockExistsSync = existsSync as unknown as ReturnType<typeof vi.fn>;
 const mockReadFile = readFile as unknown as ReturnType<typeof vi.fn>;
 const mockIsTrackedRepository = isTrackedRepository as unknown as ReturnType<typeof vi.fn>;
@@ -217,5 +223,42 @@ describe('runWebhookHandler', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('[webhook] Dispatch failed for check_run:', error);
 
     consoleErrorSpy.mockRestore();
+  });
+
+  describe('poll cadence reset (PAN-4507)', () => {
+    async function send(event: string) {
+      const body = JSON.stringify({ repository: { full_name: 'test-owner/test-repo' }, action: 'edited' });
+      const { createHmac } = await import('node:crypto');
+      const signature = `sha256=${createHmac('sha256', 'test-webhook-secret').update(body, 'utf-8').digest('hex')}`;
+      const response = await Effect.runPromise(runWebhookHandler(body, {
+        'x-github-event': event,
+        'x-hub-signature-256': signature,
+      }));
+      await new Promise((r) => setImmediate(r));
+      return response;
+    }
+
+    it('resets the GitHub poll cadence for an issues event from a tracked repo', async () => {
+      const response = await send('issues');
+
+      expect(response.status).toBe(200);
+      expect(resetPollCadence).toHaveBeenCalledTimes(1);
+      expect(resetPollCadence).toHaveBeenCalledWith('github');
+    });
+
+    it('does not reset the cadence for a check_run event', async () => {
+      await send('check_run');
+
+      expect(resetPollCadence).not.toHaveBeenCalled();
+    });
+
+    it('rejects an issues event from an untracked repo without a reset', async () => {
+      mockIsTrackedRepository.mockReturnValue(false);
+
+      const response = await send('issues');
+
+      expect(response.status).toBe(403);
+      expect(resetPollCadence).not.toHaveBeenCalled();
+    });
   });
 });

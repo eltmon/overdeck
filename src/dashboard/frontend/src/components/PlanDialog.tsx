@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { KNOWN_HARNESSES } from '@overdeck/contracts';
+import { DEFAULT_EFFORT, KNOWN_HARNESSES, type EffortLevel } from '@overdeck/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
@@ -11,6 +11,7 @@ import { TasksPanel } from './TasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
 import { PlanOptionCheckbox } from './PlanOptionCheckbox';
+import { PlanEffortPicker } from './PlanEffortPicker';
 import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
 
 interface PlanDialogProps {
@@ -101,7 +102,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
   const [harnessOverride, setHarnessOverride] = useState<Harness>('claude-code');
   const harnessOverrideTouched = useRef(false);
-  const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
+  const [effort, setEffort] = useState<EffortLevel>(DEFAULT_EFFORT);
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
@@ -863,30 +864,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         )}
 
                         {/* Effort level */}
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-1.5 block">Effort</label>
-                          <div className="flex gap-2">
-                            {(['low', 'medium', 'high'] as const).map((level) => (
-                              <button
-                                key={level}
-                                type="button"
-                                onClick={() => setEffort(level)}
-                                className={`flex-1 py-1.5 text-sm rounded-lg border transition-colors capitalize ${
-                                  effort === level
-                                    ? 'bg-signal-review/20 border-signal-review text-signal-review font-medium'
-                                    : 'bg-popover border-border text-muted-foreground hover:text-foreground hover:border-border/80'
-                                }`}
-                              >
-                                {level}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {effort === 'low' && 'Quick planning — concise tasks, minimal exploration'}
-                            {effort === 'medium' && 'Balanced — standard planning depth (default)'}
-                            {effort === 'high' && 'Deep analysis — thorough exploration, edge cases, tradeoffs'}
-                          </p>
-                        </div>
+                        <PlanEffortPicker effort={effort} onChange={setEffort} />
                       </div>
 
                       <div className="flex gap-3">

@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-4509",
+  "created": "2026-10-04T02:10:08.078Z",
+  "updated": "2026-10-04T02:23:17.446Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "scanner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:10:08.078Z",
+      "doneAt": "2026-10-04T02:13:39.130Z"
+    },
+    "cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:13:50.771Z",
+      "doneAt": "2026-10-04T02:15:37.126Z"
+    },
+    "fix-currency": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:15:42.528Z",
+      "doneAt": "2026-10-04T02:16:44.973Z"
+    },
+    "wire-lint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:16:49.182Z",
+      "doneAt": "2026-10-04T02:17:34.851Z"
+    },
+    "docs-releasing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4509",
+      "claimedAt": "2026-10-04T02:17:38.987Z",
+      "doneAt": "2026-10-04T02:18:24.056Z"
+    },
+    "scanner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:19:55.798Z"
+    },
+    "scanner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:27.663Z"
+    },
+    "scanner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:41.096Z"
+    },
+    "scanner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:53.598Z"
+    },
+    "cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:06.356Z"
+    },
+    "cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:19.734Z"
+    },
+    "cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:32.871Z"
+    },
+    "cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:46.039Z"
+    },
+    "fix-currency.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:57.860Z"
+    },
+    "fix-currency.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:22:09.496Z"
+    },
+    "wire-lint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:22:21.801Z"
+    },
+    "wire-lint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:22:36.038Z"
+    },
+    "wire-lint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:22:50.642Z"
+    },
+    "docs-releasing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:23:04.561Z"
+    },
+    "docs-releasing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:23:17.446Z"
+    }
+  }
+}

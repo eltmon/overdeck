@@ -1,0 +1,393 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:07:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4509: Docs lint: fail on dollar signs that Mintlify renders as math, and bare less-than before a digit",
+    "updated": "2026-10-04T02:09:54.195Z"
+  },
+  "plan": {
+    "id": "pan-4509",
+    "title": "Docs lint: fail on dollar signs that Mintlify renders as math, and bare less-than before a digit",
+    "status": "running",
+    "uid": "ddd3cfe1-3009-49ec-b4f0-d71902fbb524",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:07:53Z",
+    "updated": "2026-10-04T02:09:54.195Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4509",
+        "label": "PAN-4509",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4509.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "lint",
+      "mintlify",
+      "ci"
+    ],
+    "narratives": {
+      "Problem": "Mintlify renders a pair of $ on a line as LaTeX math, and on a line with inline code it does so even for \\$. Model prices rendered as formula glyphs until hand-fixed to &#36; (commits 2050875, bb8ffba). Nothing in npm run lint or CI catches a regression. A bare < before a digit also breaks strict MDX. Four published lines on main fail the rule today (guides/legacy-codebases.mdx:95-97, reference/token-spend-report.mdx:93).",
+      "Proposal": "Extend the existing but unwired scripts/lint-docs.js with an exported findMdxProblems(content) scanner (any $ or \\$ and any <digit in prose fails; fenced code, inline code and frontmatter are skipped), a docs.json navigation walk over every published page, and a --root flag. Keep its old docs/*.md checks. Wire it as lint:docs at the end of the npm run lint chain (it lands in the CI core lint group automatically via run-lint-group.mjs). Fix the four offending lines with &#36;. Document the rule in docs/RELEASING.md's changelog section. Full detail and the scanner code are in the PRD .pan/drafts/PAN-4509.md.",
+      "NonGoals": "- Checking unpublished .mdx files or snippets/*.mdx\n- Checking YAML frontmatter\n- Special-casing JSX expressions, JSX attribute strings or {/* */} comments\n- An opt-out marker for intentional LaTeX\n- Multi-line inline code spans (spans are matched within one line)\n- Any other MDX validation (unclosed tags, broken links)\n- Changing the existing docs/*.md empty-file and trailing-newline checks\n- Editing scripts/run-lint-group.mjs or .github/workflows/ci.yml"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extend scripts/lint-docs.js instead of creating a new lint script.",
+        "rationale": "It is the existing docs lint home, unwired today, and its old docs/*.md checks pass on main (node scripts/lint-docs.js exits 0), so wiring it adds them back to CI at no cost."
+      },
+      {
+        "summary": "Fail on any $ in prose, not only pairs.",
+        "rationale": "The issue proposes 'any $ or \\$'; a single $ becomes a pair as soon as a second price lands on the line, so the rule must not count."
+      },
+      {
+        "summary": "Skip YAML frontmatter.",
+        "rationale": "Frontmatter is not MDX prose; &#36; there would appear as a literal entity in page metadata."
+      },
+      {
+        "summary": "No opt-out marker and no JSX/comment special-casing.",
+        "rationale": "No published page uses real LaTeX and no JSX or comment on a published page contains $ today; adding exemptions would be speculative."
+      },
+      {
+        "summary": "The page set is the docs.json navigation walk; a listed page with no file is an error.",
+        "rationale": "The issue scopes the rule to every page listed in docs.json; a missing file would otherwise be silently skipped."
+      },
+      {
+        "summary": "Wire as lint:docs appended to the lint chain without touching CI config.",
+        "rationale": "scripts/run-lint-group.mjs puts every step not in HEAVY_STEPS into the core CI group, so CI picks it up automatically."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-04-PAN-4509-docs-lint-fail-on-dollar-signs-that-mintlify-renders-as-math-and-bare-less-than-before-a-digit.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "scanner",
+        "title": "Exported MDX prose scanner in scripts/lint-docs.js with string-fixture tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:07:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4509",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-docs.js",
+            "tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/lint-docs.test.ts passes with all findMdxProblems cases green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 steps 1, 2 and the findMdxProblems part of step 5. Restructure scripts/lint-docs.js so its existing top-level docs/*.md checks move behind an isMain guard (pattern: scripts/windows-smoke/summarize.mjs line 175, const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]). Keep the old checks' behavior identical. Add a header comment citing PAN-4509 and commits 2050875/bb8ffba explaining Mintlify math pairing and why &#36; and &lt; are the fixes. Export stripInlineCode(line) and findMdxProblems(content) exactly as specified in the PRD code block (DOLLAR_MESSAGE 'dollar sign in prose renders as math on Mintlify — write &#36; instead', LT_DIGIT_MESSAGE 'bare \"<\" before a digit breaks strict MDX — write &lt; instead'; returns {line, message}[], 1-based lines, one message per rule per line). Create tests/unit/scripts/lint-docs.test.ts importing these from '../../../scripts/lint-docs.js' (precedent: tests/unit/scripts/windows-smoke-summarize.test.ts) with cases: prose $2/M, escaped \\$2/M, single $54,116, &#36;2/M, inline `$HOME`, double-backtick span containing $, $ in prose on a line that also has inline code, backtick fence with $ npm i, fence indented inside <Steps>, tilde fence, frontmatter description with $, <3 retries, &lt;3, 'a < 3', and correct line numbers in multi-line content. Tests use string fixtures only; never read real repo pages; no skipIf/.only."
+        },
+        "items": [
+          {
+            "id": "scanner.ac1",
+            "title": "Given content with $2/M, \\$2/M or a single $54,116 in prose, findMdxProblems returns one problem at that 1-based line whose message contains &#36;",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scanner.ac2",
+            "title": "Given $ only inside a backtick fence, an indented fence, a tilde fence, a single- or double-backtick inline code span, or frontmatter, findMdxProblems returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scanner.ac3",
+            "title": "Given a prose line '<3 retries', findMdxProblems returns a problem whose message contains &lt;; given '&lt;3' or 'a < 3' or '&#36;2' it returns none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scanner.ac4",
+            "title": "Importing scripts/lint-docs.js from the test does not run the docs/*.md checks or call process.exit (the isMain guard holds), and npx vitest run tests/unit/scripts/lint-docs.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli",
+        "title": "docs.json published-page walk and --root CLI in scripts/lint-docs.js with tmpdir CLI tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:07:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4509",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-docs.js",
+            "tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-docs.test.ts",
+            "node scripts/lint-docs.js --root ."
+          ],
+          "expected_outputs": [
+            "tests/unit/scripts/lint-docs.test.ts passes including the CLI fixture cases",
+            "node scripts/lint-docs.js --root . prints file:line problems only for the four known currency lines until the fix-currency item lands, and exits 0 after it"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 steps 3, 4 and the CLI part of step 5. Export collectPublishedPages(docsJson): recursively collect every string reached under docsJson.navigation through tabs, groups and pages arrays, where a pages entry may be a { group, pages } object. Under isMain: parse --root <dir> (default process.cwd()); run the existing docs/*.md checks against <root>/docs unchanged; read <root>/docs.json, collect pages, resolve each to <root>/<path>.mdx else <root>/<path>.md; a page with neither prints 'docs.json lists \"<path>\" but no <path>.mdx or <path>.md exists'; run findMdxProblems on each file and print '<relative path>:<line>: <message>' via console.error. Exit 1 on any error; on success print 'docs lint passed (<n> docs files, <m> published pages)'. In tests/unit/scripts/lint-docs.test.ts add: a collectPublishedPages test with a nested { group, pages } object; CLI tests modeled on tests/unit/scripts/lint-dist-externals.test.ts (mkdtempSync root, afterEach rmSync, execFileSync node SCRIPT --root root): bad.mdx with 'Price: $2/M' on line 3 listed in docs.json plus docs/ok.md ending in a newline -> exit status 1 and stderr contains 'bad.mdx:3:' and '&#36;'; clean fixture -> exit 0; docs.json listing a missing page -> exit 1 and stderr names the page."
+        },
+        "items": [
+          {
+            "id": "cli.ac1",
+            "title": "Given a tmpdir root whose docs.json lists bad and bad.mdx has $2/M on line 3, node scripts/lint-docs.js --root <tmpdir> exits 1 and stderr contains 'bad.mdx:3:' and '&#36;'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac2",
+            "title": "Given a clean tmpdir root (docs/ok.md ending in a newline, published pages with &#36; only), the CLI exits 0 and prints 'docs lint passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac3",
+            "title": "Given docs.json listing a page with no .mdx or .md file, the CLI exits 1 and stderr names that page path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac4",
+            "title": "collectPublishedPages returns page strings from a pages array that contains a nested { group, pages } object, in document order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-currency",
+        "title": "Replace the four currency dollar signs on published pages with &#36;",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4509",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/legacy-codebases.mdx",
+            "reference/token-spend-report.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cF '$' guides/legacy-codebases.mdx reference/token-spend-report.mdx"
+          ],
+          "expected_outputs": [
+            "both files report a count of 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. In guides/legacy-codebases.mdx lines 95-97 change $200K, $50K and **$500K/year** to &#36;200K, &#36;50K and **&#36;500K/year**. In reference/token-spend-report.mdx line 93 change '- **Total spend:** $54,116' to '- **Total spend:** &#36;54,116'. Change no other text. These are the only $ characters in either file."
+        },
+        "items": [
+          {
+            "id": "fix-currency.ac1",
+            "title": "When grep -cF '$' guides/legacy-codebases.mdx reference/token-spend-report.mdx runs, it prints a count of 0 for both files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-currency.ac2",
+            "title": "When the diff is read, guides/legacy-codebases.mdx lines 95-97 contain &#36;200K/year, &#36;50K/year and **&#36;500K/year**, reference/token-spend-report.mdx line 93 contains '**Total spend:** &#36;54,116', and the rest of each line is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-lint",
+        "title": "Add lint:docs to package.json and append it to the npm run lint chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T02:07:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4509",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "node scripts/run-lint-group.mjs --list"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs exits 0 and prints 'docs lint passed'",
+            "the core line of --list output includes 'npm run lint:docs'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In package.json add the script \"lint:docs\": \"node scripts/lint-docs.js\" beside the other lint:* scripts, and append ' && npm run lint:docs' to the very end of the lint script (line 114, after npm run lint:effect-diagnostics). Do not edit scripts/run-lint-group.mjs or .github/workflows/ci.yml: any step not in its HEAVY_STEPS map runs in the core CI lint group automatically. Requires the scanner and cli items (the script must have the new checks) and fix-currency (main must pass before the gate turns on)."
+        },
+        "items": [
+          {
+            "id": "wire-lint.ac1",
+            "title": "npm run lint:docs exits 0 on the branch and prints 'docs lint passed' with a published-page count of 59 or more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-lint.ac2",
+            "title": "node scripts/run-lint-group.mjs --list prints 'npm run lint:docs' on the core line, and the package.json lint script ends with '&& npm run lint:docs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-lint.ac3",
+            "title": "Given a temporary local edit adding '$2/M' to a prose line of changelog.mdx, npm run lint:docs exits 1 and names changelog.mdx with the line number and &#36; (edit reverted afterwards, not committed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-releasing",
+        "title": "Document the &#36; and &lt; rule in docs/RELEASING.md's changelog section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:07:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4509",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RELEASING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'lint:docs' docs/RELEASING.md"
+          ],
+          "expected_outputs": [
+            "a line in the 'Update the public changelog' section mentions &#36;, &lt; and npm run lint:docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In docs/RELEASING.md, section '## Update the public changelog' (line 118), extend step 1 (drafting the entries) with: write every currency dollar as &#36; (for example &#36;2/M input) and every < before a digit as &lt;, because Mintlify renders paired $ as math (even escaped as \\$ on a line with inline code) and strict MDX rejects < before a digit; npm run lint:docs, part of npm run lint and CI, fails on either. Inside RELEASING.md write the entities in inline code (`&#36;`, `&lt;`) so the rendered markdown shows them literally."
+        },
+        "items": [
+          {
+            "id": "docs-releasing.ac1",
+            "title": "Step 1 of the 'Update the public changelog' section in docs/RELEASING.md contains the instruction to write currency as &#36; and < before a digit as &lt;",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-releasing.ac2",
+            "title": "The same step names npm run lint:docs as the check that fails on a raw $ or bare < before a digit and says it runs in npm run lint and CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scanner",
+        "to": "cli",
+        "type": "blocks"
+      },
+      {
+        "from": "cli",
+        "to": "wire-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-currency",
+        "to": "wire-lint",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

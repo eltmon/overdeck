@@ -108,6 +108,38 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).not.toContain('PROBE: no findings');
   });
 
+  it('renders the deep-analysis section and probe pass for xhigh effort, naming the actual level', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', 'xhigh');
+
+    expect(prompt).toContain('## Planning Effort: Xhigh (Deep Analysis)');
+    expect(prompt).toContain('XHIGH effort planning');
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).not.toContain('LOW effort planning');
+  });
+
+  it('renders the deep-analysis section and probe pass for max effort, naming the actual level', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', 'max');
+
+    expect(prompt).toContain('## Planning Effort: Max (Deep Analysis)');
+    expect(prompt).toContain('MAX effort planning');
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).not.toContain('LOW effort planning');
+  });
+
+  it('renders the low-effort section without a probe pass for low effort', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', 'low');
+
+    expect(prompt).toContain('LOW effort planning');
+    expect(prompt).not.toContain('Probe Pass (required before finalize)');
+  });
+
+  it('renders no effort section and no probe pass for medium effort', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', 'medium');
+
+    expect(prompt).not.toContain('## Planning Effort');
+    expect(prompt).not.toContain('Probe Pass (required before finalize)');
+  });
+
   it('throws when planningModel is missing instead of falling back to a hardcoded model', async () => {
     await expect(
       buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined as unknown as string),

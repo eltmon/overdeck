@@ -23,6 +23,8 @@ import { resolveGitHubIssue, type IssueResolution } from '../../lib/tracker-util
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 import { attachHintLines } from '../../lib/terminal-backends/attach-hint.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { InvalidEffortError, resolveEffort, type EffortConfigSlice, type ResolvedEffort } from '../../lib/agents/resolve-effort.js';
 
 const execAsync = promisify(exec);
 
@@ -352,9 +354,28 @@ async function clearIdlePriorStrike(plan: Pick<StrikePlan, 'sessionName'>, now =
   return true;
 }
 
+/**
+ * Resolves pan strike's effort once through resolveEffort (role 'strike'),
+ * so the dry-run print and the launched agent always agree. Throws the
+ * resolver's InvalidEffortError unchanged for a bogus `--effort`; runOne
+ * turns that into a readable message before it reaches the operator.
+ */
+function resolveStrikeEffort(issueId: string, options: StrikeOptions, config?: EffortConfigSlice): ResolvedEffort {
+  return resolveEffort({ explicit: options.effort, role: 'strike', issueId, model: options.model, harness: options.harness, config });
+}
+
 async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
   const spinner = ora(`Striking ${issueId}...`).start();
   try {
+    let resolvedEffort: ResolvedEffort;
+    try {
+      resolvedEffort = resolveStrikeEffort(issueId, options);
+    } catch (error) {
+      if (error instanceof InvalidEffortError) {
+        throw new Error(`Invalid --effort value: ${options.effort}. Expected one of ${EFFORT_LEVELS.join(', ')}.`);
+      }
+      throw error;
+    }
     const plan = await resolveStrikePlan(planStrike(issueId));
 
     if (options.dryRun) {
@@ -365,7 +386,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
       console.log(`  Base:       ${plan.baseBranch} (${plan.forge})`);
       console.log(`  Session:    ${plan.sessionName}`);
       console.log(`  Harness:    ${options.harness ?? 'claude-code'}`);
-      console.log(`  Effort:     ${options.effort ?? 'medium'}`);
+      console.log(`  Effort:     ${resolvedEffort.effort} (${resolvedEffort.source})`);
       if (options.model) console.log(`  Model:      ${options.model}`);
       return;
     }
@@ -386,7 +407,8 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
       role: 'strike',
       prompt,
       startedBy: 'operator:cli:pan-strike',
-      effort: options.effort,
+      effort: resolvedEffort.effort,
+      effortSource: resolvedEffort.source,
     });
 
     spinner.succeed(`Strike agent spawned: ${agent.id}`);
@@ -437,6 +459,7 @@ export async function strikeCommand(ids: string[], options: StrikeOptions = {}):
 export const __testInternals = {
   planStrike,
   resolveStrikePlan,
+  resolveStrikeEffort,
   buildStrikePrompt,
   clearIdlePriorStrike,
   ensureStrikeWorktree,
