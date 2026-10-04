@@ -426,18 +426,27 @@ export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Pr
 }
 
 /** Patch diff since a given base commit. */
-export async function diffPatchSinceCommit(cwd: string, baseCommit: string, filePath?: string): Promise<string> {
-  const args = ['diff', '--patch', '--minimal', '--no-color', baseCommit]
+export async function diffPatchSinceCommit(
+  cwd: string,
+  baseCommit: string,
+  filePath?: string,
+  options: DiffOptions = {},
+): Promise<string> {
+  const args = ['diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), baseCommit]
   if (filePath) args.push('--', filePath)
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }
 
 /** Patch diff for specific file paths against HEAD. */
-export async function diffPatchFilesAgainstHead(cwd: string, filePaths: string[]): Promise<string> {
+export async function diffPatchFilesAgainstHead(
+  cwd: string,
+  filePaths: string[],
+  options: DiffOptions = {},
+): Promise<string> {
   if (filePaths.length === 0) return ''
   const { stdout } = await execFileAsync('git', [
-    'diff', '--patch', '--minimal', '--no-color', 'HEAD', '--', ...filePaths,
+    'diff', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), 'HEAD', '--', ...filePaths,
   ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }

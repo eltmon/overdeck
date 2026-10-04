@@ -13,6 +13,7 @@ import {
   diffPatchFilesAgainstHead,
   type TurnDiffFileChange,
 } from '../checkpoint/checkpoint-manager.js';
+import { diffOptionArgs, type DiffOptions } from '../diffs/diff-output.js';
 import {
   getConversationById,
   getConversationByName,
@@ -154,15 +155,18 @@ async function diffPatchForFiles(
   repoRoot: string,
   createdAt: string,
   filePaths: string[],
+  options: DiffOptions = {},
 ): Promise<string> {
   const baseCommit = await findCommitAtTime(repoRoot, createdAt);
   if (!baseCommit) {
-    return diffPatchFilesAgainstHead(repoRoot, filePaths);
+    return diffPatchFilesAgainstHead(repoRoot, filePaths, options);
   }
 
   const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
+  // Only constant flags from diffOptionArgs join this command string.
+  const optionFlags = diffOptionArgs(options).map(arg => ` ${arg}`).join('');
   const { stdout } = await promisify(exec)(
-    `git diff --patch --minimal --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git diff --patch --minimal --no-color${optionFlags} ${baseCommit} -- ${quotedPaths}`,
     { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
   );
   return stdout;
@@ -290,6 +294,7 @@ export async function getConversationDiffs(
 export async function getConversationDiffFull(
   name: string,
   deps: ConversationDiffDependencies,
+  options: DiffOptions = {},
 ): Promise<ConversationDiffResult> {
   try {
     const conv = getConversationByName(name);
@@ -302,7 +307,7 @@ export async function getConversationDiffFull(
     if (cwdRepoRoot) {
       const baseCommit = await findCommitAtTime(cwdRepoRoot, conv.createdAt);
       if (baseCommit) {
-        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit);
+        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, undefined, options);
         if (patch) patches.push(patch);
       }
     }
@@ -323,7 +328,7 @@ export async function getConversationDiffFull(
     for (const [repoRoot, filePaths] of filesByRepo) {
       if (repoRoot === cwdRepoRoot) continue;
       try {
-        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths);
+        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths, options);
         if (patch) patches.push(patch);
       } catch {
         // file may have been committed or repo unavailable
@@ -343,6 +348,7 @@ export async function getConversationDiffTurn(
   turnId: string,
   fileFilter: string | undefined,
   deps: ConversationDiffDependencies,
+  options: DiffOptions = {},
 ): Promise<ConversationDiffResult> {
   try {
     const conv = lookupConversation(name);
@@ -355,7 +361,7 @@ export async function getConversationDiffTurn(
     if (cwdRepoRoot) {
       const baseCommit = await findCommitAtTime(cwdRepoRoot, conv.createdAt);
       if (baseCommit) {
-        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter);
+        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter, options);
         if (patch) patches.push(patch);
       }
     }
@@ -374,7 +380,7 @@ export async function getConversationDiffTurn(
     for (const [repoRoot, filePaths] of filesByRepo) {
       if (repoRoot === cwdRepoRoot) continue;
       try {
-        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths);
+        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths, options);
         if (patch) patches.push(patch);
       } catch {
         // file may have been committed or repo unavailable

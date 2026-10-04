@@ -8,6 +8,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn } from '../../../lib/overdeck/conversation-diffs.js';
 import { getCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { diffOptionsFromSearchParams } from '../../../lib/diffs/diff-output.js';
 import { jsonResponse } from '../http-helpers.js';
 import { validateOrigin } from './origin-validation.js';
 
@@ -45,8 +46,9 @@ const getConversationDiffFullRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const diffOptions = diffOptionsFromSearchParams(new URL(request.url, 'http://localhost').searchParams);
     return yield* Effect.promise(async () => {
-      const response = await getConversationDiffFull(name, conversationDiffDependencies);
+      const response = await getConversationDiffFull(name, conversationDiffDependencies, diffOptions);
       return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
@@ -66,8 +68,9 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     const turnId = params['turnId'] ?? '';
     const reqUrl = new URL(request.url, 'http://localhost');
     const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
+    const diffOptions = diffOptionsFromSearchParams(reqUrl.searchParams);
     return yield* Effect.promise(async () => {
-      const response = await getConversationDiffTurn(name, turnId, fileFilter, conversationDiffDependencies);
+      const response = await getConversationDiffTurn(name, turnId, fileFilter, conversationDiffDependencies, diffOptions);
       return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
