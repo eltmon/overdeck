@@ -142,3 +142,17 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   lands, and check that the journal has no later `review.requested` from
   deacon-lite first. Do not kill a duplicate worker: the supervisor records a
   killed worker as an `error`, which feeds back to the agent and adds a round.
+
+### Deploys blocked by a comment the boot preflight reads as an import → PAN-4541 (2026-10-04, critical)
+
+- Every `pan reload` since `66777e339e4` (PAN-4508) aborts with "Deployment
+  cannot resolve custom from …/dist/dashboard/server.js". The preflight's
+  regex scanner (`src/lib/bundle-imports.ts` line 16) matches `from "custom"`
+  in a JSDoc comment PAN-4508 added to `src/lib/jev/settings-validation.ts`.
+  The old dashboard keeps running (the preflight works); nothing ships.
+- Learning: a failed reload leaves the gate `idle` and only says why in the
+  reload log, so a deploy watcher that only checks `buildCommit` sees
+  "not deployed" and nothing else. Read the newest `reload-*.log` after every
+  reload attempt.
+- Learning: a background deploy loop ran twice (origin unknown), which could
+  race two reloads. Guard any deploy script with `flock`.
