@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:41:38.083Z",
+  "updated": "2026-10-04T05:41:53.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "merged-exit.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T05:41:38.083Z"
+    },
+    "shelf-rename.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:53.082Z"
     }
   }
 }
