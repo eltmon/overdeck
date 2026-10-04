@@ -160,3 +160,31 @@ describe('GET /api/diffs/compare (PAN-4503)', () => {
     expect(body.code).toBe('REPO_NOT_ALLOWED');
   });
 });
+
+describe('GET /api/diffs/refs (PAN-4503)', () => {
+  it('lists branches, peeled tags and recent commits, and never checkpoint refs', async () => {
+    const { status, body } = await get(`/api/diffs/refs?${new URLSearchParams({ repo }).toString()}`);
+    expect(status).toBe(200);
+    expect(body.repoRoot).toBe(repo);
+    expect(body.head).toEqual({ branch: 'main', sha: shaB });
+
+    const branchNames = body.branches.map((b: { name: string }) => b.name);
+    expect(branchNames).toEqual(expect.arrayContaining(['main', 'left', 'right', 'unrelated']));
+    expect(body.branches.every((b: { remote: boolean }) => b.remote === false)).toBe(true);
+
+    expect(body.tags).toEqual([{ name: 'v1', sha: shaA }]);
+
+    const newest = git(repo, 'log', '--branches', '--tags', '--date-order', '-n', '1', '--format=%H').trim();
+    expect(body.commits[0].sha).toBe(newest);
+    expect(body.commits[0]).toMatchObject({ shortSha: expect.any(String), subject: 'unrelated', date: expect.any(String) });
+
+    expect(JSON.stringify(body)).not.toContain('refs/pan');
+    expect(branchNames.some((name: string) => name.includes('agent-ws'))).toBe(false);
+  });
+
+  it('returns 400 REPO_NOT_ALLOWED for a repo outside the allowed roots', async () => {
+    const { status, body } = await get(`/api/diffs/refs?${new URLSearchParams({ repo: join(outsideRoot, 'repo') }).toString()}`);
+    expect(status).toBe(400);
+    expect(body.code).toBe('REPO_NOT_ALLOWED');
+  });
+});

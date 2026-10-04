@@ -98,6 +98,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents/:agentId/diffs/vs-main',                   kind: 'http', disposition: 'RELOCATE',   door: 'Diffs domain' },
   { surface: 'POST /api/agents/:agentId/diffs/test-checkpoint',          kind: 'http', disposition: 'RELOCATE',   door: 'Diffs domain' },
   { surface: 'GET /api/diffs/compare',                                   kind: 'http', disposition: 'RELOCATE',   door: 'Diffs domain' },
+  { surface: 'GET /api/diffs/refs',                                      kind: 'http', disposition: 'RELOCATE',   door: 'Diffs domain' },
   { surface: 'GET /api/agents/:id/handoff/suggestion',                   kind: 'http', disposition: 'RELOCATE',   door: 'Conversations' },
   { surface: 'POST /api/agents/:id/handoff',                             kind: 'http', disposition: 'RELOCATE',   door: 'Conversations' },
   { surface: 'GET /api/agents/:id/cost',                                 kind: 'http', disposition: 'RELOCATE',   door: 'CostResolver.byAgent' },

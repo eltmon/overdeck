@@ -42,6 +42,16 @@ export interface CompareResponse {
   diff?: string
 }
 
+export interface RepoRefsResponse {
+  repoRoot: string
+  /** branch is null when HEAD is detached or unborn; sha is null when unborn. */
+  head: { branch: string | null; sha: string | null }
+  branches: Array<{ name: string; sha: string; remote: boolean }>
+  /** sha is the peeled commit for annotated tags. */
+  tags: Array<{ name: string; sha: string }>
+  commits: Array<{ sha: string; shortSha: string; subject: string; date: string }>
+}
+
 export type CompareResult<T> = { ok: true; value: T } | { ok: false; failure: CompareError }
 
 /** Realpath'd roots: `containing` accepts any path inside; `exact` accepts only the path itself. */
@@ -196,4 +206,54 @@ export async function compareRefs(input: {
     )
   }
   return ok(response)
+}
+
+async function gitOrEmpty(repoRoot: string, args: string[]): Promise<string> {
+  try {
+    return await runGit(repoRoot, args)
+  } catch {
+    return ''
+  }
+}
+
+function nulFields(stdout: string): string[][] {
+  return stdout.split('\n').filter(Boolean).map((line) => line.split('\0'))
+}
+
+/**
+ * Branches, tags and recent commits for the compare picker. Only refs/heads,
+ * refs/remotes and refs/tags are read, so checkpoint refs under refs/pan/turn/
+ * never appear.
+ */
+export async function listRepoRefs(repoRoot: string): Promise<RepoRefsResponse> {
+  const refFormat = '--format=%(refname:short)%00%(objectname)'
+  const [local, remote, tagOut, logOut, branchOut, headOut] = await Promise.all([
+    gitOrEmpty(repoRoot, ['for-each-ref', '--count=200', '--sort=-committerdate', refFormat, 'refs/heads']),
+    gitOrEmpty(repoRoot, ['for-each-ref', '--count=200', '--sort=-committerdate', refFormat, 'refs/remotes']),
+    gitOrEmpty(repoRoot, [
+      'for-each-ref', '--count=200', '--sort=-creatordate',
+      '--format=%(refname:short)%00%(objectname)%00%(*objectname)', 'refs/tags',
+    ]),
+    gitOrEmpty(repoRoot, ['log', '--branches', '--tags', '--date-order', '-n', '50', '--format=%H%x00%h%x00%s%x00%cI']),
+    gitOrEmpty(repoRoot, ['rev-parse', '--abbrev-ref', 'HEAD']),
+    gitOrEmpty(repoRoot, ['rev-parse', '--verify', '--quiet', 'HEAD']),
+  ])
+
+  const branches = [
+    ...nulFields(local).map(([name, sha]) => ({ name, sha, remote: false })),
+    ...nulFields(remote)
+      .filter(([name]) => !name.endsWith('/HEAD'))
+      .map(([name, sha]) => ({ name, sha, remote: true })),
+  ]
+  const tags = nulFields(tagOut).map(([name, sha, peeled]) => ({ name, sha: peeled || sha }))
+  const commits = nulFields(logOut).map(([sha, shortSha, subject, date]) => ({ sha, shortSha, subject, date }))
+  const branch = branchOut.trim()
+
+  return {
+    repoRoot,
+    head: { branch: branch && branch !== 'HEAD' ? branch : null, sha: headOut.trim() || null },
+    branches,
+    tags,
+    commits,
+  }
 }
