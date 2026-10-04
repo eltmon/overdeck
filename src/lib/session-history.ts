@@ -22,6 +22,7 @@ import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'path';
+import { isEffortLevel, type EffortLevel } from '@overdeck/contracts';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -48,6 +49,8 @@ export interface SessionIndexEntry {
   source: string;
   harness?: string;
   model?: string;
+  /** The reasoning-effort level the launch ran at (PAN-4259); absent on legacy/unknown entries. */
+  effort?: EffortLevel;
   /** Absolute transcript path recorded at session start, when known. */
   path?: string;
 }
@@ -127,6 +130,7 @@ function normalizeSessionEntry(value: unknown, legacy = false): SessionIndexEntr
     source: typeof entry.source === 'string' ? entry.source : 'unknown',
     ...(typeof entry.harness === 'string' && entry.harness.trim() ? { harness: entry.harness.trim() } : {}),
     ...(typeof entry.model === 'string' && entry.model.trim() ? { model: entry.model.trim() } : {}),
+    ...(isEffortLevel(entry.effort) ? { effort: entry.effort } : {}),
     ...(typeof entry.path === 'string' && entry.path.trim() ? { path: entry.path.trim() } : {}),
   };
 }
@@ -212,7 +216,7 @@ export function readLatestIndexedSessionId(agentId: string): string | null {
   return readSessionIndexWithLegacy(agentId).at(-1)?.sessionId ?? null;
 }
 
-type SessionEntryMetadata = { harness?: string; model?: string; path?: string };
+type SessionEntryMetadata = { harness?: string; model?: string; path?: string; effort?: EffortLevel };
 
 /**
  * Append one session to the agent's append-only index. Sync: its callers are
@@ -229,7 +233,7 @@ export function appendSessionIdToHistory(
   if (!sessionId) return;
   const dir = join(getOverdeckHome(), 'agents', agentId);
   mkdirSync(dir, { recursive: true });
-  let recorded: { harness?: unknown; model?: unknown } = {};
+  let recorded: { harness?: unknown; model?: unknown; effort?: unknown } = {};
   try { recorded = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')); } catch { /* legacy/no state */ }
   appendFileSync(join(dir, 'sessions.json'), sessionIndexLine(sessionId, source, metadata, recorded), { flag: 'a' });
 }
@@ -248,7 +252,7 @@ export async function appendSessionIdToHistoryAsync(
   if (!sessionId) return;
   const dir = join(getOverdeckHome(), 'agents', agentId);
   await mkdir(dir, { recursive: true });
-  let recorded: { harness?: unknown; model?: unknown } = {};
+  let recorded: { harness?: unknown; model?: unknown; effort?: unknown } = {};
   try { recorded = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')); } catch { /* legacy/no state */ }
   await appendFile(join(dir, 'sessions.json'), sessionIndexLine(sessionId, source, metadata, recorded), { flag: 'a' });
 }
@@ -258,7 +262,7 @@ function sessionIndexLine(
   sessionId: string,
   source: string,
   metadata: SessionEntryMetadata,
-  recorded: { harness?: unknown; model?: unknown },
+  recorded: { harness?: unknown; model?: unknown; effort?: unknown },
 ): string {
   const harness = metadata.harness?.trim()
     || (typeof recorded.harness === 'string' ? recorded.harness.trim() : '')
@@ -266,8 +270,9 @@ function sessionIndexLine(
   const model = metadata.model?.trim()
     || (typeof recorded.model === 'string' ? recorded.model.trim() : '')
     || 'unknown';
+  const effort = metadata.effort ?? (isEffortLevel(recorded.effort) ? recorded.effort : undefined);
   const path = metadata.path?.trim();
-  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model, ...(path ? { path } : {}) })}\n`;
+  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model, ...(effort ? { effort } : {}), ...(path ? { path } : {}) })}\n`;
   if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF');
   return line;
 }
@@ -296,6 +301,29 @@ export function createFreshSessionIdentity(agentId: string, harness: RuntimeName
   const dir = join(getOverdeckHome(), 'agents', agentId);
   logAgentLifecycle(agentId, `session identity allocated: harness=${harness} sessionId=${sessionId} indexPersisted=${existsSync(join(dir, 'sessions.json'))}`);
   return sessionId;
+}
+
+/**
+ * Launch effort per session for one agent (PAN-4259 D1 rules 2–3): the
+ * sessions.json entry's effort, else state.json's effort for the newest
+ * indexed session (or any session when the index is empty). Reads both
+ * files once; the returned lookup does no I/O.
+ */
+export function readLaunchEfforts(agentId: string): (sessionId?: string | null) => EffortLevel | undefined {
+  const entries = readSessionIndexWithLegacy(agentId);
+  const byId = new Map(entries.map((entry) => [entry.sessionId, entry.effort]));
+  const newest = entries.at(-1)?.sessionId;
+  let stateEffort: EffortLevel | undefined;
+  try {
+    const raw = JSON.parse(readFileSync(join(getOverdeckHome(), 'agents', agentId, 'state.json'), 'utf8')) as { effort?: unknown };
+    if (isEffortLevel(raw.effort)) stateEffort = raw.effort;
+  } catch { /* legacy/no state */ }
+  return (sessionId) => {
+    const indexed = sessionId ? byId.get(sessionId) : undefined;
+    if (indexed) return indexed;
+    if (entries.length === 0 || (sessionId && sessionId === newest)) return stateEffort;
+    return undefined;
+  };
 }
 
 export function logLauncherSessionPinned(agentId: string, sessionId: string, launcher: string): void {
