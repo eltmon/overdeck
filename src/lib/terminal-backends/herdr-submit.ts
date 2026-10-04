@@ -15,6 +15,7 @@
 
 import { screenComposerPayloadPresence, type ComposerPayloadPresence } from '../pane-composer.js';
 import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
+import { toWellFormedText } from '../well-formed-text.js';
 import { STEER_HERDR_KEYS, type SubmitMode } from './steer-keys.js';
 
 /** Structural, like steer-keys.ts: importing herdr-api here would close an import cycle through types.ts. */
@@ -37,10 +38,11 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => set
 export async function pasteAndSubmitHerdrPane(
   api: HerdrSubmitApi,
   paneId: string,
-  text: string,
+  rawText: string,
   mode: SubmitMode = 'enter',
   deps: HerdrSubmitDeps = {},
 ): Promise<HerdrSubmitOutcome> {
+  const text = toWellFormedText(rawText);
   const sleep = deps.sleep ?? defaultSleep;
   const now = deps.now ?? Date.now;
   const keys = mode === 'steer' ? [...STEER_HERDR_KEYS] : ['enter'];

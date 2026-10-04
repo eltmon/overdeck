@@ -1107,6 +1107,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
 | `review.stalled` | deacon-lite's `recoverSilentReviewers`, before it re-dispatches a silent reviewer (`data.reviewer`, `runId`, `paneState`, `silentForMs`) |
 | `review.stall-escalated` | deacon-lite's `recoverSilentReviewers`, when a re-dispatched reviewer fails again or the re-dispatch itself fails; the issue needs you (`data.reviewer`, `runId`, `paneState`, `reason`) |
+| `review.dispatch-failed` | `cloister/review-dispatch-failure.ts` `recordReviewDispatchFailure`, when the terminal backend rejected a review kickoff outright (`invalid_request`, e.g. a lone surrogate on the wire); the issue needs you (`data.reviewer`, `data.error`) — there was never a reviewer to recover, so no deacon-lite routine re-dispatches it |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
@@ -1187,9 +1188,15 @@ observe and nudge — none reconciles a stored copy of anything:
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
    PAN-4221) — re-requests a review a dashboard restart left undispatched.
+   Its tail check requires the journal's LAST entry to itself be a
+   `request-review` `verification.passed` (PAN-4506): a later
+   `review.dispatch-failed` entry fails that check, so a kickoff the backend
+   rejected outright is left alone rather than re-requested.
 8. `recoverSilentReviewers` (`cloister/silent-reviewer-recovery.ts`,
    PAN-4433) — re-dispatches, once per run, a reviewer that was dispatched but
    never produced output, and escalates a second failure to the operator.
+   It only considers a reviewer that is actually live; a rejected kickoff
+   (PAN-4506) never started one, so this routine never sees it.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
 returns before any of the eight routines run — none of them fires at all

@@ -32,6 +32,7 @@ import { fileURLToPath } from 'url';
 import { Data } from 'effect';
 
 import { herdrSocketPath } from './select.js';
+import { toWellFormedText } from '../well-formed-text.js';
 
 /** Protocol generation and schema version this adapter was written against. */
 const HERDR_FIXTURE_DIR = join(
@@ -175,6 +176,11 @@ function nextRequestId(): string {
   return `od-${requestCounter}`;
 }
 
+/** Herdr's serde_json rejects a lone surrogate with `invalid_request`; sanitize every string on the wire. */
+function wellFormedReplacer(_key: string, value: unknown): unknown {
+  return typeof value === 'string' ? toWellFormedText(value) : value;
+}
+
 export class HerdrApiClient {
   readonly socketPath: string;
   private readonly connect: (socketPath: string) => HerdrSocket;
@@ -235,7 +241,7 @@ export class HerdrApiClient {
 
       socket.on('connect', () => {
         try {
-          socket.write(`${JSON.stringify({ id, method, params })}\n`);
+          socket.write(`${JSON.stringify({ id, method, params }, wellFormedReplacer)}\n`);
           written = true;
         } catch (cause) {
           fail('write_failed', `herdr ${method} could not be written`, false, cause);
@@ -340,7 +346,7 @@ export class HerdrApiClient {
     };
 
     socket.on('connect', () => {
-      socket.write(`${JSON.stringify({ id, method, params })}\n`);
+      socket.write(`${JSON.stringify({ id, method, params }, wellFormedReplacer)}\n`);
     });
 
     socket.on('data', (chunk) => {

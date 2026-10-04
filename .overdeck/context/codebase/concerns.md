@@ -391,4 +391,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
-<!-- last-verified: 2026-10-03 -->
+- Text that reaches Herdr must be well-formed UTF-16 (PAN-4506) — a lone
+  surrogate (e.g. from a naive `.slice(0, N)` cut through an emoji) makes
+  `JSON.stringify` emit an unpaired `\udXXX` escape, and Herdr's `serde_json`
+  rejects the whole request with `invalid_request: … unexpected end of hex
+  escape`, silently killing a review kickoff. Use `truncateWellFormed` /
+  `toWellFormedText` from `src/lib/well-formed-text.ts` for any text (a
+  truncated preview, a paste payload) that is heading to a Herdr request.
+<!-- last-verified: 2026-10-04 -->

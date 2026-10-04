@@ -186,6 +186,15 @@ assistant turn).
   claude-code agents through `/effort`, and codex, ACP, OpenCode, and pi
   conversations through their control channels — see
   [Changing effort on a running session](#changing-effort-on-a-running-session).
+- Planning — `pan plan --effort`, the dashboard Plan dialog (default `high`,
+  all five levels), and the planning half of `pan start` on an unplanned
+  issue. The start-planning API rejects an unknown level with 400; the
+  planner resolves with role `plan` (`roles.plan.effort` → project → `high`)
+  and is clamped to the planning model and harness. The planning prompt's
+  effort section names the resolved level, and `high` and above add the
+  probe pass.
+- `pan strike` (`roles.strike.effort` → project → `high`); `--dry-run`
+  prints the resolved level and its source.
 - Recording — every new `sessions.json` line carries the launch `effort`, and
   every new cost-ledger row (`cost_events.effort`, `events.jsonl`) carries the
   effort its request ran at: for claude-code the level on the transcript
@@ -200,13 +209,12 @@ assistant turn).
 
 Everything else — specialist/review-parent/test/worker
 launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
-staffing, planning, and issue-view and conversation-row display — still
+staffing, and issue-view and conversation-row display — still
 resolves effort ad hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
-| Planning (`pan plan`, PlanDialog) | [#4258](https://github.com/eltmon/overdeck/issues/4258) |
 | Effort on issue-view agent rows, conversation rows, and Agents-page conversation entries | [#4510](https://github.com/eltmon/overdeck/issues/4510) |
 | Per-harness mapping/clamping correctness | [#4260](https://github.com/eltmon/overdeck/issues/4260) |

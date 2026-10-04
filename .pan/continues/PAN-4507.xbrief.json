@@ -1,0 +1,151 @@
+{
+  "version": "1",
+  "issueId": "PAN-4507",
+  "created": "2026-10-04T02:14:09.588Z",
+  "updated": "2026-10-04T02:44:54.354Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-status-mapping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:14:09.588Z",
+      "doneAt": "2026-10-04T02:16:46.225Z"
+    },
+    "poll-cadence-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:17:03.437Z",
+      "doneAt": "2026-10-04T02:20:19.629Z"
+    },
+    "extract-status-mapping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:17:31.151Z"
+    },
+    "extract-status-mapping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:17:59.584Z"
+    },
+    "extract-status-mapping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:18:12.257Z"
+    },
+    "poll-cadence-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:33.878Z"
+    },
+    "poll-cadence-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:46.828Z"
+    },
+    "poll-cadence-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:20:59.121Z"
+    },
+    "poll-cadence-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:21:12.167Z"
+    },
+    "wire-unchanged-backoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:21:29.804Z",
+      "doneAt": "2026-10-04T02:25:04.934Z"
+    },
+    "wire-unchanged-backoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:25:19.242Z"
+    },
+    "wire-unchanged-backoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:25:33.251Z"
+    },
+    "wire-unchanged-backoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:25:46.630Z"
+    },
+    "wire-unchanged-backoff.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:25:59.433Z"
+    },
+    "cache-status-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:26:14.923Z",
+      "doneAt": "2026-10-04T02:27:26.154Z"
+    },
+    "cache-status-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:27:41.866Z"
+    },
+    "cache-status-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:27:55.427Z"
+    },
+    "cache-status-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:28:08.132Z"
+    },
+    "reset-poll-cadence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:28:20.109Z",
+      "doneAt": "2026-10-04T02:38:18.418Z"
+    },
+    "reset-poll-cadence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:38:31.460Z"
+    },
+    "reset-poll-cadence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:38:44.428Z"
+    },
+    "reset-poll-cadence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:38:57.167Z"
+    },
+    "reset-poll-cadence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:39:09.592Z"
+    },
+    "issues-webhook-reset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:39:22.724Z",
+      "doneAt": "2026-10-04T02:42:22.685Z"
+    },
+    "issues-webhook-reset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:42:36.953Z"
+    },
+    "issues-webhook-reset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:42:50.962Z"
+    },
+    "issues-webhook-reset.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:43:06.986Z"
+    },
+    "docs-caching": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4507",
+      "claimedAt": "2026-10-04T02:43:21.438Z",
+      "doneAt": "2026-10-04T02:44:11.879Z"
+    },
+    "docs-caching.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:44:26.155Z"
+    },
+    "docs-caching.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:44:40.326Z"
+    },
+    "docs-caching.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T02:44:54.353Z"
+    }
+  }
+}
