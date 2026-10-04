@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:18:21.508Z",
+  "updated": "2026-10-04T05:18:34.039Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "dashboard-restart-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:18:21.507Z"
+    },
+    "dashboard-restart-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:18:34.038Z"
     }
   }
 }
