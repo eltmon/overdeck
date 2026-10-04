@@ -43,6 +43,11 @@ export interface ForkViaServerOptions {
   handoffAuthorHarness?: RuntimeName;
   /** Operator only: let --cwd be a project's primary checkout (PAN-4338). */
   allowPrimary?: boolean;
+  /** Turn on, for the new conversation only (PAN-4499). */
+  skills?: string[];
+  packs?: string[];
+  /** Launch without sending the kickoff (PAN-4499). */
+  hold?: boolean;
   /** Who is asking; defaults to the caller's own environment. */
   callerKind?: 'operator' | 'agent';
 }
@@ -78,8 +83,40 @@ export function isForkResultInProgress(conv: ForkResultConv): boolean {
  * NOT fall back to `DASHBOARD_URL` (which can be the Traefik `https://overdeck.localhost`
  * origin) — a self-signed TLS hop would just make a loopback call fail.
  */
-function dashboardBaseUrl(): string {
+export function dashboardBaseUrl(): string {
   return (process.env['OVERDECK_DASHBOARD_URL'] || 'http://127.0.0.1:3011').replace(/\/$/, '');
+}
+
+/**
+ * Poll a conversation until its fork pipeline finishes (forkStatus cleared) or
+ * fails, or the deadline passes. Shared by a fresh fork/handoff and
+ * `pan handoff start` (PAN-4499), which both need the same synchronous
+ * "here are the final details" UX.
+ */
+export async function waitForForkPipeline(
+  base: string,
+  conv: ForkResultConv,
+  { timeoutMs, pollMs }: { timeoutMs: number; pollMs: number },
+): Promise<ForkResultConv> {
+  const deadline = Date.now() + timeoutMs;
+  let latest = conv;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, pollMs));
+    try {
+      const g = await fetch(`${base}/api/conversations/${conv.id}`);
+      if (!g.ok) continue;
+      latest = (await g.json()) as ForkResultConv;
+    } catch {
+      continue;
+    }
+    const fs = latest.forkStatus;
+    if (fs === null || fs === undefined || fs === 'failed') break;
+  }
+  const fs = latest.forkStatus;
+  return {
+    ...latest,
+    timedOut: fs !== null && fs !== undefined && fs !== 'failed',
+  };
 }
 
 export async function forkConversationViaServer(
@@ -109,6 +146,9 @@ export async function forkConversationViaServer(
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;
   body['callerKind'] = opts.callerKind ?? verdictCallerFromEnv(process.env, readAncestorAgentIds).kind;
   if (opts.allowPrimary) body['allowPrimary'] = true;
+  if (opts.skills?.length) body['skills'] = opts.skills;
+  if (opts.packs?.length) body['packs'] = opts.packs;
+  if (opts.hold) body['hold'] = true;
 
   let res: Response;
   try {
@@ -141,25 +181,6 @@ export async function forkConversationViaServer(
   const conv = created.conversation;
   if (!conv?.id) throw new ForkServerError('Dashboard did not return a conversation');
 
-  // The server runs the fork pipeline (author + spawn) asynchronously. Poll the
-  // new conversation until its forkStatus clears (live) or reports failure.
-  const deadline = Date.now() + timeoutMs;
-  let latest = conv;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, pollMs));
-    try {
-      const g = await fetch(`${base}/api/conversations/${conv.id}`);
-      if (!g.ok) continue;
-      latest = (await g.json()) as ForkResultConv;
-    } catch {
-      continue;
-    }
-    const fs = latest.forkStatus;
-    if (fs === null || fs === undefined || fs === 'failed') break;
-  }
-  const fs = latest.forkStatus;
-  return {
-    ...latest,
-    timedOut: fs !== null && fs !== undefined && fs !== 'failed',
-  };
+  // The server runs the fork pipeline (author + spawn) asynchronously.
+  return waitForForkPipeline(base, conv, { timeoutMs, pollMs });
 }

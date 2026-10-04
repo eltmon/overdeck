@@ -150,6 +150,48 @@ Switching models when forking is common, but comes with caveats:
 
 Agent-authored handoff forks use the orchestrator-injected template in `roles/handoff.md`. The template defines the Markdown handoff contract, including the required `## Suggested skills` section, artifact-reference rules, redaction requirements, and the `{{outputPath}}` plus `.done` sentinel completion protocol.
 
+## Held kickoff (PAN-4499)
+
+`pan handoff --hold` (and the fork modal's "Hold — start it myself" checkbox)
+authors the kickoff, creates the row, and launches the session, but sends
+nothing to the harness. The kickoff text is stored on
+`conversations.held_kickoff` (non-null means held) via the leaf module
+`src/lib/overdeck/conversation-kickoff-store.ts` (`holdKickoff`,
+`readHeldKickoff`, `claimHeldKickoff`, `restoreHeldKickoff`). `runForkPipeline`
+checks `ForkRequest.hold`: when set, it calls `ensureForkSessionReady` as
+normal, then `holdKickoff()` instead of delivering, and the row finishes with
+`forkStatus = null` — no new `forkStatus` value exists for "held", so the
+lifecycle sweeper and the CLI's `isForkResultInProgress` treat it exactly like
+a finished fork. A dashboard restart resumes a held fork the same way, from
+the persisted `ForkRequest.hold`, and still never delivers.
+
+The kickoff door, `src/lib/overdeck/conversation-kickoff.ts` and the route
+`src/dashboard/server/routes/conversation-kickoff.ts`
+(`GET`/`POST /api/conversations/:name/kickoff`), is the only path that sends a
+held kickoff, and it sends it at most once:
+
+- `GET` answers `{ held: true, text }` or `{ held: false }`.
+- `POST` (optional body `{ text }`) atomically claims the held kickoff
+  (`claimHeldKickoff`, a single SQLite transaction — D's exactly-once guarantee
+  needs no client-side locking). A second `POST`, or one on a conversation that
+  was never held, answers 409 and sends nothing. The claimed text (or the
+  operator's edited `text`) is delivered through `deliverForkSeed`, the same
+  tail `runForkPipeline` uses for a fresh fork's delivery. If `ensureForkSessionReady`
+  or delivery throws, the door restores the hold with `restoreHeldKickoff` and
+  marks `forkStatus = 'failed'`; a `'stranded'` delivery (the text reached the
+  terminal pane but was never submitted) does not restore, since the text is
+  already there. The door never calls `markConversationEnded` — the session is
+  a live conversation, not a failed fork.
+- `pan handoff start <conv>` (`src/cli/commands/handoff-start.ts`) is the CLI
+  front-end: it POSTs the door and polls with the same
+  `waitForForkPipeline` helper `pan handoff` itself uses.
+
+`pan handoff --skill <name>` / `--pack <id>` write only the successor's
+`conversations.skill_overrides` (PAN-4486's per-conversation skill layer) —
+`src/lib/skill-overrides/conversation-flags.ts` resolves the requested names
+against the skill and pack catalogs and merges them on top of the inherited
+map; no global, project, or issue skill store is touched.
+
 ## Developer Notes
 
 The fork pipeline lives in `src/lib/overdeck/conversation-forks.ts`; the seed and session helpers it calls live in `src/lib/conversations/summary-fork.ts`.

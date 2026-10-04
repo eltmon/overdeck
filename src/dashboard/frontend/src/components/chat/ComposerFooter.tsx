@@ -31,6 +31,7 @@ import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
+import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
@@ -153,6 +154,7 @@ function ComposerFooterInput({
   const consumeAttachmentsForConversation = useComposerStore((s) => s.consumeAttachments);
   const addCommandResult = useComposerStore((s) => s.addCommandResult);
   const holdSend = useComposerStore((s) => s.holdSend);
+  const heldKickoff = useHeldKickoff(conversation.name);
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
@@ -169,6 +171,7 @@ function ComposerFooterInput({
   // the currently-mounted conversation immediately (PAN-539 attribution race).
   const currentConversationNameRef = useRef(conversation.name);
   currentConversationNameRef.current = conversation.name;
+  useSeedHeldKickoff(editorRef.current, conversation.name, heldKickoff.held, heldKickoff.text);
 
   const piConversation = isPiConversation(conversation);
   const { effort, chip: effortChip, pending: effortPending, liveChangeEnabled, title: effortTitle, onChange: handleEffortChange } =
@@ -436,6 +439,33 @@ function ComposerFooterInput({
       return;
     }
 
+    // PAN-4499 D12: Send on a held conversation starts it through the kickoff
+    // door instead of the message route — never both.
+    if (heldKickoff.held) {
+      const holdConversationName = conversation.name;
+      setSendingFor(holdConversationName, true);
+      try {
+        await startHeldKickoff(holdConversationName, kickoffUnchanged(messageText, heldKickoff.text) ? undefined : messageText);
+        if (holdConversationName === currentConversationNameRef.current) {
+          editor.update(() => { $getRoot().clear(); });
+          setText('');
+        }
+        heldKickoff.refresh();
+      } catch (err) {
+        if (err instanceof HeldKickoffConflictError) {
+          toast.error('This conversation was already started');
+          heldKickoff.refresh();
+        } else {
+          console.error('[ComposerFooter] Failed to start held conversation:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to start conversation');
+        }
+      } finally {
+        setSendingFor(holdConversationName, false);
+        editor.focus();
+      }
+      return;
+    }
+
     const submitConversationName = conversation.name;
 
     // Re-read pending attachments before any async work — if uploads are still in
@@ -579,7 +609,7 @@ function ComposerFooterInput({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -670,6 +700,7 @@ function ComposerFooterInput({
 
   return (
     <div className={styles.composerFooter}>
+      {heldKickoff.held && <HeldKickoffNotice />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
         {pendingAttachments.length > 0 && (

@@ -27,6 +27,7 @@ vi.mock('../../hooks/useDiffPreferences', () => ({
       lineHoverHighlight: 'disabled',
       disableLineNumbers: false,
       enableLineSelection: false,
+      ignoreWhitespace: false,
     },
     update: vi.fn(),
   }),

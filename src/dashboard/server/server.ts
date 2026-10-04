@@ -68,6 +68,7 @@ import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
+import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { conversationPullRequestRoutes } from './routes/conversation-pull-requests.js';
@@ -88,6 +89,7 @@ import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
+import { diffCompareRouteLayer } from './routes/diff-compare.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { claudeCodeRouteLayer } from './routes/claude-code.js';
 import { linearMcpAuthRouteLayer } from './routes/linear-mcp-auth.js';
@@ -307,6 +309,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   miscRouteLayer,
   paletteRouteLayer,
   conversationsRouteLayer,
+  conversationKickoffRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
   conversationPullRequestRoutes,
@@ -327,6 +330,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   webhooksRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
+  diffCompareRouteLayer,
   codexAuthRouteLayer,
   claudeCodeRouteLayer,
   linearMcpAuthRouteLayer,

@@ -1,0 +1,1005 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-03T23:47:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4503: Diff panel: compare any two refs in a local repo (no PR needed), and an ignore-whitespace toggle",
+    "updated": "2026-10-03T23:53:51.690Z"
+  },
+  "plan": {
+    "id": "pan-4503",
+    "title": "Diff panel: compare any two refs in a local repo (no PR needed), and an ignore-whitespace toggle",
+    "status": "running",
+    "uid": "098eb0ae-538d-49c3-b76b-30b702e16767",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-03T23:47:48Z",
+    "updated": "2026-10-03T23:53:51.690Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4503",
+        "label": "PAN-4503",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4501",
+        "label": "PAN-4501 (sibling, merges after this)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3178",
+        "label": "PAN-3178 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "diffs",
+      "frontend",
+      "api",
+      "git"
+    ],
+    "metadata": {
+      "sizeJustification": "The two halves (two-ref compare, ignore-whitespace) share the diff panel, the diff helpers and the route files, and PAN-4501 is held by hold-for-uat until PAN-4503 merges: a watcher releases PAN-4501 on this issue's merge, so splitting into sibling issues would let PAN-4501 ship before the whitespace half and break the agreed one-deploy coordination. The surface is 27 files across 5 subsystems, decomposed into 12 small items with a DAG that keeps backend and frontend work parallel.",
+      "canonicalFilename": "2026-10-03-PAN-4503-diff-panel-compare-any-two-refs-in-a-local-repo-no-pr-needed-and-an-ignore-whitespace-toggle.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The diff panel can show only per-turn, all-turns and vs-main diffs, so comparing two commits in a local-only repository (no remote, no PR) needs a hand-built popout URL. Every diff path runs git diff without -w, so re-indentation drowns out the real change.",
+      "Proposal": "Add GET /api/diffs/compare (two-dot or three-dot, repo path validated against registered project roots, workspaces dirs and exact conversation cwds; refs shape-checked before any git call and diffed only as resolved SHAs) and GET /api/diffs/refs for the picker, both with no-loss matrix rows. Thread a shared DiffOptions { ignoreWhitespace } (query param ignoreWhitespace=1 -> git -w) through every agent and conversation diff helper and route. In the diff panel, add a per-browser ignore-whitespace toggle and a URL-reflected Compare view with a datalist ref picker, also in the popout. Cherry-pick PAN-4501's pure route-move commit so the capped conversations.ts never grows. Full detail: .pan/drafts/PAN-4503.md.",
+      "NonGoals": "- Recomputing turn-summary file lists (GET .../diffs summaries) with -w\n- Comparing against the working tree or the index; compare is commit-to-commit only\n- A compare-only popout without an agent or conversation prefix (PAN-3178 Changes surface)\n- Fixing PAN-4501 gaps: conversation vs-main route, /full file list, configured default branch\n- Rename detection in compare file lists (--no-renames is deliberate)\n- Converting existing promisify(exec) calls in conversation-diffs.ts to execFile beyond adding the constant -w flag\n- Relabeling the vs main chip\n- Raising any scripts/file-size-allowlist.txt cap\n- Writing the ignore-whitespace preference into the URL"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A second route, GET /api/diffs/refs, feeds the picker, with its own no-loss matrix row.",
+        "rationale": "The issue asks for picking from branches, tags and recent commits; the compare response must stay a pure diff, and the picker needs refs before any compare runs."
+      },
+      {
+        "summary": "The compare response always carries files and carries diff only when file= is given.",
+        "rationale": "This is the exact vs-main contract the panel already renders, and it avoids computing a whole-repository patch to show a file list. PAN-3178 renders per file and can reuse it unchanged."
+      },
+      {
+        "summary": "Allowed repositories: inside a registered project root or its workspaces dir, or exactly equal to an unarchived conversation cwd.",
+        "rationale": "Exact match for conversation cwds stops a conversation started in the home directory from opening every repository under it, while still covering the motivating local-only scratch repo."
+      },
+      {
+        "summary": "mode defaults to two-dot.",
+        "rationale": "Two-dot is exactly the changes between A and B, which is the operator's local-only straight-line case; three-dot is one click away."
+      },
+      {
+        "summary": "Turn-summary file lists are not recomputed with -w.",
+        "rationale": "Agent summaries are event-sourced at turn time and conversation summaries are cached by transcript stat; patches still honor -w in every view, which satisfies the acceptance criterion."
+      },
+      {
+        "summary": "Cherry-pick PAN-4501 commit 123a49ab986 instead of inventing a second route extraction.",
+        "rationale": "routes/conversations.ts is at its 1072-line cap, so whitespace parsing cannot be added there; reusing PAN-4501's identical move keeps both branches on the same layout and shrinks PAN-4501's rebase conflict to the few changed lines."
+      },
+      {
+        "summary": "The ref picker uses a native input + datalist.",
+        "rationale": "It supports both picking and typing a ref with no new dependency."
+      },
+      {
+        "summary": "Ignore-whitespace persists in the existing diff preferences in localStorage and is not written to the URL.",
+        "rationale": "The issue says the setting persists per browser; existing diff preferences already live in localStorage key overdeck.ui.diff.preferences."
+      }
+    ],
+    "items": [
+      {
+        "id": "move-conversation-diff-routes",
+        "title": "Cherry-pick the PAN-4501 conversation diff route move",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/conversations-no-loss.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "wc -l src/dashboard/server/routes/conversations.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "conversations.ts line count is at most 1072",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "NFR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Run `git fetch origin feature/pan-4501` then `git cherry-pick 123a49ab986` (a pure move of the three conversation diff routes from routes/conversations.ts into the new routes/conversation-diffs.ts, exported as conversationDiffRoutes). Amend the commit trailer to `Item: move-conversation-diff-routes`. If the cherry-pick conflicts, abort it and recreate the move by hand per PRD Decision D13 (new file content = `git show 123a49ab986:src/dashboard/server/routes/conversation-diffs.ts`). Then add `join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversation-diffs.ts'),` to CONVERSATION_ROUTE_SURFACE_FILES in conversations-no-loss.test.ts right after the conversation-subagent-input.ts entry. The expected route list and the count of 40 do not change. Never git checkout another branch in this workspace."
+        },
+        "items": [
+          {
+            "id": "move-conversation-diff-routes.ac1",
+            "title": "Given the cherry-pick lands, when `wc -l src/dashboard/server/routes/conversations.ts` runs, then it reports at most 1072 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-conversation-diff-routes.ac2",
+            "title": "Given routes/conversation-diffs.ts is listed in CONVERSATION_ROUTE_SURFACE_FILES, when conversations-no-loss.test.ts runs, then it reports 40 live conversation routes and no missing or unexpected routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-conversation-diff-routes.ac3",
+            "title": "Given the moved routes, when no-loss-matrix.test.ts runs, then it finds a registration and a matrix row for each of the three GET /api/conversations/:name/diffs routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diff-output-helpers",
+        "title": "Add shared DiffOptions and numstat helpers in src/lib/diffs/diff-output.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diffs/diff-output.ts",
+            "src/lib/diffs/__tests__/diff-output.test.ts",
+            "src/lib/checkpoint/checkpoint-manager.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/diffs/__tests__/diff-output.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-circular-deps.sh"
+          ],
+          "expected_outputs": [
+            "diff-output.test.ts passes",
+            "typecheck completes without errors",
+            "circular-deps lint reports no new cycle"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/diffs/diff-output.ts exporting: interface TurnDiffFileChange (moved verbatim from checkpoint-manager.ts lines 72-77), interface DiffOptions { ignoreWhitespace?: boolean }, const IGNORE_WHITESPACE_PARAM = 'ignoreWhitespace', diffOptionArgs(options = {}) returning ['-w'] when ignoreWhitespace else [], diffOptionsFromSearchParams(params: URLSearchParams) treating values 1 and true as on, and parseNumstatWithStatus (moved verbatim from checkpoint-manager.ts, grep `function parseNumstatWithStatus(numstat: string, nameStatus: string)`). diff-output.ts must import nothing from checkpoint-manager.ts. In checkpoint-manager.ts delete both moved definitions, import them from ../diffs/diff-output.js, and add `export type { TurnDiffFileChange } from '../diffs/diff-output.js'` so existing importers compile. Plain functions only, no Effect wrappers."
+        },
+        "items": [
+          {
+            "id": "diff-output-helpers.ac1",
+            "title": "Given diffOptionArgs, when called with {} it returns [] and with { ignoreWhitespace: true } it returns ['-w']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-output-helpers.ac2",
+            "title": "Given URLSearchParams ignoreWhitespace=1 or =true, when diffOptionsFromSearchParams runs, then it returns { ignoreWhitespace: true }, and for =0, =yes or an absent param it returns {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-output-helpers.ac3",
+            "title": "Given checkpoint-manager.ts after the move, when lint-circular-deps.sh runs, then it reports no new cycle, and checkpoint-manager.ts re-exports TurnDiffFileChange instead of defining it or parseNumstatWithStatus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whitespace-agent-views",
+        "title": "Apply ignoreWhitespace to the agent per-turn, all-turns and vs-main diff routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/checkpoint/checkpoint-manager.ts",
+            "src/dashboard/server/routes/diffs.ts",
+            "src/lib/checkpoint/__tests__/ignore-whitespace.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/checkpoint/__tests__/ignore-whitespace.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ignore-whitespace.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add a trailing `options: DiffOptions = {}` param to diffCheckpointsBody/diffCheckpoints, diffCheckpointFilesBody/diffCheckpointFiles, diffAgainstMain and diffAgainstMainFiles in checkpoint-manager.ts, and insert `...diffOptionArgs(options)` right after '--no-color' in every --patch and --numstat git call of those functions (not in --name-status calls). Existing callers in read-model.ts, domain-services.ts and the test-checkpoint route stay unchanged. In routes/diffs.ts, the turn, full and vs-main handlers compute diffOptionsFromSearchParams(url.searchParams) from the URL they already build and pass it to every diff helper call (the full handler builds url before its files call). New test ignore-whitespace.test.ts builds a fixture repo on branch main with a.js and b.txt, captures checkpoints t1/t2 around a re-indent of a.js plus an appended line in b.txt (agent id agent-ws), and asserts the PRD WI-3 step 5 expectations."
+        },
+        "items": [
+          {
+            "id": "whitespace-agent-views.ac1",
+            "title": "Given checkpoints around a re-indent-only change to a.js and a real change to b.txt, when diffCheckpoints runs with { ignoreWhitespace: true }, then the patch contains b.txt and omits a.js, and without options it contains both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-agent-views.ac2",
+            "title": "Given the same checkpoints, when diffCheckpointFiles runs with { ignoreWhitespace: true }, then it returns only b.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-agent-views.ac3",
+            "title": "Given those changes committed on a feature branch off main, when diffAgainstMainFiles runs with { ignoreWhitespace: true }, then it returns only b.txt and diffAgainstMain for a.js returns an empty string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whitespace-conversation-views",
+        "title": "Apply ignoreWhitespace to the conversation all-turns and turn diff routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/checkpoint/checkpoint-manager.ts",
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add `options: DiffOptions = {}` to diffPatchSinceCommit(cwd, baseCommit, filePath?, options) and diffPatchFilesAgainstHead(cwd, filePaths, options) in checkpoint-manager.ts, inserting ...diffOptionArgs(options) after '--no-color'. In src/lib/overdeck/conversation-diffs.ts, diffPatchForFiles gains an options param passed to diffPatchFilesAgainstHead and adds the constant flags to its exec string (`--no-color${diffOptionArgs(options).map(a => ` ${a}`).join('')}`); getConversationDiffFull(name, deps, options = {}) and getConversationDiffTurn(name, turnId, fileFilter, deps, options = {}) pass options to every diffPatchSinceCommit and diffPatchForFiles call. getConversationDiffs (summaries) is NOT changed (Decision D9). In routes/conversation-diffs.ts the full route passes diffOptionsFromSearchParams(new URL(request.url, 'http://localhost').searchParams) as the third argument and the turn route passes diffOptionsFromSearchParams(reqUrl.searchParams) as the fifth. Extend conversation-diffs.test.ts per PRD WI-4 steps 4-5 (step 5 serves conversationDiffRoutes through the HttpRouter.toHttpEffect + HttpServerRequest.fromWeb harness from knowledge-viewer.test.ts, reusing the same fixture conversation with an empty session file so /full falls back to the cwd-repo patch)."
+        },
+        "items": [
+          {
+            "id": "whitespace-conversation-views.ac1",
+            "title": "Given a conversation repo whose working tree re-indents a.js and appends to b.txt, when getConversationDiffFull runs with { ignoreWhitespace: true }, then the diff contains b.txt and omits a.js, and without options it contains both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-conversation-views.ac2",
+            "title": "Given the same repo, when getConversationDiffTurn runs for turn id vs-main with { ignoreWhitespace: true }, then the diff omits a.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-conversation-views.ac3",
+            "title": "Given the same fixture conversation served through the conversationDiffRoutes layer with the HttpRouter.toHttpEffect harness, when GET /api/conversations/<name>/diffs/full?ignoreWhitespace=1 is requested, then the response body diff omits a.js and contains b.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compare-repo-validation",
+        "title": "Validate compare repositories and refs in src/lib/diffs/compare.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "deep",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "parallelSafeReason": "Touches only the new files src/lib/diffs/compare.ts and its test; no other item edits them before it completes.",
+          "foundationFor": [
+            "compare-route",
+            "refs-route"
+          ],
+          "files_scope": [
+            "src/lib/diffs/compare.ts",
+            "src/lib/diffs/__tests__/compare.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/diffs/__tests__/compare.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "compare.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/lib/diffs/compare.ts with CompareErrorCode, CompareError, CompareResult<T>, AllowedDiffRoots { containing; exact }, and plain async functions resolveAllowedDiffRoots(), validateRefShape(ref), resolveCompareRepo(repo, roots), resolveCommit(repoRoot, ref). Rules (PRD Decisions D4, D5): containing roots = realpath of each listProjectsSync() config.path plus realpath of resolve(config.path, config.workspace?.workspaces_dir ?? 'workspaces'); exact roots = realpath of each listConversations() cwd; a repo is allowed when realpath(repo) is inside or equal to a containing root, or exactly equal to an exact root. Ref shape: non-empty, at most 256 chars, no leading -, no .., matches /^[A-Za-z0-9._\\/@{}~^+-]+$/ ; this check never spawns git. resolveCommit runs execFile git rev-parse --verify --quiet --end-of-options <ref>^{commit}. Import execFile from node:child_process and promisify it; no exec, no execSync. Tests per PRD WI-5 step 5, including a vi.mock pass-through spy on execFile."
+        },
+        "items": [
+          {
+            "id": "compare-repo-validation.ac1",
+            "title": "Given refs '-n', '--output=/tmp/x', 'a..b', 'a b', 'HEAD:file', an empty string or a 257-character string, when validateRefShape runs, then it returns INVALID_REF and the execFile spy records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-repo-validation.ac2",
+            "title": "Given a fixture repo inside a containing root, when resolveCompareRepo runs, then it returns the repo top-level path, and a sibling repo outside every root returns REPO_NOT_ALLOWED with no execFile call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-repo-validation.ac3",
+            "title": "Given an exact root, when resolveCompareRepo runs on that exact path it accepts it, and on a repo nested inside that path it rejects it with REPO_NOT_ALLOWED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-repo-validation.ac4",
+            "title": "Given a relative path, a missing path or a non-git allowed directory, when resolveCompareRepo runs, then it returns INVALID_REPO, INVALID_REPO and NOT_A_GIT_REPO respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-repo-validation.ac5",
+            "title": "Given a temp OVERDECK_HOME with a conversation created with cwd X, when resolveAllowedDiffRoots runs, then realpath(X) appears in exact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compare-route",
+        "title": "Serve GET /api/diffs/compare with two-dot and three-dot modes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "complex",
+          "kind": "api",
+          "requiresInspection": true,
+          "parallelSafeReason": "Its shared files (compare.ts, diff-compare.ts, the matrix) are serialized by blocks edges from compare-repo-validation and to refs-route; nothing else runs on them concurrently.",
+          "foundationFor": [
+            "compare-view-in-panel",
+            "refs-route"
+          ],
+          "files_scope": [
+            "src/lib/diffs/compare.ts",
+            "src/dashboard/server/routes/diff-compare.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/diff-compare.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/diff-compare.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add compareRefs({ repoRoot, base, head, mode, file?, options? }) to compare.ts returning CompareResponse { repoRoot, mode, base: {ref, sha}, head: {ref, sha}, mergeBase, files, diff? }: three-dot runs git merge-base (failure = NO_MERGE_BASE) and diffs from the merge base; two-dot diffs from baseSha; file list = git -c core.quotePath=false diff --no-renames --numstat --no-color ...diffOptionArgs(options) <from> <headSha> plus the same with --name-status (no -w) via parseNumstatWithStatus; diff only when file is given (--patch --minimal, maxBuffer 50MB, `-- <file>`). Only SHAs reach git diff. New route file src/dashboard/server/routes/diff-compare.ts exports createDiffCompareRoutes({ allowedRoots }) and diffCompareRouteLayer (default deps = resolveAllowedDiffRoots); the handler uses validateOrigin from ./origin-validation.js, parses repo/base/head/mode (default two-dot, unknown = INVALID_MODE)/file/ignoreWhitespace, runs validateRefShape on both refs BEFORE resolveCompareRepo, then resolveCommit, then compareRefs; failures return 400 with { code, error }; exceptions return 500. Register diffCompareRouteLayer in server.ts next to diffsRouteLayer and add the matrix row { surface: 'GET /api/diffs/compare', kind: 'http', disposition: 'RELOCATE', door: 'Diffs domain' }. Route tests use the HttpRouter.toHttpEffect + HttpServerRequest.fromWeb harness from knowledge-viewer.test.ts with a no-remote fixture repo (PRD WI-6 step 5)."
+        },
+        "items": [
+          {
+            "id": "compare-route.ac1",
+            "title": "Given a no-remote fixture repo with commits A and B, when GET /api/diffs/compare?repo=<repo>&base=<A>&head=<B> is requested, then it returns 200 with files exactly a.js, b.txt and c.md and base.sha/head.sha equal to the fixture SHAs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-route.ac2",
+            "title": "Given the same request with ignoreWhitespace=1, when it is served, then files is exactly b.txt and c.md, and with file=b.txt the diff contains +there",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-route.ac3",
+            "title": "Given diverged branches left and right, when compared with mode=two-dot and mode=three-dot, then two-dot lists l.txt and r.txt while three-dot lists only r.txt and returns mergeBase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-route.ac4",
+            "title": "Given base=-n, base=nope, a repo outside the allowed roots, mode=four-dot, or unrelated histories in three-dot mode, when requested, then the route returns 400 with codes INVALID_REF, UNKNOWN_REF, REPO_NOT_ALLOWED, INVALID_MODE and NO_MERGE_BASE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-route.ac5",
+            "title": "Given the new route, when no-loss-matrix.test.ts runs, then it finds a matrix row for GET /api/diffs/compare with door Diffs domain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "refs-route",
+        "title": "Serve GET /api/diffs/refs for the compare picker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/diffs/compare.ts",
+            "src/dashboard/server/routes/diff-compare.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/diff-compare.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/diff-compare.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add listRepoRefs(repoRoot) to compare.ts returning RepoRefsResponse { repoRoot, head: { branch, sha }, branches: [{ name, sha, remote }], tags: [{ name, sha }], commits: [{ sha, shortSha, subject, date }] } using exactly the git commands in PRD WI-7 step 1 (for-each-ref over refs/heads, refs/remotes minus */HEAD, refs/tags with peeled sha, git log --branches --tags --date-order -n 50, rev-parse for head; an unborn repo yields empty commits and null head sha). Add GET /api/diffs/refs to routes/diff-compare.ts (validateOrigin, resolveCompareRepo with 400 { code, error } on failure, then listRepoRefs) and add it to the layer. Add matrix row { surface: 'GET /api/diffs/refs', kind: 'http', disposition: 'RELOCATE', door: 'Diffs domain' }. Extend diff-compare.test.ts."
+        },
+        "items": [
+          {
+            "id": "refs-route.ac1",
+            "title": "Given the fixture repo with branches left and right and tag v1, when GET /api/diffs/refs?repo=<repo> is requested, then it returns 200 with those branches (remote false), tag v1 with its commit SHA, commits[0] equal to the newest commit, and head.branch equal to the checked-out branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refs-route.ac2",
+            "title": "Given the fixture repo has a checkpoint ref under refs/pan/turn, when refs are listed, then no branch, tag or commit entry names refs/pan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refs-route.ac3",
+            "title": "Given a repo outside the allowed roots, when GET /api/diffs/refs is requested, then it returns 400 with code REPO_NOT_ALLOWED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refs-route.ac4",
+            "title": "Given the new route, when no-loss-matrix.test.ts runs, then it finds a matrix row for GET /api/diffs/refs with door Diffs domain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whitespace-toggle-ui",
+        "title": "Add the ignore-whitespace toggle to the diff panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useDiffPreferences.ts",
+            "src/dashboard/frontend/src/lib/diffRouteSearch.ts",
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/diffRouteSearch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/diffRouteSearch.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/DiffPanel.tsx"
+          ],
+          "expected_outputs": [
+            "diffRouteSearch.test.ts passes",
+            "typecheck completes without errors",
+            "DiffPanel.tsx is under 1000 lines"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. useDiffPreferences.ts: add ignoreWhitespace: boolean to DiffPreferences and ignoreWhitespace: false to DEFAULTS (persisted in localStorage key overdeck.ui.diff.preferences like the other prefs; never written to the URL). diffRouteSearch.ts: add buildDiffFetchUrl(base, params) that appends only non-empty params with URLSearchParams. DiffPanel.tsx: build every fetch URL with buildDiffFetchUrl(path, { file: selectedFilePath, ignoreWhitespace: ignoreWhitespace ? '1' : null }); append ignoreWhitespace as the last element of the diff-vs-main, diff-turn and diff-full queryKey arrays so toggling refetches; add a ToggleButton after the word-wrap toggle with the lucide-react Space icon (size-3), pressed={ignoreWhitespace}, onPressedChange updating the pref, ariaLabel and title 'Ignore whitespace changes' when off and 'Show whitespace changes' when on. New test diffRouteSearch.test.ts covers buildDiffFetchUrl."
+        },
+        "items": [
+          {
+            "id": "whitespace-toggle-ui.ac1",
+            "title": "Given buildDiffFetchUrl('/x', {}), when called, then it returns '/x', and with { file: 'a b.ts', ignoreWhitespace: '1' } it returns '/x?file=a+b.ts&ignoreWhitespace=1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-toggle-ui.ac2",
+            "title": "Given null or empty param values, when buildDiffFetchUrl runs, then those keys are omitted from the URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whitespace-toggle-ui.ac3",
+            "title": "Given the diff panel with the toggle pressed, when any view fetches, then the request URL includes ignoreWhitespace=1 and the queryKey includes true (verified end to end by the Playwright item)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compare-bar-component",
+        "title": "Build the DiffCompareBar ref picker component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DiffCompareBar.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DiffCompareBar.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/__tests__/DiffCompareBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DiffCompareBar.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. New component DiffCompareBar({ repoPath, base, head, mode, error?, onApply }). It fetches /api/diffs/refs?repo=<repoPath> with useQuery (queryKey ['diff-refs', repoPath]) and shows the JSON error string on a non-OK response. One row: base <input list> (aria-label 'Compare base ref'), two mode buttons labelled A..B (aria-label 'Two-dot compare') and A...B (aria-label 'Three-dot compare'), head <input list> (aria-label 'Compare head ref'), and a Compare button. One shared <datalist> lists local branches, remote branches, tags (value = name) and commits (value = shortSha, label = subject). Inputs start from the props; an empty head starts as HEAD. Compare or Enter calls onApply with trimmed values and the mode; Compare is disabled while base or head is empty. An error prop renders under the inputs. Native datalist only, no new dependency. Follow the dashboard style guide (no pill badges, no Inter)."
+        },
+        "items": [
+          {
+            "id": "compare-bar-component.ac1",
+            "title": "Given a stubbed refs response with branch main, tag v1 and two commits, when the bar renders, then the datalist contains options for main, v1 and both short SHAs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-bar-component.ac2",
+            "title": "Given base v1, head main and the A...B button selected, when Compare is clicked, then onApply is called with { base: 'v1', head: 'main', mode: 'three-dot' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-bar-component.ac3",
+            "title": "Given an empty base input, when the bar renders, then the Compare button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-bar-component.ac4",
+            "title": "Given error='Unknown ref', when the bar renders, then the text Unknown ref is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compare-view-in-panel",
+        "title": "Wire the Compare view into the diff panel, conversation panel and popout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "parallelSafeReason": "Every other item that edits DiffPanel.tsx or diffRouteSearch.ts (whitespace-toggle-ui) is a blocks predecessor, so it runs alone on those files.",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/diffRouteSearch.ts",
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/App/StandaloneRoutes.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/diffRouteSearch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/diffRouteSearch.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "diffRouteSearch.test.ts passes",
+            "typecheck completes without errors",
+            "file-size lint passes with DiffPanel.tsx under 1000 lines and ConversationPanel.tsx at or under 1531"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, steps 1-6. diffRouteSearch.ts: DiffRouteSearch gains diffBase, diffHead, diffMode (two-dot|three-dot), kept by parseDiffRouteSearch only when diffTurnId === 'compare'; stripDiffSearchParams strips them. DiffPanel.tsx: DiffUrlParams and writeDiffParamsToUrl/clearDiffParamsFromUrl handle the three keys; new prop repoPath?: string; isCompare = selectedTurnId === 'compare'; compare query with queryKey ['diff-compare', repoPath, diffBase, diffHead, diffMode, selectedFilePath ?? null, ignoreWhitespace] and URL buildDiffFetchUrl('/api/diffs/compare', { repo, base, head, mode (default two-dot), file, ignoreWhitespace }), enabled only with repoPath, base and head; a non-OK response throws an Error carrying the JSON error string, passed to DiffCompareBar as error; a Compare… chip after vs main only when repoPath is set; DiffCompareBar at the top of the content when isCompare, onApply writes diffTurnId=compare plus the three keys and drops diffFilePath; without base/head the content shows 'Pick a base and head to compare.'; selectFile keeps the compare keys; the No completed turns yet guard also skips isCompare; the pop-out button adds repo, diffBase, diffHead, diffMode when set. ConversationPanel.tsx: add repoPath={conversation.cwd} to <DiffPanel (one line). StandaloneRoutes.tsx: pass repoPath={search.get('repo') ?? undefined}."
+        },
+        "items": [
+          {
+            "id": "compare-view-in-panel.ac1",
+            "title": "Given search { diff: '1', diffTurnId: 'compare', diffBase: 'a', diffHead: 'b', diffMode: 'three-dot' }, when parseDiffRouteSearch runs, then it keeps all three compare keys, and with diffTurnId 'vs-main' it drops them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-view-in-panel.ac2",
+            "title": "Given diffMode 'bogus', when parseDiffRouteSearch runs, then diffMode is omitted, and stripDiffSearchParams removes all six diff keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-view-in-panel.ac3",
+            "title": "Given a DiffPanel with repoPath, when the operator applies a compare, then the URL carries diffTurnId=compare, diffBase, diffHead and diffMode, and the pop-out URL also carries repo (verified end to end by the Playwright item)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compare-view-in-panel.ac4",
+            "title": "Given the finished change, when wc -l runs on DiffPanel.tsx and ConversationPanel.tsx, then it reports fewer than 1000 and at most 1531 lines respectively, and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-compare-whitespace",
+        "title": "Playwright check of compare and ignore-whitespace in an isolated browser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4503-diff-compare.spec.ts"
+          ],
+          "verify_commands": [
+            "npm run build",
+            "npx playwright test src/dashboard/frontend/tests/pan-4503-diff-compare.spec.ts --config src/dashboard/frontend/playwright.config.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-4503-diff-compare.spec.ts passes"
+          ],
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. New spec following pan-4497-timeline-overlap.spec.ts: startIsolatedDashboard() in beforeAll (never the live dashboard on 3011), a fresh browser.newContext() per test, page.route mocks for /api/conversations/pan-4503-uat/diffs, /api/diffs/refs and /api/diffs/compare (recording request URLs; returning a.js and b.txt without ignoreWhitespace, only b.txt with ignoreWhitespace=1, and a patch adding there for file=b.txt). Navigate to /popout/diff?diff=1&prefix=/api/conversations/pan-4503-uat/diffs&agentId=pan-4503-uat&repo=/tmp/pan-4503-uat&diffTurnId=compare&diffBase=v1&diffHead=main&diffMode=two-dot and assert PRD WI-11 step 4. Run npm run build first because the fixture serves dist."
+        },
+        "items": [
+          {
+            "id": "playwright-compare-whitespace.ac1",
+            "title": "Given the compare popout URL in an isolated context, when the page loads, then the base input shows v1, the head input shows main, and the file picker lists a.js and b.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-compare-whitespace.ac2",
+            "title": "Given the file list, when b.txt is clicked, then a diff line containing there renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-compare-whitespace.ac3",
+            "title": "Given the ignore-whitespace button, when it is clicked, then it has aria-pressed=true, the last compare request URL contains ignoreWhitespace=1, and the file list shows only b.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-compare-whitespace.ac4",
+            "title": "Given the toggle is on, when the page reloads, then the toggle is still aria-pressed=true, and a second page opened at the same URL lists the same compare files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-compare-whitespace",
+        "title": "Document compare and ignore-whitespace, and hand off to PAN-4501",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-03T23:47:48Z",
+        "metadata": {
+          "issueLabel": "pan-4503",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx"
+          ],
+          "verify_commands": [
+            "grep -n \"## Diff compare and ignore-whitespace (PAN-4503)\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"## Reviewing changes in the diff panel\" features/conversations.mdx",
+            "gh issue view 4501 --comments | grep -n \"diffOptionsFromSearchParams\""
+          ],
+          "expected_outputs": [
+            "the architecture heading is found",
+            "the user-facing heading is found",
+            "the PAN-4501 hand-off comment is found"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. docs/DASHBOARD-ARCHITECTURE.md: add section `## Diff compare and ignore-whitespace (PAN-4503)` before `## CPU weight and the runaway patrol (PAN-4311)` stating the two routes and params, the response shape (files always, diff only with file=), the 400 codes, the allowed-roots rule (project roots and workspaces dirs contain; conversation cwds match exactly), that refs are shape-checked before any git call and diffs run on resolved SHAs, that ignoreWhitespace=1 maps to git -w on every diff route except the turn-summary lists, and the compare URL params. features/conversations.mdx: add `## Reviewing changes in the diff panel` explaining Compare…, picking base/head, A..B vs A...B, bookmarking the popout URL, and the per-browser whitespace toggle. Then post one comment on PAN-4501 with gh issue comment 4501 containing the hand-off text in PRD WI-12 step 3 (it must mention diffOptionsFromSearchParams, vs-default-branch.ts, the /diffs/vs-main and /diffs/full routes, and that PAN-4501 should run git rebase --skip when replaying 123a49ab986 conflicts, because that move is already on main). Do not name any private repository in the comment."
+        },
+        "items": [
+          {
+            "id": "docs-compare-whitespace.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grepped, then it has a ## Diff compare and ignore-whitespace (PAN-4503) section naming GET /api/diffs/compare, GET /api/diffs/refs, the code REPO_NOT_ALLOWED and the exact-match rule for conversation cwds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-compare-whitespace.ac2",
+            "title": "Given features/conversations.mdx, when grepped, then it has a ## Reviewing changes in the diff panel section that describes A..B, A...B and the ignore-whitespace toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-compare-whitespace.ac3",
+            "title": "Given PAN-4501, when gh issue view 4501 --comments runs, then a comment mentions diffOptionsFromSearchParams and vs-default-branch.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "move-conversation-diff-routes",
+        "to": "whitespace-conversation-views",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-output-helpers",
+        "to": "whitespace-agent-views",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-output-helpers",
+        "to": "whitespace-conversation-views",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-output-helpers",
+        "to": "compare-route",
+        "type": "blocks"
+      },
+      {
+        "from": "whitespace-agent-views",
+        "to": "whitespace-conversation-views",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-repo-validation",
+        "to": "compare-route",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-route",
+        "to": "refs-route",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-repo-validation",
+        "to": "refs-route",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-route",
+        "to": "compare-view-in-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "refs-route",
+        "to": "compare-bar-component",
+        "type": "blocks"
+      },
+      {
+        "from": "whitespace-toggle-ui",
+        "to": "compare-view-in-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-bar-component",
+        "to": "compare-view-in-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-view-in-panel",
+        "to": "playwright-compare-whitespace",
+        "type": "blocks"
+      },
+      {
+        "from": "compare-view-in-panel",
+        "to": "docs-compare-whitespace",
+        "type": "blocks"
+      },
+      {
+        "from": "refs-route",
+        "to": "docs-compare-whitespace",
+        "type": "blocks"
+      },
+      {
+        "from": "whitespace-conversation-views",
+        "to": "docs-compare-whitespace",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

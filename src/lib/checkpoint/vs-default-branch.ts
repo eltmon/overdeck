@@ -5,6 +5,7 @@
  */
 import { resolveDefaultBranchForRepo } from '../project-repos.js'
 import { diffAgainstBase, diffAgainstBaseFiles, resolveBaseRef, type TurnDiffFileChange } from './checkpoint-manager.js'
+import type { DiffOptions } from '../diffs/diff-output.js'
 
 export interface VsDefaultBranchDiff {
   readonly baseBranch: string
@@ -17,14 +18,14 @@ export interface VsDefaultBranchDiff {
 
 export async function diffVsDefaultBranch(
   repoRoot: string,
-  options: { projectKey?: string | null; filePath?: string } = {},
+  options: { projectKey?: string | null; filePath?: string } & DiffOptions = {},
 ): Promise<VsDefaultBranchDiff> {
   const baseBranch = resolveDefaultBranchForRepo(repoRoot, options.projectKey)
   const baseRef = await resolveBaseRef(repoRoot, baseBranch)
   if (!baseRef) {
     return { baseBranch, baseRef: null, files: [], ...(options.filePath !== undefined && { diff: '' }) }
   }
-  const files = await diffAgainstBaseFiles(repoRoot, baseRef)
-  const diff = options.filePath !== undefined ? await diffAgainstBase(repoRoot, baseRef, options.filePath) : undefined
+  const files = await diffAgainstBaseFiles(repoRoot, baseRef, options)
+  const diff = options.filePath !== undefined ? await diffAgainstBase(repoRoot, baseRef, options.filePath, options) : undefined
   return { baseBranch, baseRef, files, ...(diff !== undefined && { diff }) }
 }

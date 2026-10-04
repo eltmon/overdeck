@@ -43,12 +43,18 @@ export function installStrictFetchMock(handler: FetchHandler) {
 
 /**
  * PAN-4255: ComposerFooter asks `GET /api/effort/default` for a live session
- * with no stored effort (its effort chip). Answers only that request.
+ * with no stored effort (its effort chip). PAN-4499: it also polls
+ * `GET /api/conversations/:name/kickoff` on every mount to show the held-kickoff
+ * notice. Answers only those two requests.
  */
 export function installEffortDefaultFetchMock() {
-  return installStrictFetchMock(({ method, url }) => (
-    method === 'GET' && url.startsWith('/api/effort/default?')
-      ? Response.json({ effort: 'high', source: 'default', requested: 'high', clamped: false })
-      : undefined
-  ));
+  return installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url.startsWith('/api/effort/default?')) {
+      return Response.json({ effort: 'high', source: 'default', requested: 'high', clamped: false });
+    }
+    if (method === 'GET' && /\/api\/conversations\/[^/]+\/kickoff$/.test(url)) {
+      return Response.json({ held: false });
+    }
+    return undefined;
+  });
 }

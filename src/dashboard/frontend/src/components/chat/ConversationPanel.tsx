@@ -1092,6 +1092,7 @@ export function ConversationPanel({
               turnDiffSummaries={diffData.summaries}
               onClose={handleCloseDiff}
               diffUrlPrefix={`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`}
+              repoPath={conversation.cwd}
             />
           </DiffWorkerPoolProvider>
         )}
