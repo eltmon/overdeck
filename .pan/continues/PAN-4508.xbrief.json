@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4508",
   "created": "2026-10-04T02:15:51.137Z",
-  "updated": "2026-10-04T03:43:03.550Z",
+  "updated": "2026-10-04T03:43:17.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "jev-usage-readout.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:43:03.549Z"
+    },
+    "jev-usage-readout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:43:17.298Z"
     }
   }
 }
