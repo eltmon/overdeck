@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:08:41.662Z",
+  "updated": "2026-10-04T03:08:55.302Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "spawn-planning-resolve-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:08:41.662Z"
+    },
+    "spawn-planning-resolve-effort.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:08:55.302Z"
     }
   }
 }
