@@ -6,6 +6,12 @@ import { useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
 import { setReauthSession } from '../lib/pending-codex-spawn';
 import { popoutTerminal } from './TerminalPanel';
 
+/** Name the store that is bad so a report says which copy to look at. */
+const SOURCE_LABEL: Record<'native' | 'cliproxy', string> = {
+  native: '~/.codex',
+  cliproxy: 'CLIProxy copy',
+};
+
 export function CodexAuthBanner() {
   const { data: authStatus } = useCodexAuthStatus();
   const [spawning, setSpawning] = useState(false);
@@ -41,7 +47,11 @@ export function CodexAuthBanner() {
     <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-center gap-3 shrink-0">
       <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0" />
       <p className="text-warning-foreground text-sm font-semibold flex-1">
-        Codex authentication {authStatus.status} — Codex-routed agents (gpt-5.x, o3, o4-mini) will fail.
+        Codex authentication {authStatus.status}
+        {authStatus.source && (
+          <span className="font-normal ml-1 opacity-80">({SOURCE_LABEL[authStatus.source]})</span>
+        )}
+        {' '}— Codex-routed agents (gpt-5.x, o3, o4-mini) will fail.
         {authStatus.email && (
           <span className="font-normal ml-1 opacity-80">(<SensitiveText value={authStatus.email} className="text-sm" />)</span>
         )}

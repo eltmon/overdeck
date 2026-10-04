@@ -6,7 +6,12 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { CodexAuthCheckError, checkCodexAuthStatus, type CheckCodexAuthOptions } from '../../../lib/codex-auth.js';
+import {
+  CodexAuthCheckError,
+  checkCodexAuthStatus,
+  getNativeCodexAuthPath,
+  type CheckCodexAuthOptions,
+} from '../../../lib/codex-auth.js';
 import { FsError } from '../../../lib/errors.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
@@ -104,6 +109,35 @@ async function readBridgedCodexCredential(): Promise<{ accessToken: string | nul
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
 
+async function mtimeMsOrNull(path: string): Promise<number | null> {
+  try {
+    return (await stat(path)).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Re-bridge ~/.codex/auth.json into CLIProxy's codex-primary.json when the native
+ * store was written after the bridged copy (or the copy is missing). A `codex
+ * login` run in the operator's own terminal heals only the native store; without
+ * this the stale bridged copy keeps the banner red until a dashboard restart.
+ * Two stats per poll; best effort, never fails the status read.
+ */
+async function rebridgeCodexAuthIfNativeNewer(): Promise<void> {
+  const [nativeMtimeMs, bridgedMtimeMs] = await Promise.all([
+    mtimeMsOrNull(getNativeCodexAuthPath()),
+    mtimeMsOrNull(join(getCliproxyAuthDir(), 'codex-primary.json')),
+  ]);
+  if (nativeMtimeMs === null) return;
+  if (bridgedMtimeMs !== null && bridgedMtimeMs >= nativeMtimeMs) return;
+  try {
+    await bridgeCodexAuthToCliproxy();
+  } catch {
+    // Best effort: the status read below still reports what is on disk.
+  }
+}
+
 /** Bridge checkCodexAuthStatus into a route, keeping its message in a 500 body. */
 const checkCodexAuth = (options: CheckCodexAuthOptions) =>
   Effect.tryPromise({
@@ -122,6 +156,7 @@ const getCodexAuthRoute = HttpRouter.add(
       // PAN-3917: the burned-agent cross-check read a `troubled` flag off the
       // agent mirror, which is gone. Auth status now rests on the native
       // ~/.codex/auth.json mtime check alone.
+      yield* Effect.promise(() => rebridgeCodexAuthIfNativeNewer());
       const status = yield* checkCodexAuth({});
       return jsonResponse(status);
     }),

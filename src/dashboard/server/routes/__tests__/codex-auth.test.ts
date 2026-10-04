@@ -9,6 +9,7 @@ const mockCliproxy = vi.hoisted(() => ({
   authDir: '',
   logPath: '',
   homeDir: '',
+  bridge: vi.fn(async () => false),
 }));
 
 vi.mock('os', async (importOriginal) => ({
@@ -19,7 +20,7 @@ vi.mock('os', async (importOriginal) => ({
 vi.mock('../../../../lib/cliproxy.js', async () => {
   const { Effect } = await import('effect');
   return {
-    bridgeCodexAuthToCliproxy: async () => false,
+    bridgeCodexAuthToCliproxy: () => mockCliproxy.bridge(),
     decodeJwtPayload: (token: string): Record<string, unknown> | null => {
       const payload = token.split('.')[1];
       if (!payload) return null;
@@ -66,6 +67,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.useRealTimers();
+  mockCliproxy.bridge.mockReset();
+  mockCliproxy.bridge.mockImplementation(async () => false);
   await rm(tmpRoot, { recursive: true, force: true });
   tmpRoot = '';
   mockCliproxy.authDir = '';
@@ -86,6 +89,25 @@ const writeCodexFixture = async (logLines: string[] = []) => {
   const loginTime = new Date(LAST_LOGIN);
   await utimes(credentialPath, loginTime, loginTime);
   await writeFile(mockCliproxy.logPath, logLines.join('\n'));
+};
+
+/** Write ~/.codex/auth.json (under the mocked home) with the given mtime. */
+const writeNativeAuth = async (mtimeIso: string) => {
+  const codexDir = join(mockCliproxy.homeDir, '.codex');
+  await mkdir(codexDir, { recursive: true });
+  const nativePath = join(codexDir, 'auth.json');
+  await writeFile(
+    nativePath,
+    JSON.stringify({
+      tokens: {
+        access_token: jwtWithClaims({ exp: Math.floor(ms('2026-06-12T00:00:00Z') / 1000) }),
+        refresh_token: 'rt_fresh',
+        id_token: jwtWithClaims({ email: EMAIL }),
+      },
+    }),
+  );
+  const mtime = new Date(mtimeIso);
+  await utimes(nativePath, mtime, mtime);
 };
 
 async function getCodexAuth() {
@@ -129,5 +151,53 @@ describe('GET /api/settings/codex-auth', () => {
       expiresAt: '2026-06-02T04:40:00.000Z',
       source: 'cliproxy',
     });
+  });
+
+  it('re-bridges the CLIProxy copy when ~/.codex/auth.json was written after it (outside codex login)', async () => {
+    await writeCodexFixture();
+    await writeNativeAuth('2026-06-02T03:30:00Z');
+
+    await getCodexAuth();
+
+    expect(mockCliproxy.bridge).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-bridges when the CLIProxy copy is missing but the native store exists', async () => {
+    await writeNativeAuth('2026-06-02T03:30:00Z');
+
+    await getCodexAuth();
+
+    expect(mockCliproxy.bridge).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-bridge when the CLIProxy copy is at least as new as the native store', async () => {
+    await writeCodexFixture();
+    await writeNativeAuth('2026-05-20T00:00:00Z');
+
+    await getCodexAuth();
+
+    expect(mockCliproxy.bridge).not.toHaveBeenCalled();
+  });
+
+  it('does not re-bridge when the native store is absent', async () => {
+    await writeCodexFixture();
+
+    await getCodexAuth();
+
+    expect(mockCliproxy.bridge).not.toHaveBeenCalled();
+  });
+
+  it('still answers the status when the re-bridge throws', async () => {
+    mockCliproxy.bridge.mockImplementation(async () => {
+      throw new Error('disk full');
+    });
+    await writeCodexFixture();
+    await writeNativeAuth('2026-06-02T03:30:00Z');
+
+    const result = await getCodexAuth();
+
+    expect(mockCliproxy.bridge).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ status: 'valid', email: EMAIL });
   });
 });

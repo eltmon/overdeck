@@ -49,4 +49,24 @@ describe('CodexAuthBanner', () => {
     // the SPA and unmounts the useCodexAutoRetry completion poller.
     expect(window.location.href).toBe(hrefBefore);
   });
+
+  it('names the CLIProxy copy when the bad status came from the bridged store', () => {
+    mockAuthStatus.mockReturnValue({
+      data: { status: 'expired', source: 'cliproxy' },
+    } as ReturnType<typeof useCodexAuthStatus>);
+
+    render(<CodexAuthBanner />);
+
+    expect(screen.getByText('(CLIProxy copy)')).toBeTruthy();
+  });
+
+  it('names ~/.codex when the bad status came from the native store', () => {
+    mockAuthStatus.mockReturnValue({
+      data: { status: 'burned', source: 'native' },
+    } as ReturnType<typeof useCodexAuthStatus>);
+
+    render(<CodexAuthBanner />);
+
+    expect(screen.getByText('(~/.codex)')).toBeTruthy();
+  });
 });

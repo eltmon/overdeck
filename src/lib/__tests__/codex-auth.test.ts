@@ -113,6 +113,22 @@ const writeCodexFixture = async (logLines: string[] = []) => {
   await writeFile(mockCliproxy.logPath, logLines.join('\n'));
 };
 
+const writeExpiredCliproxyFixture = async (extra: Record<string, unknown>, logLines: string[] = []) => {
+  await mkdir(mockCliproxy.authDir, { recursive: true });
+  const credentialPath = join(mockCliproxy.authDir, 'codex-primary.json');
+  await writeFile(
+    credentialPath,
+    JSON.stringify({
+      access_token: jwtWithClaims({ exp: Math.floor(ms('2026-06-01T00:00:00Z') / 1000) }),
+      email: EMAIL,
+      ...extra,
+    }, null, 2),
+  );
+  const loginTime = new Date(LAST_LOGIN);
+  await utimes(credentialPath, loginTime, loginTime);
+  await writeFile(mockCliproxy.logPath, logLines.join('\n'));
+};
+
 const readCodexStatus = () => checkCodexAuthStatus();
 
 describe('checkCodexAuthStatus', () => {
@@ -140,6 +156,28 @@ describe('checkCodexAuthStatus', () => {
     await writeCodexFixture([reusedCodeBurnBlock('2026-06-02 03:30:00')]);
 
     await expect(readCodexStatus()).resolves.toMatchObject({ status: 'burned', email: EMAIL });
+  });
+
+  it('reports expired for a lapsed cliproxy access token with no refresh token', async () => {
+    await writeExpiredCliproxyFixture({});
+
+    await expect(readCodexStatus()).resolves.toMatchObject({ status: 'expired', source: 'cliproxy' });
+  });
+
+  it('reports valid for a lapsed cliproxy access token with a refresh token (CLIProxyAPI refreshes it)', async () => {
+    await writeExpiredCliproxyFixture({ refresh_token: 'rt_abc' });
+
+    await expect(readCodexStatus()).resolves.toMatchObject({
+      status: 'valid',
+      email: EMAIL,
+      expiresAt: '2026-06-01T00:00:00.000Z',
+    });
+  });
+
+  it('still reports burned for a lapsed but refreshable cliproxy token when the log shows a burn', async () => {
+    await writeExpiredCliproxyFixture({ refresh_token: 'rt_abc' }, [reusedCodeBurnBlock('2026-06-02 03:30:00')]);
+
+    await expect(readCodexStatus()).resolves.toMatchObject({ status: 'burned', source: 'cliproxy' });
   });
 
   it('reports valid when a refresh_token_reused failure is followed by a successful message request', async () => {
@@ -335,11 +373,31 @@ describe('classifyNativeCodexAuth (PAN-2285)', () => {
     expect(res.lastRefresh).toBe('2026-07-13T13:49:33Z');
   });
 
-  it('reports expired for a past-exp access token', () => {
+  it('reports expired for a past-exp access token with no refresh token', () => {
     const raw = JSON.stringify({
       tokens: { access_token: makeJwt({ exp: Math.floor(now / 1000) - 60 }) },
     });
     expect(classifyNativeCodexAuth(raw, now).status).toBe('expired');
+  });
+
+  it('reports expired for a past-exp access token whose refresh token is empty', () => {
+    const raw = JSON.stringify({
+      tokens: { access_token: makeJwt({ exp: Math.floor(now / 1000) - 60 }), refresh_token: '' },
+    });
+    expect(classifyNativeCodexAuth(raw, now).status).toBe('expired');
+  });
+
+  it('reports valid for a past-exp access token with a refresh token (codex refreshes it itself)', () => {
+    const raw = JSON.stringify({
+      tokens: {
+        access_token: makeJwt({ exp: Math.floor(now / 1000) - 11 * 24 * 3600 }),
+        refresh_token: 'rt_abc',
+        id_token: makeJwt({ email: 'user@example.com' }),
+      },
+    });
+    const res = classifyNativeCodexAuth(raw, now);
+    expect(res.status).toBe('valid');
+    expect(res.email).toBe('user@example.com');
   });
 
   it('treats API-key mode (OPENAI_API_KEY set, no OAuth tokens) as valid', () => {

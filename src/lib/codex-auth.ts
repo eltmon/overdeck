@@ -61,12 +61,25 @@ export interface CheckCodexAuthOptions {
 
 interface CliproxyCodexCredentials {
   access_token?: string;
+  refresh_token?: string;
   email?: string;
   type?: string;
-}// ─── Native ~/.codex/auth.json store (PAN-2285) ────────────────────────────────
+}
+
+/**
+ * An access token past its `exp` is not dead while a refresh token is present:
+ * the codex CLI and CLIProxyAPI both mint a new access token from it on next use.
+ * Only a lapsed token with no refresh token is truly expired. A revoked refresh
+ * token is caught separately by the burn checks.
+ */
+function hasRefreshToken(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0;
+}
+
+// ─── Native ~/.codex/auth.json store (PAN-2285) ────────────────────────────────
 
 /** Absolute path to the codex CLI's own global credential file. */
-function getNativeCodexAuthPath(): string {
+export function getNativeCodexAuthPath(): string {
   return join(homedir(), '.codex', 'auth.json');
 }
 
@@ -76,6 +89,7 @@ interface NativeCodexAuthFile {
   tokens?: {
     access_token?: unknown;
     id_token?: unknown;
+    refresh_token?: unknown;
   };
 }
 
@@ -88,7 +102,8 @@ export interface NativeCodexAuthResult {
 
 /**
  * Pure classifier for the native store's raw JSON (PAN-2285). Decodes the
- * access_token JWT `exp` to decide valid/expired; reports missing when the file
+ * access_token JWT `exp` to decide valid/expired; a lapsed access token with a
+ * refresh token is refreshable, so it is valid; reports missing when the file
  * is absent (raw === null) and unknown when it is malformed. API-key mode
  * (OPENAI_API_KEY set, no OAuth tokens) is a valid auth state. Exported for
  * testing with fabricated JWTs.
@@ -123,7 +138,9 @@ export function classifyNativeCodexAuth(raw: string | null, now: number = Date.n
   if (expSec === null) return { status: 'unknown', email, lastRefresh };
 
   const expiresAt = new Date(expSec * 1000).toISOString();
-  if (expSec * 1000 <= now) return { status: 'expired', email, expiresAt, lastRefresh };
+  if (expSec * 1000 <= now && !hasRefreshToken(parsed.tokens?.refresh_token)) {
+    return { status: 'expired', email, expiresAt, lastRefresh };
+  }
   return { status: 'valid', email, expiresAt, lastRefresh };
 }
 
@@ -337,7 +354,7 @@ export function assertCodexNativeAuthForSpawn(
     native.status === 'missing'
       ? 'not signed in (~/.codex/auth.json is missing)'
       : native.status === 'expired'
-        ? 'expired (~/.codex/auth.json access token has lapsed)'
+        ? 'expired (~/.codex/auth.json access token has lapsed and has no refresh token)'
         : hasActiveBurnedCodexAgentsSync(agentStates)
           ? 'revoked (a running codex agent hit a revoked refresh token — the shared token family is dead)'
           : null;
@@ -385,10 +402,12 @@ async function checkCliproxyCodexAuthStatus(options: CheckCodexAuthOptions = {})
   const email = typeof creds.email === 'string' ? creds.email : '';
   const expiresAt = new Date(expSec * 1000).toISOString();
 
-  if (expSec * 1000 <= Date.now()) {
+  if (expSec * 1000 <= Date.now() && !hasRefreshToken(creds.refresh_token)) {
     return { status: 'expired', email, expiresAt };
   }
 
+  // Unexpired, or lapsed but refreshable: CLIProxyAPI refreshes it itself. The
+  // burn override below still catches a refresh token that has been revoked.
   const jwtStatus: CodexAuthStatus = { status: 'valid', email, expiresAt };
   // The credential file's own write time is the authoritative "you last logged
   // in at" reference: any auth failure logged AFTER it means the CURRENT token
