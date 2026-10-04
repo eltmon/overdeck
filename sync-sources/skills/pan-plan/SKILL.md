@@ -20,12 +20,12 @@ allowed-tools:
 
 `pan plan <id>` is the plan-ONLY verb: it starts a planning session for an issue and produces a PRD and xBRIEF, but it does not start the work agent. Use `pan start <id>` when you want planning and work in one command.
 
-Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically.
+Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; effort `high` or above (the default) enables the same probe instructions automatically.
 
 ## Available commands
 
 ```bash
-pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi|codex] [--effort low|medium|high] [--local|--remote]
+pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi|codex] [--effort low|medium|high|xhigh|max] [--local|--remote]
 pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint] [--no-prd]
 pan plan done <id> [--no-prd]
 ```
@@ -59,7 +59,7 @@ The dashboard issue card's **Auto-plan** action sends the same `auto: true` requ
 pan plan PAN-1071 --probe
 ```
 
-`--probe` adds an adversarial self-review section to the planning prompt before finalize. The planner attacks hidden assumptions, ambiguous "done" criteria, unhandled failure modes, and missing dependency edges, then records acted-on findings in `continue.json` decisions with a `PROBE:` prefix. `--effort high` includes this section automatically.
+`--probe` adds an adversarial self-review section to the planning prompt before finalize. The planner attacks hidden assumptions, ambiguous "done" criteria, unhandled failure modes, and missing dependency edges, then records acted-on findings in `continue.json` decisions with a `PROBE:` prefix. Effort `high` or above (the default) includes this section automatically.
 
 ## Auto-start after planning
 

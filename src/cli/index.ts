@@ -319,7 +319,7 @@ const planCmd = program
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
-  .option('--effort <level>', 'Planning effort: low | medium | high')
+  .option('--effort <level>', 'Planning effort: low | medium | high | xhigh | max')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
   .action(lazyAction(() => import('./commands/plan.js'), 'planCommand'));
