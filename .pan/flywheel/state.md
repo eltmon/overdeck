@@ -102,3 +102,28 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - The operator authorized `pan restart approve` for the 2026-10-04 night only,
   after each merge with CI green on the exact `origin/main` tip, then verifying
   `/api/health` `buildCommit` contains the merge. Ask again on every new run.
+
+### Doomed verification holds the single CPU admission slot → PAN-4531 (2026-10-04, needs-handoff)
+
+- Verification runs all local gates (~25 min) before reading the CI test
+  verdict, so a head whose CI already failed still holds the machine-wide
+  admission slot, blocking every other verification and the agent's own
+  isolation test runs (PAN-4259 at 04:37). Root cause:
+  `src/lib/cloister/verification-runner.ts` ~line 581 computes `ciTestRed`
+  after the gates. Not fixed by hand: killing a worker mid-run risks wedging
+  its verification state.
+- Learning: overnight throughput is bounded by the serialized gate queue,
+  not by agents. Check `~/.overdeck/verification-workers/admission/owner.json`
+  before calling a long verification "stuck".
+
+### Restart during verification loses the review dispatch → PAN-4532 (2026-10-04, needs-handoff)
+
+- Verification workers survive a dashboard restart, but the waiter that
+  dispatches review after `passed` dies with the old process; the deacon's
+  re-request then ignores the finished result
+  (`verification-worker-supervisor.ts` line 174 joins only result-less
+  workers) and re-runs every gate. PAN-4515 lost a passed verification this
+  way after the 04:21 deploy.
+- Run rule until PAN-4532 lands: never approve a dashboard restart while any
+  `dist/verification-worker.js` process is alive. Deploy in a gap between
+  verifications.
