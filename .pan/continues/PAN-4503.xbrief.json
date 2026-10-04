@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4503",
   "created": "2026-10-03T23:54:05.751Z",
-  "updated": "2026-10-04T00:16:10.544Z",
+  "updated": "2026-10-04T00:16:20.805Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
       "claimedBy": "agent-pan-4503",
       "claimedAt": "2026-10-04T00:13:57.247Z",
       "doneAt": "2026-10-04T00:16:10.544Z"
+    },
+    "compare-view-in-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T00:16:20.805Z"
     }
   }
 }
