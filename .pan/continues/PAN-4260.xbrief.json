@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4260",
   "created": "2026-10-04T02:27:59.173Z",
-  "updated": "2026-10-04T04:14:20.145Z",
+  "updated": "2026-10-04T04:14:27.226Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4260",
       "claimedAt": "2026-10-04T04:12:23.028Z",
       "doneAt": "2026-10-04T04:14:20.144Z"
+    },
+    "w10-lint-effort-baseline": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4260",
+      "claimedAt": "2026-10-04T04:14:27.225Z"
     }
   }
 }
