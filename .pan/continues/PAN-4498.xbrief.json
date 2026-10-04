@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:32:06.713Z",
+  "updated": "2026-10-04T03:32:26.682Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,11 @@
       "claimedBy": "agent-pan-4498",
       "claimedAt": "2026-10-04T03:30:33.230Z",
       "doneAt": "2026-10-04T03:31:45.987Z"
+    },
+    "bookmark-routes.ac1": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4498",
+      "claimedAt": "2026-10-04T03:32:26.681Z"
     }
   }
 }
