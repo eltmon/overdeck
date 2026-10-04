@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4528",
   "created": "2026-10-04T04:36:24.345Z",
-  "updated": "2026-10-04T05:33:45.441Z",
+  "updated": "2026-10-04T05:33:57.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "collapsible-groups.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:33:45.441Z"
+    },
+    "collapsible-groups.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:57.002Z"
     }
   }
 }
