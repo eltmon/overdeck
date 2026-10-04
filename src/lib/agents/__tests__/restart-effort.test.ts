@@ -118,6 +118,33 @@ describe('restartAgent re-applies the persisted effort (PAN-4253)', () => {
     expect(getAgentState(agentId)?.effort).toBe('max');
   });
 
+  // PAN-4256: an explicit restart effort overrides the persisted pin and is
+  // itself recorded as 'explicit'.
+  it('an explicit restart effort overrides a persisted pin', async () => {
+    const agentId = 'agent-restart-effort-override';
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-4256',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-opus-5-5',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      kickoffDelivered: true,
+      effort: 'high',
+      effortSource: 'role',
+    } as never);
+
+    const result = await restartAgent(agentId, { graceful: false, effort: 'low' });
+
+    expect(result.success).toBe(true);
+    expect(readLauncher(agentId)).toContain('--effort low');
+    const after = getAgentState(agentId);
+    expect(after?.effort).toBe('low');
+    expect(after?.effortSource).toBe('explicit');
+  });
+
   it('resolves legacy state (no persisted effort) to the role default and writes it back', async () => {
     const agentId = 'agent-restart-effort-legacy';
     saveAgentStateSync({

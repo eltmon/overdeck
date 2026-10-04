@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentState } from '../../agent-state-read.js';
+import { InvalidEffortError } from '../../resolve-effort.js';
 import { workerDir, workerFactsPath } from '../ids.js';
 import { reportFooter, startWorker, type SpawnRunForWorker, type StartWorkerDeps } from '../start.js';
 
@@ -197,5 +198,42 @@ describe('startWorker (PAN-3920 W13)', () => {
     await expect(
       startWorker({ issueId: 'PAN-9', prompt: 'x', parentId: 'conv-$(rm -rf ~)' }, deps(okSpawn())),
     ).rejects.toThrow('Invalid parent id');
+  });
+
+  // PAN-4256: startWorker must resolve roles.worker.effort instead of
+  // launching unconditionally at the role file's hardcoded high.
+  it('resolves roles.worker.effort when no explicit effort is given', async () => {
+    const spawnRun = okSpawn();
+    await startWorker(
+      { issueId: 'PAN-9', prompt: 'x', parentId: null },
+      deps(spawnRun, { effortConfig: { roles: { worker: { effort: 'medium' } }, tieredExecution: { tiers: {} } } }),
+    );
+
+    expect(spawnRun.mock.calls[0]![2]).toMatchObject({ effort: 'medium', effortSource: 'role' });
+  });
+
+  it('passes an explicit effort through as the highest-precedence source', async () => {
+    const spawnRun = okSpawn();
+    await startWorker(
+      { issueId: 'PAN-9', prompt: 'x', parentId: null, effort: 'low' },
+      deps(spawnRun, { effortConfig: { roles: { worker: { effort: 'medium' } }, tieredExecution: { tiers: {} } } }),
+    );
+
+    expect(spawnRun.mock.calls[0]![2]).toMatchObject({ effort: 'low', effortSource: 'explicit' });
+  });
+
+  it('rejects an invalid explicit effort before allocating a worker id', async () => {
+    const spawnRun = okSpawn();
+    const allocateWorkerId = vi.fn(async () => 'agent-pan-9-worker-1');
+
+    await expect(
+      startWorker(
+        { issueId: 'PAN-9', prompt: 'x', parentId: null, effort: 'ultra' },
+        deps(spawnRun, { allocateWorkerId }),
+      ),
+    ).rejects.toBeInstanceOf(InvalidEffortError);
+
+    expect(allocateWorkerId).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
   });
 });

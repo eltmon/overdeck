@@ -136,4 +136,35 @@ describe('container orchestration under the no-placeholder claim flow', () => {
     expect(claimAgentStart(AGENT)).toBe(true);
     releaseAgentStart(AGENT);
   });
+
+  // PAN-4256: the container-wait background job must forward the caller's
+  // explicit effort to pan start, the same as the direct spawn path.
+  it('forwards an explicit effort to buildPanStartArgs on the container path', async () => {
+    expect(claimAgentStart(AGENT)).toBe(true);
+
+    await Effect.runPromise(handleContainerOrchestration({
+      issueId: ISSUE,
+      workspacePath,
+      devScript,
+      agentSessionName: AGENT,
+      role: 'work',
+      effectiveHarness: 'claude-code',
+      startedBy: 'test',
+      allowHost: false,
+      explicitModel: null,
+      effort: 'low',
+      spawnGuardrails: {} as never,
+      projectPath: workspacePath,
+      eventStore: { append: () => Effect.succeed(1) },
+      spawnPanCommand,
+      markWorkStartAccepted,
+      updateIssueStatus,
+    }) as Effect.Effect<{ status?: number; body?: unknown }>);
+
+    await vi.waitFor(() => expect(shared.buildPanStartArgs).toHaveBeenCalledTimes(1));
+    expect(shared.buildPanStartArgs).toHaveBeenCalledWith(expect.objectContaining({ effort: 'low' }));
+
+    await vi.waitFor(() => expect(updateIssueStatus).toHaveBeenCalledTimes(1));
+    releaseAgentStart(AGENT);
+  });
 });

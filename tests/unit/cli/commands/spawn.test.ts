@@ -188,6 +188,63 @@ describe('pan spawn', () => {
     exit.mockRestore();
   });
 
+  // PAN-4256: pan spawn resolves effort and appends the harness-specific flag.
+  it('appends --effort for an explicit value on claude-code', async () => {
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code', effort: 'medium' },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
+    );
+
+    expect(started[0].spec.argv).toEqual(['--model', 'opus', '--effort', 'medium']);
+  });
+
+  it('falls back to item metadata.effort when no flag is given', async () => {
+    mocks.readPlan.mockReturnValue(plan({ effort: 'low' }));
+
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code' },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
+    );
+
+    expect(started[0].spec.argv).toEqual(['--model', 'opus', '--effort', 'low']);
+  });
+
+  it('falls back to roles.worker.effort when neither flag nor item metadata is set', async () => {
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code' },
+      {
+        resolveBackend: async () => fakeBackend(started),
+        createWorktree: itemWorktree,
+        effortConfig: { roles: { worker: { effort: 'medium' } }, tieredExecution: { tiers: {} } },
+      },
+    );
+
+    expect(started[0].spec.argv).toEqual(['--model', 'opus', '--effort', 'medium']);
+  });
+
+  it('maps effort to -c model_reasoning_effort=<level> on codex', async () => {
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'sonnet', harness: 'codex', effort: 'high' },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
+    );
+
+    expect(started[0].spec.argv).toEqual(['--model', 'sonnet', '-c', 'model_reasoning_effort=high']);
+  });
+
+  it('exits 1 on an invalid --effort before creating a worktree or starting the agent', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code', effort: 'ultra' },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
+    );
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(itemWorktree).not.toHaveBeenCalled();
+    expect(started).toHaveLength(0);
+    exit.mockRestore();
+  });
+
   it('refuses an item that is not in the issue xBRIEF', async () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     mocks.readPlan.mockReturnValue(plan());

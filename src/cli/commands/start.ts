@@ -447,6 +447,7 @@ async function handleRemoteWorkspace(
       startedBy: resolveCliStartedBy('operator:cli:pan-start'),
       autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
       tier: fly.getResiliencyTier(),
+      effort: options.effort,
     });
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 

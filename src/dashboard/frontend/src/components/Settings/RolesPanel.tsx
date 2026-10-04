@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, ListOrdered, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { EFFORT_LEVELS, type EffortLevel } from '@overdeck/contracts';
 import { PROVIDER_BRANDS } from '../shared/branding';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
@@ -11,13 +11,12 @@ type ModelRef = string;
 interface WeightedModelRef { model: ModelRef; weight: number; }
 type RoleModelRef = ModelRef | WeightedModelRef[];
 type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
-type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 interface RoleSubConfig {
   model?: ModelRef;
   /** PAN-4257: reasoning effort for this sub-role. Unset = inherit the role/default chain. */
-  effort?: Effort;
+  effort?: EffortLevel;
 }
 
 type ReviewModeValue = 'quick' | 'full' | 'none';
@@ -25,7 +24,7 @@ type ReviewModeValue = 'quick' | 'full' | 'none';
 interface RoleConfig {
   model?: RoleModelRef;
   harness?: Harness;
-  effort?: Effort;
+  effort?: EffortLevel;
   /** PAN-1862: review role only — what kind of review runs (default quick). */
   mode?: ReviewModeValue;
   maxAgents?: number;
@@ -675,7 +674,7 @@ export function RolesPanel() {
                         <select
                           aria-label="Flywheel effort"
                           value={flywheelConfig.effort}
-                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { effort: event.target.value as Effort } })}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { effort: event.target.value as EffortLevel } })}
                           disabled={saveMutation.isPending}
                           className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                         >
@@ -726,7 +725,8 @@ export function RolesPanel() {
                       </label>
                     </div>
                     <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
-                      Effort and max agents apply on the next tick — no restart needed.{' '}
+                      Max agents applies on the next tick — no restart needed. Effort applies the next time the
+                      Flywheel starts; a paused Flywheel resumes at the effort it started with.{' '}
                       <span data-testid="flywheel-scope-timing">
                         Scope is baked into the orchestrator prompt, so a scope change applies at the next run start or
                         resume.
@@ -825,7 +825,7 @@ export function RolesPanel() {
                                 onChange={(event) => saveMutation.mutate({
                                   role: role.id,
                                   subRole: subRole.id,
-                                  patch: { effort: event.target.value === '' ? undefined : event.target.value as Effort },
+                                  patch: { effort: event.target.value === '' ? undefined : event.target.value as EffortLevel },
                                 })}
                                 className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                               >
