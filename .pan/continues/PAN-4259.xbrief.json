@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4259",
   "created": "2026-10-04T02:21:08.731Z",
-  "updated": "2026-10-04T03:56:34.245Z",
+  "updated": "2026-10-04T03:56:45.784Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "spawn-session-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:56:34.244Z"
+    },
+    "ledger-effort-column.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:56:45.784Z"
     }
   }
 }
