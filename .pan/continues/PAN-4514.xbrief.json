@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4514",
   "created": "2026-10-04T02:58:32.050Z",
-  "updated": "2026-10-04T03:22:08.404Z",
+  "updated": "2026-10-04T03:22:22.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "role-work-wait.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:22:08.404Z"
+    },
+    "docs-context-layers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:22:22.082Z"
     }
   }
 }
