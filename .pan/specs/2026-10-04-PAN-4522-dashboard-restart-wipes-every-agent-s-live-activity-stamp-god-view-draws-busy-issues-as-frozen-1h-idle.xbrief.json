@@ -1,0 +1,481 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T03:53:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4522: Dashboard restart wipes every agent's live activity stamp; God View draws busy issues as frozen '1h idle'",
+    "updated": "2026-10-04T04:12:40.066Z"
+  },
+  "plan": {
+    "id": "pan-4522",
+    "title": "Dashboard restart wipes every agent's live activity stamp; God View draws busy issues as frozen '1h idle'",
+    "status": "proposed",
+    "uid": "0b67d616-e0ed-445d-b0e1-366c99f73b1c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-04T03:53:43Z",
+    "updated": "2026-10-04T04:12:40.066Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4522",
+        "label": "PAN-4522",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "read-model",
+      "god-view",
+      "event-store",
+      "contracts",
+      "restart"
+    ],
+    "narratives": {
+      "Problem": "A dashboard restart boots the read model with agentRuntimeById = {} and the browser's syncSnapshot replaces its runtime map wholesale, so every client falls back to each agent's spawn-time state.json lastActivity until the agent's next hook beat. On 2026-10-04 the God View drew PAN-4256, PAN-4260 and PAN-4508 as frozen '1h idle' orbs while their work agents were busy.",
+      "Proposal": "(1) Add EventStore.queryRuntimeHistory(types, agentIds) returning every runtime event of the listed agents, oldest first (agent ids bound via json_each). (2) Add a pure foldRuntimeSeed(events, agentsById) in src/dashboard/server/services/runtime-seed.ts that replays each agent's full retained runtime history through the shared reducer against a per-agent scratch state and returns only the runtime map. (3) Call it inline in the read-model bootstrap so the first snapshot carries real stamps. (4) Replace the wholesale replace in syncSnapshot with a per-agent merge (new packages/contracts/src/agent-runtime-merge.ts): newer lastActivity keeps the client entry, equal stamps fall to the higher updatedAtSequence, agents the snapshot omits keep their entry. (5) Add a God View restart regression test. (6) Document the seed and the merge in docs/DASHBOARD-ARCHITECTURE.md. Full detail, snippets and line anchors are in the PRD .pan/drafts/PAN-4522.md (including its Critique response).",
+      "NonGoals": "- Do not fix the case where one tool call longer than 30 min with no hook events freezes an orb; note it in the PR body only.\n- Do not change effectiveStamp, latestActivity, classifyOrb, or STALE_AFTER_MS in the God View.\n- Do not edit the existing test 'an agent with fresh snapshot stamps but NO runtime events goes stale on evidence'.\n- Do not change AgentStateService or its RUNTIME_EVENT_TYPES list.\n- Do not add new runtime event emitters (codex agent.activity_changed path).\n- Do not change event retention or compaction.\n- Do not let the boot seed modify agentsById, agentIdBySessionId, turnDiffSummariesByAgentId, or permission maps.\n- Do not raise any cap in scripts/file-size-allowlist.txt.\n- Do not run the boot seed in Effect.forkDetach.\n- Do not reconcile seeded runtime entries against the pane inventory; entries for agents stopped via agent.status_changed keep their last activity (same as a long-lived client today).\n- Do not fix codex God View liveness (codex posts no agent.activity_changed)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Seed the read model's runtime map by replaying each agent's full retained runtime history from the event store, not from AgentStateService's pane seed and not latest-per-type.",
+        "rationale": "The pane seed stamps lastActivity with pane.stateSince and reproduces the bug. Latest-per-type loses fields (agent.model_set keeps sessionModel/sessionHarness when omitted; channelReply is conditionally kept), per plan critic round 1. Full replay measured under 1 s on the live store."
+      },
+      {
+        "summary": "Fold against a scratch state and keep only agentRuntimeById.",
+        "rationale": "agent.stopped and agent.heartbeat_dead also rewrite agentsById; replaying them onto the boot state would serve resumed agents as stopped/error because the resume's status_changed is not in the fold."
+      },
+      {
+        "summary": "Merge rule: client entry kept whole when its lastActivity is strictly newer, or equal with a strictly higher updatedAtSequence; otherwise the snapshot entry wins.",
+        "rationale": "Matches the issue's 'keeping the newer lastActivity'; agent.context_saturation_changed advances updatedAtSequence without moving lastActivity (plan critic round 1), and the AUTOINCREMENT sequence is monotonic across restarts."
+      },
+      {
+        "summary": "Do not change effectiveStamp's fallback (deviation from issue fix #3, which is phrased 'If a fallback is needed').",
+        "rationale": "After boot the agent row's lastActivity carries no live signal for any harness (enrichment emits agent.created once per server lifetime), so codex orbs already go stale 30 min after a restart; swapping the fallback to startedAt would change the operator-directed 'goes stale on evidence' semantics for every harness without fixing codex, whose liveness is a separate gap. After the seed and merge the fallback only runs for agents with no runtime events. Issue AC3 is met by the restart-scenario test."
+      },
+      {
+        "summary": "Move defaultRuntimeSnapshot out of event-reducers.ts into the new agent-runtime-merge.ts.",
+        "rationale": "event-reducers.ts is 1670 lines above the 1000-line ceiling with no allowlist row, so it cannot grow; moving the helper keeps the syncSnapshot change net-negative."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six small items across four subsystems (event store, read model, contracts reducer, God View test) plus one doc; all serve one bug and none ships value alone.",
+      "canonicalFilename": "2026-10-04-PAN-4522-dashboard-restart-wipes-every-agent-s-live-activity-stamp-god-view-draws-busy-issues-as-frozen-1h-idle.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "event-store-runtime-history",
+        "title": "Add EventStore.queryRuntimeHistory",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4522",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/event-store.ts",
+            "tests/dashboard/event-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/dashboard/event-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/dashboard/event-store.test.ts passes including the queryRuntimeHistory describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W1. Add queryRuntimeHistory(types: readonly string[], agentIds: readonly string[]): StoredEvent[] to the EventStore interface right after queryByTypesSince, implement it in createEventStore next to queryByTypesSince with the PRD SQL (type IN (...) AND json_extract(payload,'$.agentId') IN (SELECT value FROM json_each(?)) ORDER BY sequence ASC, agent ids bound as one JSON array, rows mapped through rowToStored), return [] when either list is empty, and add it to the returned object. Add a describe('EventStore.queryRuntimeHistory') block to tests/dashboard/event-store.test.ts using its makeDb() and ts() helpers."
+        },
+        "items": [
+          {
+            "id": "event-store-runtime-history.ac1",
+            "title": "Given activity_changed x2 and model_set x1 for agent-a, activity_changed x1 for agent-b and agent-c, and one agent.started for agent-a, when queryRuntimeHistory(['agent.activity_changed','agent.model_set'], ['agent-a','agent-b']) runs, then it returns exactly 4 rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-store-runtime-history.ac2",
+            "title": "Given the same store, when the query runs, then the result excludes every agent-c row and the agent.started row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-store-runtime-history.ac3",
+            "title": "When the query runs, then the returned rows are ordered by ascending sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-store-runtime-history.ac4",
+            "title": "When queryRuntimeHistory is called with an empty types list or an empty agentIds list, then it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-seed-fold",
+        "title": "Add pure foldRuntimeSeed module for the boot runtime seed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4522",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "read-model-boot-seed"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/runtime-seed.ts",
+            "tests/dashboard/runtime-seed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/dashboard/runtime-seed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/dashboard/runtime-seed.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "acJustification": "Out-of-order input is covered inside ac1's test file as a sixth case; the five ACs map to distinct reducer behaviors the critic named."
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W2. Create src/dashboard/server/services/runtime-seed.ts exporting RUNTIME_SEED_EVENT_TYPES (the 14 types in the PRD glossary, including agent.channel_reply and agent.heartbeat_dead) and foldRuntimeSeed(events, agentsById) exactly as the PRD snippet: group events by payload.agentId (skip ids not in agentsById), and for each agent replay ALL its events in ascending sequence through applyEvent from @overdeck/contracts against its own scratch state { ...INITIAL_READ_MODEL_STATE, agentsById: { [id]: agentsById[id] }, agentRuntimeById: {} }, keeping only scratch.agentRuntimeById[id]. Never fold latest-per-type and never fold against the real read-model state (decisions D2, D3). Write tests/dashboard/runtime-seed.test.ts with synthetic StoredEvent objects (no SQLite) covering the six cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "runtime-seed-fold.ac1",
+            "title": "Given activity_changed working at seq 10 (03:00:00Z) and idle at seq 20 (03:33:00Z) for agent-a, when foldRuntimeSeed runs, then it returns agent-a with lastActivity 2026-10-04T03:33:00.000Z and activity idle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-seed-fold.ac2",
+            "title": "Given agent.model_set at seq 1 with sessionModel s1, sessionHarness claude-code, claudeSessionId sess-1 and agent.model_set at seq 2 with only model m2, when foldRuntimeSeed runs, then it returns model m2 and preserves sessionModel s1, sessionHarness claude-code and claudeSessionId sess-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-seed-fold.ac3",
+            "title": "Given agent.channel_reply at seq 3, activity_changed working at seq 4 and activity_changed idle at seq 5, when foldRuntimeSeed runs, then the returned entry has channelReply undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-seed-fold.ac4",
+            "title": "Given agent.heartbeat_dead at seq 5 then activity_changed working at seq 30 for a running agent-a, when foldRuntimeSeed runs, then the returned activity is working and the input agentsById['agent-a'].status still equals running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-seed-fold.ac5",
+            "title": "Given an event for agent-zzz that is not in agentsById, when foldRuntimeSeed runs, then the returned map has no agent-zzz key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-model-boot-seed",
+        "title": "Seed agentRuntimeById inline in the read-model bootstrap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4522",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/read-model.ts",
+            "src/dashboard/server/__tests__/read-model-runtime-seed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/read-model-runtime-seed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/__tests__/read-model-runtime-seed.test.ts passes both cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W3. In src/dashboard/server/read-model.ts bootstrap (search '// ── Sequence from event store'), declare let agentRuntimeById: Record<string, AgentRuntimeSnapshot> = {} beside recentActivity; inside the existing try, after recentActivity is assigned, add the PRD's nested try: query eventStore.queryRuntimeHistory(RUNTIME_SEED_EVENT_TYPES, Object.keys(agentsById)), fold with foldRuntimeSeed, log '[ReadModel] Seeded <n> runtime entries from <m> events in <ms> ms', catch logging '[ReadModel] Failed to seed the runtime map:'. Add agentRuntimeById to the boot state object (search '...INITIAL_READ_MODEL_STATE,' in the bootstrap). Import foldRuntimeSeed and RUNTIME_SEED_EVENT_TYPES statically from './services/runtime-seed.js'. Never wrap the seed in Effect.forkDetach. Write src/dashboard/server/__tests__/read-model-runtime-seed.test.ts that drives the real ReadModelServiceLive like read-model-served-agent-status.test.ts (temp OVERDECK_HOME, vi.resetModules, vi.doMock of ../services/backend-inventory.js, ../services/issue-service-singleton.js and ../event-store.js with a fake getEventStore, AgentsResolver via Layer.succeed), with the two cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "read-model-boot-seed.ac1",
+            "title": "Given a fake event store whose queryRuntimeHistory returns agent-pan-4256 agent.activity_changed rows with newest timestamp 2026-10-04T03:33:00.000Z, when ReadModelServiceLive boots and getSnapshot runs once, then the snapshot returns agentRuntimeById['agent-pan-4256'].lastActivity equal to 2026-10-04T03:33:00.000Z",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-boot-seed.ac2",
+            "title": "Given queryRuntimeHistory throws, when ReadModelServiceLive boots, then getSnapshot resolves with agentRuntimeById {} and sequence 100",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-boot-seed.ac3",
+            "title": "Given queryRuntimeHistory throws, when ReadModelServiceLive boots, then console.error logs '[ReadModel] Failed to seed the runtime map:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snapshot-runtime-merge",
+        "title": "Merge the snapshot runtime map per agent in syncSnapshot",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4522",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "god-view-restart-test"
+          ],
+          "files_scope": [
+            "packages/contracts/src/agent-runtime-merge.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/__tests__/snapshot-runtime-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/snapshot-runtime-merge.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "packages/contracts/src/__tests__/snapshot-runtime-merge.test.ts passes",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 (event-reducers.ts at or below its origin/main line count)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W4. Create packages/contracts/src/agent-runtime-merge.ts exporting defaultRuntimeSnapshot (moved verbatim from event-reducers.ts, search 'function defaultRuntimeSnapshot') and mergeSnapshotRuntimeById(current, incoming) with the private heldIsNewer per the PRD snippet: the held entry wins when Date.parse(held.lastActivity) > Date.parse(next.lastActivity), or when the stamps are equal and both updatedAtSequence values are finite with held strictly greater; otherwise the incoming entry wins; agents absent from incoming keep their entry. In event-reducers.ts delete the local defaultRuntimeSnapshot, import both helpers from './agent-runtime-merge', and in syncSnapshot compute const agentRuntimeById = mergeSnapshotRuntimeById(state.agentRuntimeById, snapshot.agentRuntimeById) before the session-index loop, iterate that merged map in the loop, and return agentRuntimeById. event-reducers.ts must not grow past its origin/main line count (hazard H1). Write packages/contracts/src/__tests__/snapshot-runtime-merge.test.ts with the six cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "snapshot-runtime-merge.ac1",
+            "title": "Given client state holding agent-a working with lastActivity 03:35:00Z, when a snapshot carrying agent-a idle at 02:22:58Z is applied via syncSnapshot, then agent-a preserves lastActivity 03:35:00Z and activity working",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-runtime-merge.ac2",
+            "title": "Given client agent-a at 02:00Z and snapshot agent-a at 03:00Z, when syncSnapshot applies, then the result holds the snapshot entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-runtime-merge.ac3",
+            "title": "Given client and snapshot agent-a both at 03:00:00Z with client updatedAtSequence 11 (contextSaturatedAt set) and snapshot updatedAtSequence 10, when syncSnapshot applies, then the client entry wins; with the sequences reversed the snapshot entry wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-runtime-merge.ac4",
+            "title": "Given client agent-b with claudeSessionId sess-b and a snapshot with agentRuntimeById {}, when syncSnapshot applies, then agent-b's entry is preserved and agentIdBySessionId['sess-b'] returns agent-b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-runtime-merge.ac5",
+            "title": "bash scripts/lint-file-size.sh exits 0 with packages/contracts/src/event-reducers.ts at or below its origin/main line count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "god-view-restart-test",
+        "title": "God View regression test for a snapshot from a restarted server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4522",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "expected_outputs": [
+            "useConfluenceData.test.ts passes, including the PAN-4522 restart test and the unchanged 'goes stale on evidence' test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W5. Add the test 'keeps a working orb active across a snapshot from a freshly restarted server (PAN-4522)' to the describe('event-driven liveness ...') block in useConfluenceData.test.ts, using the file's agent(), queryClient(), wrapper() helpers and its fake timers: the store holds an agent whose startedAt and lastActivity are 71 min old plus a runtime entry 20 s old, then useDashboardStore.getState().syncSnapshot(...) applies a snapshot with agentRuntimeById {}, then useConfluenceOrbs classifies the orb. Assert state 'active' and idleMin < 1. Do not change effectiveStamp or the existing 'goes stale on evidence' test (decision D6). The test fails on main without snapshot-runtime-merge. The snapshot literal must include backendPanes: [pane('agent-pan-7')] (the file's pane() helper) because syncSnapshot resets backendPanesById from snapshot.backendPanes and an agent with no live pane draws no orb."
+        },
+        "items": [
+          {
+            "id": "god-view-restart-test.ac1",
+            "title": "Given an agent whose only row stamp (startedAt and lastActivity) is 71 min old and whose client runtime entry is 20 s old, when a snapshot with agentRuntimeById {} is applied, then useConfluenceOrbs renders the orb with state active and idleMin below 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "god-view-restart-test.ac2",
+            "title": "The existing test 'an agent with fresh snapshot stamps but NO runtime events goes stale on evidence' still passes unchanged in the same run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-runtime-seed",
+        "title": "Document the runtime-map boot seed and snapshot merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T03:53:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4522",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"PAN-4522\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new Frontend data flow bullet naming RUNTIME_SEED_EVENT_TYPES, queryRuntimeHistory and mergeSnapshotRuntimeById"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W6. In docs/DASHBOARD-ARCHITECTURE.md, in the 'Frontend data flow' list, add the bullet quoted in the PRD directly after the bullet that starts 'The snapshot's agent `status` is derived when it is served'. No Mintlify .mdx page documents the God View idle stamp, so no user-facing page changes."
+        },
+        "items": [
+          {
+            "id": "docs-runtime-seed.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a PAN-4522 bullet stating that the read model replays each agent's retained runtime events at boot, naming RUNTIME_SEED_EVENT_TYPES and queryRuntimeHistory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-runtime-seed.ac2",
+            "title": "The same bullet contains the merge rule: syncSnapshot preserves a held entry with a strictly newer lastActivity or an equal stamp with a higher updatedAtSequence, via mergeSnapshotRuntimeById",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "event-store-runtime-history",
+        "to": "read-model-boot-seed",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-seed-fold",
+        "to": "read-model-boot-seed",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-runtime-merge",
+        "to": "god-view-restart-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
