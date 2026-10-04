@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:15:21.655Z",
+  "updated": "2026-10-04T05:15:33.400Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "pan-spawn-effort-flag.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:15:21.655Z"
+    },
+    "pan-spawn-effort-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:15:33.400Z"
     }
   }
 }
