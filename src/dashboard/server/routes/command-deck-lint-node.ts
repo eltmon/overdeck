@@ -35,11 +35,15 @@ export function buildLintSessionNode(options: {
   if (!artifact) return null;
 
   const isRunning = artifact.outcome === 'running';
-  const status = isRunning ? 'running' : artifact.outcome === 'passed' ? 'completed' : 'failed';
+  const status = isRunning
+    ? 'running'
+    : artifact.outcome === 'passed' ? 'completed' : artifact.outcome === 'skipped' ? 'skipped' : 'failed';
 
   const transcriptParts: string[] = [
     isRunning ? 'QUALITY GATES RUNNING...' : `QUALITY GATES ${artifact.outcome.toUpperCase()}`,
     `Last run: ${artifact.ranAt}`,
+    // PAN-4543: a run cut short by the merge records why it reached no verdict.
+    ...(artifact.outcome === 'skipped' && artifact.skipReason ? [`Skipped: ${artifact.skipReason}`] : []),
     '',
   ];
   for (const gate of artifact.gates) {
