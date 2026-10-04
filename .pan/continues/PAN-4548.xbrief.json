@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4548",
+  "created": "2026-10-04T13:25:47.361Z",
+  "updated": "2026-10-04T13:25:47.361Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lint-docs-test-fileurltopath": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4548",
+      "claimedAt": "2026-10-04T13:25:47.361Z"
+    }
+  }
+}
