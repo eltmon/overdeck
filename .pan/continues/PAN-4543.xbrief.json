@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T10:12:30.742Z",
+  "updated": "2026-10-04T10:12:41.973Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "docs-close-out-rows.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T10:12:30.742Z"
+    },
+    "docs-close-out-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:12:41.973Z"
     }
   }
 }
