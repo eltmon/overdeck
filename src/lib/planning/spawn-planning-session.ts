@@ -2,6 +2,7 @@ import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { hostTransportFor } from '../runtimes/host-transport.js';
 import { compareEffort, type EffortLevel } from '@overdeck/contracts';
+import { resolveEffort } from '../agents/resolve-effort.js';
 /**
  * Spawn Planning Session — background workspace + agent setup
  *
@@ -133,7 +134,7 @@ export interface SpawnPlanningOptions {
   /** Optional harness override (PAN-636). */
   harness?: RuntimeName;
   /** Optional effort level — controls how thorough the planning agent is. */
-  effort?: 'low' | 'medium' | 'high';
+  effort?: EffortLevel;
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
   /** Add the adversarial pre-finalize probe pass to the planning prompt. */
@@ -526,6 +527,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const harnessLaunch = await prepareHarnessLaunch(effectiveHarness, { model: planningModel });
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
+    const resolvedEffort = resolveEffort({ explicit: effort, role: 'plan', issueId: issue.identifier, model: planningModel, harness: effectiveHarness });
+    if (resolvedEffort.warning) console.warn(`[start-planning] ${resolvedEffort.warning}`);
+    console.log(`[start-planning] Effort resolution for role=plan: effort=${resolvedEffort.effort} source=${resolvedEffort.source}`);
+
     progress(3, 'Loading specs & PRDs', 'PRD comes from the canonical draft path', 'complete');
 
     // ── Step 4: Configure agent ─────────────────────────────────────────
@@ -534,7 +539,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // PAN-3960: one backend answer for the launcher and the launch.
     const launchBackend = await resolveLaunchBackend();
 
-    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, '', effectiveHarness);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, resolvedEffort.effort, auto === true, probe === true, '', effectiveHarness);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
       prompt: planningPrompt,
       issueId: issue.identifier,
@@ -544,7 +549,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       harness: effectiveHarness,
     });
     if (memoryContext) {
-      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext, effectiveHarness);
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, resolvedEffort.effort, auto === true, probe === true, memoryContext, effectiveHarness);
     }
 
     await writeFeatureContext(workspacePath, issue);
@@ -553,13 +558,13 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // PAN-636: thread harness through so a planning kickoff with --harness pi
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness, resolvedEffort.effort);
     const behavior = getHarnessBehavior(effectiveHarness);
     const piLauncherFields = behavior.usesRpcFifo
-      ? await getOhmypiLauncherFields(sessionName, planningModel, effort)
+      ? await getOhmypiLauncherFields(sessionName, planningModel, resolvedEffort.effort)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
-      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', effort)
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort)
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
       ? getAcpLauncherFields(
@@ -568,20 +573,20 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           workspacePath,
           harnessLaunch.binaryPath,
           'plan',
-          effort,
+          resolvedEffort.effort,
         )
       : {};
     // PAN-1837 review fix: planning explicitly threads harness but omitted
     // kimiCodeModel — buildKimiCodeCommand() throws 'kimi-code launcher
     // requires kimiCodeModel' before a session could be created.
     const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
-      ? getKimiCodeLauncherFields(planningModel, effort)
+      ? getKimiCodeLauncherFields(planningModel, resolvedEffort.effort)
       : {};
 
     // Prime Agent (PAN-3668 WI-13): the host owns provider selection; its credential
     // travels in the pane env, never in provider exports or the launcher script.
     const primeLaunch = behavior.launchCommandKind === 'prime-agent-host'
-      ? await getPrimeAgentLauncherFields(sessionName, planningModel, workspacePath, harnessLaunch.binaryPath, { authMode: await getProviderAuthMode(planningModel), effort })
+      ? await getPrimeAgentLauncherFields(sessionName, planningModel, workspacePath, harnessLaunch.binaryPath, { authMode: await getProviderAuthMode(planningModel), effort: resolvedEffort.effort })
       : null;
 
     const providerExports = behavior.launchCommandKind === 'acp-host' || primeLaunch
@@ -622,7 +627,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
         ...(primeLaunch?.fields ?? {}),
-        ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
+        ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: resolvedEffort.effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },
     );
