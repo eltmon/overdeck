@@ -1,6 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
+import type { EffortLevel } from '@overdeck/contracts';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
@@ -12,7 +13,7 @@ interface PlanOptions {
   probe?: boolean;
   model?: string;
   harness?: 'claude-code' | 'pi' | 'codex';
-  effort?: 'low' | 'medium' | 'high';
+  effort?: EffortLevel;
   remote?: boolean;
   local?: boolean;
 }
