@@ -1,24 +1,22 @@
-# Flywheel report: overnight run 2026-10-04
+# Flywheel report: run 2026-10-04 (stopped)
 
-Run: 2026-10-04 02:04 → 10:45 UTC. Auto-pickup was OFF. The loop drained the
-issues the operator started with `pan start` plus the issues it filed itself.
-The operator authorized restart approvals for this night only. **The
-pipeline is clear, and the loop is idle, waiting for the operator to close
-out the run.**
+Run: 2026-10-04 02:04 → 20:10 UTC, stopped by the operator. Auto-pickup was
+OFF. The loop drained the issues the operator started with `pan start` plus
+the issues it filed itself, then handled the v0.65.0 release.
 
-## Headline
+## Outcome
 
-- **19 PRs merged, deployed and closed out overnight.** That is all 12 issues
-  the operator started, plus PAN-4383 (stuck in review for 2 days) and 6
-  issues the Flywheel filed and launched.
-- **Live build `b14903827a0` = `origin/main` tip.**
-- **The God View video (conversation 3215) is released.** Both God View
-  fixes have been live since 09:07 UTC.
-- **Mods evaluation ready for review:** https://claude.ai/artifact/JevxSris6qA2X34rjXxxdc
-- **6 `needs-handoff` items wait for you** (below); they are review, merge
-  and flywheel machinery.
+- **20 PRs merged, deployed and closed out**, all with no Definition-of-Done
+  override: the 12 operator-started issues, PAN-4383 (stuck in review for 2
+  days), and 7 issues the Flywheel filed and launched (PAN-4522, PAN-4523,
+  PAN-4528, PAN-4529, PAN-4541, PAN-4543, PAN-4548).
+- **v0.65.0 released:** npm `@overdeck/core@0.65.0` is `latest`, the GitHub
+  release has 11 desktop assets, and a clean-cache `npx` prints `0.65.0`.
+- **Live build `06b724af9bb` = `origin/main` tip**, reporting 0.65.0 (operator
+  approved the restart at ~20:05 UTC).
+- **No open PRs.**
 
-## Merged, deployed and closed (`origin/main`)
+## Merged, deployed and closed
 
 | Issue | Commit | What |
 | --- | --- | --- |
@@ -31,70 +29,61 @@ out the run.**
 | PAN-4498 | 9ecda10a | Conversation bookmarks |
 | PAN-4508 | 66777e33 | Jev settings in the dashboard |
 | PAN-4528 | f22dee6a | New-conversation Skills field: descriptions and collapsible groups |
-| PAN-4514 | ff4bad3d | AskUserQuestion placeholder / status-only questions |
+| PAN-4514 | ff4bad3d | AskUserQuestion is for decisions only |
 | PAN-4256 | 832b65e0 | Effort on role launch surfaces |
 | PAN-4522 | 849baa1d | God View: liveness survives dashboard restart |
 | PAN-4529 | e98acf50 | Claude Code mods evaluation (report only) |
-| PAN-4515 | 6d2e0eb7 | Chats: idle Claude Code conversations jump to 'active just now' hourly |
+| PAN-4515 | 6d2e0eb7 | Idle conversations no longer jump to 'active just now' |
 | PAN-4523 | 9c871fc4 | God View river: bands, merged-exit, stage counters |
 | PAN-4260 | 19089607 | Harness effort correctness |
 | PAN-4259 | 6eb8d3d1 | Show effort everywhere, record it in cost data |
-| PAN-4541 | cd27acfd | Deploy preflight reads real imports only (deploys were blocked 05:35-09:07) |
-| PAN-4543 | b1490382 | `pan close`: deploy-probe retry, stale-artifact rule, async cost reads (event-loop stall) |
+| PAN-4541 | cd27acfd | Deploy preflight reads real imports only |
+| PAN-4543 | b1490382 | `pan close`: deploy-probe retry, stale-artifact rule, async cost reads |
+| PAN-4548 | 06b724af | lint-docs test uses `fileURLToPath` |
+| release | 91d2ae9c | v0.65.0 (changelog `3f2e6f95`) |
 
-## Release inputs (v0.64.0 → next)
+## Waiting on the operator
 
-- Since v0.64.0: ~150 commits, 59 PR merges. Every merge is deployed and
-  closed, and `main` is green.
-- Recommendation: **v0.65.0** is the honest next number. **v0.70.0** is
-  defensible as a showcase milestone. It is your call
-  (`pan release stable --version X.Y.Z`, then push `main` and the tag).
+1. **Conversation 3230 (held):** the supervised handoff for PAN-4527, 4532,
+   4531, 4540 and 4534 (verification and auto-merge reliability). Press Send,
+   or run `pan handoff start 3230`. Brief:
+   `~/Projects/hoff-verify-merge-bundle/.pan/handoff-brief.md`.
+2. **PAN-4551, the Effect upgrade** (4.0.0-beta.73 → 4.0.0;
+   `@effect/language-service` 0.87.3): needs-handoff, sequenced after the 3230
+   bundle merges.
+3. **PAN-4546** (two concurrent quality gates with a pressure fallback) and
+   **PAN-4547** (restore automatic close-out): needs-handoff.
+4. **PAN-4530** (Flywheel idle rule): input for the flywheel/gauntlet design
+   session; already applied through `state.md`.
+5. **PAN-4550** (two tests depend on host state): low priority, not started.
+6. **Review:** the Claude Code Mods Evaluation
+   (https://claude.ai/artifact/JevxSris6qA2X34rjXxxdc) and the rescued PRD
+   `.pan/drafts/operator-ui-parity.md` (never filed).
 
-## needs-handoff (TENET-10, not auto-started)
+## Stream (flywheel/gauntlet design session)
 
-All are review, merge or flywheel machinery found tonight. They explain most
-of the night's slow review throughput.
+Ready. The brief `.pan/drafts/flywheel-gauntlet-runs.md`, the `grilling`
+skill, and `pan handoff --skill/--pack/--hold` are all present and checked.
+Suggested addition to the kickoff: also read this report and
+`.pan/flywheel/state.md` as a case study of a full drain-and-fix run.
 
-1. **PAN-4532:** a dashboard restart during verification loses the review
-   dispatch; the re-request discards the finished result and re-runs every gate.
-2. **PAN-4531:** verification runs ~25 min of local gates on a head whose CI
-   already failed, or whose PR already merged, while holding the single CPU
-   admission slot.
-3. **PAN-4527:** a re-review joins a worker started on the previous head and
-   fails the new head on the old head's CI result.
-4. **PAN-4540:** auto-merge records a gate refusal inside `triggerMerge` as
-   `failed`, which strands approved green PRs. The trigger is a transient
-   `mergeable` recompute after any push to `main`; 3 instances tonight.
-5. **PAN-4534:** CI failure feedback names no failing test, because the relay
-   reads completed workflow runs while the run is still in progress.
-6. **PAN-4530:** Flywheel skill: go idle when clear, keep the conversation
-   open, stuck is not clear (your approved rule; already in `state.md`).
+## What the run learned (detail in state.md)
 
-Suggested: one supervised handoff for 1–5, which share
-`verification-worker-supervisor.ts`, `verification-runner.ts` and the
-auto-merge executor. Take PAN-4530 into the flywheel/gauntlet design session.
+- **Throughput was bounded by machinery, not agents:** the five verification
+  and merge bugs above, plus the single-slot gate queue.
+- **Deploy restarts during verification lose review dispatches**
+  (PAN-4532). Guard: never restart while a `verification-worker.js` is alive.
+- **The Flywheel's own pushes to `main` can trigger the mergeability race**
+  (PAN-4540): hold state pushes while a merge is pending.
+- **Close-out is manual until PAN-4547:** `pan close <id> --force`, no overrides.
+- **Release preflight on a host:** reinstall `node_modules` and clean `dist/`
+  first. The 292 false test failures came from a stale install and a stale
+  `dist/` chunk, not from agent environment variables. CI's green full-suite
+  run on the exact commit is the test record.
+- **Primary-checkout drift recurred** (17 spec flips, 2 stranded drafts) and
+  was reconciled with the backup-first recipe; backup at
+  `backup/primary-2026-10-04-worktree`.
 
-## Unaddressed SHOULD-level review findings (merged anyway)
+## Unaddressed SHOULD-level review findings
 
-- PR #4513 (PAN-4509): `tests/unit/scripts/lint-docs.test.ts` uses
-  `new URL(...).pathname`; it should use `fileURLToPath` (breaks on checkout
-  paths with spaces). Both CodeRabbit and our reviewer flagged it.
-
-## Design calls for you
-
-- **Gate admission is serialized machine-wide (PAN-4311):** one heavy gate at
-  a time on 24 cores. Overnight, 5–7 PRs queued 1–2 h behind it. Allowing 2
-  concurrent gates is a CPU-storm-risk trade-off.
-- **Close-out is not automatic** (`close_out.auto` unset): merged and
-  deployed issues sat `verifying-on-main` until the Flywheel ran `pan close`.
-  Decide whether to turn it on now that PAN-4543 removed the flaky refusals.
-- **SHOULD-level findings evaporate on approval;** decide whether they should
-  become follow-up issues automatically.
-
-## Housekeeping
-
-- The primary checkout's local `main` is several commits behind `origin/main`.
-  Its fast-forward is blocked by another session's untracked
-  `.pan/continues/PAN-4383.xbrief.json`, which differs from the merged copy.
-  The Flywheel left it untouched.
-- The overnight restart authorization ended with this run.
+- None outstanding: PR #4513's `fileURLToPath` finding was fixed by PAN-4548.
