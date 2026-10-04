@@ -44,6 +44,7 @@ import {
 } from './primitives';
 import { useAutosavePipeline } from './hooks/useAutosavePipeline';
 import { useConversationSearch } from './hooks/useConversationSearch';
+import { useJevSettings } from './hooks/useJevSettings';
 import { type CloisterConfig, type OpenRouterCatalogResponse, type SaveSettingsResponse } from './SettingsPage.types';
 import { loadVoiceHardwareSettings, normalizeVoiceSettings, VOICE_HARDWARE_STORAGE_KEY } from './voiceSettingsDefaults';
 import { SETTINGS_NAV_ITEMS } from './settingsPageConstants';
@@ -301,6 +302,7 @@ export function SettingsPage() {
     scheduleAutosave,
     flushAutosave,
   });
+  const { settings: jevSettings, usage: jevUsage, save: saveJevSettings, serverError: jevServerError } = useJevSettings();
 
   // A preset writes config.yaml outside the autosave pipeline (PAN-4400), so
   // formData is stale afterwards. Replace it with the fresh document, or the
@@ -618,6 +620,7 @@ export function SettingsPage() {
         chatModelOptionEls={chatModelOptionEls}
         formData={formData}
         onSettingsChange={applySettings}
+        jev={{ settings: jevSettings, usage: jevUsage, serverError: jevServerError, onSave: saveJevSettings }}
       />
 
       <TerminalSection

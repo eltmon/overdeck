@@ -560,6 +560,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/model-presets/:id/apply',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
   { surface: 'POST /api/model-presets/undo',                         kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via model-presets path-scoped write (PAN-4400)' },
 
+  // ── jev.ts ────────────────────────────────────────────────────────────────
+  { surface: 'GET /api/jev/settings',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via jev settings door (PAN-4508)' },
+  { surface: 'PUT /api/jev/settings',                                kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via jev settings path-scoped write (PAN-4508)' },
+  { surface: 'GET /api/jev/usage',                                   kind: 'http', disposition: 'READ',        door: 'jev usage log summary, read-only (PAN-4508)' },
+
   // ── vault.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },
   { surface: 'GET /api/vault/eviction-batch',                        kind: 'http', disposition: 'READ',        door: 'FILE via src/lib/vault/evict.ts batch read (PAN-4307)' },
