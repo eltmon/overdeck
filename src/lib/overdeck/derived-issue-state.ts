@@ -73,6 +73,7 @@ import { findSpecByIssue } from '../xbrief/io.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
+import { readOpenOperatorDecision } from '../cloister/operator-decision.js';
 import { runGh } from '../github-quota/run-gh.js';
 import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
 import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
@@ -140,6 +141,8 @@ export interface IssueStateFacts {
   readonly now: number;
   /** Override for `DEFAULT_STUCK_AFTER_MS`. */
   readonly stuckAfterMs?: number;
+  /** PAN-4383: an open operator decision in the issue's pipeline journal. */
+  readonly operatorDecisionOpen?: boolean;
   /** The workspace journal's read on a post-planning auto-start (PAN-4399), when one exists. */
   readonly workStart?: DerivedWorkStart;
 }
@@ -187,6 +190,8 @@ function deriveState(facts: IssueStateFacts): IssueState {
 
 function deriveAttention(facts: IssueStateFacts): IssueAttention | undefined {
   const livePanes = facts.panes.filter(isLive);
+  // PAN-4383: the agent asked the operator with `pan ask` and waits for the answer.
+  if (facts.operatorDecisionOpen === true) return 'needs-you';
 
   // An unanswered AskUserQuestion or a permission prompt: the backend reports
   // the pane as `blocked`.
@@ -723,6 +728,11 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   return null;
 }
 
+/** PAN-4383: the issue workspace's journal holds an open `pan ask` decision. */
+function operatorDecisionOpenFor(issueId: string, projectPath: string): boolean {
+  return readOpenOperatorDecision(join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)) !== null;
+}
+
 /**
  * The single async loader: one pass over the owners, producing the snapshot
  * `deriveIssueState` reads. Every IO is injectable so tests stay offline.
@@ -769,6 +779,7 @@ export async function loadIssueStateFacts(
     ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
     ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),
     ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
+    ...(project ? { operatorDecisionOpen: operatorDecisionOpenFor(issueId, project.projectPath) } : {}),
     ...(workStart ? { workStart } : {}),
   };
   return facts;
@@ -899,6 +910,7 @@ export async function loadIssueStatesForProject(
       ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
       ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),
       ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
+      operatorDecisionOpen: operatorDecisionOpenFor(issueId, projectPath),
       ...(workStart ? { workStart } : {}),
     };
     out.set(issueId, deriveIssueState(facts));

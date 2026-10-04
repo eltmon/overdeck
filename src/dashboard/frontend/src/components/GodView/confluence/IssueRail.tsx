@@ -24,6 +24,7 @@ function trackerUrl(issueId: string): string | null {
 
 function stateLabel(orb: ConfluenceOrb): string {
   if (orb.state === 'stale') return 'stale ❄';
+  if (orb.state === 'needs-you') return 'needs you ⚑';
   if (orb.state === 'shelf') return 'yielded ⏸';
   if (orb.state === 'failed') return 'merge failed ✗';
   return 'active';

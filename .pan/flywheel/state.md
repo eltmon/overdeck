@@ -66,3 +66,52 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Learning: right after a `pan reload`, the God View and any other
   `agentRuntimeById` consumer under-report activity. Do not diagnose agent
   idleness from them in the first minutes after a restart.
+
+### Stale verification worker fails a fixed head → PAN-4527 (2026-10-04, needs-handoff)
+
+- PAN-4498's re-review after a fix push joined a verification worker started
+  on the previous head, which then failed the new head with the old head's CI
+  result ("The CI test job already failed on this head (c9994b06)") although
+  CI on the new head had passed. Root cause:
+  `src/lib/cloister/verification-worker-supervisor.ts` line 178 treats every
+  review-verification worker as `sameHead`, and `verification-runner.ts`
+  reads CI for the launch-time `headShort`. Review machinery (TENET-10), so
+  filed `needs-handoff`, not started.
+- Instance recovery: told the agent the failure was stale and to re-request
+  review on its current head. Tell: a `verification.failed` whose gate record
+  names a different head than its `head8`, or a test gate at `0ms`, is this bug.
+
+## Run rules (operator decisions)
+
+### Go idle when the pipeline is clear; stuck is not clear (2026-10-04, PAN-4530)
+
+- With auto-pickup off, when nothing is pickable and the pipeline is clear,
+  write and push `.pan/flywheel/report.md`, print `phase=idle needs-you=pipeline
+  clear — ready for operator close-out`, stop scheduling ticks, and keep the
+  conversation open. Only the operator ends the run.
+- Clear = every drained issue merged, deployed (`/api/health` `buildCommit`
+  contains it) and closed out or waiting only on automatic verify-on-main.
+  Not in flight: `needs-handoff` / operator-decision items, parked or vetoed
+  issues, other projects' long-paused agents.
+- If an in-flight issue cannot move without the operator, keep ticking and
+  name the blocker; a stopped loop must always mean clear, never stuck.
+- PAN-4530 carries the skill-text change (needs-handoff, TENET-10).
+
+### Overnight restart approval is per-run, never standing (2026-10-04)
+
+- The operator authorized `pan restart approve` for the 2026-10-04 night only,
+  after each merge with CI green on the exact `origin/main` tip, then verifying
+  `/api/health` `buildCommit` contains the merge. Ask again on every new run.
+
+### Doomed verification holds the single CPU admission slot → PAN-4531 (2026-10-04, needs-handoff)
+
+- Verification runs all local gates (~25 min) before reading the CI test
+  verdict, so a head whose CI already failed still holds the machine-wide
+  admission slot, blocking every other verification and the agent's own
+  isolation test runs (PAN-4259 at 04:37). Root cause:
+  `src/lib/cloister/verification-runner.ts` ~line 581 computes `ciTestRed`
+  after the gates. Not fixed by hand: killing a worker mid-run risks wedging
+  its verification state.
+- Learning: overnight throughput is bounded by the serialized gate queue,
+  not by agents. Check `~/.overdeck/verification-workers/admission/owner.json`
+  before calling a long verification "stuck".
