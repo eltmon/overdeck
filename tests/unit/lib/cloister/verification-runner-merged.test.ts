@@ -12,6 +12,7 @@ const {
   mockVerificationArtifactPath,
   mockWriteVerificationArtifact,
   mockRebuildWorkspaceStack,
+  mockMarkRunningSkipped,
 } = vi.hoisted(() => ({
   mockGetPrFacts: vi.fn(),
   mockEmitActivity: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockVerificationArtifactPath: vi.fn((workspacePath: string) => `${workspacePath}/.overdeck/verification-latest.json`),
   mockWriteVerificationArtifact: vi.fn(),
   mockRebuildWorkspaceStack: vi.fn(),
+  mockMarkRunningSkipped: vi.fn(() => null),
 }));
 
 // PAN-3917: the forge answers "has this merged?", not a stored merge status.
@@ -54,6 +56,7 @@ vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
   readVerificationArtifact: vi.fn(() => null),
   verificationArtifactPath: mockVerificationArtifactPath,
   writeVerificationArtifact: mockWriteVerificationArtifact,
+  markRunningVerificationArtifactSkipped: mockMarkRunningSkipped,
 }));
 
 vi.mock('../../../../src/lib/workspace/rebuild-stack.js', () => ({
@@ -82,6 +85,7 @@ vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
   checkIncompletePlanItems: vi.fn(async () => []),
 }));
 
+import { MERGED_VERIFICATION_REASON } from '../../../../src/lib/cloister/verification-escalation.js';
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
 
 const workspacePath = '/tmp/feature-pan-2901-verification-test';
@@ -124,6 +128,9 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       reason: 'The pull request already merged; pre-merge verification no longer applies.',
     });
     expect(mockRunQualityGates).not.toHaveBeenCalled();
+    // PAN-4543: an early merged skip runs before this run writes anything, so the
+    // latest artifact belongs to an earlier run and must not be relabelled.
+    expect(mockMarkRunningSkipped).not.toHaveBeenCalled();
   });
 
   it('waits for an infrastructure-triggered stack rebuild before returning', async () => {
@@ -230,5 +237,7 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       reason: 'The pull request already merged; pre-merge verification no longer applies.',
     });
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+    // PAN-4543: the post-gate merged skip finalizes this run's own 'running' write.
+    expect(mockMarkRunningSkipped).toHaveBeenCalledWith(workspacePath, MERGED_VERIFICATION_REASON);
   });
 });

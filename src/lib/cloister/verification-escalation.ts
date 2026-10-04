@@ -13,6 +13,7 @@ import { emitActivityEntry } from '../activity-logger.js';
 import { clearAgentPaused, getAgentState, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { getPrFacts } from './pr-facts.js';
+import { markRunningVerificationArtifactSkipped } from './verification-artifact.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
 import { VERIFICATION_MAX_CYCLES } from './verification-cycles.js';
 
@@ -34,10 +35,17 @@ export const MERGED_VERIFICATION_REASON =
 export async function skipMergedVerification(
   issueId: string,
   logPrefix: string,
+  workspacePath?: string,
 ): Promise<VerificationRunnerOutcome | null> {
   const facts = await getPrFacts(issueId);
   if (!facts.merged) return null;
   console.log(`[${logPrefix}] Skipping pre-merge verification for ${issueId}: ${MERGED_VERIFICATION_REASON}`);
+  // PAN-4543: a run cut short by the merge must not leave 'running' as the latest
+  // artifact. Only a caller whose own progress write is the latest passes workspacePath.
+  if (workspacePath) {
+    try { markRunningVerificationArtifactSkipped(workspacePath, MERGED_VERIFICATION_REASON); }
+    catch (err) { console.warn(`[${logPrefix}] Could not finalize the running verification artifact for ${issueId}: ${err instanceof Error ? err.message : String(err)}`); }
+  }
   return { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON };
 }
 
