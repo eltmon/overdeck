@@ -1067,16 +1067,44 @@ describe('Definition-of-Done deploy row', () => {
   });
 
   it('skips another project and misses an unreachable dashboard', async () => {
-    const otherProject = await checkDeployRow(ctx, merge, {
-      ...baseDeps,
-      readJson: async () => ({ repoRoot: '/repo/other', buildCommit: 'fedcba654321' }),
-    });
-    const unreachable = await checkDeployRow(ctx, merge, {
-      ...baseDeps,
-      readJson: async () => { throw new Error('connection refused'); },
-    });
-    expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
-    expect(unreachable).toMatchObject({ status: 'miss', observed: expect.stringContaining('dashboard not reachable') });
+    vi.useFakeTimers();
+    try {
+      const otherProject = await checkDeployRow(ctx, merge, {
+        ...baseDeps,
+        readJson: async () => ({ repoRoot: '/repo/other', buildCommit: 'fedcba654321' }),
+      });
+      const readJson = vi.fn(async () => { throw new Error('connection refused'); });
+      const pending = checkDeployRow(ctx, merge, { ...baseDeps, readJson });
+      await vi.advanceTimersByTimeAsync(4000);
+      const unreachable = await pending;
+      expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
+      expect(unreachable).toMatchObject({ status: 'miss' });
+      expect(unreachable.observed).toContain('dashboard not reachable');
+      expect(unreachable.observed).toContain('after 3 attempts');
+      expect(readJson).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // PAN-4543: the dashboard event loop stalls 4-5 s after a close-out; a probe
+  // that answers on a later attempt proves the deploy.
+  it('passes when the health probe answers on its third attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const readJson = async (url: string) => {
+        calls += 1;
+        if (calls < 3) throw new Error('The operation was aborted due to timeout');
+        return baseDeps.readJson(url);
+      };
+      const pending = checkDeployRow(ctx, merge, { ...baseDeps, readJson });
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(await pending).toMatchObject({ status: 'pass' });
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
