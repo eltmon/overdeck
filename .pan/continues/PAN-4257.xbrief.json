@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:29:48.594Z",
+  "updated": "2026-10-04T03:30:01.195Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "review-callsite-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:29:48.594Z"
+    },
+    "effort-first-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:30:01.194Z"
     }
   }
 }
