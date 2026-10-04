@@ -8,6 +8,12 @@ import {
   getAgentState,
 } from '../../../../lib/agents.js';
 import { getAgentJsonlPath, scanPendingInputs } from '../../../../lib/agent-enrichment.js';
+import {
+  answerOperatorDecision,
+  isOperatorDecisionToolId,
+  OPERATOR_DECISION_TOOL_ID_PREFIX,
+  readOpenOperatorDecision,
+} from '../../../../lib/cloister/operator-decision.js';
 import { deliverPlanActionToSession } from '../../../../lib/overdeck/conversation-delivery.js';
 import {
   answerSessionPaneChoice,
@@ -132,43 +138,71 @@ export const getAgentPendingQuestionsRoute = HttpRouter.add(
 // user message. We compose that user message from the chosen option labels
 // and deliver it through the standard message pipeline.
 //
-// Body: { answers: string[] }  — one chosen-option label per question.
+// Body: { answers: string[], toolUseId?: string }  — one chosen-option label per
+// question; toolUseId picks the question set (PAN-4383: an operator decision).
+
+export async function handlePostAgentAnswerQuestion(
+  id: string,
+  body: Record<string, unknown>,
+): Promise<{ body: Record<string, unknown>; status?: number }> {
+  if (!id.trim()) return { body: { error: 'missing agent id' }, status: 400 };
+  const answers = body['answers'];
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return { body: { error: 'answers array required' }, status: 400 };
+  }
+  if (!answers.every((a): a is string => typeof a === 'string' && a.length > 0)) {
+    return { body: { error: 'every answer must be a non-empty string' }, status: 400 };
+  }
+  const toolUseId = typeof body['toolUseId'] === 'string' ? body['toolUseId'] : undefined;
+
+  const pendingQuestions = await getAgentPendingQuestions(id);
+  const matched = toolUseId ? pendingQuestions.find((q) => q.toolId === toolUseId) : undefined;
+  if (!matched && isOperatorDecisionToolId(toolUseId)) {
+    return { body: { error: 'This decision was already answered or withdrawn', code: 'decision-closed' }, status: 409 };
+  }
+  if (pendingQuestions.length === 0) {
+    return { body: { error: 'No pending questions found for this agent' }, status: 404 };
+  }
+  const questionSet = matched ?? pendingQuestions[0];
+
+  // PAN-4383: a `pan ask` decision closes in the journal only once the answer
+  // actually reached the agent.
+  if (isOperatorDecisionToolId(questionSet.toolId)) {
+    const questionId = questionSet.toolId.slice(OPERATOR_DECISION_TOOL_ID_PREFIX.length);
+    const question = questionSet.questions[0]?.question ?? '';
+    const message = `Operator answered your decision request (${questionId}):\n\nQ: ${question}\nA: ${answers[0]}`;
+    const result = await deliverAgentMessage(id, message, 'operator-decision-answer');
+    if (!result.ok) {
+      return { body: { error: result.failure ?? 'delivery failed', code: 'delivery-failed' }, status: 502 };
+    }
+    const workspace = getAgentState(id)?.workspace;
+    const decision = workspace ? readOpenOperatorDecision(workspace) : null;
+    if (workspace && decision?.questionId === questionId) {
+      answerOperatorDecision(workspace, decision, answers[0], 'dashboard-answer');
+    }
+    return { body: { success: true, agentId: id, delivered: 1 } };
+  }
+
+  const questions = questionSet.questions;
+  const lines: string[] = [];
+  for (let i = 0; i < answers.length && i < questions.length; i++) {
+    const q = questions[i].question ?? `Question ${i + 1}`;
+    lines.push(`Q: ${q}\nA: ${answers[i]}`);
+  }
+  const message = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
+
+  await deliverAgentMessage(id, message, 'ask-user-question-answer');
+  return { body: { success: true, agentId: id, delivered: answers.length } };
+}
 
 export const postAgentAnswerQuestionRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/answer-question',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    if (!id.trim()) {
-      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
-    }
     const body = (yield* readJsonBody) as Record<string, unknown>;
-
-    const answers = body['answers'];
-    if (!Array.isArray(answers) || answers.length === 0) {
-      return jsonResponse({ error: 'answers array required' }, { status: 400 });
-    }
-    if (!answers.every((a): a is string => typeof a === 'string' && a.length > 0)) {
-      return jsonResponse({ error: 'every answer must be a non-empty string' }, { status: 400 });
-    }
-
-    const pendingQuestions = yield* Effect.promise(() => getAgentPendingQuestions(id));
-    if (pendingQuestions.length === 0) {
-      return jsonResponse({ error: 'No pending questions found for this agent' }, { status: 404 });
-    }
-
-    const questionSet = pendingQuestions[0];
-    const questions = questionSet.questions;
-    const lines: string[] = [];
-    for (let i = 0; i < answers.length && i < questions.length; i++) {
-      const q = questions[i].question ?? `Question ${i + 1}`;
-      lines.push(`Q: ${q}\nA: ${answers[i]}`);
-    }
-    const message = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
-
-    yield* Effect.promise(() => deliverAgentMessage(id, message, 'ask-user-question-answer'));
-    return jsonResponse({ success: true, agentId: id, delivered: answers.length });
+    const result = yield* Effect.promise(() => handlePostAgentAnswerQuestion(params['id'] ?? '', body));
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 

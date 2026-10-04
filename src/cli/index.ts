@@ -348,6 +348,13 @@ program
   .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
+  .command('ask <id> [question]')
+  .description('Ask the operator a blocking decision; it appears in the dashboard Needs-you')
+  .option('--option <label>', 'A choice the operator can pick (repeat 2-4 times)', (value: string, previous: string[] = []) => [...previous, value], [] as string[])
+  .option('--context <text>', 'What you already tried or know, shown with the question')
+  .option('--withdraw', 'Close your open decision request (answered another way, or no longer needed)')
+  .action(lazyAction(() => import('./commands/ask.js'), 'askCommand'));
+program
   .command('answer <id> [option]')
   .description('Show a pending pane choice, or answer its numbered option')
   .action(lazyAction(() => import('./commands/answer.js'), 'answerCommand'));
