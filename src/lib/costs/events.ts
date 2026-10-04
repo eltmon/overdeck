@@ -18,6 +18,7 @@ import {
 } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import type { EffortLevel } from '@overdeck/contracts';
 import { insertCostEvent } from '../overdeck/cost-sync.js';
 import { appendToWal } from './wal.js';
 
@@ -43,6 +44,9 @@ export interface CostEvent {
 
   // Caveman A/B test variant — set when agents.caveman.ab_test is true (PAN-611)
   cavemanVariant?: 'enabled' | 'disabled' | 'off';
+
+  /** Effort the request ran at (PAN-4259); absent on legacy rows. */
+  effort?: EffortLevel;
 }
 
 export interface EventMetadata {

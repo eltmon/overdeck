@@ -51,6 +51,19 @@ function costEvent(overrides: Partial<CostEvent> = {}): CostEvent {
   };
 }
 
+describe('insertCostEvent effort column (PAN-4259)', () => {
+  it('persists effort and leaves legacy rows NULL', () => {
+    insertCostEvent(costEvent({ requestId: 'with-effort', effort: 'high' }));
+    insertCostEvent(costEvent({ requestId: 'without-effort' }));
+
+    const db = getOverdeckDatabase();
+    expect(
+      db.prepare('SELECT effort FROM cost_events ORDER BY id').all<{ effort: string | null }>()
+        .map((row) => row.effort),
+    ).toEqual(['high', null]);
+  });
+});
+
 describe('getTodayCost', () => {
   it('sums cost_events from UTC midnight only', () => {
     insertCostEvent(costEvent({

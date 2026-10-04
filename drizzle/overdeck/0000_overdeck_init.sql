@@ -148,7 +148,8 @@ CREATE TABLE `cost_events` (
 	`cache_write` integer,
 	`cost` real,
 	`request_id` text,
-	`source_file` text
+	`source_file` text,
+	`effort` text
 );
 --> statement-breakpoint
 CREATE INDEX `cost_issue_idx` ON `cost_events` (`issue_id`);--> statement-breakpoint

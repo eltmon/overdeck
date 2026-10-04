@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { isEffortLevel, EffortLevelSchema } from '@overdeck/contracts';
 
 import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
 import { IssueId, type IssueId as IssueIdType } from './issues.js';
@@ -64,6 +65,7 @@ const costEventsTable = sqliteTable('cost_events', {
   cost:        real('cost'),
   requestId:   text('request_id'),
   sourceFile:  text('source_file'),
+  effort:      text('effort'),
 });
 
 // ── Entities ─────────────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export const CostEvent = Schema.Struct({
   cost:        Schema.Number,
   requestId:   Schema.NullOr(Schema.String),
   sourceFile:  Schema.NullOr(Schema.String),
+  effort:      Schema.optional(Schema.NullOr(EffortLevelSchema)),
   warnings:    Schema.optional(Schema.Array(Schema.Struct({
     type:     Schema.String,
     provider: Schema.NullOr(Schema.String),
@@ -476,6 +479,7 @@ export const CostResolverLive = Layer.effect(
           cost:        r.cost        ?? 0,
           requestId:   r.requestId   ?? null,
           sourceFile:  r.sourceFile  ?? null,
+          effort:      isEffortLevel(r.effort) ? r.effort : null,
         })) as ReadonlyArray<CostEvent>;
       });
 
@@ -586,6 +590,7 @@ export const CostWriterLive = Layer.effect(
               cost:        event.cost,
               requestId:   event.requestId,
               sourceFile:  event.sourceFile,
+              effort:      event.effort ?? null,
             })
             .onConflictDoNothing(),
         );

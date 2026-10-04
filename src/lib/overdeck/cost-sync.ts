@@ -52,8 +52,8 @@ export function insertCostEvent(event: CostEvent): boolean {
     .prepare(
       `INSERT OR IGNORE INTO cost_events
         (ts, issue_id, agent_id, session_id, session_type, provider, model,
-         input, output, cache_read, cache_write, cost, request_id, source_file)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         input, output, cache_read, cache_write, cost, request_id, source_file, effort)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       tsMillis,
@@ -70,6 +70,7 @@ export function insertCostEvent(event: CostEvent): boolean {
       event.cost,
       event.requestId ?? null,
       event.source ?? null,
+      event.effort ?? null,
     );
   return result.changes > 0;
 }
