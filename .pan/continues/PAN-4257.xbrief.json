@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4257",
   "created": "2026-10-04T02:21:43.836Z",
-  "updated": "2026-10-04T03:31:50.779Z",
+  "updated": "2026-10-04T03:32:03.669Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "settings-crew-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T03:31:50.779Z"
+    },
+    "settings-crew-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:32:03.669Z"
     }
   }
 }
