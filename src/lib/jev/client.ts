@@ -12,7 +12,10 @@
  * bodies), retries are off (callers run off hot paths; fail fast beats backoff), and the API
  * key is always passed explicitly. Nothing here logs the key, the request, or the error object.
  *
- * Each real (non-memo) answered call records one cost event as `background:<feature>`.
+ * Each real (non-memo) answered call records one cost event as `background:<feature>`. Every
+ * real request, answered or failed, also appends one row to the usage log (PAN-4508) — never
+ * a memo hit, an unavailable result, or the config-load failure path — so the settings panel
+ * can show per-feature call counts and the last error without reading eval logs.
  */
 import {
   APIConnectionError,
@@ -42,17 +45,11 @@ import {
   type ResolvedJevConfig,
 } from './config.js';
 import { dedupeInFlight, getMemoized, jevMemoKey, setMemoized, withJevSlot } from './memo.js';
+import type { JevFailureReason } from './failure-reason.js';
 import { QUESTION_SET_VERSION } from './questions.js';
+import { appendJevUsage } from './usage-log.js';
 
-export type JevFailureReason =
-  | 'auth-failed'
-  | 'rate-limited'
-  | 'timeout'
-  | 'aborted'
-  | 'connection-error'
-  | 'bad-request'
-  | 'server-error'
-  | 'error';
+export type { JevFailureReason } from './failure-reason.js';
 
 export type JevAssessment<Q extends Questions> =
   | { status: 'answered'; answers: SystemOneResult<Q>['answers']; model: string; usage: Usage }
@@ -104,6 +101,7 @@ export async function assess<const Q extends Questions>(
 
   return dedupeInFlight(key, () =>
     withJevSlot(async (): Promise<JevAssessment<Q>> => {
+      const startedAt = Date.now();
       try {
         const result = await createJevClient(resolved, { fetch: options.fetch }).systemOne(
           { state, questions, model: resolved.model },
@@ -116,6 +114,13 @@ export async function assess<const Q extends Questions>(
           model: servedModel,
           usage: { inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens },
         });
+        void appendJevUsage({
+          ts: new Date().toISOString(),
+          feature: featureKey,
+          outcome: 'answered',
+          model: servedModel,
+          durationMs: Date.now() - startedAt,
+        });
         const answered: JevAssessment<Q> = {
           status: 'answered',
           answers: result.answers,
@@ -125,7 +130,17 @@ export async function assess<const Q extends Questions>(
         setMemoized(key, answered);
         return answered;
       } catch (err) {
-        return failed(classifyJevError(err), err);
+        const reason = classifyJevError(err);
+        void appendJevUsage({
+          ts: new Date().toISOString(),
+          feature: featureKey,
+          outcome: 'failed',
+          reason,
+          ...(err instanceof APIError ? { status: err.status } : {}),
+          model: resolved.model,
+          durationMs: Date.now() - startedAt,
+        });
+        return failed(reason, err);
       }
     }),
   );

@@ -74,6 +74,25 @@ Low-cost mode (`background_ai.cheap_mode`, on by default) turns all of them off 
 toggles. With no `jev:` block, low-cost mode on, or a toggle off, Overdeck behaves exactly as it
 does without Jev: no request, no startup check, and no warning.
 
+### Set it in Settings
+
+**Settings → Background AI** also exposes the route, model and timeout directly, below the
+TypeSafe API key row — no manual YAML editing required (PAN-4508):
+
+- **Route** — a select with three options. **OpenCode Zen** sets `jev.base_url` to
+  `https://opencode.ai/zen`. **TypeSafe direct** removes `base_url`. A third option, **Custom**,
+  appears only when `jev.base_url` is already some other URL; choosing it again keeps that URL
+  as-is — there is no field here to type a new custom URL.
+- **Model** — a text field with suggestions `jev-1.13-free`, `jev-1.13`, `jev-1.13.0`. It is
+  required while any Jev toggle above is on; clearing it in that case shows an error and the
+  change is not saved.
+- **Timeout** — a number field, 1–30000 ms.
+
+Every field saves automatically as you edit it (debounced while typing) and applies to the next
+Jev request — no restart needed. `jev.api_key_ref` has no Settings control and stays
+config.yaml-only. Turning a Jev toggle on while `jev.model` is blank shows an error and the
+toggle change is not saved.
+
 ## What is sent to TypeSafe
 
 `jevTurnEndAssessment` and `jevAcceptanceCriteriaReview` are both live. `jevTurnEndAssessment`
@@ -134,3 +153,15 @@ Every real request (not a repeat served from Overdeck's in-process memo) appends
 cost ledger with the source `background:<feature>`, for example
 `background:jevTurnEndAssessment`. The 24-hour spend appears next to each toggle in
 Settings → Background AI.
+
+## Usage readout
+
+The Jev settings panel also shows, per feature: **calls in the last 24 hours**, the **last call
+time**, and the **last error** (failure reason and HTTP status, if any) — so you can see whether
+Jev is actually doing anything without reading logs (PAN-4508).
+
+That readout is built from a plain-text usage log: every real (non-memo) Jev request appends one
+JSON line to `~/.overdeck/jev/usage/<UTC date>.jsonl`, with the time, feature, outcome
+(`answered` or `failed`), failure reason and HTTP status (on a failure), model, and request
+duration. The log never records the API key, the text sent to Jev, the answer, or an error
+message. A repeat served from the in-process memo is not counted — it made no request.

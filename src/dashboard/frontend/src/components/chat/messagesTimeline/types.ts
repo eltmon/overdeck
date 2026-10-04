@@ -59,4 +59,6 @@ export interface MessagesTimelineProps {
   targetMessageNonce?: number;
   /** Called after a requested target message has been scrolled into view. */
   onTargetMessageHandled?: () => void;
+  /** PAN-4498 — main conversation timeline only: role icons bookmark messages. */
+  bookmarksEnabled?: boolean;
 }

@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Fetch } from '@typesafe-ai/sdk';
 import type { CostEvent } from '../../costs/events.js';
+import type { JevUsageRow } from '../usage-log.js';
 
 // Capture cost events instead of writing them to the JSONL/SQLite ledger.
 const captured: CostEvent[] = [];
 vi.mock('../../costs/events.js', () => ({
   appendCostEvent: (event: CostEvent) => {
     captured.push(event);
+  },
+}));
+
+// Capture usage-log rows instead of writing them to disk.
+const capturedUsage: JevUsageRow[] = [];
+vi.mock('../usage-log.js', () => ({
+  appendJevUsage: (row: JevUsageRow) => {
+    capturedUsage.push(row);
   },
 }));
 
@@ -60,6 +69,7 @@ function answeredFetch(model = 'test-model-x', usage = { input_tokens: 120, outp
 beforeEach(() => {
   resetJevMemo();
   captured.length = 0;
+  capturedUsage.length = 0;
 });
 
 afterEach(() => {
@@ -239,6 +249,43 @@ describe('assess() cost recording (PAN-4369)', () => {
     const { fetch } = fakeFetch(() => jsonResponse({ error: 'bad key' }, 401));
     await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config(), fetch, env: {} });
     expect(captured).toHaveLength(0);
+  });
+});
+
+describe('assess() usage log (PAN-4508)', () => {
+  it('appends exactly one answered row for a real request', async () => {
+    const { fetch } = answeredFetch('jev-1.13-free');
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config(), fetch, env: {} });
+    expect(capturedUsage).toHaveLength(1);
+    expect(capturedUsage[0]).toMatchObject({ feature: FEATURE, outcome: 'answered', model: 'jev-1.13-free' });
+  });
+
+  it('appends exactly one failed row with the HTTP status on a 401', async () => {
+    const { fetch } = fakeFetch(() => jsonResponse({ error: 'bad key' }, 401));
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config(), fetch, env: {} });
+    expect(capturedUsage).toHaveLength(1);
+    expect(capturedUsage[0]).toMatchObject({ feature: FEATURE, outcome: 'failed', reason: 'auth-failed', status: 401 });
+  });
+
+  it('appends nothing for a memo hit or an unavailable result', async () => {
+    const { fetch } = answeredFetch();
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config(), fetch, env: {} });
+    expect(capturedUsage).toHaveLength(1);
+    capturedUsage.length = 0;
+
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config(), fetch, env: {} });
+    expect(capturedUsage).toHaveLength(0);
+
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config({ cheapMode: true }), fetch, env: {} });
+    expect(capturedUsage).toHaveLength(0);
+  });
+
+  it('never records the API key or the state text', async () => {
+    const { fetch } = fakeFetch(() => jsonResponse({ error: 'bad key' }, 401));
+    await assess(FEATURE, STATE, JEV_SMOKE_QUESTIONS, { config: config({ key: 'super-secret-key' }), fetch, env: {} });
+    const serialized = JSON.stringify(capturedUsage);
+    expect(serialized).not.toContain('super-secret-key');
+    expect(serialized).not.toContain(STATE);
   });
 });
 

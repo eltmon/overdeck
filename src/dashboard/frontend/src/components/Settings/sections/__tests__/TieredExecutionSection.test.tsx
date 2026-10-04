@@ -643,6 +643,52 @@ describe('TieredExecutionSection', () => {
     expect(container.querySelector('pre')?.textContent).toContain('tiered_execution:\n  enabled: false');
   });
 
+  // PAN-4257 (settings-effort-first-switch)
+  it('ac1: toggling the effort-first switch sets escalation.effort_first true', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <TieredExecutionSection
+        formData={baseSettings({
+          tiered_execution: {
+            enabled: false,
+            tiers: {},
+            by_kind: {},
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
+            replay_threshold: 0.5,
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Raise effort before promoting the model' }));
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.escalation.effort_first).toBe(true);
+  });
+
+  // PAN-4257 (settings-effort-first-switch)
+  it('ac2: an unrelated escalation edit preserves an existing effort_first: true', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <TieredExecutionSection
+        formData={baseSettings({
+          tiered_execution: {
+            enabled: false,
+            tiers: {},
+            by_kind: {},
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, effort_first: true },
+            replay_threshold: 0.5,
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Retries at tier'), { target: { value: '2' } });
+    const saved = onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.escalation;
+    expect(saved.retries_at_tier).toBe(2);
+    expect(saved.effort_first).toBe(true);
+  });
+
   it('renders supervisor-required and replay-threshold validation errors inline', () => {
     const onSettingsChange = vi.fn();
     const { rerender } = render(

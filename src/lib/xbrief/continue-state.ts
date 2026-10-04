@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import type { EffortLevel } from '@overdeck/contracts';
 import type { XBriefDifficulty } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -102,10 +103,21 @@ export interface TierPromotionHistoryEntry {
   reason: string;
 }
 
+/** PAN-4257: an effort-first escalation step recorded in place of a tier promotion. */
+export interface TierEffortRaiseHistoryEntry {
+  at: string;
+  kind: 'effort';
+  from: EffortLevel;
+  to: EffortLevel;
+  reason: string;
+}
+
 export interface TierOverride {
   effectiveDifficulty: XBriefDifficulty;
   promotions: number;
-  history: TierPromotionHistoryEntry[];
+  /** PAN-4257: the effort an effort-first escalation raised this item to. Cleared by the next promotion. */
+  effectiveEffort?: EffortLevel;
+  history: Array<TierPromotionHistoryEntry | TierEffortRaiseHistoryEntry>;
 }
 
 export type TierOverridesMap = Record<string, TierOverride>;

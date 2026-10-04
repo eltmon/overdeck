@@ -66,3 +66,79 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Learning: right after a `pan reload`, the God View and any other
   `agentRuntimeById` consumer under-report activity. Do not diagnose agent
   idleness from them in the first minutes after a restart.
+
+### Stale verification worker fails a fixed head → PAN-4527 (2026-10-04, needs-handoff)
+
+- PAN-4498's re-review after a fix push joined a verification worker started
+  on the previous head, which then failed the new head with the old head's CI
+  result ("The CI test job already failed on this head (c9994b06)") although
+  CI on the new head had passed. Root cause:
+  `src/lib/cloister/verification-worker-supervisor.ts` line 178 treats every
+  review-verification worker as `sameHead`, and `verification-runner.ts`
+  reads CI for the launch-time `headShort`. Review machinery (TENET-10), so
+  filed `needs-handoff`, not started.
+- Instance recovery: told the agent the failure was stale and to re-request
+  review on its current head. Tell: a `verification.failed` whose gate record
+  names a different head than its `head8`, or a test gate at `0ms`, is this bug.
+
+## Run rules (operator decisions)
+
+### Go idle when the pipeline is clear; stuck is not clear (2026-10-04, PAN-4530)
+
+- With auto-pickup off, when nothing is pickable and the pipeline is clear,
+  write and push `.pan/flywheel/report.md`, print `phase=idle needs-you=pipeline
+  clear — ready for operator close-out`, stop scheduling ticks, and keep the
+  conversation open. Only the operator ends the run.
+- Clear = every drained issue merged, deployed (`/api/health` `buildCommit`
+  contains it) and closed out or waiting only on automatic verify-on-main.
+  Not in flight: `needs-handoff` / operator-decision items, parked or vetoed
+  issues, other projects' long-paused agents.
+- If an in-flight issue cannot move without the operator, keep ticking and
+  name the blocker; a stopped loop must always mean clear, never stuck.
+- PAN-4530 carries the skill-text change (needs-handoff, TENET-10).
+
+### Overnight restart approval is per-run, never standing (2026-10-04)
+
+- The operator authorized `pan restart approve` for the 2026-10-04 night only,
+  after each merge with CI green on the exact `origin/main` tip, then verifying
+  `/api/health` `buildCommit` contains the merge. Ask again on every new run.
+
+### Doomed verification holds the single CPU admission slot → PAN-4531 (2026-10-04, needs-handoff)
+
+- Verification runs all local gates (~25 min) before reading the CI test
+  verdict, so a head whose CI already failed still holds the machine-wide
+  admission slot, blocking every other verification and the agent's own
+  isolation test runs (PAN-4259 at 04:37). Root cause:
+  `src/lib/cloister/verification-runner.ts` ~line 581 computes `ciTestRed`
+  after the gates. Not fixed by hand: killing a worker mid-run risks wedging
+  its verification state.
+- Learning: overnight throughput is bounded by the serialized gate queue,
+  not by agents. Check `~/.overdeck/verification-workers/admission/owner.json`
+  before calling a long verification "stuck".
+
+### Restart during verification loses the review dispatch → PAN-4532 (2026-10-04, needs-handoff)
+
+- Verification workers survive a dashboard restart, but the waiter that
+  dispatches review after `passed` dies with the old process; the deacon's
+  re-request then ignores the finished result
+  (`verification-worker-supervisor.ts` line 174 joins only result-less
+  workers) and re-runs every gate. PAN-4515 lost a passed verification this
+  way after the 04:21 deploy.
+- Run rule until PAN-4532 lands: never approve a dashboard restart while any
+  `dist/verification-worker.js` process is alive. Deploy in a gap between
+  verifications.
+- Recovery for a restart-lost dispatch (until PAN-4532 lands): when the
+  journal shows `verification.passed` but no reviewer spawned, and the newest
+  `.overdeck/verification/*.json` `head8` equals both the workspace HEAD and
+  the PR `headRefOid` with a clean tree, run `pan review restart <id>`. It
+  dispatches the reviewer without re-verifying. Letting the deacon re-request
+  instead re-runs every gate. Used on PAN-4257 (2026-10-04 04:57).
+- Collision warning for that recovery: deacon-lite re-requests a lost
+  dispatch on its own within minutes ("a dashboard restart during verification
+  left the review undispatched"), and that re-request starts a full
+  re-verification. On PAN-4498 and PAN-4508 (05:06) the deacon fired within a
+  minute of `pan review restart`, giving each a reviewer plus a duplicate
+  verification. Run `pan review restart` only right after `verification.passed`
+  lands, and check that the journal has no later `review.requested` from
+  deacon-lite first. Do not kill a duplicate worker: the supervisor records a
+  killed worker as an `error`, which feeds back to the agent and adds a round.

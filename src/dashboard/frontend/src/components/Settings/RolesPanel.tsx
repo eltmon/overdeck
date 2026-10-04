@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, ListOrdered, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { PROVIDER_BRANDS } from '../shared/branding';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
@@ -15,6 +16,8 @@ type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 interface RoleSubConfig {
   model?: ModelRef;
+  /** PAN-4257: reasoning effort for this sub-role. Unset = inherit the role/default chain. */
+  effort?: Effort;
 }
 
 type ReviewModeValue = 'quick' | 'full' | 'none';
@@ -288,16 +291,21 @@ async function saveRoleConfig(role: RoleId, patch: RoleConfigPatch, subRole?: st
   const settings = await fetchSettings();
   const currentRole = settings.roles?.[role] ?? {};
   const nextRole: RoleConfigPatch = subRole
-    ? {
-        ...currentRole,
-        sub: {
-          ...(currentRole.sub ?? {}),
-          [subRole]: {
-            ...(currentRole.sub?.[subRole] ?? {}),
-            model: patch.model as ModelRef,
+    ? (() => {
+        const nextSub: RoleSubConfig = { ...(currentRole.sub?.[subRole] ?? {}) };
+        if (patch.model !== undefined) nextSub.model = patch.model as ModelRef;
+        if ('effort' in patch) {
+          if (patch.effort === undefined) delete nextSub.effort;
+          else nextSub.effort = patch.effort;
+        }
+        return {
+          ...currentRole,
+          sub: {
+            ...(currentRole.sub ?? {}),
+            [subRole]: nextSub,
           },
-        },
-      }
+        };
+      })()
     : {
         ...currentRole,
         ...patch,
@@ -783,6 +791,7 @@ export function RolesPanel() {
                       {role.subRoles?.map((subRole) => {
                         const subModel = getSubRoleModel(settings, role, subRole);
                         const subTooltip = modelRefTooltip(subModel, workhorses, parentModelRefForSubRoles);
+                        const subEffort = settings?.roles?.[role.id]?.sub?.[subRole.id]?.effort ?? '';
 
                         return (
                           <div key={subRole.id} className="rounded-md border border-border bg-card p-3">
@@ -807,6 +816,23 @@ export function RolesPanel() {
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />
+                            <label className="mt-2 block space-y-1.5">
+                              <span className="text-xs font-medium text-foreground">Effort</span>
+                              <select
+                                aria-label={`${role.name} ${subRole.name} effort`}
+                                value={subEffort}
+                                disabled={saveMutation.isPending}
+                                onChange={(event) => saveMutation.mutate({
+                                  role: role.id,
+                                  subRole: subRole.id,
+                                  patch: { effort: event.target.value === '' ? undefined : event.target.value as Effort },
+                                })}
+                                className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                              >
+                                <option value="">Inherit</option>
+                                {EFFORT_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+                              </select>
+                            </label>
                           </div>
                         );
                       })}
