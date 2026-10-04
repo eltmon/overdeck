@@ -3,7 +3,7 @@ import { Effect, Layer, Schema } from 'effect';
 
 import { CostEventRecordedEvent } from '@overdeck/contracts';
 
-import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
+import { Db, EventBus, CostArchive, toCostArchiveEvent } from '../../../../src/lib/overdeck/infra.js';
 import {
   CostResolver,
   CostResolverLive,
@@ -38,6 +38,7 @@ function makeWiredFakeDb() {
     cost: number | null;
     requestId: string | null;
     sourceFile: string | null;
+    effort: string | null;
   };
 
   const rows: Row[] = [];
@@ -411,7 +412,7 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
     },
   );
 
-  it('record() passes all 14 NEED columns to the DB insert', async () => {
+  it('record() passes all 15 NEED columns to the DB insert', async () => {
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeWiredFakeDb();
     const layer = CostWriterLive.pipe(
       Layer.provide(dbLayer),
@@ -419,7 +420,7 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
       Layer.provide(archiveLayer),
     );
 
-    const event = makeSampleEvent();
+    const event = { ...makeSampleEvent(), effort: 'xhigh' as const };
     await Effect.runPromise(
       CostWriter.use((w) => w.record(event)).pipe(Effect.provide(layer)),
     );
@@ -440,7 +441,30 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
       cost:        0.05,
       requestId:   'req-xyz',
       sourceFile:  null,
+      effort:      'xhigh',
     });
+  });
+
+  it('record() defaults effort to null when the event has none', async () => {
+    const { dbLayer, busLayer, archiveLayer, insertedValues } = makeWiredFakeDb();
+    const layer = CostWriterLive.pipe(
+      Layer.provide(dbLayer),
+      Layer.provide(busLayer),
+      Layer.provide(archiveLayer),
+    );
+
+    const event = makeSampleEvent();
+    await Effect.runPromise(
+      CostWriter.use((w) => w.record(event)).pipe(Effect.provide(layer)),
+    );
+
+    const row = insertedValues[0] as Record<string, unknown>;
+    expect(row.effort).toBeNull();
+  });
+
+  it('toCostArchiveEvent keeps effort', () => {
+    expect(toCostArchiveEvent({ ...makeSampleEvent(), effort: 'low' })).toMatchObject({ effort: 'low' });
+    expect(toCostArchiveEvent(makeSampleEvent())).not.toHaveProperty('effort');
   });
 
   it('reconcile() returns { imported: 0 } for default (claude) source', async () => {

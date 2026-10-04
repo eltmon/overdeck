@@ -62,6 +62,7 @@ vi.mock('../termination.js', () => ({ stopAgent: mocks.stopAgent }));
 
 import { restartAgent } from '../recovery.js';
 import { saveAgentStateSync, getAgentDir, getAgentState } from '../agent-state.js';
+import { readSessionIndex } from '../../session-history.js';
 
 let tempHome: string;
 let prevOverdeckHome: string | undefined;
@@ -139,5 +140,25 @@ describe('restartAgent re-applies the persisted effort (PAN-4253)', () => {
     const after = getAgentState(agentId);
     expect(after?.effort).toBe('high');
     expect(after?.effortSource).toBe('default');
+  });
+
+  it('records the relaunch effort on the new sessions.json line', async () => {
+    const agentId = 'agent-restart-effort-sessions-json';
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-4253',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-opus-5-5',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      kickoffDelivered: true,
+    });
+
+    const result = await restartAgent(agentId, { graceful: false });
+
+    expect(result.success).toBe(true);
+    expect(readSessionIndex(agentId).at(-1)?.effort).toBe('high');
   });
 });

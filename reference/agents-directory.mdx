@@ -107,8 +107,8 @@ left pane closed to hide it. **Live** in the top bar goes back.
 | Pane | What it shows |
 | --- | --- |
 | **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live agents of all shown (hover for the words). |
-| **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness and model, last activity and age. |
-| **Detail** (right) | The entry's header (id, harness, model, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
+| **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness, model and — for Overdeck agents — reasoning effort with its source (for example `xhigh (role)`), last activity and age. |
+| **Detail** (right) | The entry's header (id, harness, model, effort, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
 
 Lanes nest under the conversation that launched them, and handoff and fork
 successors nest under their predecessor; a lane shows `<role letter> <lane key>

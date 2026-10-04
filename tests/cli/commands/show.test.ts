@@ -237,6 +237,52 @@ describe('showCommand', () => {
       expect(lineCount).toBeLessThanOrEqual(25);
     });
 
+    it("prints the agent's effort and includes it in --json", async () => {
+      getAgentStateMock.mockReturnValue({
+        id: 'agent-pan-6',
+        issueId: 'PAN-6',
+        status: 'running',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        effort: 'xhigh',
+        effortSource: 'role',
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-6');
+      const textOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      logSpy.mockClear();
+
+      expect(textOut).toContain('effort');
+      expect(textOut).toContain('xhigh');
+      expect(textOut).toContain('(role)');
+
+      await showCommand('PAN-6', { json: true });
+      const jsonPayload = JSON.parse(logSpy.mock.calls[0][0]);
+      logSpy.mockRestore();
+
+      expect(jsonPayload.effort).toBe('xhigh');
+      expect(jsonPayload.effortSource).toBe('role');
+    });
+
+    it('prints no effort line and null effort fields without agent state', async () => {
+      getAgentStateMock.mockReturnValue(null);
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-6');
+      const textOut = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      logSpy.mockClear();
+
+      expect(textOut).not.toMatch(/effort/);
+
+      await showCommand('PAN-6', { json: true });
+      const jsonPayload = JSON.parse(logSpy.mock.calls[0][0]);
+      logSpy.mockRestore();
+
+      expect(jsonPayload.effort).toBeNull();
+      expect(jsonPayload.effortSource).toBeNull();
+    });
+
     it('--json short-circuits to a single JSON payload (no human-formatted lines)', async () => {
       derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-8',

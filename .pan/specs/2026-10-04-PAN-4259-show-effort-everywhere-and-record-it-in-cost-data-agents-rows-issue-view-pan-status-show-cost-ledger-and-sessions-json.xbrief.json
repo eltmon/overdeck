@@ -1,0 +1,834 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T02:19:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4259: Show effort everywhere and record it in cost data: Agents rows, issue view, pan status/show, cost ledger, and sessions.json",
+    "updated": "2026-10-04T02:20:38.490Z"
+  },
+  "plan": {
+    "id": "pan-4259",
+    "title": "Show effort everywhere and record it in cost data: Agents rows, issue view, pan status/show, cost ledger, and sessions.json",
+    "status": "running",
+    "uid": "5e4156ab-06e8-49fb-8386-9ac29c6c1965",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T02:19:33Z",
+    "updated": "2026-10-04T02:20:38.490Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4259",
+        "label": "PAN-4259",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249 (program)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4510",
+        "label": "PAN-4510 (split-off display surfaces)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "costs",
+      "sessions-json",
+      "agents-page",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan touches 37 files (17 of them tests or docs) across more than 6 subsystems because a cost_events column alone spans drizzle/overdeck, src/lib, tests and docs, and the issue's three acceptance criteria (ledger + sessions.json, cost report by effort, Agents-row Playwright check) span src/lib, src/cli, packages/contracts and src/dashboard. The surfaces no stated acceptance criterion names (issue-view rows, ConversationList, Agents-page conversation entries) were split into PAN-4510; splitting further would move one of the operator's stated acceptance criteria out of this issue.",
+      "canonicalFilename": "2026-10-04-PAN-4259-show-effort-everywhere-and-record-it-in-cost-data-agents-rows-issue-view-pan-status-show-cost-ledger-and-sessions-json.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Effort is resolved, persisted and changeable (PAN-4249, PAN-4253-PAN-4255), but no cost-ledger row or sessions.json line records it, no cost report groups by it, and the Agents page, pan status and pan show do not show it. Nobody can see what a given effort level costs or which level an agent runs at.",
+      "Proposal": "Record effort at launch on sessions.json lines (passed explicitly where the line is written before state.json); add a nullable cost_events.effort column persisted by every write door; stamp ingested rows with the claude record's observed effort, else the session's launch effort, else state.json effort for the newest session only; add getEffortRollup and `pan cost effort`; carry effort on native-agent DirectoryEntry values and render it on Agents History rows and the detail header; print it in pan status and pan show; document all of it. Full detail: .pan/drafts/PAN-4259.md.",
+      "NonGoals": "- Issue-view agent rows, ConversationList/ConversationRow, and Agents-page conversation entries (PAN-4510).\n- A second effort display in the conversation header (the PAN-4255 composer chip already shows it).\n- Effort on Live-view rows of the Agents page.\n- Backfilling effort into existing cost_events or events.jsonl rows, or rewriting existing sessions.json lines.\n- effortSource on sessions.json lines or cost rows.\n- CostResolver.byEffort, a cost-by-effort HTTP route, or any dashboard costs UI change.\n- Effort on background-AI, memory-extraction, or legacy-migration cost rows.\n- src/cli/commands/strike.ts and its lint-effort.sh baseline row (PAN-4258).\n- Any effort default, or any change to how effort is resolved or launched.\n- Any new `effort ?? '<level>'` fallback or copied effort-level list."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split issue-view rows, ConversationList rows, and Agents-page conversation entries into new sibling PAN-4510.",
+        "rationale": "The full S7 surface projects to about 40 files; those surfaces are named by none of PAN-4259's three acceptance criteria and share no data path with the ledger work, so splitting them keeps every stated criterion here."
+      },
+      {
+        "summary": "A cost row's effort is the claude record's observed effort, else the sessions.json launch effort for its session, else state.json effort only for the newest session, else NULL.",
+        "rationale": "Rows are built at ingestion, not launch; the record value is what the request ran at, the session entry is the launch value, and state.json describes only the most recent launch."
+      },
+      {
+        "summary": "sessions.json carries effort only, omitted when unknown.",
+        "rationale": "The issue names only effort; omitting the key keeps legacy and effort-less lines identical and avoids a fake 'unknown' level."
+      },
+      {
+        "summary": "The effort report is getEffortRollup in cost-sync.ts plus `pan cost effort`, with no CostResolver method or HTTP route.",
+        "rationale": "pan cost already reads cost-sync raw SQL; one variant per operation, and a new route would need a no-loss-matrix row for no stated need."
+      },
+      {
+        "summary": "No backfill of existing cost rows; they report as 'unrecorded'.",
+        "rationale": "Historical effort is not knowable reliably and requestId dedup never rewrites rows."
+      },
+      {
+        "summary": "Agents page shows effort on History rows and the detail header, not Live rows.",
+        "rationale": "Live rows show no model or harness today; the detail header serves both views."
+      },
+      {
+        "summary": "Leave strike.ts to PAN-4258 despite the lint baseline comment naming PAN-4259.",
+        "rationale": "PAN-4258's issue body owns the strike dry-run effort line."
+      }
+    ],
+    "items": [
+      {
+        "id": "sessions-effort",
+        "title": "sessions.json entries record the launch effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "tests/unit/lib/agents/session-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/session-index.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "session-index.test.ts passes including the new effort cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "spawn-session-effort",
+            "reconciler-effort",
+            "collectors-effort"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W1. In src/lib/session-history.ts: add effort?: EffortLevel to SessionIndexEntry and SessionEntryMetadata; normalizeSessionEntry keeps effort only when isEffortLevel; sessionIndexLine writes effort from metadata, else from state.json when isEffortLevel, and omits the key otherwise (never 'unknown'); add exported readLaunchEfforts(agentId) that reads sessions.json and state.json once and returns a lookup: the entry's effort, else state.json effort only for the newest indexed session (or any session when the index is empty), else undefined. Exact snippets are in the PRD."
+        },
+        "items": [
+          {
+            "id": "sessions-effort.ac1",
+            "title": "Given appendSessionIdToHistory is called with metadata effort 'xhigh', when readSessionIndex reads the agent, then the new entry returns effort 'xhigh' and the raw line contains \"effort\":\"xhigh\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessions-effort.ac2",
+            "title": "Given state.json holds effort 'low' and the call passes no effort, the new line records effort 'low'; for an agent with no state.json the raw line has no effort key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessions-effort.ac3",
+            "title": "Given a hand-written legacy line without effort and a line with effort 'bogus', readSessionIndex parses both and returns effort undefined for each.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessions-effort.ac4",
+            "title": "Given entries s1 (medium), s2 (none), s3 (none, newest) and state.json effort 'high', readLaunchEfforts returns medium for s1, undefined for s2, high for s3, and high for any id when the index is empty.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-session-effort",
+        "title": "Spawn and restart pass the launch effort to the session index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/recovery.ts",
+            "tests/unit/lib/agents/session-index.test.ts",
+            "src/lib/agents/__tests__/restart-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/session-index.test.ts src/lib/agents/__tests__/restart-effort.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint:file-size passes with spawn.ts at or under 1081 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W2. createFreshSessionIdentity(agentId, harness, model?, effort?) forwards effort in the append metadata. spawn.ts: pass options.effort to createFreshSessionIdentity in the fresh-spawn state literal (same line) and add effort: options.effort to the spawnRun appendSessionIdToHistory metadata. recovery.ts prepareRestartSessionIdentity: allocate(agentId, harness, state.model, state.effort). Both call sites run before state.json is saved, so the state.json fallback cannot supply the new effort."
+        },
+        "items": [
+          {
+            "id": "spawn-session-effort.ac1",
+            "title": "Given no state.json exists, when createFreshSessionIdentity('a2', 'claude-code', 'claude-opus-5-5', 'max') runs, then readSessionIndex('a2') returns a newest entry with effort 'max'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-session-effort.ac2",
+            "title": "Given a legacy agent state without effort, when restartAgent(agentId, { graceful: false }) runs, then the newest sessions.json entry records effort 'high'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-session-effort.ac3",
+            "title": "Given the change is applied, npm run lint:file-size exits 0 and src/lib/agents/spawn.ts is at or under 1081 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ledger-effort-column",
+        "title": "cost_events gains an effort column persisted by every write door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/overdeck/cost-sync.ts",
+            "src/lib/costs/events.ts",
+            "src/lib/overdeck/__tests__/schema-topups.test.ts",
+            "tests/unit/lib/overdeck/cost.test.ts",
+            "tests/lib/overdeck/cost-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/schema-topups.test.ts tests/unit/lib/overdeck/cost.test.ts tests/lib/overdeck/cost-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "reconciler-effort",
+            "collectors-effort",
+            "effort-cost-report"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W3. Add `effort` text to the init SQL and a runSchemaTopUp ALTER TABLE in ensureRuntimeIndexesSync after the PAN-4499 line; export toCostArchiveEvent and add an effort spread to it; costEventsTable gets effort: text('effort'); the overdeck CostEvent schema gets effort: Schema.optional(Schema.NullOr(EffortLevelSchema)); CostWriter.record inserts effort ?? null; recent() maps effort with isEffortLevel; the legacy CostEvent interface in costs/events.ts gets effort?: EffortLevel; insertCostEvent adds effort as the 15th column."
+        },
+        "items": [
+          {
+            "id": "ledger-effort-column.ac1",
+            "title": "Given a database whose cost_events table lacks effort, when it is reopened through getOverdeckDatabase, then PRAGMA table_info(cost_events) lists an effort column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ledger-effort-column.ac2",
+            "title": "Given one legacy event inserted with effort 'high' and one without, insertCostEvent persists them so SELECT effort FROM cost_events ORDER BY id returns ['high', null].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ledger-effort-column.ac3",
+            "title": "Given makeSampleEvent with effort 'xhigh', CostWriter.record sends 15 columns to the DB insert including effort 'xhigh', and passes effort null for a sample without it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ledger-effort-column.ac4",
+            "title": "Given toCostArchiveEvent receives an event with effort 'low', it returns effort 'low'; for an event without effort the returned object has no effort key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-effort",
+        "title": "Claude and pi transcript reconciliation stamp each cost row with effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/reconciler.ts",
+            "src/lib/costs/sync-wal.ts",
+            "src/lib/costs/__tests__/reconciler-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/costs/__tests__/reconciler-effort.test.ts src/lib/costs/__tests__/reconciler-pi.test.ts tests/unit/lib/costs/reconciler-collect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconciler-effort.test.ts and the existing reconciler tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W4. SessionMapping gets effort?: EffortLevel; buildSessionIndex calls readLaunchEfforts(agentDir) once per agent and stores effortFor(sessionId) per session; extractCostEvents takes an optional 6th launchEffort and stamps each event with observedEffortFromRecord(entry) ?? launchEffort (D1); callers pass the mapping's effort; the pi path calls readLaunchEfforts once per agent dir and stamps effortFor(event.sessionId); export toOverdeckCostEvent in reconciler.ts and add effort: event.effort ?? null there and in the sync-wal.ts copy."
+        },
+        "items": [
+          {
+            "id": "reconciler-effort.ac1",
+            "title": "Given a claude transcript whose usage-bearing assistant record has effort 'xhigh', when extractCostEvents runs with launch effort 'high', then the returned event has effort 'xhigh'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-effort.ac2",
+            "title": "Given the same transcript without an effort field, extractCostEvents returns an event with effort 'high' (the launch effort passed in).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-effort.ac3",
+            "title": "Given an agent dir with sessions.json lines s1 (medium) and s2 (no effort, newest) and state.json effort 'max', buildSessionIndex returns effort medium for s1 and max for s2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-effort.ac4",
+            "title": "Given an event with effort 'medium' and one without, toOverdeckCostEvent returns effort 'medium' and effort null respectively.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collectors-effort",
+        "title": "Codex, prime-agent and ohmypi reconciliation stamp cost rows with launch effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/codex-collector.ts",
+            "src/lib/costs/prime-agent-collector.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+            "src/lib/overdeck/__tests__/cost-prime-agent-reconcile.test.ts",
+            "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts src/lib/overdeck/__tests__/cost-prime-agent-reconcile.test.ts tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three reconcile test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W5. Build one readLaunchEfforts lookup per agent root (a no-op lookup for the codex-global and pi-global roots) and add effort: effortFor(sessionId) ?? null to each event built in codex-collector.ts, prime-agent-collector.ts, and the ohmypi block of cost.ts reconcile. readAgentRoleSync stays untouched."
+        },
+        "items": [
+          {
+            "id": "collectors-effort.ac1",
+            "title": "Given a codex fixture agent whose sessions.json line for the rollout session has effort 'low', the codex collector returns events with effort 'low', and a codex-global root event has effort null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collectors-effort.ac2",
+            "title": "Given a prime-agent fixture agent with state.json effort 'medium' and no session index, the prime-agent collector returns events with effort 'medium'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collectors-effort.ac3",
+            "title": "Given the ohmypi fixture agent agent-pan-9999 has state.json effort 'medium', after reconcile({ source: 'ohmypi' }) the resolver's recent() returns its ohmypi events with effort 'medium'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-cost-report",
+        "title": "pan cost effort reports spend grouped by effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost-sync.ts",
+            "src/cli/commands/cost.ts",
+            "tests/lib/overdeck/cost-sync.test.ts",
+            "tests/cli/commands/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/overdeck/cost-sync.test.ts tests/cli/commands/cost.test.ts",
+            "npm run typecheck",
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "cost-sync.test.ts and cli cost.test.ts pass including the effort cases",
+            "typecheck completes without errors",
+            "lint:effort passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W6. Add EffortRollup and getEffortRollup(issueId?) next to getModelRollup: GROUP BY effort, NULL or invalid values merge into one 'unrecorded' bucket, sort by EFFORT_LEVELS.indexOf with unrecorded last (no copied level list). Add a `pan cost effort` subcommand with --issue <id> and --json after the `issue <issueId>` subcommand; text output comes from a new exported pure formatter formatEffortRollup(rows, issueId?) returning lines (a 'Costs by effort' heading, plus ' for <ISSUE>' with --issue, then one line per bucket; an empty list returns ['No cost events found.']), tested in tests/cli/commands/cost.test.ts like formatIssueCostAggregate. No CostResolver method and no HTTP route; the static no-loss audit list in tests/unit/lib/overdeck/cost.test.ts needs no change."
+        },
+        "items": [
+          {
+            "id": "effort-cost-report.ac1",
+            "title": "Given rows at low, medium, high (two), xhigh, max and two without effort, getEffortRollup() returns buckets in the order low, medium, high, xhigh, max, unrecorded with calls 2 for high and 2 for unrecorded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-cost-report.ac2",
+            "title": "Given rows for PAN-1 and PAN-2, getEffortRollup('PAN-1') returns totals that count only PAN-1 rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-cost-report.ac3",
+            "title": "Given rows for high and unrecorded and issue PAN-1, formatEffortRollup returns a first line containing 'Costs by effort for PAN-1' followed by one bucket line containing 'high' and one containing 'unrecorded'; given an empty list it returns ['No cost events found.'].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-entry-effort",
+        "title": "Agent directory entries carry a native agent's effort and source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-directory.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W7. DirectoryEntry gets effort: Schema.optional(EffortLevelSchema) and effortSource: Schema.optional(Schema.String) after model. In buildDirectoryEntries' native-agent branch, spread effort and effortSource from state when state.effort is set. Pane-only, conversation, external and subagent entries are unchanged (conversation entries are PAN-4510)."
+        },
+        "items": [
+          {
+            "id": "directory-entry-effort.ac1",
+            "title": "Given a native agent whose state.json has effort 'xhigh' and effortSource 'role', buildDirectoryEntries returns its entry with effort 'xhigh' and effortSource 'role'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-entry-effort.ac2",
+            "title": "Given a native agent whose state.json has no effort, its entry has neither an effort nor an effortSource key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-row-effort",
+        "title": "Agents page History rows and detail header render effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/effortChip.ts",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryList.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryDetail.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.test.tsx",
+            "src/dashboard/frontend/tests/agents-effort.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.test.tsx",
+            "cd src/dashboard/frontend && npx playwright test tests/agents-effort.spec.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AgentsDirectory.test.tsx passes",
+            "agents-effort.spec.ts passes against a running dashboard",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W8. Add formatEffortLabel(effort, source) to effortChip.ts: null for an unknown level, '<level> (<EFFORT_SOURCE_LABELS label>)' when the source is known, else the level. DirectoryList.tsx and DirectoryDetail.tsx append it to the runtime arrays (harness · model · effort). Add a unit case to AgentsDirectory.test.tsx and a new Playwright spec agents-effort.spec.ts modeled on effort-chip.spec.ts: route-mock /api/agent-directory* with one native-agent entry (effort 'xhigh', effortSource 'role'), visit /agents?view=history in Playwright's fresh per-test browser context, and check the first directory-row text."
+        },
+        "items": [
+          {
+            "id": "agents-row-effort.ac1",
+            "title": "Given an entry with effort 'xhigh' and effortSource 'role', the History row rendered by DirectoryList contains the text 'xhigh (role)', and an entry without effort renders no effort suffix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-row-effort.ac2",
+            "title": "Given formatEffortLabel('high', 'explicit') it returns 'high (set)'; given an invalid level it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-row-effort.ac3",
+            "title": "Given the mocked /api/agent-directory response, agents-effort.spec.ts visits /agents?view=history in an isolated browser context and finds 'xhigh (role)' in the first [data-component=\"directory-row\"], with no unexpected non-GET API calls recorded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-effort",
+        "title": "pan status prints each agent's effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/status.ts",
+            "src/cli/commands/__tests__/status-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/status-harness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "status-harness.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W9. After the Model: line in status.ts, print `  Effort:   <effort> (<effortSource>)` when agent.effort is set (source in parentheses only when present). --json already includes the fields."
+        },
+        "items": [
+          {
+            "id": "status-effort.ac1",
+            "title": "Given a running agent with effort 'high' and effortSource 'explicit', pan status output matches /Effort:\\s+high \\(explicit\\)/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-effort.ac2",
+            "title": "Given a running agent without effort, pan status prints no Effort: line for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "show-effort",
+        "title": "pan show prints the agent's effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/show.ts",
+            "tests/cli/commands/show.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/show.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "show.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W10. In show.ts add effort and effortSource (null when absent) to the --json object, and after the health line block print `  effort   <effort> (<effortSource>)` when agentState.effort is set."
+        },
+        "items": [
+          {
+            "id": "show-effort.ac1",
+            "title": "Given getAgentState returns effort 'xhigh' and effortSource 'role', pan show prints an effort line containing 'xhigh' and '(role)'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-effort.ac2",
+            "title": "Given the same state, pan show --json returns effort 'xhigh' and effortSource 'role'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-effort.ac3",
+            "title": "Given no agent state, pan show --json returns effort null and effortSource null and the text output prints no effort line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-display-docs",
+        "title": "Document effort recording, the effort cost report, and effort display",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T02:19:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4259",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "reference/agents-directory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan cost effort' configuration/effort.mdx",
+            "grep -n '4510' configuration/effort.mdx",
+            "grep -n 'reasoning effort' reference/agents-directory.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4259.md W11. configuration/effort.mdx 'What honors it today': add the Recording, Reporting and Display bullets from the PRD; replace the #4259 sibling-table row with the #4510 row and reword the sentence above the table. reference/agents-directory.mdx: the Agents row text says rows show reasoning effort with its source, and the Detail row lists effort."
+        },
+        "items": [
+          {
+            "id": "effort-display-docs.ac1",
+            "title": "Given the change, configuration/effort.mdx 'What honors it today' states that new sessions.json lines and cost_events rows carry effort and that `pan cost effort` groups spend by effort with an unrecorded bucket.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-display-docs.ac2",
+            "title": "Given the change, the configuration/effort.mdx sibling table links #4510 for issue-view and conversation-row display and no longer links #4259.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-display-docs.ac3",
+            "title": "Given the change, reference/agents-directory.mdx says Agents rows show reasoning effort with its source, for example xhigh (role), and the Detail header lists effort.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sessions-effort",
+        "to": "spawn-session-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "sessions-effort",
+        "to": "reconciler-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "sessions-effort",
+        "to": "collectors-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "ledger-effort-column",
+        "to": "reconciler-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "ledger-effort-column",
+        "to": "collectors-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "ledger-effort-column",
+        "to": "effort-cost-report",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-entry-effort",
+        "to": "agents-row-effort",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

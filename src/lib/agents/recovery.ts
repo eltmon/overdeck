@@ -126,7 +126,7 @@ function prepareRestartSessionIdentity(
   state: AgentState,
   allocate: typeof createFreshSessionIdentity = createFreshSessionIdentity,
 ): string | undefined {
-  const sessionId = allocate(agentId, harness, state.model);
+  const sessionId = allocate(agentId, harness, state.model, state.effort);
   if (sessionId) state.sessionId = sessionId;
   else delete state.sessionId;
   return sessionId;

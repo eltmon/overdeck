@@ -31,7 +31,9 @@ import type { IssueId } from '../overdeck/issues.js';
 import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
 import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
-import { readSessionIndexWithLegacy } from '../session-history.js';
+import { readLaunchEfforts, readSessionIndexWithLegacy } from '../session-history.js';
+import { observedEffortFromRecord } from '../claude-effort-transcript.js';
+import type { EffortLevel } from '@overdeck/contracts';
 import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 // ============== Types ==============
@@ -60,6 +62,7 @@ export interface SessionMapping {
   agentId: string;
   issueId: string | null;
   sessionType: string;  // planning, implementation, review, test, merge
+  effort?: EffortLevel;
 }
 
 interface TranscriptEntry {
@@ -181,6 +184,7 @@ export function buildSessionIndex(): Map<string, SessionMapping> {
     const agentPath = join(agentsDir, agentDir);
 
     const sessionIds = readSessionIndexWithLegacy(agentDir).map((entry) => entry.sessionId);
+    const effortFor = readLaunchEfforts(agentDir);
 
     // Read state.json for issue/workspace context and role.
     const stateFile = join(agentPath, 'state.json');
@@ -215,6 +219,7 @@ export function buildSessionIndex(): Map<string, SessionMapping> {
         agentId: agentDir,
         issueId: issueId ?? resolveUnmappedSessionIssueId({ sessionId: sid, agentId: agentDir }),
         sessionType,
+        effort: effortFor(sid),
       });
     }
   }
@@ -307,6 +312,7 @@ export function extractCostEvents(
   issueId: string,
   sessionType: string,
   sessionId: string,
+  launchEffort?: EffortLevel,
 ): CostEvent[] {
   const events: CostEvent[] = [];
   const lines = content.split('\n');
@@ -344,6 +350,7 @@ export function extractCostEvents(
       const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };
       const cost = calculateCost(tokenUsage, pricing);
       const timestamp = entry.timestamp || entry.ts || entry.created_at || new Date().toISOString();
+      const effort = observedEffortFromRecord(entry) ?? launchEffort;
 
       events.push({
         ts: timestamp,
@@ -360,6 +367,7 @@ export function extractCostEvents(
         cost,
         requestId,
         sessionId,
+        ...(effort ? { effort } : {}),
       });
     } catch {
       // Skip malformed lines
@@ -528,6 +536,15 @@ export async function collectPiCostEvents(opts: {
 
   candidates.sort((a, b) => a.path.localeCompare(b.path));
   const maxEvents = opts.maxEvents ?? Number.POSITIVE_INFINITY;
+  const effortLookups = new Map<string, ReturnType<typeof readLaunchEfforts>>();
+  const effortForAgent = (agentDirName: string): ReturnType<typeof readLaunchEfforts> => {
+    let lookup = effortLookups.get(agentDirName);
+    if (!lookup) {
+      lookup = readLaunchEfforts(agentDirName);
+      effortLookups.set(agentDirName, lookup);
+    }
+    return lookup;
+  };
   const flush = async () => {
     if (!opts.onBatch || (result.events.length === 0 && result.verdicts.length === 0)) return;
     const batch = { events: result.events, verdicts: result.verdicts };
@@ -547,6 +564,11 @@ export async function collectPiCostEvents(opts: {
     try {
       const content = readFileSync(transcriptPath, 'utf-8');
       const events = extractPiCostEvents(content, transcript.agentDirName, resolvedIssueId, transcript.sessionType, sessionId);
+      const effortFor = effortForAgent(transcript.agentDirName);
+      for (const event of events) {
+        const effort = effortFor(event.sessionId);
+        if (effort) event.effort = effort;
+      }
       if (events.length === 0) {
         result.verdicts.push({ path: transcriptPath, mtimeMs: transcript.mtimeMs, size: transcript.size, verdict: 'no-usage' });
         await flush();
@@ -591,7 +613,7 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
   return result;
 }
 
-function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCostEvent {
+export function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCostEvent {
   return {
     ts: new Date(event.ts),
     issueId: event.issueId ? (event.issueId as IssueId) : null,
@@ -607,6 +629,7 @@ function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCost
     cost: event.cost ?? 0,
     requestId: event.requestId ?? null,
     sourceFile,
+    effort: event.effort ?? null,
   };
 }
 
@@ -718,6 +741,7 @@ export async function reconcile(opts: { dryRun?: boolean; includePi?: boolean } 
         const agentId = mapping?.agentId || 'unattributed';
         const issueId = mapping?.issueId || pathIssueId || resolveUnmappedSessionIssueId({ sessionId, agentId });
         const sessionType = mapping?.sessionType || 'implementation';
+        const launchEffort = mapping?.effort;
 
         // Get last processed offset
         const lastOffset = getSessionOffset(sessionId);
@@ -733,7 +757,7 @@ export async function reconcile(opts: { dryRun?: boolean; includePi?: boolean } 
         }
 
         // Extract cost events
-        const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId);
+        const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId, launchEffort);
 
         if (events.length === 0) {
           if (!opts.dryRun) {
@@ -776,12 +800,13 @@ export async function reconcile(opts: { dryRun?: boolean; includePi?: boolean } 
             const agentId = mapping?.agentId || 'unattributed-subagent';
             const issueId = mapping?.issueId || pathIssueId || resolveUnmappedSessionIssueId({ sessionId, agentId });
             const sessionType = mapping?.sessionType || 'implementation';
+            const launchEffort = mapping?.effort;
 
             const lastOffset = getSessionOffset(sessionId);
             const readResult = readNewBytes(transcriptPath, lastOffset);
             if (!readResult || !readResult.content) continue;
 
-            const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId);
+            const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId, launchEffort);
 
             if (events.length === 0) {
               if (!opts.dryRun) {

@@ -61,4 +61,18 @@ describe('CostWriter.reconcile — prime-agent (PAN-3668 WI-19)', () => {
     expect(second).toMatchObject({ imported: 0, eventsImported: 0, duplicatesSkipped: 2 });
     expect(odb.raw().prepare('SELECT COUNT(*) AS n FROM cost_events').get()).toEqual({ n: 2 });
   });
+
+  it('stamps prime-agent rows with the agent\'s launch effort', async () => {
+    const agentDir = join(odb.home, 'agents', 'agent-pan-3668');
+    mkdirSync(join(agentDir, 'prime-sessions'), { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ issueId: 'PAN-3668', role: 'work', harness: 'prime-agent', effort: 'medium' }));
+    const sessionFile = join(agentDir, 'prime-sessions', '01a0e000.jsonl');
+    copyFileSync(FIXTURE, sessionFile);
+    const layer = makeWriterLayer(odb);
+
+    await Effect.runPromise(CostWriter.use((w) => w.reconcile({ source: 'prime-agent' })).pipe(Effect.provide(layer)));
+    const rows = odb.raw().prepare('SELECT effort FROM cost_events ORDER BY id').all() as Array<{ effort: string | null }>;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.effort === 'medium')).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,6 +40,10 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
     copyFileSync(
       join(FIXTURES, 'ohmypi', 'openai-codex-gpt-5.5.jsonl'),
       join(ohmypiDir, '2026-06-27T14-43-13-805Z_019f0988-e30d-7000-b11c-23c3826c54ab.jsonl'),
+    );
+    writeFileSync(
+      join(tempHome, 'agents', 'agent-pan-9999', 'state.json'),
+      JSON.stringify({ id: 'agent-pan-9999', effort: 'medium' }),
     );
 
     const dbPath = join(tempHome, 'overdeck.db');
@@ -107,6 +111,7 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
       event.model === 'gpt-5.5' &&
       event.cost > 0
     )).toBe(true);
+    expect(result.recent.filter((event) => event.sessionType === 'ohmypi').every((event) => event.effort === 'medium')).toBe(true);
 
     expect(result.secondCodex.imported).toBe(0);
     expect(result.secondCodex.skipped).toHaveLength(0);

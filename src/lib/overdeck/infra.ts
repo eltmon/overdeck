@@ -118,6 +118,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `skill_overrides` text');
   // PAN-4499: the kickoff a held handoff has not sent yet; non-null means held.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `held_kickoff` text');
+  // PAN-4259: the effort a cost row's request ran at; NULL for legacy rows.
+  runSchemaTopUp(db, 'ALTER TABLE `cost_events` ADD COLUMN `effort` text');
   // PAN-3822: pull requests linked to conversations (branch-detected by the
   // pull-request sync sweep). Mirrors the init migration for existing DBs.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_pull_requests` (`conversation_id` text NOT NULL, `host` text NOT NULL, `repository` text NOT NULL, `number` integer NOT NULL, `url` text NOT NULL, `source` text NOT NULL, `linked_at` integer NOT NULL, `dismissed_at` integer, `snapshot_json` text, PRIMARY KEY(`conversation_id`, `host`, `repository`, `number`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
@@ -820,7 +822,7 @@ function archiveKey(event: { requestId?: unknown; sourceFile?: unknown; source?:
   return source ? `source:${source}` : null;
 }
 
-function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unknown> {
+export function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unknown> {
   const ts = event.ts instanceof Date
     ? event.ts.toISOString()
     : typeof event.ts === 'string'
@@ -844,6 +846,7 @@ function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unkn
     ...(typeof event.sessionId === 'string' ? { sessionId: event.sessionId } : {}),
     ...(typeof event.sourceFile === 'string' ? { source: event.sourceFile } : {}),
     ...(Array.isArray(event.warnings) ? { warnings: event.warnings } : {}),
+    ...(typeof event.effort === 'string' ? { effort: event.effort } : {}),
   };
 }
 

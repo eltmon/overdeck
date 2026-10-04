@@ -135,6 +135,23 @@ describe('AgentsDirectory', () => {
     expect(new URLSearchParams(window.location.search).get('window')).toBe('168');
   });
 
+  it("shows the agent's effort and source on its row", () => {
+    useAgentDirectory.mockReturnValue({
+      data: {
+        generatedAt: '', windowHours: 24, entries: [
+          entry({ id: 'agent-pan-6', issueId: 'PAN-6', effort: 'xhigh', effortSource: 'role' }),
+          entry({ id: 'agent-pan-7', issueId: 'PAN-7' }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<AgentsDirectory />);
+    const row = (id: string) => document.querySelector(`[data-entry-id="${id}"]`) as HTMLElement;
+    expect(row('agent-pan-6')).toHaveTextContent('xhigh (role)');
+    expect(row('agent-pan-7').textContent).not.toContain('(');
+  });
+
   it('renders a working agent with the live state badge and a stopped one with the muted badge', () => {
     render(<AgentsDirectory />);
     const badge = (id: string) => within(document.querySelector(`[data-entry-id="${id}"]`) as HTMLElement)

@@ -8,6 +8,7 @@ import { forwardRef, type KeyboardEvent, type RefObject } from 'react';
 
 import type { DirectoryEntry } from '@overdeck/contracts';
 
+import { formatEffortLabel } from '../../chat/effortChip';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { compactModelName } from '../../../lib/model-names';
 import { useDashboardStore } from '../../../lib/store';
@@ -92,8 +93,9 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
           const title = rowTitle(entry);
           const harness = known(entry.harness);
           const model = known(entry.model);
-          const runtime = [harness, model && compactModelName(model)].filter(Boolean).join(' · ');
-          const runtimeFull = [harness, model].filter(Boolean).join(' · ');
+          const effort = formatEffortLabel(entry.effort, entry.effortSource);
+          const runtime = [harness, model && compactModelName(model), effort].filter(Boolean).join(' · ');
+          const runtimeFull = [harness, model, effort].filter(Boolean).join(' · ');
           return (
             <div
               key={entry.id}

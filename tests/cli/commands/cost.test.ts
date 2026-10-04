@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatIssueCostAggregate } from '../../../src/cli/commands/cost.js';
+import { formatEffortRollup, formatIssueCostAggregate } from '../../../src/cli/commands/cost.js';
 import type { IssueAggregate } from '../../../src/lib/database/cost-events-db.js';
+import type { EffortRollup } from '../../../src/lib/overdeck/cost-sync.js';
 
 describe('cost command formatting', () => {
   it('shows synthesis and per-reviewer review stages for an issue aggregate', () => {
@@ -34,5 +35,19 @@ describe('cost command formatting', () => {
     expect(output).toContain('security: $0.0200 (1 call)');
     expect(output).toContain('correctness: $0.0300 (2 calls)');
     expect(output).not.toContain('work: $0.0234');
+  });
+
+  it('formatEffortRollup prints one line per bucket', () => {
+    const rows: EffortRollup[] = [
+      { effort: 'high', totalCost: 0.12, calls: 3, totalTokens: 1500 },
+      { effort: 'unrecorded', totalCost: 0.04, calls: 1, totalTokens: 200 },
+    ];
+
+    const lines = formatEffortRollup(rows, 'PAN-1');
+
+    expect(lines[0]).toContain('Costs by effort for PAN-1');
+    expect(lines.some((line) => line.includes('high'))).toBe(true);
+    expect(lines.some((line) => line.includes('unrecorded'))).toBe(true);
+    expect(formatEffortRollup([])).toEqual(['No cost events found.']);
   });
 });

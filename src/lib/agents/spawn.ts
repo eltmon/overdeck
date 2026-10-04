@@ -363,6 +363,7 @@ async function spawnRunWithoutConsentClaim(
       appendSessionIdToHistory(agentId, rawSessionId, 'launcher', {
         harness: resolvedHarness,
         model: selectedModel,
+        effort: options.effort,
       });
     }
 
@@ -711,7 +712,7 @@ async function spawnAgentWithoutConsentClaim(
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
-    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel),
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel, options.effort),
     startedBy,
   };
   // PAN-3917 W12: one backend answer for both the supervisor decision and the

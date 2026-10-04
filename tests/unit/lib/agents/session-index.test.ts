@@ -14,10 +14,12 @@ import { kimiSessionsRoot } from '../../../../src/lib/runtimes/storage/kimi-code
 import {
   appendSessionIdToHistory,
   clearSessionResetMarker,
+  createFreshSessionIdentity,
   isSessionResetMarker,
   latestSessionResetTime,
   orderedTranscriptCandidates,
   parseSessionIndex,
+  readLaunchEfforts,
   readSessionIndex,
   readSessionIndexWithLegacy,
   resetSessionIndex,
@@ -436,5 +438,69 @@ describe('sessions.json index', () => {
     })).toEqual([
       { kind: 'claude', path: '/claude/session-a.jsonl', model: 'claude-sonnet-4-6' },
     ]);
+  });
+
+  it('records the launch effort on a new sessions.json line', () => {
+    appendSessionIdToHistory('a1', 's1', 'launcher', { harness: 'claude-code', model: 'm', effort: 'xhigh' });
+
+    expect(readSessionIndex('a1')[0].effort).toBe('xhigh');
+    const raw = readFileSync(join(process.env.OVERDECK_HOME!, 'agents', 'a1', 'sessions.json'), 'utf8');
+    expect(raw).toContain('"effort":"xhigh"');
+  });
+
+  it('falls back to state.json effort and omits effort when none is known', () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ effort: 'low' }));
+
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'launcher');
+    expect(readSessionIndex('agent-pan-3950')[0].effort).toBe('low');
+
+    appendSessionIdToHistory('no-state-agent', 'session-b', 'launcher');
+    const raw = readFileSync(join(process.env.OVERDECK_HOME!, 'agents', 'no-state-agent', 'sessions.json'), 'utf8');
+    expect(raw).not.toContain('effort');
+  });
+
+  it('parses legacy lines without effort', () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    const indexPath = join(agentDir, 'sessions.json');
+    writeFileSync(
+      indexPath,
+      `${JSON.stringify({ sessionId: 'old', at: '', source: 'launcher', harness: 'claude-code', model: 'm' })}\n`
+      + `${JSON.stringify({ sessionId: 'bogus-effort', at: '', source: 'launcher', harness: 'claude-code', model: 'm', effort: 'bogus' })}\n`,
+    );
+
+    const entries = readSessionIndex('agent-pan-3950');
+    expect(entries.find((entry) => entry.sessionId === 'old')?.effort).toBeUndefined();
+    expect(entries.find((entry) => entry.sessionId === 'bogus-effort')?.effort).toBeUndefined();
+  });
+
+  it('readLaunchEfforts applies the entry, then state.json for the newest session only', () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    appendSessionIdToHistory('agent-pan-3950', 's1', 'launcher', { effort: 'medium' });
+    appendSessionIdToHistory('agent-pan-3950', 's2', 'launcher');
+    appendSessionIdToHistory('agent-pan-3950', 's3', 'launcher');
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ effort: 'high' }));
+
+    const lookup = readLaunchEfforts('agent-pan-3950');
+    expect(lookup('s1')).toBe('medium');
+    expect(lookup('s2')).toBeUndefined();
+    expect(lookup('s3')).toBe('high');
+    expect(lookup('unknown-session')).toBeUndefined();
+
+    const emptyIndexAgentDir = join(process.env.OVERDECK_HOME!, 'agents', 'empty-index-agent');
+    mkdirSync(emptyIndexAgentDir, { recursive: true });
+    writeFileSync(join(emptyIndexAgentDir, 'state.json'), JSON.stringify({ effort: 'high' }));
+    const emptyIndexLookup = readLaunchEfforts('empty-index-agent');
+    expect(emptyIndexLookup('anything')).toBe('high');
+  });
+
+  it('createFreshSessionIdentity records the effort it is given before state.json exists', () => {
+    const sessionId = createFreshSessionIdentity('a2', 'claude-code', 'claude-opus-5-5', 'max');
+
+    expect(sessionId).toBeDefined();
+    expect(readSessionIndex('a2').at(-1)?.effort).toBe('max');
   });
 });

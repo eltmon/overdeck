@@ -195,15 +195,26 @@ assistant turn).
   probe pass.
 - `pan strike` (`roles.strike.effort` → project → `high`); `--dry-run`
   prints the resolved level and its source.
+- Recording — every new `sessions.json` line carries the launch `effort`, and
+  every new cost-ledger row (`cost_events.effort`, `events.jsonl`) carries the
+  effort its request ran at: for claude-code the level on the transcript
+  record, else the session's launch effort. Rows recorded before this change
+  read as `unrecorded`.
+- Reporting — `pan cost effort [--issue <id>] [--json]` groups spend by
+  effort, one bucket per level plus `unrecorded`.
+- Display — Agents page History rows and the detail header show
+  `<level> (<source>)`; `pan status` prints `Effort:`; `pan show` prints
+  `effort` and includes `effort`/`effortSource` in `--json`. The conversation
+  composer chip shows it for conversations.
 
 Everything else — specialist/review-parent/test/worker
 launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
-staffing, and dashboard-wide display — still resolves effort ad
-hoc and is tracked in sibling issues:
+staffing, and issue-view and conversation-row display — still
+resolves effort ad hoc and is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
 | Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
-| Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
+| Effort on issue-view agent rows, conversation rows, and Agents-page conversation entries | [#4510](https://github.com/eltmon/overdeck/issues/4510) |
 | Per-harness mapping/clamping correctness | [#4260](https://github.com/eltmon/overdeck/issues/4260) |

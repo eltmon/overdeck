@@ -498,6 +498,7 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       role: state.role,
       harness: state.harness ?? pane?.harness ?? 'unknown',
       model: state.model || pane?.model || 'unknown',
+      ...(state.effort ? { effort: state.effort, ...(state.effortSource ? { effortSource: state.effortSource } : {}) } : {}),
       state: remoteStopped ? 'stopped' : remote ? 'unknown' : localState,
       startedAt: state.startedAt ?? null,
       lastActivityAt: state.lastActivity ?? state.stoppedAt ?? state.startedAt ?? null,

@@ -272,6 +272,8 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       liveness: liveness ? { backend, ...liveness } : null,
       cv: cvData,
       journal,
+      effort: agentState?.effort ?? null,
+      effortSource: agentState?.effortSource ?? null,
     }, null, 2));
     return;
   }
@@ -343,6 +345,10 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     console.log(`  ${chalk.dim('health')}   ${statusColor(status)}  ${chalk.dim('·')} ${extras.join(` ${chalk.dim('·')} `)}`);
   } else {
     console.log(`  ${chalk.dim('health')}   ${chalk.dim('(no agent state)')}`);
+  }
+
+  if (agentState?.effort) {
+    console.log(`  ${chalk.dim('effort')}   ${agentState.effort}${agentState.effortSource ? chalk.dim(` (${agentState.effortSource})`) : ''}`);
   }
 
   // CV line (stats summary)

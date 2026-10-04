@@ -254,6 +254,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     console.log(`  Harness:  ${agent.harness ?? 'claude-code'}`);
     console.log(`  Model:    ${agent.model}`);
+    if (agent.effort) {
+      console.log(`  Effort:   ${agent.effort}${agent.effortSource ? ` (${agent.effortSource})` : ''}`);
+    }
     console.log(`  Role:     ${agent.role}`);
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);

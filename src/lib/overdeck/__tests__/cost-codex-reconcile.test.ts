@@ -91,6 +91,37 @@ describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
     expect(readRows(odb)).toHaveLength(1);
   });
 
+  it('stamps codex rows with the agent\'s launch effort', async () => {
+    seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
+    const agentDir = join(odb.home, 'agents', 'agent-pan-9999');
+    writeFileSync(
+      join(agentDir, 'sessions.json'),
+      JSON.stringify({ sessionId: 'thread-pan-9999', at: '2026-07-05T14:11:25.000Z', source: 'launcher', effort: 'low' }) + '\n',
+      'utf8',
+    );
+
+    const globalRoot = join(odb.home, 'codex-global-sessions');
+    const globalDayDir = join(globalRoot, '2026', '07', '05');
+    mkdirSync(globalDayDir, { recursive: true });
+    writeFileSync(
+      join(globalDayDir, 'rollout-2026-07-05T14-11-25-thread-global.jsonl'),
+      [
+        JSON.stringify({ timestamp: '2026-07-05T14:11:25.000Z', type: 'session_meta', payload: { type: 'session_meta', id: 'thread-global', cwd: '/home/eltmon/Projects/overdeck' } }),
+        JSON.stringify({ timestamp: '2026-07-05T14:11:25.100Z', type: 'turn_context', payload: { type: 'turn_context', model: 'gpt-5.5' } }),
+        tokenCountLine({ input: 12000, cached: 4000, output: 800 }),
+      ].join('\n') + '\n',
+      'utf8',
+    );
+
+    const result = await collectCodexCostEvents({ extraRoots: [globalRoot] });
+    const agentEvents = result.events.filter((event) => event.agentId === 'agent-pan-9999');
+    const globalEvents = result.events.filter((event) => event.agentId === 'codex-global');
+    expect(agentEvents.length).toBeGreaterThan(0);
+    expect(agentEvents.every((event) => event.effort === 'low')).toBe(true);
+    expect(globalEvents.length).toBeGreaterThan(0);
+    expect(globalEvents.every((event) => event.effort === null)).toBe(true);
+  });
+
   it('returns cold-sweep events in bounded batches', async () => {
     const rolloutFile = seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
     appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });

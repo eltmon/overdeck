@@ -6,6 +6,8 @@ import { getOverdeckHome } from '../paths.js';
 import type { IssueId } from '../overdeck/issues.js';
 import { lookupSkipVerdict, type SkipVerdict } from './skip-cache.js';
 import { codexAgentSessionsDir } from '../runtimes/storage/codex.js';
+import { readLaunchEfforts } from '../session-history.js';
+import type { EffortLevel } from '@overdeck/contracts';
 
 export type SkipVerdictEntry = { path: string; mtimeMs: number; size: number; verdict: SkipVerdict };
 
@@ -24,6 +26,7 @@ type CollectedCostEvent = {
   cost: number;
   requestId: string | null;
   sourceFile: string | null;
+  effort: EffortLevel | null;
 };
 
 type CostReconcileExtraRoot =
@@ -77,6 +80,15 @@ export async function collectCodexCostEvents(opts: {
   const candidates = roots.flatMap(root => walkJsonl(root.root).map(file => ({ file, root })))
     .sort((a, b) => a.file.localeCompare(b.file));
   const maxEvents = opts.maxEvents ?? Number.POSITIVE_INFINITY;
+  const effortLookups = new Map<string, (sessionId?: string | null) => EffortLevel | undefined>();
+  const effortForRoot = (agentName: string): (sessionId?: string | null) => EffortLevel | undefined => {
+    let lookup = effortLookups.get(agentName);
+    if (!lookup) {
+      lookup = agentName === 'codex-global' ? () => undefined : readLaunchEfforts(agentName);
+      effortLookups.set(agentName, lookup);
+    }
+    return lookup;
+  };
   const flush = async () => {
     if (!opts.onBatch || (events.length === 0 && verdicts.length === 0)) return;
     const batch = { events, verdicts };
@@ -101,11 +113,13 @@ export async function collectCodexCostEvents(opts: {
     if (unknown) skipped.push({ file, reason: 'unknown-model' });
     const session = root.inferIssueFromCwd ? parseCodexSession(file) : null;
     const issueId = root.inferIssueFromCwd ? inferIssueFromPath(session?.cwd) ?? 'UNKNOWN' as IssueId : root.issueId;
+    const effortFor = effortForRoot(root.agentName);
     for (const usage of parsed) {
       events.push({ ts: new Date(usage.timestamp), issueId, agentId: root.agentName,
         sessionId: usage.sessionId, sessionType: 'codex', provider: usage.provider, model: usage.model,
         input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cacheWrite: usage.cacheWrite,
-        cost: usage.cost, requestId: usage.requestId, sourceFile: file });
+        cost: usage.cost, requestId: usage.requestId, sourceFile: file,
+        effort: effortFor(usage.sessionId) ?? null });
       if (events.length >= maxEvents) await flush();
     }
     verdicts.push({ path: file, mtimeMs: stat.mtimeMs, size: stat.size, verdict: unknown ? 'unknown-model' : 'imported' });
