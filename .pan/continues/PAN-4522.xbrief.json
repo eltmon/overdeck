@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4522",
+  "created": "2026-10-04T04:14:15.923Z",
+  "updated": "2026-10-04T04:14:15.923Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "event-store-runtime-history": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T04:14:15.923Z"
+    }
+  }
+}
