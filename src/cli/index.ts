@@ -319,7 +319,7 @@ const planCmd = program
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
-  .option('--effort <level>', 'Planning effort: low | medium | high')
+  .option('--effort <level>', 'Planning effort: low | medium | high | xhigh | max')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
   .action(lazyAction(() => import('./commands/plan.js'), 'planCommand'));
@@ -347,6 +347,13 @@ program
   .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
   .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
+program
+  .command('ask <id> [question]')
+  .description('Ask the operator a blocking decision; it appears in the dashboard Needs-you')
+  .option('--option <label>', 'A choice the operator can pick (repeat 2-4 times)', (value: string, previous: string[] = []) => [...previous, value], [] as string[])
+  .option('--context <text>', 'What you already tried or know, shown with the question')
+  .option('--withdraw', 'Close your open decision request (answered another way, or no longer needed)')
+  .action(lazyAction(() => import('./commands/ask.js'), 'askCommand'));
 program
   .command('answer <id> [option]')
   .description('Show a pending pane choice, or answer its numbered option')

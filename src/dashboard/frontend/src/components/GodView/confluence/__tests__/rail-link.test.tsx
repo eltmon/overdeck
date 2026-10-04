@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceData, ConfluenceOrb } from '../useConfluenceData';
 import { GodViewConfluence } from '../GodViewConfluence';
+import { IssueRail } from '../IssueRail';
 
 vi.mock('../RiverCanvas', () => ({
   RiverCanvas: ({ onSelect, selectedId }: {
@@ -124,5 +125,21 @@ describe('Confluence issue drawer link', () => {
   it('contains no preview issue rail', () => {
     renderConfluence();
     expect(document.querySelector('.confluence-issue-rail')).toBeNull();
+  });
+});
+
+describe('Confluence issue rail state label (PAN-4383)', () => {
+  it('labels an orb waiting on an operator decision as needs you', () => {
+    render(
+      <IssueRail
+        orb={{ ...data.orbs[0], state: 'needs-you' } as ConfluenceOrb}
+        agents={[]}
+        entries={[]}
+        onClose={vi.fn()}
+        onOpenIssue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('needs you ⚑')).toBeInTheDocument();
   });
 });

@@ -28,7 +28,24 @@ vi.mock('../../../lib/tmux.js', () => ({
   isHarnessProcessAlive: tmuxMocks.isHarnessProcessAlive,
 }));
 
+const projectMocks = vi.hoisted(() => ({
+  getProjectSync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+}));
+
+vi.mock('../../../lib/projects.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/projects.js')>()),
+  getProjectSync: projectMocks.getProjectSync,
+  resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
+}));
+
+vi.mock('../../../lib/tracker-utils.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/tracker-utils.js')>()),
+  resolveGitHubIssue: vi.fn(() => ({ isGitHub: false })),
+}));
+
 import { strikeCommand, __testInternals } from '../strike.js';
+import { InvalidEffortError, type EffortConfigSlice } from '../../../lib/agents/resolve-effort.js';
 
 function git(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -46,6 +63,55 @@ describe('strikeCommand', () => {
     tmuxMocks.sessionExists.mockReset();
     tmuxMocks.isHarnessProcessAlive.mockReset();
     tmuxMocks.isHarnessProcessAlive.mockResolvedValue(true);
+    projectMocks.getProjectSync.mockReset();
+    projectMocks.resolveProjectFromIssueSync.mockReset();
+  });
+
+  describe('resolveStrikeEffort', () => {
+    const emptyConfig = { tieredExecution: { tiers: {} }, roles: {} } as unknown as EffortConfigSlice;
+
+    it('returns high with source default when no --effort and no roles.strike.effort is set', () => {
+      const resolved = __testInternals.resolveStrikeEffort('PAN-1234', {}, emptyConfig);
+      expect(resolved).toMatchObject({ effort: 'high', source: 'default' });
+    });
+
+    it('returns the role-configured level with source role when roles.strike.effort is set', () => {
+      const config = { tieredExecution: { tiers: {} }, roles: { strike: { effort: 'medium' } } } as unknown as EffortConfigSlice;
+      const resolved = __testInternals.resolveStrikeEffort('PAN-1234', {}, config);
+      expect(resolved).toMatchObject({ effort: 'medium', source: 'role' });
+    });
+
+    it('throws InvalidEffortError for a bogus --effort without spawning an agent', async () => {
+      expect(() => __testInternals.resolveStrikeEffort('PAN-1234', { effort: 'bogus' as never }, emptyConfig))
+        .toThrow(InvalidEffortError);
+
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+        throw new Error(`process.exit unexpectedly called with "${code}"`);
+      }) as never);
+
+      await expect(strikeCommand(['PAN-1234'], { effort: 'bogus' as never }))
+        .rejects.toThrow('process.exit unexpectedly called with "1"');
+      expect(agentMocks.spawnAgent).not.toHaveBeenCalled();
+
+      exitSpy.mockRestore();
+    });
+  });
+
+  it('prints the resolved effort and its source on the dry-run Effort line', async () => {
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectName: 'overdeck', projectPath: '/tmp/overdeck-strike-dry-run' });
+    projectMocks.getProjectSync.mockReturnValue({
+      name: 'overdeck', path: '/tmp/overdeck-strike-dry-run', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN',
+      workspace: { default_branch: 'main' },
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await strikeCommand(['PAN-4258'], { effort: 'xhigh', dryRun: true });
+
+    const effortLine = logSpy.mock.calls.map((args) => String(args[0])).find((line) => line.includes('Effort:'));
+    expect(effortLine).toContain('xhigh (explicit)');
+    expect(agentMocks.spawnAgent).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
   });
 
   it('exports a function', () => {
