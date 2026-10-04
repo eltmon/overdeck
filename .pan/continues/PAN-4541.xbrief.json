@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4541",
   "created": "2026-10-04T08:22:14.052Z",
-  "updated": "2026-10-04T08:40:33.498Z",
+  "updated": "2026-10-04T08:40:47.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "lexer-scanner.ac6": {
       "status": "completed",
       "doneAt": "2026-10-04T08:40:33.498Z"
+    },
+    "docs-boot-preflight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T08:40:47.712Z"
     }
   }
 }
