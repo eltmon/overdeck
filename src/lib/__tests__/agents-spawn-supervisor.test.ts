@@ -841,6 +841,44 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(persisted.status).toBe('starting');
   });
 
+  // PAN-4506: the terminal backend answers a malformed kickoff with
+  // `ok:false, failure: 'invalid_request: …'` — Herdr's serde_json rejecting a
+  // lone surrogate in the wire payload. Unlike an ordinary refusal, this must
+  // fail the spawn loudly and tear the agent down, or the stall detector
+  // re-dispatches the same doomed text forever.
+  it('fails the kickoff for claude-code when the backend rejects it as invalid_request, and stops the agent (PAN-4506)', async () => {
+    vi.doUnmock('../agents/termination.js');
+    deliverAgentMessageMock.mockResolvedValueOnce({
+      ok: false,
+      path: 'tmux',
+      failure: 'invalid_request: invalid request: unexpected end of hex escape at line 1 column 4021',
+    });
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      prompt: 'review the change',
+    })).rejects.toThrow('kickoff rejected by the terminal backend: invalid_request');
+
+    const persisted = JSON.parse(
+      readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),
+    ) as AgentState;
+    expect(persisted.status).toBe('stopped');
+  });
+
+  it('leaves today\'s behavior alone for an ordinary claude-code refusal (not invalid_request)', async () => {
+    deliverAgentMessageMock.mockResolvedValueOnce({ ok: false, path: 'tmux', failure: 'refused: guard' });
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      prompt: 'review the change',
+    })).resolves.toMatchObject({ role: 'review' });
+    expect(stopAgentMock).not.toHaveBeenCalled();
+  });
+
   it('preserves role-run session origin on resume by not rewriting origin fields', async () => {
     const { spawnRun } = await import('../agents.js');
 

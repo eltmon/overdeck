@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   clearFeedbackFiles: vi.fn(),
   convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
+  recordReviewDispatchFailure: vi.fn(async () => undefined),
 }));
 
 vi.mock('child_process', () => ({
@@ -137,6 +138,10 @@ vi.mock('../verdict-restore.js', () => ({
 
 vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
+}));
+
+vi.mock('../review-dispatch-failure.js', () => ({
+  recordReviewDispatchFailure: mocks.recordReviewDispatchFailure,
 }));
 
 import { buildReviewRolePrompt, purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
@@ -353,6 +358,42 @@ describe('spawnReviewRoleForIssue', () => {
     expect(result.success).toBe(true);
     expect(mocks.killSession).toHaveBeenCalledWith('agent-pan-1194-review');
     expect(mocks.spawnRun).toHaveBeenCalled();
+  });
+
+  it('PAN-4506: returns success:false and records the dispatch failure when the kickoff was rejected', async () => {
+    const { KickoffRejectedError } = await import('../../agents/kickoff-rejection.js');
+    mocks.spawnRun.mockRejectedValueOnce(
+      new KickoffRejectedError('agent-pan-4383-review', 'invalid_request: unexpected end of hex escape at line 1 column 4021'),
+    );
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-4383',
+      workspace: '/tmp/pan-review-dispatch-failed',
+      branch: 'feature/pan-4383',
+    }));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('invalid_request');
+    expect(mocks.recordReviewDispatchFailure).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-4383',
+      workspace: '/tmp/pan-review-dispatch-failed',
+      reviewer: 'agent-pan-4383-review',
+      error: expect.stringContaining('invalid_request'),
+    }));
+  });
+
+  it('does not record a dispatch failure for an ordinary spawn error', async () => {
+    mocks.spawnRun.mockRejectedValueOnce(new Error('provider unreachable'));
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-4383',
+      workspace: '/tmp/pan-review-dispatch-ordinary',
+      branch: 'feature/pan-4383',
+    }));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('provider unreachable');
+    expect(mocks.recordReviewDispatchFailure).not.toHaveBeenCalled();
   });
 
   it('purges every reviewer through canonical transcript-preserving removal', async () => {

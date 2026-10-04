@@ -86,6 +86,7 @@ import {
   recordKickoffDeliveryFailure,
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
+import { isKickoffRejection, isRejectedKickoffFailure, KickoffRejectedError } from './kickoff-rejection.js';
 import { stopAgent } from './termination.js';
 import { reapWarmIdleRoleRun } from './warm-idle-reap.js';
 import {
@@ -565,12 +566,15 @@ async function spawnRunWithoutConsentClaim(
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           try {
             const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
+            if (!delivery.ok && isRejectedKickoffFailure(delivery.failure)) {
+              throw new KickoffRejectedError(agentId, delivery.failure!);
+            }
             if (resolvedHarness === 'kimi-code' && !delivery.ok) {
               throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
             }
           } catch (error) {
-            if (resolvedHarness === 'kimi-code') await closeBackendPane(launchedPane);
-            if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+            if (resolvedHarness === 'kimi-code' || isKickoffRejection(error)) await closeBackendPane(launchedPane);
+            if (resolvedHarness === 'kimi-code' || isKickoffRejection(error)) await Effect.runPromise(stopAgent(agentId)).catch(() => {});
             throw error;
           }
         } else {
