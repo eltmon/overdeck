@@ -408,4 +408,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   escape`, silently killing a review kickoff. Use `truncateWellFormed` /
   `toWellFormedText` from `src/lib/well-formed-text.ts` for any text (a
   truncated preview, a paste payload) that is heading to a Herdr request.
+- **Two runtime maps, neither replayed at boot before PAN-4522** — the read
+  model's `agentRuntimeById` (`read-model.ts`, served in snapshots) booted `{}`,
+  and `syncSnapshot` replaced the client's map wholesale, so a restart showed
+  each agent's spawn-time `state.json` `lastActivity` until its next hook beat
+  (God View drew busy issues `1h idle`). `AgentStateService` keeps a separate map
+  seeded from pane `stateSince`, not from events. Its `RUNTIME_EVENT_TYPES` list
+  omits `agent.channel_reply` and `agent.heartbeat_dead`, both of which write
+  `agentRuntimeById` in the shared reducer. `state.json` `lastActivity` is live
+  only for codex (`recordAgentActivity`, every 5 s); codex posts no
+  `agent.activity_changed`, so the God View's row-stamp fallback is codex's only
+  liveness signal.
 <!-- last-verified: 2026-10-04 -->

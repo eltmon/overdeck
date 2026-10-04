@@ -24,6 +24,7 @@ import type {
   ScanProgressSnapshot,
   TurnDiffSummary,
 } from './types'
+import { defaultRuntimeSnapshot, mergeSnapshotRuntimeById } from './agent-runtime-merge'
 import type { DerivedIssueState } from './derived-issue-state'
 import type { GitHubQuotaSnapshot } from './github-quota'
 import type { BackendPane } from './backend-pane'
@@ -266,15 +267,6 @@ function removeAgentFromSessionIndex(
 
 // ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
 
-function defaultRuntimeSnapshot(agentId: string, timestamp: string, sequence: number): AgentRuntimeSnapshot {
-  return {
-    id: agentId,
-    activity: 'idle',
-    lastActivity: timestamp,
-    updatedAtSequence: sequence,
-  }
-}
-
 /**
  * Bump runtimeSnapshotSequence on the corresponding AgentSnapshot (if present)
  * so low-frequency subscribers can cheaply detect a runtime change. No-op if
@@ -319,12 +311,16 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
 
   const memory = snapshot.memory as Partial<MemoryReadModelState> | undefined
 
-  // Rebuild sessionId → agentId index from snapshot
+  // PAN-4522: keep a client runtime stamp that is newer than what a freshly
+  // booted server served (FR-4).
+  const agentRuntimeById = mergeSnapshotRuntimeById(state.agentRuntimeById, snapshot.agentRuntimeById)
+
+  // Rebuild sessionId → agentId index from the merged runtime map (FR-5).
   const agentIdBySessionId: Record<string, string> = {}
   for (const agent of snapshot.agents) {
     if (agent.sessionId) agentIdBySessionId[agent.sessionId] = agent.id
   }
-  for (const [agentId, runtime] of Object.entries(snapshot.agentRuntimeById ?? {})) {
+  for (const [agentId, runtime] of Object.entries(agentRuntimeById)) {
     if (runtime.claudeSessionId) agentIdBySessionId[runtime.claudeSessionId] = agentId
   }
 
@@ -334,7 +330,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById,
     derivedIssueStateByIssueId,
     backendPanesById,
-    agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
+    agentRuntimeById,
     channelPermissionRequestsById,
     channelPermissionRequestIdsByAgentId,
     resolvedChannelPermissionDecisionsById: {},
