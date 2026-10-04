@@ -4,17 +4,17 @@
     "created": "2026-10-04T04:46:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4529: Evaluate Claude Code mods for Overdeck: in-depth report (evaluation only, no adoption)",
-    "updated": "2026-10-04T04:47:10.680Z"
+    "updated": "2026-10-04T04:47:52.465Z"
   },
   "plan": {
     "id": "pan-4529",
     "title": "Evaluate Claude Code mods for Overdeck: in-depth report (evaluation only, no adoption)",
-    "status": "proposed",
+    "status": "running",
     "uid": "d17b1452-a529-4873-9c91-705a0330eaa6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T04:46:44Z",
-    "updated": "2026-10-04T04:47:10.680Z",
+    "updated": "2026-10-04T04:47:52.465Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4529",
@@ -1047,5 +1047,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
