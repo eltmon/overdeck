@@ -292,6 +292,18 @@ finalized) keeps it. A stored `running` agent with no live pane does not block t
 pane does, and so does a probe that cannot answer (`runtime-indeterminate`). The row only
 reads; it never writes agent status (PAN-4324).
 
+Close-out's DoD row 3 (verification) reads the workspace's `verification-latest.json`. A
+missing or non-terminal (`running`, `skipped`) artifact carries no verdict, so the row passes
+only when row 4 proves the work landed and row 6 (main-verify) passed; the observed text then
+says `stale non-terminal artifact` for a present file. A verification run cut short because
+the PR merged after its gates now rewrites its own `running` artifact to `skipped`
+(latest file only, no per-run file) instead of leaving `running` on disk (PAN-4543).
+
+Close-out's DoD row 8 (deploy) probes the dashboard's `/api/health` up to 3 times, with a
+5 s timeout per attempt and a 2 s pause between attempts, because the dashboard event loop
+can stall for several seconds right after a close-out. The row reports `dashboard not
+reachable` only when every attempt fails, and the observed text says `after 3 attempts`.
+
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
 `state.json`, the append-only `sessions.json` index, lifecycle and activity

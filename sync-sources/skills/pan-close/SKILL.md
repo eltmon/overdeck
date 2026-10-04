@@ -39,20 +39,25 @@ Each overridable row has one explicit acceptance flag:
 --accept-merged       Row 4: PR merged on the forge
 --accept-post-merge   Row 5: post-merge lifecycle completed
 --accept-main-verify  Row 6: merge commit verified on main
---accept-deploy       Row 7: live dashboard build includes the merge
+--accept-ship         Row 7: version strings propagated
+--accept-deploy       Row 8: live dashboard build includes the merge
 ```
 
 An acceptance records the flag, operator identity, and timestamp as a durable,
 auditable trail (commit trailer or PR comment) — never a pipeline record. The
 autonomous flywheel may run a clean close-out, but it cannot use `--accept-*`;
 an operator must apply every override after reviewing the miss.
+Row 8 probes the dashboard's `/api/health` three times (5 s timeout, 2 s apart) before it
+reports `dashboard not reachable … after 3 attempts`, so a short server stall is not a miss.
+Row 3 passes a stale `running` or `skipped` verification artifact when the work landed and
+main CI is green.
 Use an override only when the missing evidence is understood:
 
 ```bash
 pan close PAN-1234 --force
-# Row 7 deploy: MISS — live server build predates the merge
+# Row 8 deploy: MISS — live server build predates the merge
 pan close PAN-1234 --force --accept-deploy
-# Row 7 deploy: MISS-ACCEPTED — override is now durable and auditable
+# Row 8 deploy: MISS-ACCEPTED — override is now durable and auditable
 ```
 
 ## Residue Disposition
