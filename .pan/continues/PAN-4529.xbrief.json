@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:18:54.872Z",
+  "updated": "2026-10-04T05:19:07.559Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "candidate-6-review-worker-bands.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:18:54.871Z"
+    },
+    "candidate-7-other-uses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:07.559Z"
     }
   }
 }
