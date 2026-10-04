@@ -1273,6 +1273,46 @@ describe('validateSettingsApi', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('dashboard.require_token_mint must be a boolean');
   });
+
+  describe('validateSettingsApi Jev toggles (PAN-4508)', () => {
+    const settingsWithJevToggleOn = {
+      ...validSettings,
+      background_ai: { features: { jevTurnEndAssessment: true } },
+    };
+
+    it('errors when a Jev toggle is flipped on with no model configured', async () => {
+      const { validateSettingsApi } = await import('../settings-api.js');
+      mockLoadConfig.mockReturnValue(baseConfig({
+        backgroundAi: { cheapMode: false, features: { jevTurnEndAssessment: false } },
+        jev: { configured: false, apiKeyRef: 'TYPESAFE_API_KEY', timeoutMs: 2000 },
+      }));
+
+      const result = validateSettingsApi(settingsWithJevToggleOn);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((error) => error.includes('jevTurnEndAssessment'))).toBe(true);
+    });
+
+    it('warns instead of erroring when the toggle is already on in the saved config', async () => {
+      const { validateSettingsApi } = await import('../settings-api.js');
+      mockLoadConfig.mockReturnValue(baseConfig({
+        backgroundAi: { cheapMode: false, features: { jevTurnEndAssessment: true } },
+        jev: { configured: true, apiKeyRef: 'TYPESAFE_API_KEY', timeoutMs: 2000 },
+      }));
+
+      const result = validateSettingsApi(settingsWithJevToggleOn);
+
+      expect(result.valid).toBe(true);
+      expect(result.warnings.some((warning) => warning.includes('jev.model is not set'))).toBe(true);
+    });
+
+    it('does not throw when loadConfigSync returns undefined', async () => {
+      const { validateSettingsApi } = await import('../settings-api.js');
+      mockLoadConfig.mockReturnValue(undefined);
+
+      expect(() => validateSettingsApi(settingsWithJevToggleOn)).not.toThrow();
+    });
+  });
 });
 
 describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-up)', () => {
