@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:16:46Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4257: Tier effort reaches slots: per-slot effort from the tier table, and escalation raises effort before promoting the model",
-    "updated": "2026-10-04T02:20:51.346Z"
+    "updated": "2026-10-04T02:21:31.588Z"
   },
   "plan": {
     "id": "pan-4257",
     "title": "Tier effort reaches slots: per-slot effort from the tier table, and escalation raises effort before promoting the model",
-    "status": "proposed",
+    "status": "running",
     "uid": "c7035f36-3f9b-4ff6-88cf-a6f8f77e4166",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:16:46Z",
-    "updated": "2026-10-04T02:20:51.346Z",
+    "updated": "2026-10-04T02:21:31.588Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4257",
@@ -767,5 +767,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
