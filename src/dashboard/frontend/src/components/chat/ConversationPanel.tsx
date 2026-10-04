@@ -35,6 +35,7 @@ import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
+import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
 import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
@@ -695,7 +696,7 @@ export function ConversationPanel({
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
   const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
-    <ConversationPullRequestProvider conversation={conversation}><div className={styles.conversationTerminal}>
+    <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><div className={styles.conversationTerminal}>
       {/* Header — hidden in embedded mode (ZoneB already shows session info).
           Three-tier layout: row 1 = title + primary actions, row 2 = read-only
           metadata, long-tail/config/destructive actions live in the ⋮ menu. */}
@@ -1116,7 +1117,7 @@ export function ConversationPanel({
           }}
         />
       )}
-    </div></ConversationPullRequestProvider>
+    </div></ConversationBookmarksProvider></ConversationPullRequestProvider>
   );
 }
 
