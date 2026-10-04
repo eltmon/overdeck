@@ -4,17 +4,17 @@
     "created": "2026-10-04T03:53:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4522: Dashboard restart wipes every agent's live activity stamp; God View draws busy issues as frozen '1h idle'",
-    "updated": "2026-10-04T04:12:40.066Z"
+    "updated": "2026-10-04T04:13:13.365Z"
   },
   "plan": {
     "id": "pan-4522",
     "title": "Dashboard restart wipes every agent's live activity stamp; God View draws busy issues as frozen '1h idle'",
-    "status": "proposed",
+    "status": "running",
     "uid": "0b67d616-e0ed-445d-b0e1-366c99f73b1c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T03:53:43Z",
-    "updated": "2026-10-04T04:12:40.066Z",
+    "updated": "2026-10-04T04:13:13.365Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4522",
@@ -477,5 +477,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
