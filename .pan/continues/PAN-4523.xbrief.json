@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T05:41:25.343Z",
+  "updated": "2026-10-04T05:41:38.083Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "merged-exit.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:41:25.343Z"
+    },
+    "merged-exit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:41:38.083Z"
     }
   }
 }
