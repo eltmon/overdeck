@@ -6,6 +6,7 @@
  * The Effect-based CostWriter.record() path goes through CostArchiveLive;
  * this sync path mirrors only the cache-table insert into overdeck.db.
  */
+import { EFFORT_LEVELS, isEffortLevel, type EffortLevel } from '@overdeck/contracts';
 import type { CostEvent } from '../costs/events.js';
 import { getOverdeckDatabase } from './infra.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
@@ -475,6 +476,44 @@ export function getModelRollup(issueId?: string): ModelRollup[] {
     calls: r.calls ?? 0,
     totalTokens: r.total_tokens ?? 0,
   }));
+}
+
+export interface EffortRollup {
+  effort: EffortLevel | 'unrecorded';
+  totalCost: number;
+  calls: number;
+  totalTokens: number;
+}
+
+/** Cost grouped by the effort each row ran at (PAN-4259); NULL rows bucket as `unrecorded`. */
+export function getEffortRollup(issueId?: string): EffortRollup[] {
+  const db = getOverdeckDatabase();
+  const where = issueId ? 'WHERE UPPER(issue_id) = UPPER(?)' : '';
+  const params = issueId ? [issueId] : [];
+  const rows = db
+    .prepare(
+      `SELECT effort,
+              SUM(cost) AS total_cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS total_tokens
+       FROM cost_events
+       ${where}
+       GROUP BY effort`,
+    )
+    .all(...params) as Array<{ effort: string | null; total_cost: number; calls: number; total_tokens: number }>;
+  const rank = (e: EffortRollup['effort']) => (e === 'unrecorded' ? EFFORT_LEVELS.length : EFFORT_LEVELS.indexOf(e));
+  const byEffort = new Map<EffortRollup['effort'], EffortRollup>();
+  for (const r of rows) {
+    const effort = isEffortLevel(r.effort) ? r.effort : 'unrecorded';
+    const prev = byEffort.get(effort);
+    byEffort.set(effort, {
+      effort,
+      totalCost: (prev?.totalCost ?? 0) + (r.total_cost ?? 0),
+      calls: (prev?.calls ?? 0) + (r.calls ?? 0),
+      totalTokens: (prev?.totalTokens ?? 0) + (r.total_tokens ?? 0),
+    });
+  }
+  return [...byEffort.values()].sort((a, b) => rank(a.effort) - rank(b.effort));
 }
 
 /**

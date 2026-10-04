@@ -11,6 +11,7 @@ import {
   getCostsByIssue,
   getCostForIssueAggregate,
   getAgentCostStats,
+  getEffortRollup,
 } from '../../../src/lib/overdeck/cost-sync.js';
 import { buildAgentStatsSnapshot } from '../../../src/dashboard/server/routes/resources/agents-stats.js';
 import { closeOverdeckDatabase, getOverdeckDatabase } from '../../../src/lib/overdeck/infra.js';
@@ -61,6 +62,32 @@ describe('insertCostEvent effort column (PAN-4259)', () => {
       db.prepare('SELECT effort FROM cost_events ORDER BY id').all<{ effort: string | null }>()
         .map((row) => row.effort),
     ).toEqual(['high', null]);
+  });
+});
+
+describe('getEffortRollup (PAN-4259)', () => {
+  it('returns one bucket per effort level', () => {
+    insertCostEvent(costEvent({ requestId: 'r-low', effort: 'low' }));
+    insertCostEvent(costEvent({ requestId: 'r-medium', effort: 'medium' }));
+    insertCostEvent(costEvent({ requestId: 'r-high-1', effort: 'high' }));
+    insertCostEvent(costEvent({ requestId: 'r-high-2', effort: 'high' }));
+    insertCostEvent(costEvent({ requestId: 'r-xhigh', effort: 'xhigh' }));
+    insertCostEvent(costEvent({ requestId: 'r-max', effort: 'max' }));
+    insertCostEvent(costEvent({ requestId: 'r-none-1' }));
+    insertCostEvent(costEvent({ requestId: 'r-none-2' }));
+
+    const rows = getEffortRollup();
+    expect(rows.map((r) => r.effort)).toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'unrecorded']);
+    expect(rows.find((r) => r.effort === 'high')?.calls).toBe(2);
+    expect(rows.find((r) => r.effort === 'unrecorded')?.calls).toBe(2);
+  });
+
+  it('filters by issue', () => {
+    insertCostEvent(costEvent({ requestId: 'r-pan-1', issueId: 'PAN-1', effort: 'high' }));
+    insertCostEvent(costEvent({ requestId: 'r-pan-2', issueId: 'PAN-2', effort: 'high' }));
+
+    const rows = getEffortRollup('PAN-1');
+    expect(rows).toEqual([expect.objectContaining({ effort: 'high', calls: 1 })]);
   });
 });
 
