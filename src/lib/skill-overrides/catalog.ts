@@ -4,6 +4,10 @@
  *
  * Pack skills (PAN-4334) have their own catalog, `listPackCatalog()`, because
  * they default off while native skills default on.
+ *
+ * Each entry carries the root it was read from as `origin` (PAN-4528):
+ * 'overdeck' for `~/.overdeck/skills`, 'personal' for `~/.claude/skills` and
+ * `~/.agents/skills`, 'project' for `<projectRoot>/.pan/skills`.
  */
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -18,9 +22,12 @@ import {
 } from '../skill-packs/adapters.js';
 import { listPacks, packExtractDir } from '../skill-packs/sources.js';
 
+export type SkillOrigin = 'overdeck' | 'personal' | 'project';
+
 export interface SkillCatalogEntry {
   name: string;
   description: string;
+  origin: SkillOrigin;
   /** True when the skill exists only under `<projectRoot>/.pan/skills` (a "project skill"). */
   projectSkill?: boolean;
 }
@@ -30,7 +37,7 @@ export function parseSkillDescription(content: string): string {
   return readSkillFrontmatter(content).description;
 }
 
-async function readRoot(root: string, projectSkill: boolean): Promise<SkillCatalogEntry[]> {
+async function readRoot(root: string, origin: SkillOrigin): Promise<SkillCatalogEntry[]> {
   let dirents;
   try {
     dirents = await readdir(root, { withFileTypes: true });
@@ -46,8 +53,8 @@ async function readRoot(root: string, projectSkill: boolean): Promise<SkillCatal
     } catch {
       continue;
     }
-    const entry: SkillCatalogEntry = { name: dirent.name, description: parseSkillDescription(content) };
-    if (projectSkill) entry.projectSkill = true;
+    const entry: SkillCatalogEntry = { name: dirent.name, description: parseSkillDescription(content), origin };
+    if (origin === 'project') entry.projectSkill = true;
     entries.push(entry);
   }
   return entries;
@@ -57,15 +64,15 @@ export async function listSkillCatalog(
   opts: { projectRoot?: string; home?: string } = {},
 ): Promise<SkillCatalogEntry[]> {
   const home = opts.home ?? homedir();
-  const roots: Array<[string, boolean]> = [
-    [join(home, '.overdeck', 'skills'), false],
-    [join(home, '.claude', 'skills'), false],
-    [join(home, '.agents', 'skills'), false],
-    ...(opts.projectRoot ? [[join(opts.projectRoot, '.pan', 'skills'), true] as [string, boolean]] : []),
+  const roots: Array<[string, SkillOrigin]> = [
+    [join(home, '.overdeck', 'skills'), 'overdeck'],
+    [join(home, '.claude', 'skills'), 'personal'],
+    [join(home, '.agents', 'skills'), 'personal'],
+    ...(opts.projectRoot ? [[join(opts.projectRoot, '.pan', 'skills'), 'project'] as [string, SkillOrigin]] : []),
   ];
   const byName = new Map<string, SkillCatalogEntry>();
-  for (const [root, projectSkill] of roots) {
-    for (const entry of await readRoot(root, projectSkill)) {
+  for (const [root, origin] of roots) {
+    for (const entry of await readRoot(root, origin)) {
       if (!byName.has(entry.name)) byName.set(entry.name, entry);
     }
   }

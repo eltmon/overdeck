@@ -14,9 +14,9 @@ import {
 } from '../resolve.js';
 
 const catalog = [
-  { name: 'grilling', description: 'Grill the plan' },
-  { name: 'codebase-design', description: 'Design modules' },
-  { name: 'pan-done', description: 'Finish work' },
+  { name: 'grilling', description: 'Grill the plan', origin: 'overdeck' as const },
+  { name: 'codebase-design', description: 'Design modules', origin: 'personal' as const },
+  { name: 'pan-done', description: 'Finish work', origin: 'overdeck' as const },
 ];
 
 function stateOf(states: ReturnType<typeof resolveSkillStates>, name: string) {
@@ -51,8 +51,14 @@ describe('resolveSkillStates', () => {
   });
 
   it('carries the project-skill tag from the catalog', () => {
-    const states = resolveSkillStates([{ name: 'local', description: '', projectSkill: true }], { global: {} });
-    expect(states[0]).toMatchObject({ name: 'local', projectSkill: true, enabled: true, source: 'default' });
+    const states = resolveSkillStates([{ name: 'local', description: '', origin: 'project', projectSkill: true }], { global: {} });
+    expect(states[0]).toMatchObject({ name: 'local', origin: 'project', projectSkill: true, enabled: true, source: 'default' });
+  });
+
+  it('carries the origin from the catalog', () => {
+    const states = resolveSkillStates(catalog, { global: {} });
+    expect(stateOf(states, 'grilling')).toMatchObject({ origin: 'overdeck' });
+    expect(stateOf(states, 'codebase-design')).toMatchObject({ origin: 'personal' });
   });
 
   it('keeps core skills on regardless of overrides', () => {
@@ -140,14 +146,30 @@ describe('listSkillCatalog', () => {
 
     const entries = await listSkillCatalog({ home, projectRoot });
     expect(entries).toEqual([
-      { name: 'codebase-design', description: 'Design' },
-      { name: 'grilling', description: 'From overdeck' },
-      { name: 'project-skill', description: '', projectSkill: true },
+      { name: 'codebase-design', description: 'Design', origin: 'personal' },
+      { name: 'grilling', description: 'From overdeck', origin: 'overdeck' },
+      { name: 'project-skill', description: '', origin: 'project', projectSkill: true },
     ]);
   });
 
   it('returns an empty list when no roots exist', async () => {
     await expect(listSkillCatalog({ home })).resolves.toEqual([]);
+  });
+
+  it('tags each root with its origin, including ~/.agents/skills as personal', async () => {
+    await addSkill(join(home, '.overdeck', 'skills'), 'overdeck-skill', 'name: overdeck-skill');
+    await addSkill(join(home, '.claude', 'skills'), 'claude-skill', 'name: claude-skill');
+    await addSkill(join(home, '.agents', 'skills'), 'agents-skill', 'name: agents-skill');
+    const projectRoot = join(home, 'project');
+    await addSkill(join(projectRoot, '.pan', 'skills'), 'project-skill', 'name: project-skill');
+
+    const entries = await listSkillCatalog({ home, projectRoot });
+    expect(entries).toEqual([
+      { name: 'agents-skill', description: '', origin: 'personal' },
+      { name: 'claude-skill', description: '', origin: 'personal' },
+      { name: 'overdeck-skill', description: '', origin: 'overdeck' },
+      { name: 'project-skill', description: '', origin: 'project', projectSkill: true },
+    ]);
   });
 });
 
