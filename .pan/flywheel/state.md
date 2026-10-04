@@ -50,3 +50,19 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   `lifecycle.log` resolved (`agent-pan-<n>`), not the newest `*.jsonl` in
   the workspace's project dir: the planning session's transcript lives there
   too and can mask an idle work agent, or the reverse.
+
+### God View frozen orbs and river misdraws → PAN-4522, PAN-4523 (2026-10-04)
+
+- Resolves the open observation above. The planning agents were not the
+  cause. A dashboard restart boots the read model with an empty
+  `agentRuntimeById` (`src/dashboard/server/read-model.ts` boot state), the
+  client snapshot reducer replaces its runtime map wholesale
+  (`packages/contracts/src/event-reducers.ts` line 337), and God View falls
+  back to the spawn-time `state.json` `lastActivity`, so every busy agent
+  reads as idle since spawn until its next tool beat → PAN-4522.
+- Layout overlap of the shelf and doldrums bands, merged issues held on the
+  shelf by the close-out pause, and PLAN/REVIEW counters counting stopped
+  agents → PAN-4523 (God View frontend only).
+- Learning: right after a `pan reload`, the God View and any other
+  `agentRuntimeById` consumer under-report activity. Do not diagnose agent
+  idleness from them in the first minutes after a restart.
