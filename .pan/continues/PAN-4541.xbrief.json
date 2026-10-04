@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4541",
   "created": "2026-10-04T08:22:14.052Z",
-  "updated": "2026-10-04T08:23:06.238Z",
+  "updated": "2026-10-04T08:24:28.387Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4541",
       "claimedAt": "2026-10-04T08:22:14.052Z",
       "doneAt": "2026-10-04T08:23:06.237Z"
+    },
+    "lexer-scanner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4541",
+      "claimedAt": "2026-10-04T08:24:28.387Z"
     }
   }
 }
