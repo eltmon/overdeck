@@ -4,17 +4,17 @@
     "created": "2026-10-04T13:24:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4548: lint-docs test resolves its script with URL.pathname; use fileURLToPath so paths with spaces work",
-    "updated": "2026-10-04T13:24:58.657Z"
+    "updated": "2026-10-04T13:25:32.502Z"
   },
   "plan": {
     "id": "pan-4548",
     "title": "lint-docs test resolves its script with URL.pathname; use fileURLToPath so paths with spaces work",
-    "status": "proposed",
+    "status": "running",
     "uid": "20c7a23b-1c88-46fd-a104-6b2097811f70",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T13:24:23Z",
-    "updated": "2026-10-04T13:24:58.657Z",
+    "updated": "2026-10-04T13:25:32.502Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4548",
@@ -125,5 +125,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
