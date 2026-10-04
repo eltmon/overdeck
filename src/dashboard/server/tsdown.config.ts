@@ -141,7 +141,7 @@ export default defineConfig(async () => {
       deaconEntryChunkAssertion(),
     ],
     deps: {
-      alwaysBundle: [/^@overdeck\//],
+      alwaysBundle: [/^@overdeck\//, 'es-module-lexer'],
       neverBundle: [
         '@lydell/node-pty',
         '@parcel/watcher',

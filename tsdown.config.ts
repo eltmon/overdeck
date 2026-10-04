@@ -41,7 +41,10 @@ export default defineConfig({
     // imported a package no consumer can install, and its `workspace:*` entry in
     // `dependencies` made `npm install @overdeck/core` fail outright. Bundle it
     // like @overdeck/*; it stays a devDependency build input.
-    alwaysBundle: (id) => id.startsWith('@overdeck/') || id === 'effect-acp' || id.startsWith('effect-acp/'),
+    // The boot preflight that detects an incomplete node_modules (PAN-4541)
+    // must not itself need node_modules, so its lexer is bundled too.
+    alwaysBundle: (id) => id.startsWith('@overdeck/') || id === 'effect-acp' || id.startsWith('effect-acp/')
+      || id === 'es-module-lexer',
     neverBundle: ['@lydell/node-pty'],
   },
   outDir: 'dist',

@@ -382,6 +382,26 @@ bundle's source repo. It publishes `project.deploy_changed` with `emitOnly`
 when the projection changes, and the frontend reads `deployByProjectKey` from
 the snapshot and those events. The frontend never polls.
 
+### Boot preflight before switchover
+
+`pan reload` builds `origin/main` into the idle generation, then refuses to
+switch if the PTY supervisor or the dashboard server bundle cannot resolve
+its external packages from that generation (`supervisorDeploymentFailure`,
+`dashboardServerBootFailure`; PAN-3172, PAN-3264). On refusal the old
+dashboard keeps running.
+
+The check resolves real import specifiers only: it tokenizes the bundle with
+es-module-lexer, so static imports, export-from re-exports, and dynamic
+imports with a literal specifier count, while a package name that merely
+appears inside a comment or a string never does (PAN-4541; before this, a
+JSDoc comment mentioning an unrelated word blocked every reload).
+
+The lexer is bundled into `dist`, so the check needs nothing from
+`node_modules` to run.
+
+The `pan reload` that deploys a change runs the CLI that is already
+installed, so a scanner fix protects deploys only from the next reload on.
+
 ## What This Replaces
 
 This design supersedes the multi-actor "ship-role" pipeline removed in
