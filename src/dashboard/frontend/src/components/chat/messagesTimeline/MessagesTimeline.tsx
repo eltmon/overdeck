@@ -41,6 +41,7 @@ import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
 import { useConnectionPhase } from '../../../lib/connectionState';
+import { useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 import {
   ALWAYS_UNVIRTUALIZED_TAIL_ROWS,
   AUTO_SCROLL_THRESHOLD_PX,
@@ -109,6 +110,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousSearchQueryRef = useRef('');
   const handledTargetKeyRef = useRef<string | null>(null);
+  const bookmarksCtx = useConversationBookmarks();
+  const jumpRequest = bookmarksEnabled ? bookmarksCtx?.jumpRequest ?? null : null;
+  const handledJumpNonceRef = useRef<number | null>(null);
+  const [flashRowId, setFlashRowId] = useState<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   // Compact boundaries are interleaved (and split work groups) inside
@@ -392,6 +397,27 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
   useEffect(() => {
+    if (!jumpRequest) return;
+    if (handledJumpNonceRef.current === jumpRequest.nonce) return;
+    handledJumpNonceRef.current = jumpRequest.nonce;
+    const index = rows.findIndex((row) => row.kind === 'message' && row.message.id === jumpRequest.messageId);
+    if (index >= 0) {
+      const row = rows[index]!;
+      scrollToRow(index, row.id);
+      setFlashRowId(row.id);
+      bookmarksCtx?.resolveJump(jumpRequest.nonce, true);
+    } else {
+      bookmarksCtx?.resolveJump(jumpRequest.nonce, false);
+    }
+  }, [jumpRequest, rows, scrollToRow, bookmarksCtx]);
+
+  useEffect(() => {
+    if (!flashRowId) return;
+    const timer = setTimeout(() => setFlashRowId(null), 1600);
+    return () => clearTimeout(timer);
+  }, [flashRowId]);
+
+  useEffect(() => {
     if (!searchOpen) return;
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
@@ -491,7 +517,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     style={{
                       display: 'flow-root',
                       background: 'var(--background)',
-                      outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                      outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id || flashRowId === row.id ? '2px solid var(--color-primary)' : undefined,
                       outlineOffset: '-2px',
                       borderRadius: 8,
                     }}
@@ -535,7 +561,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               key={row.id}
               data-search-row-id={row.id}
               style={{
-                outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id || flashRowId === row.id ? '2px solid var(--color-primary)' : undefined,
                 outlineOffset: '-2px',
                 borderRadius: 8,
               }}

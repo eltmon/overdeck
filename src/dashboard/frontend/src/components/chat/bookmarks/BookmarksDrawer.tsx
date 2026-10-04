@@ -39,56 +39,61 @@ function BookmarkRow({ messageId, label, messageCreatedAt, createdAt }: {
   if (!ctx) return null;
 
   return (
-    <li className="flex items-center gap-2 text-xs">
-      {editing ? (
-        <input
-          aria-label="Rename bookmark"
-          maxLength={200}
-          autoFocus
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              const trimmed = value.trim();
-              if (trimmed.length > 0 && trimmed !== label) void ctx.rename(messageId, trimmed);
-              setEditing(false);
-            } else if (event.key === 'Escape') {
-              event.preventDefault();
-              setValue(label);
-              setEditing(false);
-            }
-          }}
-          className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground"
-        />
-      ) : (
+    <li className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2 text-xs">
+        {editing ? (
+          <input
+            aria-label="Rename bookmark"
+            maxLength={200}
+            autoFocus
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                const trimmed = value.trim();
+                if (trimmed.length > 0 && trimmed !== label) void ctx.rename(messageId, trimmed);
+                setEditing(false);
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                setValue(label);
+                setEditing(false);
+              }
+            }}
+            className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground"
+          />
+        ) : (
+          <button
+            type="button"
+            className="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-foreground hover:underline"
+            onClick={() => ctx.jumpTo(messageId)}
+          >
+            {label}
+          </button>
+        )}
+        <span className="text-muted-foreground">{formatTimestamp(messageCreatedAt ?? createdAt)}</span>
+        {!editing && (
+          <button
+            type="button"
+            aria-label="Rename bookmark"
+            className="shrink-0 border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => { setValue(label); setEditing(true); }}
+          >
+            <Pencil size={12} />
+          </button>
+        )}
         <button
           type="button"
-          className="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-foreground hover:underline"
-          onClick={() => ctx.jumpTo(messageId)}
-        >
-          {label}
-        </button>
-      )}
-      <span className="text-muted-foreground">{formatTimestamp(messageCreatedAt ?? createdAt)}</span>
-      {!editing && (
-        <button
-          type="button"
-          aria-label="Rename bookmark"
+          aria-label="Remove bookmark"
           className="shrink-0 border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => { setValue(label); setEditing(true); }}
+          onClick={() => void ctx.remove(messageId)}
         >
-          <Pencil size={12} />
+          <X size={12} />
         </button>
+      </div>
+      {ctx.missingMessageId === messageId && (
+        <div className="text-[11px] text-muted-foreground">This message is not in the loaded transcript.</div>
       )}
-      <button
-        type="button"
-        aria-label="Remove bookmark"
-        className="shrink-0 border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
-        onClick={() => void ctx.remove(messageId)}
-      >
-        <X size={12} />
-      </button>
     </li>
   );
 }

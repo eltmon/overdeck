@@ -2,13 +2,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import { ConversationBookmarksProvider } from '../ConversationBookmarks';
+import { ConversationBookmarksProvider, useConversationBookmarks } from '../ConversationBookmarks';
 import { BookmarksToggle, BookmarksDrawer } from '../BookmarksDrawer';
+
+/** Simulates MessagesTimeline reporting a jump target that isn't in the loaded rows (FR-13). */
+function MissJumpFor({ messageId }: { messageId: string }) {
+  const ctx = useConversationBookmarks();
+  useEffect(() => {
+    if (ctx?.jumpRequest && ctx.jumpRequest.messageId === messageId) {
+      ctx.resolveJump(ctx.jumpRequest.nonce, false);
+    }
+  }, [ctx, ctx?.jumpRequest, messageId]);
+  return <button onClick={() => ctx?.jumpTo(messageId)}>simulate-miss</button>;
+}
 
 const fetchMock = vi.fn();
 
@@ -48,6 +60,7 @@ function renderPanel(initial: StoredBookmark[] = []) {
     <QueryClientProvider client={client}>
       <ConversationBookmarksProvider conversationName="conv-a">
         <BookmarksToggle />
+        <MissJumpFor messageId="m1" />
         <BookmarksDrawer />
       </ConversationBookmarksProvider>
     </QueryClientProvider>,
@@ -126,5 +139,17 @@ describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
     renderPanel([]);
     fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
     expect(await screen.findByText('No bookmarks yet. Click the icon beside a message to bookmark it.')).toBeInTheDocument();
+  });
+
+  it('a missing jump target shows "This message is not in the loaded transcript."', async () => {
+    renderPanel([
+      { messageId: 'm1', label: 'Not loaded', messageCreatedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
+    expect(screen.queryByText('This message is not in the loaded transcript.')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('simulate-miss'));
+
+    expect(await screen.findByText('This message is not in the loaded transcript.')).toBeInTheDocument();
   });
 });
