@@ -156,3 +156,13 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   reload attempt.
 - Learning: a background deploy loop ran twice (origin unknown), which could
   race two reloads. Guard any deploy script with `flock`.
+
+### Run end 2026-10-04 ~10:45 UTC: pipeline clear, loop idle
+
+- 19 PRs merged, deployed and closed overnight. Close-out is NOT automatic
+  here (`close_out.auto` unset): merged and deployed issues stay
+  `verifying-on-main` until `pan close <id> --force` runs (no `--accept-*`).
+  PAN-4543 removed the two flaky refusals (deploy probe vs the event-loop
+  stall from sync cost reads; stale `running` verification artifacts).
+- Throughput lesson: the night's bottleneck was the serialized gate queue
+  plus the verification/merge bugs PAN-4527/4531/4532/4534/4540, not agents.
