@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:08:00.158Z",
+  "updated": "2026-10-04T03:08:14.676Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "planning-prompt-rank-bands.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T03:08:00.157Z"
+    },
+    "spawn-planning-resolve-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:08:14.676Z"
     }
   }
 }
