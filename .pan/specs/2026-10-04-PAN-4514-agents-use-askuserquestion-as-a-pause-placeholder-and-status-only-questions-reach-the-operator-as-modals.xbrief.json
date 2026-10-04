@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:43:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4514: Agents use AskUserQuestion as a pause: placeholder and 'status only' questions reach the operator as modals",
-    "updated": "2026-10-04T02:49:51.911Z"
+    "updated": "2026-10-04T02:57:52.296Z"
   },
   "plan": {
     "id": "pan-4514",
     "title": "Agents use AskUserQuestion as a pause: placeholder and 'status only' questions reach the operator as modals",
-    "status": "proposed",
+    "status": "running",
     "uid": "320a6afc-af90-47c7-8fd4-2c362be49cba",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:43:30Z",
-    "updated": "2026-10-04T02:49:51.911Z",
+    "updated": "2026-10-04T02:57:52.296Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4514",
@@ -371,5 +371,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

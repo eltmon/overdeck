@@ -382,4 +382,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
-<!-- last-verified: 2026-10-03 -->
+- AskUserQuestion modal = deny-reason markers: `scanPendingInputs`
+  (`src/lib/agent-enrichment.ts`) treats an `is_error` AUQ tool_result as pending
+  only if it contains `PAN-1520` or `surfaced to the operator`. Any hook deny that
+  must NOT surface (the PAN-4514 junk guard) must omit both strings; any that must
+  surface must keep one.
+<!-- last-verified: 2026-10-04 -->
