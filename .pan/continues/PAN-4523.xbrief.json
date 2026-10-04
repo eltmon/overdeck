@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4523",
   "created": "2026-10-04T04:08:29.865Z",
-  "updated": "2026-10-04T04:29:58.061Z",
+  "updated": "2026-10-04T04:37:21.350Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-04T04:29:50.473Z"
     },
     "stage-live": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4523",
-      "claimedAt": "2026-10-04T04:29:58.061Z"
+      "claimedAt": "2026-10-04T04:29:58.061Z",
+      "doneAt": "2026-10-04T04:37:21.350Z"
     }
   }
 }
