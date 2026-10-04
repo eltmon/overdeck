@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T03:10:18.285Z",
+  "updated": "2026-10-04T03:10:32.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "strike-resolve-effort.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T03:10:18.285Z"
+    },
+    "strike-resolve-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:10:32.154Z"
     }
   }
 }
