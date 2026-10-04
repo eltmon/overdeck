@@ -119,7 +119,9 @@ selected. Native launches use the per-process `KIMI_MODEL_THINKING_EFFORT`
 override; ACP sets the session's `thinking` option after selecting the model.
 Overdeck does not edit the shared Kimi configuration. Saved Medium maps to High,
 and Extra High maps to Max. K2.7 Code and HighSpeed always think and do not
-offer adjustable effort.
+offer adjustable effort. Overdeck stores canonical levels for K3 (`kimi-code/k3`
+included) and translates at launch, so a saved Medium launches as High and
+Extra High as Max on both routes.
 
 For a running ACP session, the host accepts the authenticated `set-effort`
 operation with an `effort` string. It acknowledges the normalized effort only
