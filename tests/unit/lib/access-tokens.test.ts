@@ -52,7 +52,11 @@ describe('access-token registry (PAN-3762)', () => {
     const verified = registry.verifyAccessToken(token);
     expect(verified.ok).toBe(true);
     expect(verified.ok && verified.record.id).toBe(record.id);
-    expect(registry.verifyAccessToken(`${token.slice(0, -1)}0`)).toEqual({ ok: false });
+    // Flip the last hex digit to something it provably isn't — appending a
+    // literal '0' was a no-op (and this assertion a false pass) whenever the
+    // real random token already ended in '0' (1-in-16 chance).
+    const tamperedDigit = token.at(-1) === '0' ? '1' : '0';
+    expect(registry.verifyAccessToken(`${token.slice(0, -1)}${tamperedDigit}`)).toEqual({ ok: false });
     expect(registry.verifyAccessToken(null)).toEqual({ ok: false });
 
     await registry.revokeAccessToken(record.id);
