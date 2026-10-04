@@ -382,4 +382,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `chat/messagesTimeline/MessagesTimeline.tsx` never call `measure()` or put
   volatile data (width) in `getItemKey`: rows fall back to estimates and overlap
   (PAN-4497). Re-read mounted rows with `resizeItem` over `elementsCache` instead.
-<!-- last-verified: 2026-10-03 -->
+- Reasoning effort resolves only through `resolveEffort` (`src/lib/agents/resolve-effort.ts`),
+  which also clamps to model∩harness levels; `npm run lint:effort` ratchets new
+  `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3
+  translation (`src/lib/kimi-effort.ts`), so a Kimi model row must list canonical
+  levels, not native ones, or `medium`/`xhigh` clamp wrongly (PAN-4260).
+<!-- last-verified: 2026-10-04 -->

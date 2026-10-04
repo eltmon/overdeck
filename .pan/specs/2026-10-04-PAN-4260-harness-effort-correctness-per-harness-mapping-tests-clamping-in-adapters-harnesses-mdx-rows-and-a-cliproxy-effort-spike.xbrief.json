@@ -4,17 +4,17 @@
     "created": "2026-10-04T02:18:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4260: Harness effort correctness: per-harness mapping tests, clamping in adapters, harnesses.mdx rows, and a CLIProxy --effort spike",
-    "updated": "2026-10-04T02:27:02.695Z"
+    "updated": "2026-10-04T02:27:45.379Z"
   },
   "plan": {
     "id": "pan-4260",
     "title": "Harness effort correctness: per-harness mapping tests, clamping in adapters, harnesses.mdx rows, and a CLIProxy --effort spike",
-    "status": "proposed",
+    "status": "running",
     "uid": "855b7ebc-b146-45d7-92e7-eaea1388b1b8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T02:18:54Z",
-    "updated": "2026-10-04T02:27:02.695Z",
+    "updated": "2026-10-04T02:27:45.379Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4260",
@@ -809,5 +809,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
