@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4515",
   "created": "2026-10-04T03:22:32.796Z",
-  "updated": "2026-10-04T03:48:37.890Z",
+  "updated": "2026-10-04T03:48:57.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
     "scan-last-record-at.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T03:48:37.890Z"
+    },
+    "scan-last-record-at.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T03:48:57.802Z"
     }
   }
 }
