@@ -239,6 +239,8 @@ const MERGE_LANE_STATES = new Set<DerivedIssueStateName>(['ready', 'merged']);
 /** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
  * so a large stale population never becomes an unreadable label wall. */
 const STALE_ORB_LIMIT = 14;
+/** Shelf emissary cap (PAN-4523 D5): the longest-idle shelf orbs represent the population. */
+const SHELF_ORB_LIMIT = 8;
 
 /**
  * The agents whose paused / yielded flags describe the issue RIGHT NOW.
@@ -758,9 +760,12 @@ export function useConfluenceOrbs(
     const staleOrbs = next.filter((orb) => orb.state === 'stale')
       .sort((a, b) => b.staleMin - a.staleMin)
       .slice(0, STALE_ORB_LIMIT);
-    const keepStale = new Set(staleOrbs.map((orb) => orb.id));
+    const shelfOrbs = next.filter((orb) => orb.state === 'shelf')
+      .sort((a, b) => b.idleMin - a.idleMin)
+      .slice(0, SHELF_ORB_LIMIT);
+    const keep = new Set([...staleOrbs, ...shelfOrbs].map((orb) => orb.id));
     return next
-      .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
+      .filter((orb) => (orb.state !== 'stale' && orb.state !== 'shelf') || keep.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
   }, [agents, issuesRaw, microStatesByAgentId, derivedIssueStateByIssueId, workspaceHealth, parked, agentRuntimeById]);
 }

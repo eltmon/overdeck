@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   advanceMergeDwell,
+  evictionFor,
   resolveMergeReconciliation,
   type RiverEffectsApi,
 } from '../RiverCanvas';
@@ -292,6 +293,30 @@ describe('planSweepCommands', () => {
       sweepEvent('agent.activity_changed', { agentId: 'agent-pan-1' }),
     ]);
     expect(commands).toHaveLength(0);
+  });
+});
+
+describe('evictionFor (PAN-4523 render-layer eviction)', () => {
+  it('drops shelf and stale orbs, fades other active orbs, and merges MERGE orbs', () => {
+    expect(evictionFor('shelf', 'WORK')).toBe('drop');
+    expect(evictionFor('stale', 'REVIEW')).toBe('drop');
+    expect(evictionFor('active', 'WORK')).toBe('fade');
+    expect(evictionFor('shelf', 'MERGE')).toBe('merge');
+  });
+
+  it('keeps exactly eight shelf orbs through an eight-to-eight replacement', () => {
+    const live = new Map(Array.from({ length: 8 }, (_, index) =>
+      [`PAN-${index}`, orb(`PAN-${index}`, { state: 'shelf', stage: 'WORK' })] as const));
+    const nextIds = new Set([...Array.from({ length: 7 }, (_, index) => `PAN-${index}`), 'PAN-99']);
+
+    for (const [id, existing] of live) {
+      if (nextIds.has(id)) continue;
+      if (evictionFor(existing.state, existing.stage) === 'drop') live.delete(id);
+    }
+    live.set('PAN-99', orb('PAN-99', { state: 'shelf', stage: 'WORK' }));
+
+    expect(live.size).toBe(8);
+    expect([...live.values()].every((candidate) => candidate.state === 'shelf')).toBe(true);
   });
 });
 

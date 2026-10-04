@@ -277,6 +277,55 @@ describe('useConfluenceOrbs', () => {
       'synthesis',
     ]);
   });
+
+  it('caps the shelf at eight orbs, longest-idle first', () => {
+    const agentsById: Record<string, AgentSnapshot> = {};
+    const issuesRaw: { id: string; identifier: string; title: string; labels: string[] }[] = [];
+    for (let index = 0; index < 10; index++) {
+      const issueId = `PAN-20${index}`;
+      const minutesAgo = (index + 1) * 10;
+      agentsById[`agent-${issueId}`] = agent({
+        id: `agent-${issueId}`,
+        issueId,
+        status: 'stopped',
+        paused: true,
+        pausedReason: `hold ${index}`,
+        lastActivity: new Date(NOW.getTime() - minutesAgo * 60_000).toISOString(),
+      });
+      issuesRaw.push({ id: issueId, identifier: issueId, title: `Shelf ${index}`, labels: [] });
+    }
+    useDashboardStore.setState({ agentsById, issuesRaw });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', issuesRaw.map((issue) => issue.id)], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    const shelfIds = () => result.current.filter((orb) => orb.state === 'shelf').map((orb) => orb.id);
+    expect(shelfIds()).toHaveLength(8);
+    expect(shelfIds()).not.toContain('PAN-200');
+    expect(shelfIds()).not.toContain('PAN-201');
+
+    // PAN-200 (the freshest, 10m) becomes the oldest at 200m; the cap still
+    // holds at 8, and PAN-200 now displaces PAN-202 (the next freshest).
+    act(() => useDashboardStore.setState((state) => ({
+      agentsById: {
+        ...state.agentsById,
+        'agent-PAN-200': agent({
+          id: 'agent-PAN-200',
+          issueId: 'PAN-200',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'hold 0',
+          lastActivity: new Date(NOW.getTime() - 200 * 60_000).toISOString(),
+        }),
+      },
+    })));
+
+    expect(shelfIds()).toHaveLength(8);
+    expect(shelfIds()).toContain('PAN-200');
+    expect(shelfIds()).not.toContain('PAN-201');
+    expect(shelfIds()).not.toContain('PAN-202');
+  });
 });
 
 describe('orb stage counts only live agents (PAN-4523)', () => {

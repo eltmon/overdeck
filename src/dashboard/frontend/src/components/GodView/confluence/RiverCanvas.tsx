@@ -154,6 +154,14 @@ export function resolveMergeReconciliation(
   return { retired, cancelMerge: false, shouldSpawn: !hasCurrent && !retired };
 }
 
+/** How the canvas removes an orb that left the cast. Shelf and Doldrums orbs drop
+ * at once so the band caps (SHELF_ORB_LIMIT, STALE_ORB_LIMIT) hold on every frame. */
+export function evictionFor(state: ConfluenceOrb['state'], stage: Stage): 'merge' | 'drop' | 'fade' {
+  if (stage === 'MERGE') return 'merge';
+  if (state === 'shelf' || state === 'stale') return 'drop';
+  return 'fade';
+}
+
 interface Engine {
   api: RiverEffectsApi;
   update(props: RiverCanvasProps): void;
@@ -399,7 +407,9 @@ function createEngine(
     }
     for (const orb of list()) {
       if (live.has(orb.id) || orb.merging || orb.fading !== null) continue;
-      if (orb.stage === 'MERGE') startMerge(orb);
+      const eviction = evictionFor(orb.state, orb.stage);
+      if (eviction === 'merge') startMerge(orb);
+      else if (eviction === 'drop') renderOrbs.delete(orb.id);
       else orb.fading = 1;
     }
     for (const issueId of retiredIds) if (!live.has(issueId)) retiredIds.delete(issueId);
