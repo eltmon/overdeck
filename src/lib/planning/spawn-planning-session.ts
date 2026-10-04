@@ -1,6 +1,7 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { hostTransportFor } from '../runtimes/host-transport.js';
+import { compareEffort, type EffortLevel } from '@overdeck/contracts';
 /**
  * Spawn Planning Session — background workspace + agent setup
  *
@@ -196,7 +197,7 @@ async function readRoleInstructionsBody(): Promise<string> {
   return (match ? raw.slice(match[0].length) : raw).trim();
 }
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = '', harness?: RuntimeName): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel: string, effort?: EffortLevel, auto = false, probe = false, memoryContext = '', harness?: RuntimeName): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   if (!planningModel) throw new Error('buildPlanningPrompt: planningModel is required (resolved by roles.plan.model)');
@@ -251,22 +252,25 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
     childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the xBRIEF plan between the corresponding items. Use \\\`informs\\\` for softer ordering hints.\n`;
   }
 
-  const effortSection = effort && effort !== 'medium' ? `
-## Planning Effort: ${effort === 'high' ? 'High (Deep Analysis)' : 'Low (Quick Planning)'}
+  const deepEffort = effort !== undefined && compareEffort(effort, 'high') >= 0;
+  const effortSection = effort === 'low' ? `
+## Planning Effort: Low (Quick Planning)
 
-${effort === 'high'
-    ? `**The user has requested HIGH effort planning.** Be exceptionally thorough:
+**The user has requested LOW effort planning.** Be concise and fast:
+- Focus on the most critical decisions only
+- Keep the task list tight — 3–5 items max unless truly necessary
+- Skip deep exploration; read only the directly relevant files
+- Ask only essential clarifying questions
+
+` : deepEffort ? `
+## Planning Effort: ${effort!.charAt(0).toUpperCase()}${effort!.slice(1)} (Deep Analysis)
+
+**The user has requested ${effort!.toUpperCase()} effort planning.** Be exceptionally thorough:
 - Explore more of the codebase before concluding — check adjacent files, not just the obvious ones
 - Identify edge cases, potential failure modes, and risks
 - Consider multiple implementation approaches and explain tradeoffs
 - Ask more clarifying questions when scope is ambiguous
-- Break down tasks into finer-grained subtasks`
-    : `**The user has requested LOW effort planning.** Be concise and fast:
-- Focus on the most critical decisions only
-- Keep the task list tight — 3–5 items max unless truly necessary
-- Skip deep exploration; read only the directly relevant files
-- Ask only essential clarifying questions`
-  }
+- Break down tasks into finer-grained subtasks
 
 ` : '';
 
@@ -296,7 +300,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete xBRIEF via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
-  const probeSection = probe || effort === 'high' ? `
+  const probeSection = probe || deepEffort ? `
 ## Probe Pass (required before finalize)
 
 After drafting the xBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
