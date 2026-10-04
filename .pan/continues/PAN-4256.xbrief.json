@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:12:16.121Z",
+  "updated": "2026-10-04T05:12:28.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "review-parent-effort.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T05:12:16.121Z"
+    },
+    "role-file-effort-e2e-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:28.644Z"
     }
   }
 }
