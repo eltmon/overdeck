@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:31:33.792Z",
+  "updated": "2026-10-04T03:31:45.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -81,9 +81,10 @@
       "doneAt": "2026-10-04T03:31:33.792Z"
     },
     "bookmark-store.ac5": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4498",
-      "claimedAt": "2026-10-04T03:30:33.230Z"
+      "claimedAt": "2026-10-04T03:30:33.230Z",
+      "doneAt": "2026-10-04T03:31:45.987Z"
     }
   }
 }
