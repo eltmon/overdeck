@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4522",
   "created": "2026-10-04T04:14:15.923Z",
-  "updated": "2026-10-04T05:49:17.396Z",
+  "updated": "2026-10-04T05:49:31.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "snapshot-runtime-merge.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:49:17.395Z"
+    },
+    "snapshot-runtime-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:49:31.875Z"
     }
   }
 }
