@@ -600,6 +600,16 @@ async function spawnReviewRoleForIssueBody(
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
+    const { resolveEffort } = await import('../agents/resolve-effort.js');
+    const reviewEffort = resolveEffort({
+      role: 'review',
+      issueId: opts.issueId,
+      model: opts.model,
+      harness: opts.harness,
+    });
+    if (reviewEffort.warning) {
+      console.warn(`[review-agent] ${reviewEffort.warning}`);
+    }
     const dispatchedAt = new Date().toISOString();
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
@@ -608,6 +618,8 @@ async function spawnReviewRoleForIssueBody(
       ...(opts.harness ? { harness: opts.harness } : {}),
       ...(allowHost ? { allowHost: true } : {}),
       startedBy: 'review-agent',
+      effort: reviewEffort.effort,
+      effortSource: reviewEffort.source,
     });
     // Persist the runId on the synthesis agent's own state so the idempotency
     // guard above can tell a genuinely-running review (runId matches current
