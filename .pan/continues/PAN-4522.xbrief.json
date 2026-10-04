@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4522",
   "created": "2026-10-04T04:14:15.923Z",
-  "updated": "2026-10-04T05:07:53.896Z",
+  "updated": "2026-10-04T05:08:00.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4522",
       "claimedAt": "2026-10-04T04:38:06.833Z",
       "doneAt": "2026-10-04T05:07:53.896Z"
+    },
+    "snapshot-runtime-merge": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4522",
+      "claimedAt": "2026-10-04T05:08:00.981Z"
     }
   }
 }
