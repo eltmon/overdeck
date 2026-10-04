@@ -20,6 +20,7 @@ import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-in
 import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPath } from '../config.js';
 import { resolveWorkspaceRepoRoots } from '../project-repos.js';
+import { truncateWellFormed } from '../well-formed-text.js';
 
 const execAsync = promisify(exec);
 
@@ -457,7 +458,7 @@ export function formatTier1Summary(
     lines.push('CodeRabbit findings (ADVISORY — non-gating; context, not acceptance criteria):');
     for (const finding of manifest.codeRabbitFindings.slice(0, 10)) {
       const location = finding.path ? `${finding.path}${typeof finding.line === 'number' ? `:${finding.line}` : ''}` : 'general';
-      const bodyPreview = finding.body.slice(0, 200);
+      const bodyPreview = truncateWellFormed(finding.body, 200);
       lines.push(`  - ${location} ${bodyPreview}${finding.body.length > 200 ? '...' : ''}`);
     }
     if (manifest.codeRabbitFindings.length > 10) {
