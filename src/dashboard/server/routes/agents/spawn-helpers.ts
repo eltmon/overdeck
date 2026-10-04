@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { lstat, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { Role } from '@overdeck/contracts';
+import type { EffortLevel, Role } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
@@ -94,6 +94,8 @@ export function handleRemoteAgentSpawn(input: {
   projectPath: string;
   spawnGuardrails: SpawnGuardrailDecision;
   lifecycle: LifecycleTransition;
+  /** Explicit operator-chosen effort only — never a resolved default (PAN-4256). */
+  effort?: EffortLevel;
 }) {
   return Effect.gen(function* () {
     const {
@@ -106,6 +108,7 @@ export function handleRemoteAgentSpawn(input: {
       projectPath,
       spawnGuardrails,
       lifecycle,
+      effort,
     } = input;
 
     const { spawnRemoteAgent, checkRemoteSpendCap } = yield* Effect.promise(() => import('../../../../lib/remote/remote-agents.js'));
@@ -141,6 +144,7 @@ export function handleRemoteAgentSpawn(input: {
       startedBy,
       autoSpawnConsentRequired,
       tier: fly.getResiliencyTier(),
+      effort,
     }));
 
     // Write canonical state.json so activeRoleRunExists() sees this remote
@@ -236,6 +240,8 @@ export function handleContainerOrchestration(input: {
   /** Explicit operator-chosen model only — forwarded to `pan start` as
    * `--model`; null lets `pan start` resolve staffing itself (PAN-3857). */
   explicitModel: string | null;
+  /** Explicit operator-chosen effort only — never a resolved default (PAN-4256). */
+  effort?: EffortLevel;
   spawnGuardrails: SpawnGuardrailDecision;
   projectPath: string;
   eventStore: EventStoreAppend;
@@ -253,6 +259,7 @@ export function handleContainerOrchestration(input: {
       effectiveHarness,
       allowHost,
       explicitModel,
+      effort,
       spawnGuardrails,
       projectPath,
       eventStore,
@@ -434,6 +441,7 @@ export function handleContainerOrchestration(input: {
                       issueId,
                       model: explicitModel,
                       harness: effectiveHarness,
+                      effort,
                       allowHost,
                     }),
                     workspacePath,

@@ -41,7 +41,6 @@ declare -A BASELINE=(
   ["packages/pi-extension/src/index.ts"]=1                       # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
   ["packages/ohmypi-extension/src/index.ts"]=1                   # Pi native thinking-level union (off/minimal/…), not an effort-enum copy — see header
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
-  ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
 )
 
 PATTERNS=(

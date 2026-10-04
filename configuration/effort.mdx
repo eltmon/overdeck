@@ -242,6 +242,21 @@ assistant turn).
   ACP, native Kimi Code, Pi and Muse — receives a resolved, clamped level
   from its producer and never applies its own default (see
   [How each harness receives effort](/configuration/harnesses#how-each-harness-receives-effort)).
+- The review parent's fresh spawn — `roles.review.effort` (the resumed-session
+  branch keeps the saved session's effort unchanged) (PAN-4256).
+- The test role's dispatch — both the automatic post-review queue and the
+  manual re-dispatch route — `roles.test.effort` (PAN-4256).
+- `pan worker run --effort <level>` (PAN-4256).
+- `pan spawn --effort <level>` — item `metadata.effort` → plan
+  `metadata.effort` → `roles.worker.effort` → `high`; only claude-code and
+  codex panes get a mapped `--effort`/`model_reasoning_effort` flag, every
+  other harness launches with no effort flag (PAN-4256).
+- `pan flywheel start` — `roles.flywheel.effort` at the next start; a paused
+  Flywheel resumed keeps the effort it started with (PAN-4256).
+- `POST /api/agents` (an explicit `effort` field in the body) and
+  `POST /api/agents/:id/restart` (ditto, pinning the relaunch as `explicit`)
+  (PAN-4256).
+- `pan start --remote` work agents on Fly — `roles.work.effort` (PAN-4256).
 - Tiered-execution work spawns — a registered swarm slot
   (`resolveSlotTierSpawnParams`) and the single work agent
   (`resolveSingleWorkTierSpawnParams`) both staff through `resolveStaffing()`,
@@ -263,12 +278,9 @@ assistant turn).
 - `pan strike` (`roles.strike.effort` → project → `high`); `--dry-run`
   prints the resolved level and its source.
 
-Everything else — specialist/review-parent/test/worker
-launches, the Flywheel orchestrator, remote Fly workspaces, and
-dashboard-wide display — still resolves effort ad hoc and is tracked in
-sibling issues:
+Everything else — dashboard-wide display — still resolves effort ad hoc and
+is tracked in sibling issues:
 
 | Surface | Issue |
 | --- | --- |
-| Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
 | Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |

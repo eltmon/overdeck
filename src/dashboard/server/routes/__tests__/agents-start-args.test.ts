@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildPanStartArgs } from '../agents.js';
+import { parseAgentEffortOverride } from '../agents/shared.js';
 
 describe('agent start route pan start args', () => {
   it('omits --harness when the dashboard request did not explicitly pick one', () => {
@@ -52,5 +53,36 @@ describe('agent start route pan start args', () => {
       harness: 'pi',
       allowHost: true,
     })).toEqual(['start', 'PAN-3857', '--local', '--harness', 'pi', '--host', '--yes']);
+  });
+
+  // PAN-4256: an explicit operator-chosen effort forwards as --effort; no
+  // effort means no flag, so `pan start` resolves roles.work.effort itself.
+  it('forwards an explicit effort override', () => {
+    expect(buildPanStartArgs({
+      issueId: 'PAN-1',
+      effort: 'low',
+    })).toEqual(['start', 'PAN-1', '--local', '--effort', 'low']);
+  });
+
+  it('omits --effort when the request did not name one', () => {
+    expect(buildPanStartArgs({
+      issueId: 'PAN-1',
+    })).toEqual(['start', 'PAN-1', '--local']);
+  });
+});
+
+describe('parseAgentEffortOverride', () => {
+  it('throws naming the five canonical levels for an invalid value', () => {
+    expect(() => parseAgentEffortOverride('ultra')).toThrow(/low, medium, high, xhigh, max/);
+  });
+
+  it('returns undefined for undefined, null, or an empty string', () => {
+    expect(parseAgentEffortOverride(undefined)).toBeUndefined();
+    expect(parseAgentEffortOverride(null)).toBeUndefined();
+    expect(parseAgentEffortOverride('')).toBeUndefined();
+  });
+
+  it('returns the level for a canonical value', () => {
+    expect(parseAgentEffortOverride('medium')).toBe('medium');
   });
 });

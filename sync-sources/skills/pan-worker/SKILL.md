@@ -61,7 +61,7 @@ pan worker list --parent conv-orchestrator --json
 ```
 
 `pan worker run` flags: `--issue` (required), exactly one of `--prompt` or `--brief`, and optionally
-`--model`, `--harness`, `--read-only`, `--cwd` (must be inside the issue workspace), `--parent`,
+`--model`, `--harness`, `--effort <level>` (default: `roles.worker.effort`), `--read-only`, `--cwd` (must be inside the issue workspace), `--parent`,
 `--name`, `--detach`, `--timeout <seconds>`, `--stop-after-report`.
 
 - **Primary checkout refusal.** A read-write worker's `--cwd` that resolves (symlinks followed) to a

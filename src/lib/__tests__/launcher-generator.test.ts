@@ -1183,6 +1183,24 @@ describe('generateLauncherScript', () => {
     `);
   });
 
+  // PAN-4256: a remote work agent's resolved --effort reaches the launcher
+  // via extraArgs, the same path local launches use.
+  it('remote agent with a resolved --effort', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      spawnMode: 'remote',
+      workingDir: '/workspace',
+      setRemotePath: true,
+      promptFile: '/workspace/.pan/prompts/agent.md',
+      baseCommand: 'claude',
+      model: 'claude-sonnet-4-6',
+      changeDir: false,
+      extraArgs: '--effort medium',
+    });
+    expect(script).toContain('--effort medium');
+  });
+
   it('runtime adapter', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,

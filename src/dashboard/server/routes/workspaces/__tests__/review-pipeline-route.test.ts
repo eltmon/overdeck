@@ -28,6 +28,7 @@ const routeMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   spawnReviewRoleForIssue: vi.fn(),
   refreshIssuePullRequestStateNow: vi.fn(),
+  resolveEffort: vi.fn(),
 }));
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
@@ -54,6 +55,10 @@ vi.mock('../../../../../lib/cloister/conflict-gate.js', () => ({
 vi.mock('../../../../../lib/agents.js', () => ({
   transitionIssueToInReview: routeMocks.transitionIssueToInReview,
   spawnRun: routeMocks.spawnRun,
+}));
+
+vi.mock('../../../../../lib/agents/resolve-effort.js', () => ({
+  resolveEffort: routeMocks.resolveEffort,
 }));
 
 vi.mock('../../../../../lib/projects.js', () => ({
@@ -93,7 +98,7 @@ vi.mock('../../../../../lib/cloister/flywheel.js', () => ({}));
 vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnAgent: vi.fn(), spawnRunPromise: vi.fn() }));
 
 import { EventStoreService } from '../../../services/domain-services.js';
-import { reviewPipelineRouteLayer, _resetAutoRequeueCountsForTests } from '../review-pipeline.js';
+import { reviewPipelineRouteLayer, _resetAutoRequeueCountsForTests, requestReviewGuarded } from '../review-pipeline.js';
 import { requestReviewPipeline } from '../../../../../lib/cloister/request-review-pipeline.js';
 
 function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
@@ -142,6 +147,7 @@ beforeEach(() => {
   routeMocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo' });
   routeMocks.transitionIssueToInReview.mockResolvedValue(undefined);
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
+  routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
 });
 
 afterEach(() => {
@@ -345,6 +351,31 @@ describe('POST /api/review/:issueId/request — operator standing (#3853)', () =
       expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledOnce();
     });
     expect(routeMocks.spawnReviewRoleForIssue.mock.calls[0][0]).not.toHaveProperty('operatorRequested');
+  });
+});
+
+// PAN-4256: the manual test re-dispatch (an approved PR whose checks are not
+// green) must honor roles.test.effort instead of launching the test role
+// unconditionally at the role file's hardcoded high.
+describe('requestReviewGuarded — test re-dispatch resolves effort (PAN-4256)', () => {
+  it('threads roles.test.effort into the re-dispatched test role', async () => {
+    routeMocks.resolveEffort.mockReturnValue({ effort: 'medium', source: 'role', requested: 'medium', clamped: false });
+    routeMocks.spawnRun.mockResolvedValue({ id: 'agent-pan-3340-test' });
+
+    const outcome = await requestReviewGuarded('PAN-3340', {
+      source: 'api',
+      derived: derived({
+        pr: { url: 'https://gh/pr/7', number: 7, reviewState: 'approved', checks: 'red', mergeable: true },
+      }),
+      approvalStandsAtHead: async () => true,
+    });
+
+    expect(outcome).toEqual({ kind: 'tests-requeued' });
+    expect(routeMocks.resolveEffort).toHaveBeenCalledWith({ role: 'test', issueId: 'PAN-3340' });
+    expect(routeMocks.spawnRun).toHaveBeenCalledWith('PAN-3340', 'test', expect.objectContaining({
+      effort: 'medium',
+      effortSource: 'role',
+    }));
   });
 });
 
