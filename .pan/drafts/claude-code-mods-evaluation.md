@@ -229,7 +229,23 @@ These limits apply to every candidate below. Each one comes from the docs refere
 
 ## Candidate 6: Reviewer and worker progress bands
 
-To be written (spec item `candidate-6-review-worker-bands`).
+| Field | Finding |
+| --- | --- |
+| What it would do | Draw a band or status line in each reviewer, synthesis and worker pane that shows the convoy's progress (which of the four reviewers have reported, whether synthesis has started) and the verification gate's state (typecheck, lint, test). |
+| Mod capability | `ui.render` on `AbovePrompt` or `$.ui.status`, fed by `$.clock.every` plus `$.http.fetch` to the dashboard, as in Candidate 1. |
+| Replaces or improves | Improves only what a person sees when they open a reviewer or worker pane. It replaces nothing: the dashboard's reviewer tree and the issue view stay the operator surface. |
+| Overdeck evidence | `src/lib/cloister/review-convoy.ts:315` — `export async function launchConvoyReviewers(params: ConvoyLaunchParams)`; `src/lib/cloister/review-convoy.ts:310` — `harness?: RuntimeName;`; `src/lib/cloister/verification-runner.ts:297` — `export async function runVerificationForIssueInProcess(`; `src/lib/cloister/verification-runner.ts:2` — `Verification Runner — orchestrates the full verification gate lifecycle.` |
+| Harness parity | Reviewers and workers can run on any harness (the convoy takes a `harness` parameter), so a Claude-Code-only band would show on some reviewer panes and not on others. |
+| Risk | Low. It reads only and its loss costs nothing, but it adds a poll in every short-lived pane for a view that nobody watches. |
+| Size | S once Candidate 1 exists: the same mod with a role-specific band. |
+| Sources | plugin-authoring skill: reference.md "Drawing: ui.render" and "Work that outlives a dispatch"; docs: https://code.claude.com/docs/en/plugins/mods/interface (S9), https://code.claude.com/docs/en/plugins/mods/reference (S3); research brief §5. |
+| Verdict | do-not-adopt: the panes it would decorate are rarely watched, the dashboard reviewer tree already shows the same state for every harness, and Candidate 1's band covers the work agent's view of review and verification. |
+
+**Who would see it.** `launchConvoyReviewers` starts four independent reviewers and later a synthesis agent for one review run (`src/lib/cloister/review-convoy.ts:315` — `export async function launchConvoyReviewers(params: ConvoyLaunchParams)`). Each runs in its own pane for a few minutes and writes a report file. The operator follows the run in the dashboard's reviewer tree, which reads those agents and reports for every harness. Opening a reviewer pane is a debugging step, not the normal view, so a band there helps only in that rare case.
+
+**The verification gate has no pane.** `runVerificationForIssueInProcess` runs the gate inside the verification worker process, not inside a Claude Code session (`src/lib/cloister/verification-runner.ts:297` — `export async function runVerificationForIssueInProcess(`). A band about verification would therefore have to draw in the work agent's pane, which is exactly Candidate 1's band with one more field. A band is also drawn for the person, not for the model: it does not tell the agent anything, so it cannot replace the message the runner sends to the work agent when verification passes or fails.
+
+**Harness mix.** The convoy can run reviewers on a harness other than Claude Code (`src/lib/cloister/review-convoy.ts:310` — `harness?: RuntimeName;`). A band that shows on some reviewer panes and not on others gives the operator an inconsistent view, which is a further reason to keep this state in the dashboard.
 
 ## Candidate 7: Other uses
 
