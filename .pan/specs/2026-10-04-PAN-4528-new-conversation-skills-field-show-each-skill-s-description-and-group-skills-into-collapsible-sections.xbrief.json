@@ -4,17 +4,17 @@
     "created": "2026-10-04T04:30:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4528: New-conversation Skills field: show each skill's description and group skills into collapsible sections",
-    "updated": "2026-10-04T04:35:27.177Z"
+    "updated": "2026-10-04T04:36:04.241Z"
   },
   "plan": {
     "id": "pan-4528",
     "title": "New-conversation Skills field: show each skill's description and group skills into collapsible sections",
-    "status": "proposed",
+    "status": "running",
     "uid": "f324c977-a60b-41fe-9c8b-9f361fb7130d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-04T04:30:40Z",
-    "updated": "2026-10-04T04:35:27.177Z",
+    "updated": "2026-10-04T04:36:04.241Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4528",
@@ -354,5 +354,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
