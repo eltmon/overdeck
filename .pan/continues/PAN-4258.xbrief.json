@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4258",
   "created": "2026-10-04T02:16:20.498Z",
-  "updated": "2026-10-04T02:38:48.784Z",
+  "updated": "2026-10-04T02:45:12.564Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-04T02:38:42.720Z"
     },
     "plan-dialog-default-high": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4258",
-      "claimedAt": "2026-10-04T02:38:48.784Z"
+      "claimedAt": "2026-10-04T02:38:48.784Z",
+      "doneAt": "2026-10-04T02:45:12.564Z"
     }
   }
 }
