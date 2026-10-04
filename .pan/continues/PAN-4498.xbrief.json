@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4498",
   "created": "2026-10-04T02:14:57.213Z",
-  "updated": "2026-10-04T03:42:28.373Z",
+  "updated": "2026-10-04T03:48:22.733Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-04T03:48Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-04T03:48:22.733Z"
+    }
+  ],
   "items": {
     "bookmark-store": {
       "status": "completed",
@@ -273,5 +279,14 @@
       "claimedAt": "2026-10-04T03:41:42.615Z",
       "doneAt": "2026-10-04T03:42:28.372Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-04T03:48:22Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4498\n\nPull request: https://github.com/eltmon/overdeck/pull/4521 (head `c9994b06`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
