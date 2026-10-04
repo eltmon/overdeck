@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-04T20:35:08.532143Z · model: claude-opus-5-5 · open: 820_
+_Last sequenced: 2026-10-04T21:18:37.430292Z · model: claude-opus-5-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -324,6 +324,7 @@ _Last sequenced: 2026-10-04T20:35:08.532143Z · model: claude-opus-5-5 · open: 
 | 359 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 362 | PAN-4552 | M | medium | ok |  |  | Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs |
 | 363 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
 | 364 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
 | 365 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
@@ -1155,10 +1156,10 @@ New since the prior run: conversations that never progress make Overdeck unusabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-04T20:35:08.532143Z",
+  "generatedAt": "2026-10-04T21:18:37.430292Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 820,
+  "openCount": 821,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11362,6 +11363,19 @@ New since the prior run: conversations that never progress make Overdeck unusabl
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4552",
+      "rank": 362,
+      "size": "M",
+      "importance": "medium",
+      "score": 61,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs",
+      "rationale": "New since the prior run: a follow-up to the three fresh-WSL2-host fixes in v0.66.0, ranked in the first-run reliability band beside PAN-2572 because unfixed setup hints and hidden first-launch dialogs block new hosts before any pipeline work can start.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12659,6 +12673,20 @@ New since the prior run: conversations that never progress make Overdeck unusabl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4552",
+      "to": "PAN-2416",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4552",
+      "to": "PAN-2625",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.35
     }
   ]
 }
