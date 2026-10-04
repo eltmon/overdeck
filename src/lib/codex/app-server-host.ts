@@ -26,6 +26,7 @@ import { codexHome } from '../runtimes/storage/codex.js';
 import { calculateCost, getPricing } from '../cost.js';
 import { recordAgentActivity } from '../agents/agent-state.js';
 import { appendSessionIdToHistory } from '../session-history.js';
+import { isEffortLevel } from '@overdeck/contracts';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -57,7 +58,7 @@ export interface CodexAppServerHostOptions {
   agentId: string;
   cwd: string;
   model?: string;
-  effort?: string;
+  effort: string;
   resumeThreadId?: string;
   developerInstructions?: string;
   overdeckHome?: string;
@@ -119,7 +120,7 @@ export class CodexAppServerHost {
       ...(options.nativeEndpoint ? { nativeSocketPath: codexNativeSocketPath(this.agentDir()) } : {}),
     });
     this.threadModel = options.model;
-    this.effort = options.effort ?? 'high';
+    this.effort = options.effort;
     this.attachManagerEvents();
   }
 
@@ -233,7 +234,7 @@ export class CodexAppServerHost {
     try {
       if (name === 'status') return { status: 200, body: this.status() };
       if (name === 'set-effort') {
-        if (typeof body.effort !== 'string' || !['low', 'medium', 'high', 'xhigh', 'max'].includes(body.effort)) {
+        if (!isEffortLevel(body.effort)) {
           return { status: 400, body: { error: 'Invalid reasoning effort' } };
         }
         this.effort = body.effort;
@@ -935,6 +936,7 @@ async function main(): Promise<void> {
   const developerInstructions = (
     await Promise.all(args.developerInstructionFiles.map((file) => readFile(file, 'utf-8')))
   ).filter((content) => content.trim()).join('\n\n---\n\n');
+  if (!args.effort) throw new Error('codex app-server host requires --effort <level>');
   const host = new CodexAppServerHost({
     agentId,
     cwd: process.cwd(),

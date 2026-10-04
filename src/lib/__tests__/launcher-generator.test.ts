@@ -4,6 +4,8 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { generateLauncherScript, type LauncherConfig  } from '../launcher-generator.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
+import { resolveEffort } from '../agents/resolve-effort.js';
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.overdeck/ui-theme.json) deterministically uses the dark default
@@ -1810,6 +1812,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       role: 'work',
       harness: 'codex',
       codexMode: 'app-server',
+      codexEffort: 'high',
       spawnMode: 'conversation',
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
@@ -1826,6 +1829,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       role: 'work',
       harness: 'codex',
       codexMode: 'app-server',
+      codexEffort: 'high',
       resumeSessionId: '019ee5e7-thread-abc',
     });
     expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc'$/m);
@@ -1837,6 +1841,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       role: 'work',
       harness: 'codex',
       codexMode: 'app-server',
+      codexEffort: 'high',
       codexNativeEndpoint: true,
       resumeSessionId: '019ee5e7-thread-abc',
     });
@@ -1847,8 +1852,30 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       role: 'work',
       harness: 'codex',
       codexMode: 'app-server',
+      codexEffort: 'high',
     });
     expect(workAgent).not.toMatch(/--native-endpoint/);
+  });
+
+  it.each(EFFORT_LEVELS)('codex app-server launch argv carries the resolved effort %s', (level) => {
+    const codexEffort = resolveEffort({ explicit: level, model: 'gpt-5.6-sol', harness: 'codex' }).effort;
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      codexEffort,
+    });
+    expect(script).toContain(`codex-app-server-host.js' --effort '${level}'`);
+  });
+
+  it('codex app-server launcher requires codexEffort', () => {
+    expect(() => generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+    })).toThrow('codex app-server launcher requires codexEffort');
   });
 
   it('acp mode launches the authenticated host in an isolated provider environment', () => {
