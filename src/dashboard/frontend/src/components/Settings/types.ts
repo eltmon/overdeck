@@ -1,3 +1,4 @@
+import type { EffortLevel } from '@overdeck/contracts';
 import type { ConfigurableProvider } from '../../../../../lib/configurable-providers.js';
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
@@ -177,6 +178,8 @@ export interface TieredExecutionConfig {
     /** PAN-2391: weighted entries this tier spreads tasks across. When
      * present, model/harness above are the max-weight representative. */
     distribution?: Array<{ model: ModelId; modelRef?: string; harness: Harness; weight: number }>;
+    /** PAN-4257: reasoning effort this tier launches its agents at. */
+    effort?: EffortLevel;
   }>;
   supervisor?: {
     model: ModelId;
@@ -196,6 +199,8 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
+    /** PAN-4257: raise effort a step before promoting to the next tier's model. */
+    effort_first?: boolean;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;
