@@ -1,0 +1,46 @@
+{
+  "version": "1",
+  "issueId": "PAN-4548",
+  "created": "2026-10-04T13:25:47.361Z",
+  "updated": "2026-10-04T13:54:58.708Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-04T13:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-10-04T13:54:58.708Z"
+    }
+  ],
+  "items": {
+    "lint-docs-test-fileurltopath": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4548",
+      "claimedAt": "2026-10-04T13:25:47.361Z",
+      "doneAt": "2026-10-04T13:26:39.790Z"
+    },
+    "lint-docs-test-fileurltopath.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T13:27:41.640Z"
+    },
+    "lint-docs-test-fileurltopath.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T13:27:58.171Z"
+    },
+    "lint-docs-test-fileurltopath.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T13:28:14.208Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-10-04T13:54:58Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4548\n\n# Review — PAN-4548\n## Verdict: CHANGES REQUESTED — PR #4549 description does not state \"No documented surface changes\" (issue AC3 / PRD AC3)\n\n## Context\n- Run ID: agent-pan-4548-review-fa28021d\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4548/.pan/review/agent-pan-4548-review-fa28021d/context.json\n- Branch / workspace: feature/pan-4548 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4548\n- PR: https://github.com/eltmon/overdeck/pull/4549\n- HEAD reviewed: fa28021d943c94cf11cc26b1c078431378b7b81b\n- Base / prior cycle SHA: main / none (first cycle)\n\n## Blocking Findings\n\n### [requirements] PR description omits the required \"no documented surface changes\" statement — PR #4549 body\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect (requirements/process); in_pr_scope\n- Trigger and changed-code connection: Issue PAN-4548 AC3 reads \"No documented surface changes; the PR says so.\" PRD `.pan/drafts/PAN-4548.md` work item 2 says \"The PR description must state: 'No documented surface changes.'\" and AC3 repeats it.\n- Expected / observed / impact: Expected the PR body to contain that statement. Observed body (`gh pr view feature/pan-4548 --json body`) contains only `**Issue:** #4548`, a one-item AC checklist, and the CodeRabbit auto-summary. The phrase does not appear. An explicit in-scope acceptance criterion is unmet.\n- Evidence: `gh pr view` at review time. Commit `aca19de` (\"record AC3 evidence\") claims \"PR description states no documented surface changes\", which does not match the live PR body, so the AC3 evidence was misrecorded.\n- Fix: Add the sentence \"No documented surface changes.\" to the PR #4549 description (for example `gh pr edit 4549 --body-file <file>` preserving the existing content). No code change is needed.\n\n## Non-blocking Findings\n- `?` Follow-up: the same `.pathname` pattern remains in `tests/unit/scripts/vendor-okf-skill.test.ts`, `tests/unit/scripts/lint-dist-externals.test.ts`, and `tests/unit/scripts/canonicalize-circular-deps.test.ts`. They are explicitly out of scope per the plan's NonGoals; a follow-up issue should cover them. Pre-existing, not this author's blocker.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status | Notes |\n| --- | --- | --- |\n| tests/unit/scripts/lint-docs.test.ts | reviewed | +1 import (`fileURLToPath` from `node:url`, placed after `node:path`), line 12 `SCRIPT` now `fileURLToPath(new URL(...))`. Surgical; no unrelated lines touched. `SCRIPT` is consumed at line 157 by `execFileSync('node', [SCRIPT, ...])`; a decoded path also matches `scripts/lint-docs.js` `isMain` check (`fileURLToPath(import.meta.url) === process.argv[1]`). |\n| .pan/drafts/PAN-4548.md | reviewed — N/A for code dimensions | Pipeline-owned planning record (PRD). |\n| .pan/specs/2026-10-04-PAN-4548-…xbrief.json | reviewed — N/A for code dimensions | Pipeline-owned xBRIEF spec. |\n| .pan/continues/PAN-4548.xbrief.json | reviewed — N/A for code dimensions | Pipeline-owned continue record. |\n\n### Dimensions\n- Correctness: Change is correct. `fileURLToPath` decodes percent-encoding, so a spaced checkout path yields a real filesystem path; the PRD's planning-time node probe shows `.pathname` returns `/tmp/a%20b/...` vs `fileURLToPath` returning `/tmp/a b/...`. Import is present (a missing import would fail vitest/eslint since typecheck excludes tests).\n- Security: No trust boundary or attacker input involved; test-only path resolution. Nothing reachable.\n- Performance: No runtime impact; one constant computed once at module load.\n- Requirements/UX: see AC matrix. AC3 unmet.\n\n### AC-to-evidence matrix\n| AC / Req | Status | Evidence |\n| --- | --- | --- |\n| AC1 / FR-1: imports `fileURLToPath`, `SCRIPT` uses it, no `.pathname` | met | Line 5 import, line 12 definition; `grep -c '\\.pathname'` → 0 |\n| AC2 / FR-2: `npx vitest run tests/unit/scripts/lint-docs.test.ts` exits 0 | met | Focused run: 1 file, 22/22 passed. CI test-shard 1–4 green on run 37205745141 (headSha fa28021d, exact HEAD). |\n| AC3: PR says no documented surface changes; diff touches only the test file | unmet | Code diff touches only the test file (other files are `.pan/` planning artifacts) — met. PR description lacks the statement — unmet. |\n| NFR-1: touches only the test file; no production/doc change | met | `git diff main...HEAD --stat`: only non-`.pan/` file is the test. |\n\n## Verification\n- `npx vitest run tests/unit/scripts/lint-docs.test.ts` → 22 passed.\n- `gh pr checks feature/pan-4548` → all checks pass (build, lint, lint-group core/effect/skills/state, test-shard 1–4, test-e2e, overdeck/test verification gate); run 37205745141 headSha confirmed = fa28021d943c94cf11cc26b1c078431378b7b81b.\n- `npm run lint:effect-diagnostics`: covered by green `lint-group (effect)` on exact HEAD; not re-run.\n- Full test suite not run (per role; CI ran it).\n- Spaced-path end-to-end probe skipped; the PRD's node probe plus the semantic change are sufficient evidence.\n\n## Scope Note\n- Working tree has an uncommitted modification to `.pan/continues/PAN-4548.xbrief.json`; it is not part of HEAD and was not reviewed as a change.\n- The only blocker is a PR-description edit; once the statement is added, this is approve-grade with no code changes required.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4548/.pan/review/agent-pan-4548-review-fa28021d/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4548 -m \"Fixed review issues\"`"
+    }
+  ]
+}

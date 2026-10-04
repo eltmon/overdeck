@@ -2,13 +2,14 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { collectPublishedPages, findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
 
 const DOLLAR = '&#36;';
 const LT = '&lt;';
 
-const SCRIPT = new URL('../../../scripts/lint-docs.js', import.meta.url).pathname;
+const SCRIPT = fileURLToPath(new URL('../../../scripts/lint-docs.js', import.meta.url));
 
 describe('findMdxProblems', () => {
   it('flags a dollar sign in prose', () => {

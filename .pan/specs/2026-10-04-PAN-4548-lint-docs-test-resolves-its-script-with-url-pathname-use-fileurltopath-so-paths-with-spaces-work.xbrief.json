@@ -1,0 +1,129 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-04T13:24:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4548: lint-docs test resolves its script with URL.pathname; use fileURLToPath so paths with spaces work",
+    "updated": "2026-10-04T13:25:32.502Z"
+  },
+  "plan": {
+    "id": "pan-4548",
+    "title": "lint-docs test resolves its script with URL.pathname; use fileURLToPath so paths with spaces work",
+    "status": "running",
+    "uid": "20c7a23b-1c88-46fd-a104-6b2097811f70",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-04T13:24:23Z",
+    "updated": "2026-10-04T13:25:32.502Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4548",
+        "label": "PAN-4548",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4513",
+        "label": "PR #4513 (PAN-4509)",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "test",
+      "portability",
+      "lint-docs"
+    ],
+    "metadata": {
+      "docsJustification": "The change edits only how tests/unit/scripts/lint-docs.test.ts locates scripts/lint-docs.js; no user-facing page, docs/ file, CLAUDE.md section, or rule documents that, and the issue's acceptance criteria require no documented-surface change.",
+      "canonicalFilename": "2026-10-04-PAN-4548-lint-docs-test-resolves-its-script-with-url-pathname-use-fileurltopath-so-paths-with-spaces-work.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "tests/unit/scripts/lint-docs.test.ts line 11 builds SCRIPT with new URL('../../../scripts/lint-docs.js', import.meta.url).pathname. URL.pathname keeps percent-encoding, so a checkout path containing a space yields '%20' in SCRIPT; execFileSync('node', [SCRIPT, ...]) then targets a nonexistent file and the three lint-docs CLI tests fail. Even if the file were found, scripts/lint-docs.js line 139 compares fileURLToPath(import.meta.url) to process.argv[1], so an encoded argv would never match isMain.",
+      "Proposal": "Import fileURLToPath from node:url (after the node:path import) and define SCRIPT as fileURLToPath(new URL('../../../scripts/lint-docs.js', import.meta.url)), matching scripts/lint-docs.js. See .pan/drafts/PAN-4548.md work item 1 for exact before/after hunks.",
+      "NonGoals": "- Do not edit tests/unit/scripts/vendor-okf-skill.test.ts, tests/unit/scripts/lint-dist-externals.test.ts, or tests/unit/scripts/canonicalize-circular-deps.test.ts, even though they use the same .pathname pattern; they belong in a follow-up issue.\n- Do not change scripts/lint-docs.js or any production code.\n- Do not add a new regression test or a spaced-path checkout harness.\n- Do not add or change any documentation file, including .overdeck/context/codebase/conventions.md.\n- Do not reformat or reorder unrelated lines of the test file."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix only tests/unit/scripts/lint-docs.test.ts; leave the three sibling test files with the same .pathname pattern for a follow-up issue.",
+        "rationale": "The issue title, body, and acceptance criteria name exactly one file; surgical-change rules forbid widening scope silently."
+      },
+      {
+        "summary": "No new regression test for spaced paths.",
+        "rationale": "Reproducing requires a second full checkout with node_modules at a spaced path; the existing three CLI tests plus grep checks verify the change, and a planning-time node probe proved the encoding difference."
+      },
+      {
+        "summary": "No documentation change; set plan.metadata.docsJustification instead of a docs item.",
+        "rationale": "The issue's third acceptance criterion states no documented surface changes and the PR must say so."
+      }
+    ],
+    "items": [
+      {
+        "id": "lint-docs-test-fileurltopath",
+        "title": "Resolve SCRIPT in lint-docs.test.ts with fileURLToPath",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-04T13:24:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4548",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"fileURLToPath(new URL('../../../scripts/lint-docs.js'\" tests/unit/scripts/lint-docs.test.ts",
+            "grep -c '\\.pathname' tests/unit/scripts/lint-docs.test.ts",
+            "npx eslint tests/unit/scripts/lint-docs.test.ts",
+            "npx vitest run tests/unit/scripts/lint-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "first grep prints 1",
+            "second grep prints 0",
+            "eslint exits 0 with no errors",
+            "vitest exits 0 and reports every test in lint-docs.test.ts passing, including the three lint-docs CLI tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/scripts/lint-docs.test.ts: (A) add the line import { fileURLToPath } from 'node:url'; directly after import { join } from 'node:path';. (B) Replace line 11, const SCRIPT = new URL('../../../scripts/lint-docs.js', import.meta.url).pathname;, with const SCRIPT = fileURLToPath(new URL('../../../scripts/lint-docs.js', import.meta.url));. Touch nothing else. The PR description must state 'No documented surface changes.' Note: npm run typecheck excludes *.test.ts, so use eslint and vitest as evidence."
+        },
+        "items": [
+          {
+            "id": "lint-docs-test-fileurltopath.ac1",
+            "title": "Given the edited tests/unit/scripts/lint-docs.test.ts, when grepped, then it imports fileURLToPath from node:url, defines SCRIPT with fileURLToPath(new URL('../../../scripts/lint-docs.js', import.meta.url)), and grep -c '\\.pathname' returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-docs-test-fileurltopath.ac2",
+            "title": "When npx vitest run tests/unit/scripts/lint-docs.test.ts runs, then the command exits 0 and reports all tests in the file, including the three lint-docs CLI tests, as passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-docs-test-fileurltopath.ac3",
+            "title": "Given the PR for PAN-4548, then its diff touches only tests/unit/scripts/lint-docs.test.ts and its description states that no documented surface changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
