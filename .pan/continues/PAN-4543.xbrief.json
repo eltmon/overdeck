@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4543",
   "created": "2026-10-04T09:42:10.401Z",
-  "updated": "2026-10-04T09:55:49.927Z",
+  "updated": "2026-10-04T10:06:55.261Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4543",
       "claimedAt": "2026-10-04T09:50:40.191Z",
       "doneAt": "2026-10-04T09:55:49.926Z"
+    },
+    "artifact-skipped-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T10:06:55.261Z"
     }
   }
 }
