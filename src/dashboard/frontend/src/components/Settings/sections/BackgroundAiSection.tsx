@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Gauge } from 'lucide-react';
 import {
   BACKGROUND_AI_FEATURE_META,
@@ -42,6 +42,10 @@ export function BackgroundAiSection({
   onSettingsChange,
   jev,
 }: BackgroundAiSectionProps) {
+  // PAN-4508: a Jev feature toggle makes no request with jev.model blank, so turning one on
+  // (never off) is blocked client-side with an inline error under that row.
+  const [jevToggleError, setJevToggleError] = useState<{ key: BackgroundAiFeature; message: string } | null>(null);
+
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
     onSettingsChange({
@@ -206,6 +210,11 @@ export function BackgroundAiSection({
                 <div className="mt-1.5 flex items-center gap-2">
                   {backgroundModelControl(feature.key)}
                 </div>
+                {jevToggleError?.key === feature.key && (
+                  <p data-testid="jev-toggle-error" role="alert" className="text-xs text-destructive mt-1">
+                    {jevToggleError.message}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span
@@ -221,7 +230,15 @@ export function BackgroundAiSection({
                   aria-checked={effectiveOn}
                   aria-label={`Toggle ${feature.label}`}
                   disabled={cheapMode}
-                  onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
+                  onClick={() => {
+                    const turningOn = !featureOn;
+                    if (feature.key.startsWith('jev') && turningOn && jev && !(jev.settings?.model ?? '').trim()) {
+                      setJevToggleError({ key: feature.key, message: 'Set a Jev model below before turning on a Jev feature.' });
+                      return;
+                    }
+                    setJevToggleError(null);
+                    updateBackgroundAi({ features: { [feature.key]: turningOn } });
+                  }}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
                     effectiveOn ? 'bg-primary' : 'bg-muted'
                   }`}

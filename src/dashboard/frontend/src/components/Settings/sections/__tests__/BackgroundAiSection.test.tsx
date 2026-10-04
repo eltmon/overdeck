@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { BackgroundAiSection } from '../BackgroundAiSection';
-import type { SettingsConfig } from '../../types';
+import type { JevSettingsView, SettingsConfig } from '../../types';
 
 function settings(typesafe?: string): SettingsConfig {
   return {
@@ -79,5 +79,71 @@ describe('BackgroundAiSection Jev settings panel (PAN-4508)', () => {
       />,
     );
     expect(screen.getByTestId('jev-settings-panel')).toBeTruthy();
+  });
+});
+
+describe('BackgroundAiSection Jev toggle gating (PAN-4508)', () => {
+  function jevSettings(model: JevSettingsView['model']): JevSettingsView {
+    return { configured: true, route: 'zen', model, timeoutMs: 2000, apiKeyRef: 'TYPESAFE_API_KEY' };
+  }
+
+  // The switch itself defaults to "on" when background_ai.features omits the key, so these
+  // cases set jevTurnEndAssessment: false explicitly to represent the off switch the ACs describe.
+  function offSettings(): SettingsConfig {
+    return { ...settings(), background_ai: { cheap_mode: false, features: { jevTurnEndAssessment: false } } };
+  }
+
+  it('blocks turning a Jev toggle on with no model and does not call onSettingsChange', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={offSettings()}
+        onSettingsChange={onSettingsChange}
+        jev={{ settings: jevSettings(undefined), serverError: null, onSave: vi.fn() }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Toggle Jev: turn-end classification'));
+    expect(screen.getByTestId('jev-toggle-error')).toHaveTextContent('Set a Jev model below before turning on a Jev feature.');
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('turns a Jev toggle on when a model is set', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={offSettings()}
+        onSettingsChange={onSettingsChange}
+        jev={{ settings: jevSettings('jev-1.13-free'), serverError: null, onSave: vi.fn() }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Toggle Jev: turn-end classification'));
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange.mock.calls[0][0].background_ai.features.jevTurnEndAssessment).toBe(true);
+    expect(screen.queryByTestId('jev-toggle-error')).toBeNull();
+  });
+
+  it('never blocks turning a Jev toggle off, even with no model', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={<option value="claude-haiku-4-5">Haiku</option>}
+        formData={{ ...settings(), background_ai: { cheap_mode: false, features: { jevTurnEndAssessment: true } } }}
+        onSettingsChange={onSettingsChange}
+        jev={{ settings: jevSettings(undefined), serverError: null, onSave: vi.fn() }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Toggle Jev: turn-end classification'));
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange.mock.calls[0][0].background_ai.features.jevTurnEndAssessment).toBe(false);
+    expect(screen.queryByTestId('jev-toggle-error')).toBeNull();
+  });
+
+  it('does not block when the jev prop is absent', () => {
+    const onSettingsChange = renderSection(settings());
+    fireEvent.click(screen.getByLabelText('Toggle Jev: turn-end classification'));
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('jev-toggle-error')).toBeNull();
   });
 });
