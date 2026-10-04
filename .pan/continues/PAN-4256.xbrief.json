@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T03:35:54.640Z",
+  "updated": "2026-10-04T03:57:02.128Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-04T03:35:43.191Z"
     },
     "flywheel-role-effort": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4256",
-      "claimedAt": "2026-10-04T03:35:54.639Z"
+      "claimedAt": "2026-10-04T03:35:54.639Z",
+      "doneAt": "2026-10-04T03:57:02.128Z"
     }
   }
 }
