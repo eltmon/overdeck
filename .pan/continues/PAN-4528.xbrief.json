@@ -1,0 +1,89 @@
+{
+  "version": "1",
+  "issueId": "PAN-4528",
+  "created": "2026-10-04T04:36:24.345Z",
+  "updated": "2026-10-04T05:34:32.568Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "server-origin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4528",
+      "claimedAt": "2026-10-04T04:36:24.345Z",
+      "doneAt": "2026-10-04T04:55:51.087Z"
+    },
+    "row-descriptions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4528",
+      "claimedAt": "2026-10-04T04:55:59.104Z",
+      "doneAt": "2026-10-04T05:01:25.396Z"
+    },
+    "collapsible-groups": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4528",
+      "claimedAt": "2026-10-04T05:01:46.804Z",
+      "doneAt": "2026-10-04T05:26:28.928Z"
+    },
+    "docs-skills-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4528",
+      "claimedAt": "2026-10-04T05:26:35.526Z",
+      "doneAt": "2026-10-04T05:30:10.295Z"
+    },
+    "server-origin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:31:48.904Z"
+    },
+    "server-origin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:32:13.393Z"
+    },
+    "server-origin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:32:32.750Z"
+    },
+    "row-descriptions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:32:45.013Z"
+    },
+    "row-descriptions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:32:57.789Z"
+    },
+    "row-descriptions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:10.260Z"
+    },
+    "collapsible-groups.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:22.713Z"
+    },
+    "collapsible-groups.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:34.073Z"
+    },
+    "collapsible-groups.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:45.441Z"
+    },
+    "collapsible-groups.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:33:57.002Z"
+    },
+    "collapsible-groups.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:34:09.032Z"
+    },
+    "docs-skills-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:34:21.072Z"
+    },
+    "docs-skills-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:34:32.568Z"
+    }
+  }
+}
