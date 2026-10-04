@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:10:40.589Z",
+  "updated": "2026-10-04T05:13:01.930Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4529",
       "claimedAt": "2026-10-04T05:09:55.533Z",
       "doneAt": "2026-10-04T05:10:40.589Z"
+    },
+    "commit-research-brief.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:13:01.930Z"
     }
   }
 }
