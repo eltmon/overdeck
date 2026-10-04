@@ -16,6 +16,7 @@ import {
   SWEEP_FLARE_COLOR,
   advanceFrostAccrual,
   clamp,
+  computeLayout,
   fmtAge,
   hexA,
   modelGlyph,
@@ -23,7 +24,6 @@ import {
   parkedOrbitTag,
   pickOrb,
   positionOrb,
-  type LayoutRect,
   type Stage,
 } from './model';
 import type {
@@ -167,27 +167,6 @@ function mixColor(first: string, second: string, amount: number): string {
   return `rgb(${channel(16)},${channel(8)},${channel(0)})`;
 }
 
-function canvasLayout(width: number, height: number): LayoutRect {
-  const padX = 26;
-  const riverTop = 92;
-  const doldrumsH = 64;
-  const shelfH = 34;
-  return {
-    padX,
-    riverTop,
-    spectrumH: 0,
-    doldrumsH,
-    shelfH,
-    riverBottom: height - doldrumsH - shelfH - 22,
-    colW: (width - padX * 2) / STAGES.length,
-    shelfY: height - doldrumsH - shelfH + shelfH / 2 - 10,
-    doldrumsY: height - doldrumsH + doldrumsH / 2 - 12,
-    portalX: width - padX - 8,
-    sunX: 64,
-    sunY: 52,
-  };
-}
-
 function roleColor(role: string): string {
   return ROLE_COLORS[role as keyof typeof ROLE_COLORS] ?? STAGE_COLORS.WORK;
 }
@@ -239,7 +218,7 @@ function createEngine(
   let width = 0;
   let height = 0;
   let dpr = 1;
-  let layout = canvasLayout(1, 1);
+  let layout = computeLayout(1, 1);
   let last = performance.now();
   let simT = 0;
   let frameId = 0;
@@ -435,7 +414,7 @@ function createEngine(
     }
     fx.setTransform(dpr, 0, 0, dpr, 0, 0);
     trail.setTransform(dpr, 0, 0, dpr, 0, 0);
-    layout = canvasLayout(width, height);
+    layout = computeLayout(width, height);
     anchorAll();
     aurora.resize();
   };
@@ -484,18 +463,18 @@ function createEngine(
   };
 
   const drawZones = () => {
-    fx.fillStyle = 'rgba(255,184,0,0.04)'; fx.fillRect(layout.padX, layout.shelfY - layout.shelfH / 2, width - layout.padX * 2, layout.shelfH);
-    fx.strokeStyle = 'rgba(255,184,0,0.16)'; fx.setLineDash([4, 6]); fx.beginPath(); fx.moveTo(layout.padX, layout.shelfY - layout.shelfH / 2); fx.lineTo(width - layout.padX, layout.shelfY - layout.shelfH / 2); fx.stroke(); fx.setLineDash([]);
-    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,0.5)'; fx.textAlign = 'right'; fx.fillText('⏸ SHELF — parked / yielded by governor', width - layout.padX - 8, layout.shelfY - layout.shelfH / 2 + 11);
-    const frost = fx.createLinearGradient(0, layout.doldrumsY - layout.doldrumsH / 2, 0, layout.doldrumsY + layout.doldrumsH / 2);
+    fx.fillStyle = 'rgba(255,184,0,0.04)'; fx.fillRect(layout.padX, layout.shelfTop, width - layout.padX * 2, layout.shelfH);
+    fx.strokeStyle = 'rgba(255,184,0,0.16)'; fx.setLineDash([4, 6]); fx.beginPath(); fx.moveTo(layout.padX, layout.shelfTop); fx.lineTo(width - layout.padX, layout.shelfTop); fx.stroke(); fx.setLineDash([]);
+    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,0.5)'; fx.textAlign = 'right'; fx.fillText('⏸ SHELF — parked / yielded by governor', width - layout.padX - 8, layout.shelfHeaderY);
+    const frost = fx.createLinearGradient(0, layout.doldrumsTop, 0, layout.doldrumsBottom);
     frost.addColorStop(0, 'rgba(120,170,255,0.02)'); frost.addColorStop(1, 'rgba(120,170,255,0.08)'); fx.fillStyle = frost;
-    fx.fillRect(layout.padX, layout.doldrumsY - layout.doldrumsH / 2, width - layout.padX * 2, layout.doldrumsH);
-    fx.strokeStyle = 'rgba(159,199,255,0.2)'; fx.beginPath(); fx.moveTo(layout.padX, layout.doldrumsY - layout.doldrumsH / 2); fx.lineTo(width - layout.padX, layout.doldrumsY - layout.doldrumsH / 2); fx.stroke();
+    fx.fillRect(layout.padX, layout.doldrumsTop, width - layout.padX * 2, layout.doldrumsH);
+    fx.strokeStyle = 'rgba(159,199,255,0.2)'; fx.beginPath(); fx.moveTo(layout.padX, layout.doldrumsTop); fx.lineTo(width - layout.padX, layout.doldrumsTop); fx.stroke();
     const staleShown = list().filter((orb) => orb.state === 'stale').length;
     const census = props.parkedTotal != null
       ? `${props.parkedTotal} parked · showing ${staleShown}`
       : `${staleShown} frozen`;
-    fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stalled, nothing autonomous will advance · ${census}`, width - layout.padX - 8, layout.doldrumsY - layout.doldrumsH / 2 + 11); fx.textAlign = 'left';
+    fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stalled, nothing autonomous will advance · ${census}`, width - layout.padX - 8, layout.doldrumsHeaderY); fx.textAlign = 'left';
     if (Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
   };
 
@@ -547,8 +526,8 @@ function createEngine(
     fx.strokeStyle = `rgba(191,227,255,${frost * 0.85})`; fx.lineWidth = 1;
     for (let index = 0; index < 6; index++) { const angle = index * Math.PI / 3 + simT * 0.15; fx.beginPath(); fx.moveTo(orb.x + Math.cos(angle) * (radius + 2), orb.y + Math.sin(angle) * (radius + 2)); fx.lineTo(orb.x + Math.cos(angle) * (radius + 4 + 7 * frost), orb.y + Math.sin(angle) * (radius + 4 + 7 * frost)); fx.stroke(); }
   };
-  const drawLabel = (orb: RenderOrb, text: string, color: string) => {
-    fx.font = '600 10px "JetBrains Mono"'; fx.textAlign = 'center'; fx.shadowColor = 'rgba(0,0,0,.9)'; fx.shadowBlur = 4; fx.fillStyle = color; fx.fillText(text, orb.x, orb.y - orb.radius - 8); fx.shadowBlur = 0; fx.textAlign = 'left';
+  const drawLabel = (orb: RenderOrb, text: string, color: string, y = orb.y - orb.radius - 8) => {
+    fx.font = '600 10px "JetBrains Mono"'; fx.textAlign = 'center'; fx.shadowColor = 'rgba(0,0,0,.9)'; fx.shadowBlur = 4; fx.fillStyle = color; fx.fillText(text, orb.x, y); fx.shadowBlur = 0; fx.textAlign = 'left';
   };
 
   const drawOrbs = () => {
@@ -564,14 +543,15 @@ function createEngine(
         const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 1.6); glow.addColorStop(0, hexA(tint, 0.4)); glow.addColorStop(1, hexA(tint, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.6, 0, 7); fx.fill();
         fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.7, 0, 7); fx.fill(); fx.strokeStyle = hexA(tint, 0.75); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.85, 0, 7); fx.stroke(); drawFrostCrown(orb, radius * 0.9, 1);
         const orbitTag = parkedOrbitTag(orb.parkedOrbit);
-        drawLabel(orb, orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orb.staleMin)}` : `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`, hexA(tint, 0.85));
+        const staleLabelY = orb.ty < layout.doldrumsY ? layout.doldrumsUpperLabelY : layout.doldrumsLowerLabelY;
+        drawLabel(orb, orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orb.staleMin)}` : `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`, hexA(tint, 0.85), staleLabelY);
         fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'failed') {
         const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'shelf') {
-        fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2); drawLabel(orb, `⏸ ${orb.id}`, 'rgba(255,184,0,.75)'); if (orb.yieldReason) { const reason = orb.yieldReason.length > 58 ? `${orb.yieldReason.slice(0, 57)}…` : orb.yieldReason; fx.font = '500 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(reason, orb.x, orb.y - orb.radius - 21); } fx.textAlign = 'left'; fx.globalAlpha = 1; continue;
+        fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2); drawLabel(orb, `⏸ ${orb.id}`, 'rgba(255,184,0,.75)', layout.shelfLabelY); if (orb.yieldReason) { const reason = orb.yieldReason.length > 58 ? `${orb.yieldReason.slice(0, 57)}…` : orb.yieldReason; fx.font = '500 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(reason, orb.x, layout.shelfReasonY); } fx.textAlign = 'left'; fx.globalAlpha = 1; continue;
       }
       const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 3); glow.addColorStop(0, hexA(baseRole, 0.45 * (0.3 + orb.heat) * (1 - orb.frost * 0.6))); glow.addColorStop(1, hexA(baseRole, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 3, 0, 7); fx.fill();
       fx.fillStyle = color; fx.shadowColor = baseRole; fx.shadowBlur = (14 + orb.heat * 22) * (1 - orb.frost * 0.7); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.6, 0, 7); fx.fill(); fx.shadowBlur = 0; fx.fillStyle = `rgba(255,255,255,${0.35 + orb.heat * 0.5})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.28, 0, 7); fx.fill();

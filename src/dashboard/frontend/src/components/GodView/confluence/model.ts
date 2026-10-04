@@ -91,7 +91,6 @@ export interface LayoutRect {
   padX: number;
   riverTop: number;
   riverBottom: number;
-  spectrumH: number;
   doldrumsH: number;
   shelfH: number;
   colW: number;
@@ -100,28 +99,71 @@ export interface LayoutRect {
   portalX: number;
   sunX: number;
   sunY: number;
+  shelfTop: number;
+  shelfBottom: number;
+  shelfHeaderY: number;
+  shelfLabelY: number;
+  shelfReasonY: number;
+  doldrumsTop: number;
+  doldrumsBottom: number;
+  doldrumsHeaderY: number;
+  doldrumsUpperY: number;
+  doldrumsLowerY: number;
+  doldrumsUpperLabelY: number;
+  doldrumsLowerLabelY: number;
 }
+
+/** Reserved below the Doldrums for the bottom HUD overlays (PAN-4523 D2). */
+const HUD_GUTTER = 32;
+const DOLDRUMS_H = 96;
+const SHELF_H = 70;
+/** Gap between the shelf band's bottom and the doldrums band's top. */
+const BAND_GAP = 10;
 
 export function computeLayout(width: number, height: number): LayoutRect {
   const padX = 26;
   const riverTop = 92;
-  const spectrumH = 54;
-  const doldrumsH = 64;
-  const shelfH = 34;
+
+  const doldrumsBottom = height - HUD_GUTTER;
+  const doldrumsTop = doldrumsBottom - DOLDRUMS_H;
+  const doldrumsY = doldrumsTop + 48;
+  const doldrumsHeaderY = doldrumsTop + 11;
+  const doldrumsUpperLabelY = doldrumsTop + 26;
+  const doldrumsUpperY = doldrumsTop + 44;
+  const doldrumsLowerY = doldrumsTop + 62;
+  const doldrumsLowerLabelY = doldrumsTop + 88;
+
+  const shelfBottom = doldrumsTop - BAND_GAP;
+  const shelfTop = shelfBottom - SHELF_H;
+  const shelfHeaderY = shelfTop + 11;
+  const shelfLabelY = shelfTop + 26;
+  const shelfY = shelfTop + 44;
+  const shelfReasonY = shelfTop + 68;
 
   return {
     padX,
     riverTop,
-    spectrumH,
-    doldrumsH,
-    shelfH,
-    riverBottom: height - spectrumH - doldrumsH - shelfH - 14,
+    riverBottom: shelfTop - 12,
+    doldrumsH: DOLDRUMS_H,
+    shelfH: SHELF_H,
     colW: (width - padX * 2) / STAGES.length,
-    shelfY: height - spectrumH - doldrumsH - shelfH + shelfH / 2 - 6,
-    doldrumsY: height - spectrumH - doldrumsH + doldrumsH / 2 - 4,
+    shelfY,
+    doldrumsY,
     portalX: width - padX - 8,
     sunX: 64,
     sunY: 52,
+    shelfTop,
+    shelfBottom,
+    shelfHeaderY,
+    shelfLabelY,
+    shelfReasonY,
+    doldrumsTop,
+    doldrumsBottom,
+    doldrumsHeaderY,
+    doldrumsUpperY,
+    doldrumsLowerY,
+    doldrumsUpperLabelY,
+    doldrumsLowerLabelY,
   };
 }
 
@@ -205,7 +247,7 @@ export function positionOrb<T extends PositionableOrb>(
   if (orb.state === 'stale') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'stale').indexOf(orb));
     orb.tx = layout.padX + 70 + (index / expectedStale) * (width * 0.72 - layout.padX);
-    orb.ty = layout.doldrumsY + (index % 2 ? 13 : -11);
+    orb.ty = index % 2 ? layout.doldrumsLowerY : layout.doldrumsUpperY;
     return orb;
   }
 
@@ -219,7 +261,7 @@ export function positionOrb<T extends PositionableOrb>(
   if (orb.state === 'shelf') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf').indexOf(orb));
     orb.tx = layout.padX + 140
-      + (index / Math.max(1, expectedShelf - 1 || 1)) * (width * 0.5);
+      + (index / Math.max(1, expectedShelf - 1 || 1)) * (width * 0.7);
     orb.ty = layout.shelfY;
     return orb;
   }

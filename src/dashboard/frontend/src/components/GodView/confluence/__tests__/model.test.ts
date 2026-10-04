@@ -27,21 +27,33 @@ function orb(id: string, state: OrbState, stage = 'WORK'): PositionableOrb {
 
 describe('Confluence model', () => {
   describe('layout and positioning', () => {
-    it('keeps the mockup layout constants at 1680×945', () => {
-      expect(computeLayout(1680, 945)).toEqual({
-        padX: 26,
-        riverTop: 92,
-        riverBottom: 779,
-        spectrumH: 54,
-        doldrumsH: 64,
-        shelfH: 34,
-        colW: 1628 / 5,
-        shelfY: 804,
-        doldrumsY: 855,
-        portalX: 1646,
-        sunX: 64,
-        sunY: 52,
-      });
+    const BAND_TEST_HEIGHTS = [600, 800, 1000] as const;
+
+    it('keeps the shelf and doldrums bands disjoint', () => {
+      for (const height of BAND_TEST_HEIGHTS) {
+        const layout = computeLayout(1280, height);
+        expect(layout.shelfBottom + 8).toBeLessThanOrEqual(layout.doldrumsTop);
+        expect(layout.shelfTop).toBeGreaterThan(layout.riverBottom);
+        expect(layout.doldrumsBottom).toBeLessThanOrEqual(height - 30);
+      }
+    });
+
+    it('keeps every band text row inside its band', () => {
+      for (const height of BAND_TEST_HEIGHTS) {
+        const layout = computeLayout(1280, height);
+        for (const y of [layout.shelfHeaderY, layout.shelfLabelY, layout.shelfReasonY]) {
+          expect(y).toBeGreaterThanOrEqual(layout.shelfTop + 9);
+          expect(y).toBeLessThanOrEqual(layout.shelfBottom - 2);
+        }
+        for (const y of [layout.doldrumsHeaderY, layout.doldrumsUpperLabelY, layout.doldrumsLowerLabelY]) {
+          expect(y).toBeGreaterThanOrEqual(layout.doldrumsTop + 9);
+          expect(y).toBeLessThanOrEqual(layout.doldrumsBottom - 2);
+        }
+        expect(layout.shelfLabelY).toBeLessThan(layout.shelfY - 14);
+        expect(layout.shelfReasonY).toBeGreaterThan(layout.shelfY + 14);
+        expect(layout.doldrumsUpperLabelY).toBeLessThan(layout.doldrumsUpperY - 14);
+        expect(layout.doldrumsLowerLabelY).toBeGreaterThan(layout.doldrumsLowerY + 14);
+      }
     });
 
     it('spreads stale orbs monotonically across two alternating rows', () => {
@@ -55,14 +67,14 @@ describe('Confluence model', () => {
       );
       expect(new Set(orbs.map((candidate) => candidate.tx)).size).toBe(8);
       expect(orbs.map((candidate) => candidate.ty)).toEqual([
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
-        layout.doldrumsY - 11,
-        layout.doldrumsY + 13,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
+        layout.doldrumsUpperY,
+        layout.doldrumsLowerY,
       ]);
     });
 
@@ -81,7 +93,7 @@ describe('Confluence model', () => {
 
       for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, orbs.length);
 
-      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 586, 1006]);
+      expect(orbs.map((candidate) => candidate.tx)).toEqual([166, 754, 1342]);
       expect(orbs.every((candidate) => candidate.ty === layout.shelfY)).toBe(true);
     });
   });
