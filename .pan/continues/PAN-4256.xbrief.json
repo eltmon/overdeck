@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:09:22.280Z",
+  "updated": "2026-10-04T05:11:30.465Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
       "claimedBy": "agent-pan-4256",
       "claimedAt": "2026-10-04T05:04:05.935Z",
       "doneAt": "2026-10-04T05:09:22.280Z"
+    },
+    "review-parent-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:11:30.465Z"
     }
   }
 }
