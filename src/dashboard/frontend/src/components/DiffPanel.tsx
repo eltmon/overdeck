@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Columns2,
   ExternalLink,
+  GitCompare,
   Rows3,
   Space,
   WrapText,
@@ -27,10 +28,11 @@ import {
 import { cn } from '../lib/utils'
 import { useTheme } from '../hooks/useTheme'
 import { useDiffPreferences } from '../hooks/useDiffPreferences'
-import { buildDiffFetchUrl, parseDiffRouteSearch } from '../lib/diffRouteSearch'
+import { buildDiffFetchUrl, parseDiffRouteSearch, type DiffCompareMode } from '../lib/diffRouteSearch'
 import { buildPatchCacheKey, resolveDiffThemeName } from '../lib/diffRendering'
 import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './DiffPanelShell'
+import { DiffCompareBar } from './DiffCompareBar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,7 +202,16 @@ function formatShortTimestamp(iso: string): string {
 
 // ─── URL helpers (Overdeck uses window.history directly) ────────────────────
 
-type DiffUrlParams = { diff?: string; diffTurnId?: string; diffFilePath?: string }
+type DiffUrlParams = {
+  diff?: string
+  diffTurnId?: string
+  diffFilePath?: string
+  diffBase?: string
+  diffHead?: string
+  diffMode?: DiffCompareMode
+}
+
+const DIFF_URL_KEYS = ['diff', 'diffTurnId', 'diffFilePath', 'diffBase', 'diffHead', 'diffMode'] as const
 
 function readDiffParamsFromUrl(): DiffUrlParams {
   return parseDiffRouteSearch(
@@ -208,20 +219,14 @@ function readDiffParamsFromUrl(): DiffUrlParams {
   )
 }
 
-function writeDiffParamsToUrl(params: {
-  diff?: string
-  diffTurnId?: string
-  diffFilePath?: string
-}) {
+function writeDiffParamsToUrl(params: DiffUrlParams) {
   const searchParams = new URLSearchParams(window.location.search)
-  // Strip existing diff params
-  searchParams.delete('diff')
-  searchParams.delete('diffTurnId')
-  searchParams.delete('diffFilePath')
-  // Set new ones
-  if (params.diff) searchParams.set('diff', params.diff)
-  if (params.diffTurnId) searchParams.set('diffTurnId', params.diffTurnId)
-  if (params.diffFilePath) searchParams.set('diffFilePath', params.diffFilePath)
+  // Replace every diff param with the new selection
+  for (const key of DIFF_URL_KEYS) {
+    searchParams.delete(key)
+    const value = params[key]
+    if (value) searchParams.set(key, value)
+  }
 
   const query = searchParams.toString()
   const url = query
@@ -231,15 +236,7 @@ function writeDiffParamsToUrl(params: {
 }
 
 function clearDiffParamsFromUrl() {
-  const searchParams = new URLSearchParams(window.location.search)
-  searchParams.delete('diff')
-  searchParams.delete('diffTurnId')
-  searchParams.delete('diffFilePath')
-  const query = searchParams.toString()
-  const url = query
-    ? `${window.location.pathname}?${query}`
-    : window.location.pathname
-  window.history.pushState({}, '', url)
+  writeDiffParamsToUrl({})
 }
 
 // ─── Simple toggle button ─────────────────────────────────────────────────────
@@ -343,6 +340,8 @@ interface DiffPanelProps {
    *  (e.g. the conversation side panel) nor write back to the shared URL. The
    *  local selection is initialized from `defaultView`. */
   isolateSelection?: boolean
+  /** Absolute repo path for the Compare view; the chip is hidden without it. */
+  repoPath?: string
 }
 
 export function DiffPanel({
@@ -353,6 +352,7 @@ export function DiffPanel({
   diffUrlPrefix,
   defaultView = 'full',
   isolateSelection = false,
+  repoPath,
 }: DiffPanelProps) {
   const { resolvedTheme } = useTheme()
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
@@ -422,8 +422,11 @@ export function DiffPanel({
   )
 
   const isVsMain = selectedTurnId === 'vs-main'
+  const isCompare = selectedTurnId === 'compare'
+  const { diffBase, diffHead, diffMode } = effectiveParams
+  const compareReady = isCompare && !!repoPath && !!diffBase && !!diffHead
   const selectedTurn =
-    selectedTurnId === null || isVsMain
+    selectedTurnId === null || isVsMain || isCompare
       ? undefined
       : (orderedTurnDiffSummaries.find((s) => s.turnId === selectedTurnId) ??
         orderedTurnDiffSummaries[0])
@@ -435,8 +438,10 @@ export function DiffPanel({
   const needsFilePicker = !selectedFilePath
   const skipTurnDiffFetch = needsFilePicker && !!selectedTurn
 
-  const { data: diffResponse, isLoading: isLoadingDiff } = useQuery({
-    queryKey: isVsMain
+  const { data: diffResponse, isLoading: isLoadingDiff, error: diffError } = useQuery({
+    queryKey: isCompare
+      ? ['diff-compare', repoPath, diffBase, diffHead, diffMode ?? 'two-dot', selectedFilePath ?? null, ignoreWhitespace]
+      : isVsMain
       ? ['diff-vs-main', agentId, selectedFilePath ?? null, ignoreWhitespace]
       : selectedTurn
         ? ['diff-turn', agentId, selectedTurn.turnId, selectedFilePath ?? null, ignoreWhitespace]
@@ -447,13 +452,22 @@ export function DiffPanel({
         : selectedTurn
           ? `${baseUrl}/${encodeURIComponent(selectedTurn.turnId)}`
           : `${baseUrl}/full`
-      const url = buildDiffFetchUrl(path, { file: selectedFilePath, ignoreWhitespace: ignoreWhitespace ? '1' : null })
+      const whitespace = ignoreWhitespace ? '1' : null
+      const url = isCompare
+        ? buildDiffFetchUrl('/api/diffs/compare', {
+            repo: repoPath, base: diffBase, head: diffHead, mode: diffMode ?? 'two-dot',
+            file: selectedFilePath, ignoreWhitespace: whitespace,
+          })
+        : buildDiffFetchUrl(path, { file: selectedFilePath, ignoreWhitespace: whitespace })
       const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to fetch diff')
-      return res.json() as Promise<{ diff?: string; files?: TurnDiffFileChange[] }>
+      const body = await res.json().catch(() => null) as { diff?: string; files?: TurnDiffFileChange[]; error?: string } | null
+      // The compare route explains 400s (unknown ref, disallowed repo) in `error`.
+      if (!res.ok) throw new Error(body?.error ?? 'Failed to fetch diff')
+      return body ?? {}
     },
-    enabled: diffOpen && !skipTurnDiffFetch,
+    enabled: diffOpen && !skipTurnDiffFetch && (!isCompare || compareReady),
   })
+  const compareError = isCompare && diffError instanceof Error ? diffError.message : null
 
   // For turn diffs without a file selected, use the summary's file list
   const filePickerFiles: TurnDiffFileChange[] | undefined = needsFilePicker
@@ -552,7 +566,12 @@ export function DiffPanel({
 
   const selectFile = (filePath: string) => {
     const turnId = selectedTurnId ?? undefined
-    writeParams({ diff: '1', ...(turnId && { diffTurnId: turnId }), diffFilePath: filePath })
+    writeParams({
+      diff: '1',
+      ...(turnId && { diffTurnId: turnId }),
+      diffFilePath: filePath,
+      ...(isCompare && { diffBase, diffHead, diffMode }),
+    })
   }
 
   const selectWholeConversation = () => {
@@ -561,6 +580,13 @@ export function DiffPanel({
 
   const selectVsMain = () => {
     writeParams({ diff: '1', diffTurnId: 'vs-main' })
+  }
+
+  // Opening Compare keeps any previous refs; applying new refs drops diffFilePath.
+  const selectCompare = (next: { base?: string; head?: string; mode?: DiffCompareMode } = {
+    base: diffBase, head: diffHead, mode: diffMode,
+  }) => {
+    writeParams({ diff: '1', diffTurnId: 'compare', diffBase: next.base, diffHead: next.head, diffMode: next.mode })
   }
 
   const handleClose = () => {
@@ -646,6 +672,26 @@ export function DiffPanel({
               <div className="text-[10px] leading-tight font-medium">vs main</div>
             </div>
           </button>
+          {repoPath && (
+            <button
+              type="button"
+              className="shrink-0 rounded-md"
+              onClick={() => selectCompare()}
+              data-turn-chip-selected={isCompare}
+            >
+              <div
+                className={cn(
+                  'flex items-center gap-1 rounded-md border px-2 py-1 text-left transition-colors',
+                  isCompare
+                    ? 'border-border bg-accent text-accent-foreground'
+                    : 'border-border/70 bg-background/70 text-muted-foreground/80 hover:border-border hover:text-foreground/80',
+                )}
+              >
+                <GitCompare className="size-2.5" />
+                <span className="text-[10px] leading-tight font-medium">Compare…</span>
+              </div>
+            </button>
+          )}
           {orderedTurnDiffSummaries.map((summary, index) => (
             <button
               key={summary.turnId}
@@ -720,8 +766,12 @@ export function DiffPanel({
               params.set('diff', '1')
               params.set('prefix', baseUrl)
               params.set('agentId', agentId)
+              if (repoPath) params.set('repo', repoPath)
               if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
               if (selectedFilePath) params.set('diffFilePath', selectedFilePath)
+              if (isCompare && diffBase) params.set('diffBase', diffBase)
+              if (isCompare && diffHead) params.set('diffHead', diffHead)
+              if (isCompare && diffMode) params.set('diffMode', diffMode)
               window.open(`/popout/diff?${params.toString()}`, '_blank', 'width=1000,height=800')
             }}
             aria-label="Open diff in new window"
@@ -750,7 +800,21 @@ export function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
-      {orderedTurnDiffSummaries.length === 0 && !isVsMain ? (
+      {isCompare && repoPath && (
+        <DiffCompareBar
+          repoPath={repoPath}
+          base={diffBase ?? ''}
+          head={diffHead ?? ''}
+          mode={diffMode ?? 'two-dot'}
+          error={compareError}
+          onApply={selectCompare}
+        />
+      )}
+      {isCompare && (!compareReady || compareError) ? (
+        <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
+          {!repoPath ? 'Compare needs a repository path.' : compareError ? '' : 'Pick a base and head to compare.'}
+        </div>
+      ) : orderedTurnDiffSummaries.length === 0 && !isVsMain && !isCompare ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           No completed turns yet.
         </div>
