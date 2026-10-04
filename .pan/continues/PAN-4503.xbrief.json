@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4503",
   "created": "2026-10-03T23:54:05.751Z",
-  "updated": "2026-10-04T00:20:13.267Z",
+  "updated": "2026-10-04T00:20:25.190Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "whitespace-toggle-ui.ac3": {
       "status": "completed",
       "doneAt": "2026-10-04T00:20:13.267Z"
+    },
+    "compare-view-in-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T00:20:25.190Z"
     }
   }
 }
