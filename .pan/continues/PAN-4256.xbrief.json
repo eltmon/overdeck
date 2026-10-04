@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4256",
   "created": "2026-10-04T02:23:15.134Z",
-  "updated": "2026-10-04T05:11:30.465Z",
+  "updated": "2026-10-04T05:12:16.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "review-parent-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-10-04T05:11:30.465Z"
+    },
+    "review-parent-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:12:16.121Z"
     }
   }
 }
