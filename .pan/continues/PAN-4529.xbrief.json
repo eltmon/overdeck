@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:19:46.986Z",
+  "updated": "2026-10-04T05:19:59.607Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "candidate-7-other-uses.ac4": {
       "status": "completed",
       "doneAt": "2026-10-04T05:19:46.986Z"
+    },
+    "cross-cutting-security.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:19:59.607Z"
     }
   }
 }
