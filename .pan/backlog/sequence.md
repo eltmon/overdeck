@@ -1,19 +1,20 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 826_
+_Last sequenced: 2026-10-04T20:31:29.731984Z · model: claude-opus-5-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-4433 | S | high | ok |  |  | In-pipeline: dispatched reviewers can stall with no output forever; detect after N min, re-dispatch once, then needs-you |
-| 2 | PAN-4467 | S | high | ok |  |  | In-pipeline: conflict repair silently skips an approved PR whose head moved past approval; PR #4440 stuck CONFLICTING |
-| 3 | PAN-4383 | M | high | ok |  |  | In-pipeline (in review): work agents blocked on an operator decision need a channel that reaches Needs-you |
-| 4 | PAN-4466 | S | medium | ok |  |  | In-pipeline: Needs-you shows subagent permission prompts with no approve/deny options and no explanation |
-| 5 | PAN-4457 | M | medium | ok |  |  | In-pipeline: linked PRs sit on hidden agent conversations; surface the issue's PR where the operator looks |
-| 6 | PAN-4464 | S | medium | ok |  |  | In-pipeline: Linear MCP auth banner becomes one click; expired links refresh, blocked agents become clickable |
-| 7 | PAN-4455 | M | medium | ok |  |  | In-pipeline: 'Continue on another device' action from the conversation itself (Session Vault hand-off) |
-| 8 | PAN-4465 | XS | low | ok |  |  | In-pipeline: pan tell accepts conversation numbers and /conv/<n> URLs; error lists accepted target forms |
-| 9 | PAN-4485 | M | high | ok |  |  | In-pipeline: post-/clear parent+sibling share one session; list revives parent, stop/resume/restart-all hit both rows |
+| 1 | PAN-4540 | S | critical | ok |  |  | Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff |
+| 2 | PAN-4527 | S | critical | ok |  |  | Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff |
+| 3 | PAN-4532 | M | critical | ok |  | PAN-4527 | Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff |
+| 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
+| 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
+| 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
+| 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
+| 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
+| 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
+| 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -52,6 +53,7 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
 | 60 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
 | 61 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 62 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -196,16 +198,8 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-4253 | M | high | ok |  |  | S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply |
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 223 | PAN-4254 | M | high | ok |  |  | S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort |
-| 224 | PAN-4256 | M | high | ok |  |  | S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort |
-| 225 | PAN-4258 | S | medium | ok |  |  | S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as "LOW effort planning" |
-| 226 | PAN-4255 | M | medium | ok |  | PAN-4253 | S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop "Effort unverified" |
-| 227 | PAN-4257 | M | medium | ok |  |  | S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings |
-| 228 | PAN-4260 | M | medium | ok |  |  | S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs |
-| 229 | PAN-4259 | M | medium | ok |  | PAN-4253 | S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -233,10 +227,13 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 254 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 257 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
 | 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 259 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 260 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
 | 261 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 262 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 263 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
 | 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
@@ -281,16 +278,16 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 316 | PAN-4297 | L | medium | ok |  | PAN-4293 | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
+| 316 | PAN-4297 | L | medium | ok |  |  | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 322 | PAN-4330 | M | medium | ok |  | PAN-4293, PAN-4297 | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
+| 322 | PAN-4330 | M | medium | ok |  | PAN-4297 | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-4473 | M | medium | ok |  | PAN-658, PAN-4330, PAN-4293 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
+| 325 | PAN-4473 | M | medium | ok |  | PAN-4330 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -327,7 +324,6 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 359 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 362 | PAN-4486 | L | medium | ok |  | PAN-4254 | Split-button new-conversation dialog (model, effort, context, skills, issue link); blocked by PAN-4254 five-level effort |
 | 363 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
 | 364 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
 | 365 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
@@ -627,8 +623,7 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 659 | PAN-2352 | M | low | needs-refinement |  | PAN-2354 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
 | 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 662 | PAN-4293 | L | low | ok |  |  | Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault |
-| 663 | PAN-4294 | L | low | ok |  | PAN-4293 | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 663 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
@@ -649,7 +644,7 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 682 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 684 | PAN-2356 | M | low | needs-refinement |  | PAN-4293, PAN-4297 | Overdeck Anywhere P3: relay service |
+| 684 | PAN-2356 | M | low | needs-refinement |  | PAN-4297 | Overdeck Anywhere P3: relay service |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 686 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 687 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -670,7 +665,7 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 702 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
 | 703 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
 | 704 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 705 | PAN-4298 | XL | low | needs-refinement |  | PAN-4293, PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
+| 705 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
 | 706 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
 | 707 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
 | 708 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
@@ -729,7 +724,6 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 | 761 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
 | 762 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
 | 763 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 764 | PAN-658 | M | low | ok |  | PAN-2356, PAN-4293 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
 | 765 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
 | 766 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
 | 767 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
@@ -834,41 +828,45 @@ _Last sequenced: 2026-10-03T14:13:23.725491Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4433 (rank 1)
+### PAN-4540 (rank 1)
 
-Already in the pipeline (merged, verifying on main), so it is pinned at a freed top slot rather than ranked against the backlog. A reviewer that never runs leaves a PR unapproved forever and starves conflict repair, so it is high importance.
+Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because a transient mergeability read inside triggerMerge was recorded as a failed merge, and failed rows never re-arm at the same head. Every stranded PR needs an operator click or a head change that costs a full re-verification, so this directly blocks pipeline throughput. Fix is scoped to the executor result mapping and gate ordering. Verification/merge machinery, so it goes through a supervised handoff.
 
-### PAN-4467 (rank 2)
+### PAN-4527 (rank 2)
 
-Already in the pipeline, pinned at a freed top slot. It closes a silent dead end between the merge gate and conflict repair, which is pipeline substrate, so it is high importance.
+Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.
 
-### PAN-4383 (rank 3)
+### PAN-4532 (rank 3)
 
-In review with a live workspace, pinned at a freed top slot. PAN-2609 sat 16 hours because a blocked work agent had no way to reach Needs-you, so this is high importance for autonomous throughput.
+Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.
 
-### PAN-4466 (rank 4)
+### PAN-4531 (rank 4)
 
-Already in the pipeline, pinned at a freed top slot. It makes subagent permission prompts answerable or explained, which removes a confusing operator dead end.
+A run certain to fail holds the machine-wide admission slot while seven waiters queue, including the agent's own isolation test for the fix. Checking the CI verdict before each gate is a small change with large queue relief. The body routes it with or after PAN-4527, which owns the headShort fix it must not reintroduce.
 
-### PAN-4457 (rank 5)
+### PAN-4534 (rank 5)
 
-Already in the pipeline, pinned at a freed top slot. It surfaces stored PR links in Command Deck, which is operator visibility work of medium importance.
+Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
 
-### PAN-4464 (rank 6)
+### PAN-4546 (rank 10)
 
-Already in the pipeline, pinned at a freed top slot. It removes a multi-step manual workaround from the Linear auth banner.
+Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
 
-### PAN-4455 (rank 7)
+### PAN-4547 (rank 11)
 
-Already in the pipeline, pinned at a freed top slot. Its stated dependencies PAN-4446 and PAN-4447 have closed, and it is the operator-requested sending-side control for the Anywhere hand-off.
+Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
 
-### PAN-4465 (rank 8)
+### PAN-4511 (rank 12)
 
-Already in the pipeline, pinned at a freed top slot. It is a small CLI ergonomics fix, so it is low importance.
+pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-4485 (rank 9)
+### PAN-4544 (rank 13)
 
-Already in the pipeline, so it is pinned at the first free slot after the other in-pipeline pins. A superseded parent that keeps reviving and shares stop/resume with its sibling can kill or overwrite a live conversation, so it is high importance despite its P3 label.
+Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
+
+### PAN-4551 (rank 14)
+
+Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
 
 ### PAN-4217 (rank 23)
 
@@ -1022,6 +1020,10 @@ New issue split out of the now-closed PAN-4370. No memory observation has been e
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
+### PAN-4550 (rank 62)
+
+Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
+
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1146,14 +1148,6 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
 
 New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.
 
-### PAN-3811 (rank 100)
-
-New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
-
-### PAN-2179 (rank 101)
-
-Triage: verify the no-kickoff zombie gap against the current liveness definition (stale work activity, not a mirror label). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1161,125 +1155,146 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-03T14:13:23.725491Z",
+  "generatedAt": "2026-10-04T20:31:29.731984Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 826,
+  "openCount": 820,
   "nodes": [
     {
-      "issue": "PAN-4433",
+      "issue": "PAN-4540",
       "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Gate refusal inside triggerMerge is marked failed, so approved green PRs never re-arm auto-merge. TENET-10: supervised handoff",
+      "rationale": "Observed 2026-10-04 on PR #4525: an approved, all-green PR was stranded because a transient mergeability read inside triggerMerge was recorded as a failed merge, and failed rows never re-arm at the same head. Every stranded PR needs an operator click or a head change that costs a full re-verification, so this directly blocks pipeline throughput. Fix is scoped to the executor result mapping and gate ordering. Verification/merge machinery, so it goes through a supervised handoff.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4527",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Re-review joins a worker started on the old head and fails the new head on stale CI; burns attempts. TENET-10: supervised handoff",
+      "rationale": "Root cause is pinned to two lines (sameHead always true, launch-time headShort reused). A wrong verdict tells agents to fix failures that no longer exist and spends verification budget, so it corrupts the core feedback loop. It also defines the head-equivalence rule PAN-4532 and PAN-4531 build on, so it goes first in the verification bundle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4532",
+      "rank": 3,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4527"
+      ],
+      "why": "Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff",
+      "rationale": "Every pan reload during a verification orphans its waiter, and four issues were exposed on 2026-10-04 alone. The re-run holds the single CPU admission slot for a head that already passed, starving every other issue. Needs PAN-4527's head-equivalence rule to decide when a finished result can be consumed, so it follows that fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4531",
+      "rank": 4,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff",
+      "rationale": "A run certain to fail holds the machine-wide admission slot while seven waiters queue, including the agent's own isolation test for the fix. Checking the CI verdict before each gate is a small change with large queue relief. The body routes it with or after PAN-4527, which owns the headShort fix it must not reintroduce.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4534",
+      "rank": 5,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10",
+      "rationale": "Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4546",
+      "rank": 10,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff",
+      "rationale": "Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4547",
+      "rank": 11,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917",
+      "rationale": "Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4511",
+      "rank": 12,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch",
+      "rationale": "pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4544",
+      "rank": 13,
       "size": "S",
       "importance": "high",
       "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: dispatched reviewers can stall with no output forever; detect after N min, re-dispatch once, then needs-you",
-      "rationale": "Already in the pipeline (merged, verifying on main), so it is pinned at a freed top slot rather than ranked against the backlog. A reviewer that never runs leaves a PR unapproved forever and starves conflict repair, so it is high importance.",
+      "why": "/api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl",
+      "rationale": "Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4467",
-      "rank": 2,
-      "size": "S",
+      "issue": "PAN-4551",
+      "rank": 14,
+      "size": "L",
       "importance": "high",
-      "score": 76,
+      "score": 74,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: conflict repair silently skips an approved PR whose head moved past approval; PR #4440 stuck CONFLICTING",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. It closes a silent dead end between the merge gate and conflict repair, which is pipeline substrate, so it is high importance.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4383",
-      "rank": 3,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline (in review): work agents blocked on an operator decision need a channel that reaches Needs-you",
-      "rationale": "In review with a live workspace, pinned at a freed top slot. PAN-2609 sat 16 hours because a blocked work agent had no way to reach Needs-you, so this is high importance for autonomous throughput.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4466",
-      "rank": 4,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: Needs-you shows subagent permission prompts with no approve/deny options and no explanation",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. It makes subagent permission prompts answerable or explained, which removes a confusing operator dead end.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4457",
-      "rank": 5,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: linked PRs sit on hidden agent conversations; surface the issue's PR where the operator looks",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. It surfaces stored PR links in Command Deck, which is operator visibility work of medium importance.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4464",
-      "rank": 6,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: Linear MCP auth banner becomes one click; expired links refresh, blocked agents become clickable",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. It removes a multi-step manual workaround from the Linear auth banner.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4455",
-      "rank": 7,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: 'Continue on another device' action from the conversation itself (Session Vault hand-off)",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. Its stated dependencies PAN-4446 and PAN-4447 have closed, and it is the operator-requested sending-side control for the Anywhere hand-off.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4465",
-      "rank": 8,
-      "size": "XS",
-      "importance": "low",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: pan tell accepts conversation numbers and /conv/<n> URLs; error lists accepted target forms",
-      "rationale": "Already in the pipeline, pinned at a freed top slot. It is a small CLI ergonomics fix, so it is low importance.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4485",
-      "rank": 9,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: post-/clear parent+sibling share one session; list revives parent, stop/resume/restart-all hit both rows",
-      "rationale": "Already in the pipeline, so it is pinned at the first free slot after the other in-pipeline pins. A superseded parent that keeps reviving and shares stop/resume with its sibling can kill or overwrite a live conversation, so it is high importance despite its P3 label.",
+      "dependsOn": [
+        "PAN-4527",
+        "PAN-4532",
+        "PAN-4531",
+        "PAN-4540",
+        "PAN-4534"
+      ],
+      "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
+      "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1776,6 +1791,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "dependsOn": [],
       "why": "Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck",
       "rationale": "New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4550",
+      "rank": 62,
+      "size": "XS",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally",
+      "rationale": "Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2925,6 +2953,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "planning": "auto"
     },
     {
+      "issue": "PAN-4487",
+      "rank": 158,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test",
+      "rationale": "New issue with a precise root cause and a one-line fix plus a named test. The whitelist silently discards three AgentState fields, so the MODEL inspector always shows a fallback spawn key and foreman ownership is lost on the first save. It touches the same whitelist PAN-4253 extends, so landing it first avoids a conflict and gives that slice a tested pattern.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3257",
       "rank": 159,
       "size": "S",
@@ -3594,19 +3635,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "planning": "auto"
     },
     {
-      "issue": "PAN-4253",
-      "rank": 220,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4242",
       "rank": 221,
       "size": "M",
@@ -3629,101 +3657,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "dependsOn": [],
       "why": "Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope.",
       "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4254",
-      "rank": 223,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4256",
-      "rank": 224,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4258",
-      "rank": 225,
-      "size": "S",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as \"LOW effort planning\"",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4255",
-      "rank": 226,
-      "size": "M",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4253"
-      ],
-      "why": "S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop \"Effort unverified\"",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4257",
-      "rank": 227,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4260",
-      "rank": 228,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4259",
-      "rank": 229,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4253"
-      ],
-      "why": "S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json",
-      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4058,6 +3991,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "planning": "auto"
     },
     {
+      "issue": "PAN-4530",
+      "rank": 257,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline",
+      "rationale": "Operator decision 2026-10-04 with replacement text drafted in the body. Skill-text only, but it stops the loop from going quiet on a stuck pipeline, which otherwise reads the same as a clear one.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3533",
       "rank": 258,
       "size": "L",
@@ -4080,6 +4026,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "why": "OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4512",
+      "rank": 260,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch",
+      "rationale": "PAN-4257 (its blocker) closed, so the pure decideEscalation exists again. Trigger choice is still open in the body, so condition is needs-refinement; Settings currently implies escalation runs.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1666",
@@ -4105,6 +4064,19 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "dependsOn": [],
       "why": "Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent",
       "rationale": "Session/activity feed coalesces review-spawn spam and supersedes re-reviews per issue — keeps active conversations most-recent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4510",
+      "rank": 263,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259",
+      "rationale": "Its blocker PAN-4259 closed and supplied the shared label helper, so this display-only follow-up is unblocked. Medium-low value: effort is already visible in the composer chip.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4650,11 +4622,9 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "importance": "medium",
       "score": 62,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4293"
-      ],
+      "dependsOn": [],
       "why": "Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite",
-      "rationale": "Moved up from 682 because its account-service dependency PAN-4293 was built and is verifying on main, and the 2026-09-29 design ships it first in tester mode behind an entitlement stub, so billing (PAN-4294) no longer blocks it.",
+      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4733,10 +4703,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "score": 62,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4293",
         "PAN-4297"
       ],
       "why": "Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue",
+      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4773,11 +4743,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "score": 60,
       "condition": "ok",
       "dependsOn": [
-        "PAN-658",
-        "PAN-4330",
-        "PAN-4293"
+        "PAN-4330"
       ],
       "why": "Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service",
+      "rationale": "Blocker PAN-658, PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6375,6 +6344,7 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "condition": "ok",
       "dependsOn": [],
       "why": "Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist.",
+      "rationale": "A 2026-10-03 comment adds a requirement to diff two arbitrary refs in a local repo with no remote or PR; scope grows but impact relative to the backlog is unchanged, so rank 455 holds.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -8910,30 +8880,15 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "planning": "skip"
     },
     {
-      "issue": "PAN-4293",
-      "rank": 662,
-      "size": "L",
-      "importance": "low",
-      "score": 27,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault",
-      "rationale": "Rank 651->662 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4294",
       "rank": 663,
       "size": "L",
       "importance": "low",
       "score": 22,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4293"
-      ],
+      "dependsOn": [],
       "why": "Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service",
-      "rationale": "Rank held at 663; the body now records decided pricing, Creem as merchant of record and hosted compute billed separately, which closes every open decision, so the condition moves from needs-refinement to ok while the PAN-4293 dependency still holds its slot in step 6.",
+      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9194,11 +9149,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "score": 26,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4293",
         "PAN-4297"
       ],
       "why": "Overdeck Anywhere P3: relay service",
-      "rationale": "Rank 659->684 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved. Also gained dependsOn PAN-4297 (hosted vault before relay).",
+      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -9450,13 +9404,12 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "score": 20,
       "condition": "needs-refinement",
       "dependsOn": [
-        "PAN-4293",
         "PAN-4294",
         "PAN-4295",
         "PAN-1676"
       ],
       "why": "Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt",
-      "rationale": "New since the prior run: the last step of the Fly track with four unbuilt prerequisites and open isolation and credential questions, so it ranks below its dependencies.",
+      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10170,22 +10123,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "why": "Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-658",
-      "rank": 764,
-      "size": "M",
-      "importance": "low",
-      "score": 15,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2356",
-        "PAN-4293"
-      ],
-      "why": "Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport",
-      "rationale": "Re-derived github-ref membership and ordering this pass: PAN-2350's phase checklist reads 'Phase 4 - Shared Sessions v0 = #658, built ON the #2356 relay', so it is a child of the Anywhere epic and gated on the relay. Rank unchanged - the cross-reference is not new. New github-ref this pass: PAN-4293 (account service) also blocks it; rank unchanged.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-624",
@@ -11425,34 +11362,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4486",
-      "rank": 362,
-      "size": "L",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4254"
-      ],
-      "why": "Split-button new-conversation dialog (model, effort, context, skills, issue link); blocked by PAN-4254 five-level effort",
-      "rationale": "New issue: well-specified UI+backend feature with clear AC; ranked mid-tier behind its in-pipeline blocker PAN-4254.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4487",
-      "rank": 158,
-      "size": "XS",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test",
-      "rationale": "New issue with a precise root cause and a one-line fix plus a named test. The whitelist silently discards three AgentState fields, so the MODEL inspector always shows a fallback spawn key and foreman ownership is lost on the first save. It touches the same whitelist PAN-4253 extends, so landing it first avoids a conflict and gives that slice a tested pattern.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -11912,25 +11821,11 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 0.95
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-658",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-1983",
       "to": "PAN-1984",
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-2356",
-      "to": "PAN-658",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-3853",
@@ -12043,13 +11938,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-2566",
-      "to": "PAN-658",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-2566",
@@ -12227,51 +12115,9 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 0.6
     },
     {
-      "from": "PAN-4253",
-      "to": "PAN-4255",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4253",
-      "to": "PAN-4259",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4293",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-4294",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
-      "to": "PAN-4294",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
-      "to": "PAN-658",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12325,13 +12171,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 1
     },
     {
-      "from": "PAN-4293",
-      "to": "PAN-4298",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4294",
       "to": "PAN-4298",
       "type": "unblocks",
@@ -12341,13 +12180,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
     {
       "from": "PAN-1676",
       "to": "PAN-4298",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
-      "to": "PAN-4297",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -12528,20 +12360,6 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-4455",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
-      "to": "PAN-4330",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4297",
       "to": "PAN-4330",
       "type": "unblocks",
@@ -12549,21 +12367,7 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 1
     },
     {
-      "from": "PAN-658",
-      "to": "PAN-4473",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4330",
-      "to": "PAN-4473",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4293",
       "to": "PAN-4473",
       "type": "unblocks",
       "source": "github-ref",
@@ -12794,39 +12598,67 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
       "confidence": 0.5
     },
     {
-      "from": "PAN-2672",
-      "to": "PAN-4485",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4254",
-      "to": "PAN-4486",
+      "from": "PAN-4527",
+      "to": "PAN-4532",
       "type": "unblocks",
       "source": "github-ref",
-      "confidence": 1
+      "confidence": 0.8
     },
     {
-      "from": "PAN-4486",
-      "to": "PAN-1357",
+      "from": "PAN-4527",
+      "to": "PAN-4531",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4527",
+      "to": "PAN-4551",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4532",
+      "to": "PAN-4551",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4531",
+      "to": "PAN-4551",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4540",
+      "to": "PAN-4551",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4534",
+      "to": "PAN-4551",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4531",
+      "to": "PAN-4546",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
     },
     {
-      "from": "PAN-4486",
-      "to": "PAN-743",
+      "from": "PAN-4532",
+      "to": "PAN-4546",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4487",
-      "to": "PAN-4253",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     }
   ]
 }
