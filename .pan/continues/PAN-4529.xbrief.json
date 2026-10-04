@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4529",
   "created": "2026-10-04T04:49:09.873Z",
-  "updated": "2026-10-04T05:15:52.861Z",
+  "updated": "2026-10-04T05:16:04.364Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "candidate-2-message-delivery.ac2": {
       "status": "completed",
       "doneAt": "2026-10-04T05:15:52.861Z"
+    },
+    "candidate-2-message-delivery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-04T05:16:04.364Z"
     }
   }
 }
