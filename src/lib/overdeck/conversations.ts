@@ -22,6 +22,7 @@ import type {
 } from '@overdeck/contracts';
 import { getOverdeckDatabase } from './infra.js';
 import { parseSkillOverridesColumn } from './conversation-launch-context.js';
+import { vacateConversationName } from './conversation-replace.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
@@ -926,8 +927,7 @@ export function createConversation(opts: {
   }
 
   db.transaction(() => {
-    db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(opts.name);
-    db.prepare(`DELETE FROM conversations WHERE name = ?`).run(opts.name);
+    vacateConversationName(db, opts.name, now);
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
