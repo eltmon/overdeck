@@ -1,7 +1,7 @@
 /**
  * PAN-1990 dashboard-sidebar: the Workspaces rail above Projects.
  */
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -221,5 +221,19 @@ describe('Sidebar Workspaces "+" entry point (PAN-3330 FR-6a)', () => {
 
     expect(await screen.findByTestId('sidebar-workspaces-toggle-grouped')).toBeDefined();
     expect(screen.queryByTestId('sidebar-new-workspace')).toBeNull();
+  });
+});
+
+describe('Sidebar Workspaces main-checkout label', () => {
+  it('names the project on an ungrouped main row and keeps "main" under a project group', async () => {
+    const workspaces = [ws({ id: 'ws-main', kind: 'main', name: 'main', projectId: 'overdeck' })];
+    renderSidebar({ workspaces });
+    const row = await screen.findByTestId('sidebar-workspace-ws-main');
+    await waitFor(() => expect(row).toHaveTextContent('Overdeck'));
+
+    cleanup();
+    localStorage.setItem('overdeck.ui.sidebarWorkspacesGrouped', 'true');
+    renderSidebar({ workspaces });
+    expect(await screen.findByTestId('sidebar-workspace-ws-main')).toHaveTextContent(/^main$/);
   });
 });

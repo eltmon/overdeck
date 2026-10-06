@@ -97,7 +97,7 @@ describe('Sidebar workspaces rail filter (PAN-3286 FR-13)', () => {
     const rail = await workspacesRail();
 
     await waitFor(() => expect(within(rail).getByText('scratch-lens')).toBeTruthy());
-    expect(within(rail).getByText('main')).toBeTruthy();
+    expect(within(rail).getByText('overdeck')).toBeTruthy();
     expect(within(rail).getByText('feature-pan-fav')).toBeTruthy();
     expect(within(rail).queryByText('feature-pan-1001')).toBeNull();
     expect(within(rail).queryByText('feature-pan-1002')).toBeNull();

@@ -464,6 +464,11 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     const prLink = ws.kind === 'issue' && ws.issueId
       ? issuePullRequestBadgeLink(derivedByIssueId[ws.issueId.toUpperCase()]?.pr)
       : null;
+    // Every project's primary checkout is a workspace named "main", so an
+    // ungrouped rail listed several identical "main" rows. Name the project.
+    const label = ws.kind === 'main' && ws.name === 'main' && !workspacesGrouped
+      ? projectNameByKey.get(ws.projectId) ?? ws.projectId
+      : ws.name;
     return (
       <button
         key={ws.id}
@@ -473,7 +478,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
         className="w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 text-muted-foreground hover:bg-accent hover:text-foreground border-transparent"
       >
         <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">{ws.name}</span>
+        <span className="truncate">{label}</span>
         {(phase || prLink) && (
           <span className="ml-auto flex items-center gap-1.5 shrink-0">
             {prLink && <span data-testid={`sidebar-workspace-pr-${ws.id}`}><PullRequestBadge link={prLink} /></span>}
