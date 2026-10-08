@@ -8,7 +8,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isUserFacingWorkspace, Sidebar, type WorkspaceRegistryRow } from './Sidebar';
+import { isRailWorkspace, isUserFacingWorkspace, Sidebar, type WorkspaceRegistryRow } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
 
 vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
@@ -84,6 +84,13 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('isRailWorkspace', () => {
+  it('drops a non-favorited main checkout from the rail and keeps a favorited one', () => {
+    expect(REGISTRY.filter(isRailWorkspace).map((w) => w.id)).toEqual(['ws-scratch', 'ws-fav']);
+    expect(isRailWorkspace(workspaceRow({ id: 'ws-main-fav', kind: 'main', name: 'main', issueId: null, isFavorite: true }))).toBe(true);
+  });
+});
+
 describe('isUserFacingWorkspace (PAN-3286 FR-13)', () => {
   it('keeps main, scratch, and favorited issue rows and drops non-favorited issue rows', () => {
     expect(REGISTRY.filter(isUserFacingWorkspace).map((w) => w.id)).toEqual(['ws-main', 'ws-scratch', 'ws-fav']);
@@ -91,13 +98,15 @@ describe('isUserFacingWorkspace (PAN-3286 FR-13)', () => {
 });
 
 describe('Sidebar workspaces rail filter (PAN-3286 FR-13)', () => {
-  it('renders only main/scratch/favorited rows plus a count row for the hidden ones', async () => {
+  it('renders only scratch/favorited rows plus a count row for the hidden pipeline worktrees', async () => {
     stubFetch();
     renderSidebar();
     const rail = await workspacesRail();
 
     await waitFor(() => expect(within(rail).getByText('scratch-lens')).toBeTruthy());
-    expect(within(rail).getByText('overdeck')).toBeTruthy();
+    // A non-favorited main checkout is reached from its project, not the rail,
+    // and it is not counted as a pipeline worktree.
+    expect(within(rail).queryByTestId('sidebar-workspace-ws-main')).toBeNull();
     expect(within(rail).getByText('feature-pan-fav')).toBeTruthy();
     expect(within(rail).queryByText('feature-pan-1001')).toBeNull();
     expect(within(rail).queryByText('feature-pan-1002')).toBeNull();
@@ -229,6 +238,15 @@ describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
     expect(container.textContent).not.toContain('1 pipeline worktrees');
   });
 
+  it('lists a main checkout under its project name, not as "main"', async () => {
+    stubFetch([
+      { ...workspaceRow({ id: 'ws-main', projectId: 'okf', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }), projectName: 'OKF' },
+    ]);
+    const { container } = renderPalette();
+
+    await waitFor(() => expect(container.textContent).toContain('OKF'));
+  });
+
   it('shows no count row when every workspace is user-facing', async () => {
     stubFetch(REGISTRY.filter(isUserFacingWorkspace));
     const { container } = renderPalette();
@@ -262,7 +280,7 @@ describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
 describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
   it('renders the memory phase for a main/scratch row that has one', async () => {
     stubFetch([
-      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, memoryPhase: 'shipping', lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, isFavorite: true, memoryPhase: 'shipping', lastAccessedAt: 50 }),
       workspaceRow({ id: 'ws-scratch', kind: 'scratch', name: 'scratch-lens', issueId: null, memoryPhase: 'exploring', lastAccessedAt: 40 }),
     ]);
     renderSidebar();

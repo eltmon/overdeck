@@ -14,7 +14,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getWorkspaceById, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
+import { getProjectByKey, getWorkspaceById, listProjects, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   archiveWorkspace,
   relocateWorkspace,
@@ -67,6 +67,11 @@ export interface WorkspaceListRow extends Omit<WorkspaceRow, 'runCommand'> {
    * instead (PAN-3286 FR-12, D-12).
    */
   memoryPhase: string | null;
+  /**
+   * The owning project's display name. Every main checkout is named "main", so
+   * surfaces that list rows across projects label main rows with this instead.
+   */
+  projectName: string;
 }
 
 function badgeFrom(derived: DerivedIssueState | undefined): WorkspacePipelineBadge | null {
@@ -119,11 +124,12 @@ function toListRow(
   workspace: WorkspaceRow,
   memoryPhase: string | null = null,
   pipeline: WorkspacePipelineBadge | null = null,
+  projectName: string = getProjectByKey(workspace.projectId)?.name ?? workspace.projectId,
 ): WorkspaceListRow {
   // Destructured out rather than deleted afterwards, so a future field added to
   // WorkspaceRow cannot silently leak through a forgotten delete.
   const { runCommand: _runCommand, ...publicFields } = workspace;
-  return { ...publicFields, pipeline, memoryPhase };
+  return { ...publicFields, pipeline, memoryPhase, projectName };
 }
 
 /**
@@ -173,11 +179,13 @@ const listWorkspaceRegistryRoute = HttpRouter.add(
     // local JSON file, and issue rows are skipped entirely.
     const memoryPhases = yield* Effect.promise(() => Promise.all(workspaces.map(readMemoryPhase)));
     const badges = yield* Effect.promise(() => pipelineBadges(workspaces));
+    const projectNames = new Map(listProjects().map((project) => [project.id, project.name]));
     return jsonResponse({
       workspaces: workspaces.map((workspace, index) => toListRow(
         workspace,
         memoryPhases[index] ?? null,
         workspace.issueId ? badges.get(workspace.issueId) ?? null : null,
+        projectNames.get(workspace.projectId) ?? workspace.projectId,
       )),
     });
   })),

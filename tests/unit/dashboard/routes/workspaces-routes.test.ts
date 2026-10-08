@@ -30,6 +30,8 @@ const routeMocks = vi.hoisted(() => ({
 vi.mock('../../../../src/lib/workspaces/resolver.js', () => ({
   getWorkspaceById: routeMocks.getWorkspaceById,
   listWorkspaces: routeMocks.listWorkspaces,
+  listProjects: () => [],
+  getProjectByKey: () => null,
 }));
 
 vi.mock('../../../../src/lib/workspaces/writer.js', () => ({
@@ -133,6 +135,8 @@ describe('GET /api/workspace-registry (ac1)', () => {
         pipeline: { state: 'ready' },
         // PAN-3286 FR-12: null for issue rows, which badge the pipeline phase.
         memoryPhase: null,
+        // No registered project row in this mock, so the key stands in.
+        projectName: 'overdeck',
       }],
     });
     expect(routeMocks.loadIssueStatesForProject).toHaveBeenCalledWith('/repo', ['PAN-9001']);

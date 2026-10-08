@@ -225,8 +225,8 @@ describe('Sidebar Workspaces "+" entry point (PAN-3330 FR-6a)', () => {
 });
 
 describe('Sidebar Workspaces main-checkout label', () => {
-  it('names the project on an ungrouped main row and keeps "main" under a project group', async () => {
-    const workspaces = [ws({ id: 'ws-main', kind: 'main', name: 'main', projectId: 'overdeck' })];
+  it('names the project on an ungrouped favorited main row and keeps "main" under a project group', async () => {
+    const workspaces = [ws({ id: 'ws-main', kind: 'main', name: 'main', projectId: 'overdeck', isFavorite: true })];
     renderSidebar({ workspaces });
     const row = await screen.findByTestId('sidebar-workspace-ws-main');
     await waitFor(() => expect(row).toHaveTextContent('Overdeck'));

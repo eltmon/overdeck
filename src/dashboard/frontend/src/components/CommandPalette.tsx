@@ -654,18 +654,23 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   }, [onSelectWorkspace]);
 
   const workspaceActions = useMemo<PaletteAction[]>(() => {
-    const actions: PaletteAction[] = visibleWorkspaceRows.map((ws) => ({
-      id: `workspace-${ws.id}`,
-      label: ws.title ?? ws.name,
-      description: ws.issueId ?? ws.kind,
-      icon: Clock,
-      group: 'Workspaces',
-      keywords: [ws.name, ws.issueId ?? '', ws.title ?? '', ws.kind],
-      onSelect: () => {
-        void fetch(`/api/workspace-registry/${ws.id}/activate`, { method: 'POST' });
-        onSelectWorkspace?.(ws.id);
-      },
-    }));
+    const actions: PaletteAction[] = visibleWorkspaceRows.map((ws) => {
+      // Every main checkout is named "main"; list it under its project.
+      const projectName = ws.projectName ?? ws.projectId;
+      const isMain = ws.kind === 'main';
+      return {
+        id: `workspace-${ws.id}`,
+        label: ws.title ?? (isMain && ws.name === 'main' ? projectName : ws.name),
+        description: ws.issueId ?? (isMain ? 'main checkout' : ws.kind),
+        icon: Clock,
+        group: 'Workspaces',
+        keywords: [ws.name, ws.issueId ?? '', ws.title ?? '', ws.kind, projectName],
+        onSelect: () => {
+          void fetch(`/api/workspace-registry/${ws.id}/activate`, { method: 'POST' });
+          onSelectWorkspace?.(ws.id);
+        },
+      };
+    });
 
     // PAN-3331 D-10 — ONE visible row. The group is what maps a row to a scope
     // chip, so the action normally lives under Actions and moves to Workspaces

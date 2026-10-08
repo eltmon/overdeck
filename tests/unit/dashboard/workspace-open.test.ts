@@ -35,6 +35,8 @@ const routeMocks = vi.hoisted(() => ({
 vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
   getWorkspaceById: routeMocks.getWorkspaceById,
   listWorkspaces: routeMocks.listWorkspaces,
+  listProjects: () => [],
+  getProjectByKey: () => null,
 }));
 
 vi.mock('../../../src/lib/workspaces/writer.js', () => ({

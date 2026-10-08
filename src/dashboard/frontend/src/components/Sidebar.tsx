@@ -162,6 +162,8 @@ export interface WorkspaceRegistryRow {
    * instead (PAN-3286 FR-12).
    */
   memoryPhase?: string | null;
+  /** The owning project's display name; main rows are labelled with it. */
+  projectName?: string;
 }
 
 const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
@@ -188,6 +190,16 @@ export const WORKSPACES_PIPELINE_EXPANDED_KEY = 'overdeck.ui.sidebarWorkspacesPi
  */
 export function isUserFacingWorkspace(workspace: WorkspaceRegistryRow): boolean {
   return workspace.kind !== 'issue' || workspace.isFavorite;
+}
+
+/**
+ * A row the sidebar Workspaces rail lists. A project's main checkout is
+ * reached from its Projects entry (Main checkout), so the rail lists it only
+ * when favorited; otherwise every project would appear twice. Cmd-K keeps
+ * listing main rows, under their project's name.
+ */
+export function isRailWorkspace(workspace: WorkspaceRegistryRow): boolean {
+  return isUserFacingWorkspace(workspace) && (workspace.kind !== 'main' || workspace.isFavorite);
 }
 
 export function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryRow[] {
@@ -302,8 +314,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const archivedWorkspaceCount = useMemo(() => workspaces.filter((w) => w.isArchived).length, [workspaces]);
   const archivedWorkspaces = useMemo(() => sortWorkspaces(workspaces.filter((w) => w.isArchived)), [workspaces]);
   // The rail lists workspaces the operator created; pipeline worktrees collapse
-  // behind a count row (PAN-3286 FR-13).
-  const visibleWorkspaces = useMemo(() => activeWorkspaces.filter(isUserFacingWorkspace), [activeWorkspaces]);
+  // behind a count row (PAN-3286 FR-13), and main checkouts show only when
+  // favorited.
+  const visibleWorkspaces = useMemo(() => activeWorkspaces.filter(isRailWorkspace), [activeWorkspaces]);
   const pipelineWorkspaces = useMemo(
     () => activeWorkspaces.filter((w) => !isUserFacingWorkspace(w)),
     [activeWorkspaces],
@@ -467,7 +480,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     // Every project's primary checkout is a workspace named "main", so an
     // ungrouped rail listed several identical "main" rows. Name the project.
     const label = ws.kind === 'main' && ws.name === 'main' && !workspacesGrouped
-      ? projectNameByKey.get(ws.projectId) ?? ws.projectId
+      ? ws.projectName ?? projectNameByKey.get(ws.projectId) ?? ws.projectId
       : ws.name;
     return (
       <button
@@ -600,7 +613,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                   )}
                 </div>
               </div>
-              {activeWorkspaces.length === 0 ? (
+              {visibleWorkspaces.length === 0 ? (
                 <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No workspaces</p>
               ) : workspacesGrouped ? (
                 groupedWorkspaces.map((group) => (

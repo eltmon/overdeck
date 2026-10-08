@@ -32,6 +32,8 @@ const routeMocks = vi.hoisted(() => ({
 vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
   getWorkspaceById: routeMocks.getWorkspaceById,
   listWorkspaces: routeMocks.listWorkspaces,
+  listProjects: () => [{ id: 'overdeck', name: 'Overdeck' }],
+  getProjectByKey: (key: string) => (key === 'overdeck' ? { id: 'overdeck', name: 'Overdeck' } : null),
 }));
 
 vi.mock('../../../src/lib/workspaces/writer.js', () => ({
@@ -211,6 +213,22 @@ describe('GET /api/workspace-registry memoryPhase (PAN-3286 FR-12)', () => {
       ...publicFields,
       pipeline: { state: 'ready', attention: 'needs-you' },
       memoryPhase: null,
+      projectName: 'Overdeck',
     });
+  });
+
+  it('labels each row with its project name, falling back to the project key', async () => {
+    routeMocks.listWorkspaces.mockReturnValue([
+      baseWorkspace({ id: 'ws-main', kind: 'main', name: 'main', issueId: null }),
+      baseWorkspace({ id: 'ws-unknown', projectId: 'unregistered', kind: 'main', name: 'main', issueId: null }),
+    ]);
+    routeMocks.readCurrentStatus.mockResolvedValue(undefined);
+
+    const rows = await listRows();
+
+    expect(rows.map((row) => [row.id, row.projectName])).toEqual([
+      ['ws-main', 'Overdeck'],
+      ['ws-unknown', 'unregistered'],
+    ]);
   });
 });

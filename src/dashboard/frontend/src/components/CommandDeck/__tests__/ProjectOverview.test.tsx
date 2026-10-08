@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
@@ -7,6 +7,13 @@ import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import type { DerivedIssueState } from '../../../types';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+
+const ensureMainWorkspace = vi.fn<(projectKey: string) => Promise<string>>();
+const navigateToWorkspace = vi.fn<(workspaceId: string) => void>();
+vi.mock('../../workspace/openMainWorkspace', () => ({
+  ensureMainWorkspace: (projectKey: string) => ensureMainWorkspace(projectKey),
+  navigateToWorkspace: (workspaceId: string) => navigateToWorkspace(workspaceId),
+}));
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
@@ -489,6 +496,24 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
     expect(window.location.search).toBe('?project=overdeck');
   });
 
+  it('opens the main checkout, creating its workspace on first use', async () => {
+    ensureMainWorkspace.mockResolvedValue('ws-main');
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('project-overview-main-checkout'));
+
+    await waitFor(() => expect(navigateToWorkspace).toHaveBeenCalledWith('ws-main'));
+    expect(ensureMainWorkspace).toHaveBeenCalledWith('overdeck');
+  });
+
   it('renders no affordance for a project with no key', () => {
     render(
       <ProjectOverview
@@ -500,5 +525,6 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
     );
 
     expect(screen.queryByTestId('project-overview-new-workspace')).toBeNull();
+    expect(screen.queryByTestId('project-overview-main-checkout')).toBeNull();
   });
 });
