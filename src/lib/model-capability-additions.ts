@@ -57,7 +57,35 @@ export const AUDITED_MODEL_ADDITIONS = {
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
     minClaudeCodeVersion: '2.1.284',
-    notes: 'Released 2026-09-28. Requires Claude Code 2.1.284 or newer (older versions treat it as an unrecognized model with a 200K window). Native 1M context, 128K max output, adaptive thinking with High default. Non-default temperature/top_p/top_k and forced tool_choice return 400. API $2/M input, $10/M output, $0.20/M cache read. Skill scores inherit the Sonnet 5 baseline until benchmarked.',
+    notes: 'Released 2026-09-28. Requires Claude Code 2.1.284 or newer (older versions treat it as an unrecognized model with a 200K window). Native 1M context, 128K max output, adaptive thinking with High default. Non-default temperature/top_p/top_k and forced tool_choice return 400. API $2/M input, $10/M output, $0.10/M cache read (cut from $0.20 on 2026-10-07). Skill scores inherit the Sonnet 5 baseline until benchmarked.',
+  },
+
+  'claude-haiku-5-5': {
+    model: 'claude-haiku-5-5',
+    provider: 'anthropic',
+    displayName: 'Claude Haiku 5.5',
+    // Equal input/output blend of the <=100K-prompt tier ($0.10/M in, $0.50/M out);
+    // the >100K tier and exact cache rates live in cost.ts.
+    costPer1MTokens: 0.3,
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 75,
+      'code-review': 72,
+      debugging: 70,
+      planning: 65,
+      documentation: 75,
+      testing: 70,
+      security: 60,
+      performance: 65,
+      synthesis: 68,
+      speed: 96,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
+    minClaudeCodeVersion: '2.1.293',
+    notes: 'Released 2026-10-07. Requires Claude Code 2.1.293 or newer, which also makes it the target of the short `haiku` alias. Native 1M context, 128K max output. Adaptive thinking on by default with Medium default effort; manual extended thinking (budget_tokens) and non-default temperature/top_p/top_k return 400. Tiered API pricing: prompts up to 100K tokens $0.10/M input, $0.50/M output, $0.01/M cache read; prompts over 100K tokens 5x that ($0.50/M input, $2.50/M output, $0.05/M cache read). Newer tokenizer: the same text is about 30% more tokens than on Haiku 4.5. Skill scores inherit the Haiku 4.5 baseline until benchmarked.',
   },
 
   'gemini-3.8-flash': {

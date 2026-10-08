@@ -103,13 +103,17 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'anthropic', model: 'claude-opus-4-8', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.7 series
   { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
-  // Anthropic - Sonnet 5.5 (2026-09-28): same rates as Sonnet 5.
-  { provider: 'anthropic', model: 'claude-sonnet-5-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
+  // Anthropic - Sonnet 5.5 (2026-09-28): same rates as Sonnet 5, except cache
+  // reads, which Anthropic cut from $0.20/M to $0.10/M on 2026-10-07.
+  { provider: 'anthropic', model: 'claude-sonnet-5-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic retained Sonnet 5 launch pricing as standard; the planned September increase was cancelled.
   { provider: 'anthropic', model: 'claude-sonnet-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
   { provider: 'anthropic', model: 'claude-opus-4-6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
+  // Anthropic - Haiku 5.5 (2026-10-07): rates for prompts up to 100K tokens. Prompts
+  // over 100K tokens cost exactly 5x on every component; calculateCost applies it.
+  { provider: 'anthropic', model: 'claude-haiku-5-5', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.00001, cacheWrite5mPer1k: 0.000125, cacheWrite1hPer1k: 0.0002, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-haiku-4-5', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002, currency: 'USD' },
   // Anthropic - 4.x series
   { provider: 'anthropic', model: 'claude-opus-4-1', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: 'USD' },
@@ -195,18 +199,29 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
   let cost = 0;
   let inputMultiplier = 1;
   let outputMultiplier = 1;
+  let cacheMultiplier = 1;
 
-  // Long-context pricing for retired Sonnet 4 (>200K total input tokens).
+  // Long-context pricing tiers, keyed on total input tokens:
+  // inputTokens + cacheReadTokens + cacheWriteTokens.
   // Sonnet 4.6, Sonnet 5 and Sonnet 5.5 include their full 1M context at standard pricing.
-  // Total input includes: inputTokens + cacheReadTokens + cacheWriteTokens
   const totalInputTokens = usage.inputTokens
     + (usage.cacheReadTokens || 0)
     + (usage.cacheWriteTokens || 0);
 
+  // Retired Sonnet 4 (>200K): input and output only; cache rates are unchanged.
   if (pricing.model === 'claude-sonnet-4'
       && totalInputTokens > 200000) {
     inputMultiplier = 2;    // $6/MTok vs $3/MTok
     outputMultiplier = 1.5; // $22.50/MTok vs $15/MTok
+  }
+
+  // Haiku 5.5 (>100K): every component, cache reads and writes included, costs
+  // 5x the <=100K row ($0.50/$2.50 in/out, $0.05 read, $0.625/$1 write per MTok).
+  if (pricing.model === 'claude-haiku-5-5'
+      && totalInputTokens > 100000) {
+    inputMultiplier = 5;
+    outputMultiplier = 5;
+    cacheMultiplier = 5;
   }
 
   // Input tokens
@@ -215,9 +230,9 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
   // Output tokens
   cost += (usage.outputTokens / 1000) * pricing.outputPer1k * outputMultiplier;
 
-  // Cache read tokens (not affected by long-context multiplier)
+  // Cache read tokens (only the Haiku 5.5 tier above multiplies them)
   if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
-    cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k;
+    cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k * cacheMultiplier;
   }
 
   // Cache write tokens - use TTL-appropriate pricing
@@ -227,7 +242,7 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
       ? pricing.cacheWrite1hPer1k
       : pricing.cacheWrite5mPer1k;
     if (cacheWritePrice) {
-      cost += (usage.cacheWriteTokens / 1000) * cacheWritePrice;
+      cost += (usage.cacheWriteTokens / 1000) * cacheWritePrice * cacheMultiplier;
     }
   }
 

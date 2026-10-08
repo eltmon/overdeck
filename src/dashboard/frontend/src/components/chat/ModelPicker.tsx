@@ -57,7 +57,7 @@ const EFFORT_WITHOUT_XHIGH = EFFORT_LEVELS.filter((level) => level !== 'xhigh');
 const EFFORT_UP_TO_HIGH = EFFORT_LEVELS.filter((level) => compareEffort(level, 'high') <= 0);
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-5-5' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
@@ -71,6 +71,7 @@ export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
   'claude-sonnet-5-5': EFFORT_LEVELS,
   'claude-sonnet-5': EFFORT_LEVELS,
   'claude-sonnet-4-6': EFFORT_WITHOUT_XHIGH,
+  'claude-haiku-5-5': EFFORT_LEVELS,
   'claude-haiku-4-5-20251001': [],
 };
 
@@ -109,6 +110,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9, effortLevels: EFFORT_WITHOUT_XHIGH },
       { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (200K context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: EFFORT_WITHOUT_XHIGH },
+      { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (1M context)', provider: 'anthropic', costDisplay: '$0.3/1M', costPer1MTokens: 0.3, effortLevels: EFFORT_LEVELS },
       { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (200K context)', provider: 'anthropic', costDisplay: '$3/1M', costPer1MTokens: 3, effortLevels: [] },
     ],
   },

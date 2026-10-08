@@ -39,6 +39,7 @@ describe('September model catalog no-loss audit', () => {
     ['claude-fable-5-1', 'anthropic', 1000000],
     ['claude-opus-5-5', 'anthropic', 1000000],
     ['claude-sonnet-5-5', 'anthropic', 1000000],
+    ['claude-haiku-5-5', 'anthropic', 1000000],
     ['gemini-3.8-flash', 'google', 1048576],
     ['gemini-3.5-flash-lite', 'google', 1048576],
     ['glm-5.3', 'zai', 1000000],

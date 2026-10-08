@@ -181,8 +181,10 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
       normalizedModel = 'claude-sonnet-4';
     }
 
-    // Haiku models - default to 4.5 (current), support 3 for legacy
-    if (model.includes('haiku-4-5') || model.includes('haiku-4.5')) {
+    // Haiku models - 5.5 before the bare 'haiku' default (which stays 4.5), 3 for legacy
+    if (model.includes('haiku-5-5') || model.includes('haiku-5.5') || model.includes('haiku.5.5')) {
+      normalizedModel = 'claude-haiku-5-5';
+    } else if (model.includes('haiku-4-5') || model.includes('haiku-4.5')) {
       normalizedModel = 'claude-haiku-4-5';
     } else if (model.includes('haiku-3')) {
       normalizedModel = 'claude-haiku-3';

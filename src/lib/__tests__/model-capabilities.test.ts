@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { capabilityClassOf } from '../model-capability-class.js';
 import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, MODEL_CAPABILITIES, modelSupportsSamplingParams } from '../model-capabilities.js';
 
 describe('model capabilities', () => {
@@ -155,6 +156,7 @@ describe('model capabilities', () => {
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-sonnet-5',
+    'claude-haiku-5-5',
   ])('modelSupportsSamplingParams returns false for %s', (model) => {
     expect(modelSupportsSamplingParams(model)).toBe(false);
   });
@@ -168,5 +170,24 @@ describe('model capabilities', () => {
     'not-a-model',
   ])('modelSupportsSamplingParams returns true for %s', (model) => {
     expect(modelSupportsSamplingParams(model)).toBe(true);
+  });
+
+  it('registers Claude Haiku 5.5 as a small 1M-context model alongside Haiku 4.5', () => {
+    const haiku55 = MODEL_CAPABILITIES['claude-haiku-5-5'];
+    expect(haiku55).toMatchObject({
+      model: 'claude-haiku-5-5',
+      provider: 'anthropic',
+      displayName: 'Claude Haiku 5.5',
+      contextWindow: 1000000,
+      maxOutputTokens: 128000,
+      effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      supportsSamplingParams: false,
+      minClaudeCodeVersion: '2.1.293',
+      costPer1MTokens: 0.3,
+    });
+    expect(haiku55.skills.speed).toBe(96);
+    expect(haiku55.skills['context-length']).toBe(95);
+    expect(capabilityClassOf('claude-haiku-5-5')).toBe('small');
+    expect(MODEL_CAPABILITIES['claude-haiku-4-5'].contextWindow).toBe(200000);
   });
 });

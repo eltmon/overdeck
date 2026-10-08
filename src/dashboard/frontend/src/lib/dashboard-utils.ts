@@ -37,6 +37,7 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('sonnet-4-6') || backingModel.includes('sonnet-4.6')) return 'Sonnet 4.6';
   if (backingModel.includes('sonnet-4-5') || backingModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
   if (backingModel.includes('sonnet-4') || backingModel.includes('sonnet')) return 'Sonnet 4';
+  if (backingModel.includes('haiku-5-5') || backingModel.includes('haiku-5.5') || backingModel.includes('haiku.5.5')) return 'Haiku 5.5';
   if (backingModel.includes('haiku-4-5') || backingModel.includes('haiku-4.5')) return 'Haiku 4.5';
   if (backingModel.includes('haiku-3')) return 'Haiku 3';
   if (backingModel.includes('haiku')) return 'Haiku 4.5';

@@ -99,3 +99,15 @@ it('lists Claude Sonnet 5.5 in the offline fallback catalog before Sonnet 5 (PAN
   expect(sonnet55Index).toBeGreaterThanOrEqual(0);
   expect(sonnet55Index).toBeLessThan(sonnet5Index);
 });
+
+it('lists Claude Haiku 5.5 in the offline fallback catalog before Haiku 4.5', () => {
+  const anthropic = FALLBACK_GROUPS.find(group => group.provider === 'anthropic');
+  expect(anthropic?.models).toContainEqual(expect.objectContaining({
+    id: 'claude-haiku-5-5',
+    costPer1MTokens: 0.3,
+  }));
+  const haiku55Index = anthropic!.models.findIndex(m => m.id === 'claude-haiku-5-5');
+  const haiku45Index = anthropic!.models.findIndex(m => m.id === 'claude-haiku-4-5-20251001');
+  expect(haiku55Index).toBeGreaterThanOrEqual(0);
+  expect(haiku55Index).toBeLessThan(haiku45Index);
+});

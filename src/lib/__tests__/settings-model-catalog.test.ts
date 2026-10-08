@@ -19,6 +19,13 @@ const sonnet55 = {
   effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
   costPer1MTokens: 6,
 };
+const haiku55 = {
+  id: 'claude-haiku-5-5',
+  name: 'Claude Haiku 5.5 (1M context)',
+  contextWindow: 1000000,
+  effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+  costPer1MTokens: 0.3,
+};
 
 // GPT-6 Sol/Luna (2026-09-22) and GPT-6.1 Sol (2026-09-29) are additions after the fixture was captured.
 const gpt6Additions = [
@@ -31,7 +38,7 @@ const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
 function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
-    anthropic: catalog.anthropic.filter((model) => model.id !== opus55.id && model.id !== sonnet55.id),
+    anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
   };
 }
@@ -42,6 +49,8 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.findIndex((model) => model.id === sonnet55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-sonnet-5'));
+    expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
+    expect(existing.anthropic.findIndex((model) => model.id === haiku55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-haiku-4-5'));
     expect(existing.openai.slice(0, 4).map((model) => model.id)).toEqual(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']);
     expect(existing.openai.filter((model) => gpt6AdditionIds.has(model.id))).toEqual(gpt6Additions);
     expect(withoutOpus55(existing)).toEqual(previousCatalog);
@@ -58,6 +67,7 @@ describe('model catalog no-loss audit', () => {
     expect(goModels).toEqual([go]);
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
+    expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
     expect(withoutOpus55(existing)).toEqual(previousCatalog);
   });
 });

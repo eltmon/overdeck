@@ -93,6 +93,11 @@ describe('getChunkBudgetChars (PAN-4327)', () => {
     expect(getChunkBudgetChars('claude-sonnet-5')).toBe(1_200_000);
   });
 
+  it('keeps Haiku 5.5 chunks under its 100K-token pricing tier despite the 1M window', () => {
+    expect(getChunkBudgetChars('claude-haiku-5-5')).toBe(240_000);
+    expect(getChunkBudgetChars('claude-haiku-5-5')).toBeLessThan(getChunkBudgetChars('claude-sonnet-5-5'));
+  });
+
   it('falls back to the default budget for an unmodeled or missing model', () => {
     expect(getChunkBudgetChars(undefined)).toBe(300_000);
   });

@@ -56,6 +56,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'claude-sonnet-5-5' as ModelId, name: 'Claude Sonnet 5.5 (1M context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Sonnet (September 2026) — 1M context, 128K output, low→max effort; needs Claude Code 2.1.284+' },
       { id: 'claude-sonnet-5' as ModelId, name: 'Claude Sonnet 5 (1M context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Previous Sonnet — 1M context, standard pricing' },
       { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6 (200K context)', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Sonnet — fast, capable, great for implementation' },
+      { id: 'claude-haiku-5-5' as ModelId, name: 'Claude Haiku 5.5 (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 0.3, capabilities: ['fast', 'cost-efficient', 'code', 'large-context'], description: 'Current Haiku (October 2026) — 1M context, 128K output, low→max effort; prompts over 100K tokens cost 5×; needs Claude Code 2.1.293+' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5 (200K context)', icon: Zap, tier: 'fast', costPer1MTokens: 3, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },

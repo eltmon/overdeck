@@ -9,6 +9,12 @@ describe('getFriendlyModelName', () => {
     expect(getFriendlyModelName('claude-opus-5')).toBe('Opus 5');
   });
 
+  it('names Haiku 5.5 and Haiku 4.5 apart', () => {
+    expect(getFriendlyModelName('claude-haiku-5-5')).toBe('Haiku 5.5');
+    expect(getFriendlyModelName('claude-haiku-4-5-20251001')).toBe('Haiku 4.5');
+    expect(getFriendlyModelName('claude-haiku-4-5')).toBe('Haiku 4.5');
+  });
+
   it('matches Sonnet 5.5 before the broader Sonnet 5 pattern (PAN-4327)', () => {
     expect(getFriendlyModelName('claude-sonnet-5-5')).toBe('Sonnet 5.5');
     expect(getFriendlyModelName('claude-sonnet-5')).toBe('Sonnet 5');

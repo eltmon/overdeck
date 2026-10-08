@@ -56,13 +56,13 @@ describe('cost module', () => {
       expect(pricing?.cacheWrite1hPer1k).toBe(0.004);
     });
 
-    it('should price claude-sonnet-5-5 distinctly from claude-sonnet-5 at the same rates', () => {
+    it('should price claude-sonnet-5-5 distinctly from claude-sonnet-5, with the 2026-10-07 cache-read cut', () => {
       const pricing = getPricing('anthropic', 'claude-sonnet-5-5');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-sonnet-5-5');
       expect(pricing?.inputPer1k).toBe(0.002);
       expect(pricing?.outputPer1k).toBe(0.010);
-      expect(pricing?.cacheReadPer1k).toBe(0.0002);
+      expect(pricing?.cacheReadPer1k).toBe(0.0001);
       expect(pricing?.cacheWrite5mPer1k).toBe(0.0025);
       expect(pricing?.cacheWrite1hPer1k).toBe(0.004);
 
@@ -70,7 +70,19 @@ describe('cost module', () => {
       expect(cost).toBe(12);
 
       const cacheCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing!);
-      expect(cacheCost).toBe(0.2);
+      expect(cacheCost).toBe(0.1);
+    });
+
+    it('should price claude-haiku-5-5 at its prompts-up-to-100K rates', () => {
+      const pricing = getPricing('anthropic', 'claude-haiku-5-5');
+      expect(pricing).toBeDefined();
+      expect(pricing?.model).toBe('claude-haiku-5-5');
+      expect(pricing?.inputPer1k).toBe(0.0001);
+      expect(pricing?.outputPer1k).toBe(0.0005);
+      expect(pricing?.cacheReadPer1k).toBe(0.00001);
+      expect(pricing?.cacheWrite5mPer1k).toBe(0.000125);
+      expect(pricing?.cacheWrite1hPer1k).toBe(0.0002);
+      expect(getPricing('anthropic', 'claude-haiku-4-5')?.model).toBe('claude-haiku-4-5');
     });
 
     it('should have correct pricing for claude-haiku-4-5', () => {
@@ -362,6 +374,60 @@ describe('cost module', () => {
       const cost = calculateCost(usage, haikuPricing);
       // No multiplier: (250000/1000 * 0.001) + (10000/1000 * 0.005) = 0.25 + 0.05 = 0.3
       expect(cost).toBe(0.3);
+    });
+
+    describe('claude-haiku-5-5 prompt-size tiers', () => {
+      const haiku55 = () => getPricing('anthropic', 'claude-haiku-5-5')!;
+
+      it('charges the <=100K rates at exactly 100K total input tokens', () => {
+        const usage: TokenUsage = {
+          inputTokens: 60_000,
+          outputTokens: 20_000,
+          cacheReadTokens: 30_000,
+          cacheWriteTokens: 10_000,
+          cacheTTL: '1h',
+        };
+        // Total input 60K + 30K + 10K = 100K: not over the tier boundary.
+        // 60 * 0.0001 + 20 * 0.0005 + 30 * 0.00001 + 10 * 0.0002
+        // = 0.006 + 0.01 + 0.0003 + 0.002 = 0.0183
+        expect(calculateCost(usage, haiku55())).toBeCloseTo(0.0183, 6);
+      });
+
+      it('charges 5x on input, output, cache reads and cache writes above 100K', () => {
+        const usage: TokenUsage = {
+          inputTokens: 60_001,
+          outputTokens: 20_000,
+          cacheReadTokens: 30_000,
+          cacheWriteTokens: 10_000,
+          cacheTTL: '1h',
+        };
+        // Total input 100,001 tokens: every component at the >100K rate.
+        // 60.001 * 0.0005 + 20 * 0.0025 + 30 * 0.00005 + 10 * 0.001
+        // = 0.0300005 + 0.05 + 0.0015 + 0.01 = 0.0915005
+        expect(calculateCost(usage, haiku55())).toBeCloseTo(0.0915005, 5);
+      });
+
+      it('lands on the published >100K per-MTok rates', () => {
+        const pricing = haiku55();
+        expect(calculateCost({ inputTokens: 1_000_000, outputTokens: 0 }, pricing)).toBeCloseTo(0.5, 6);
+        // Output alone never crosses the input-size boundary; pair it with 1M input: 0.5 + 2.5.
+        expect(calculateCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing)).toBeCloseTo(3, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing)).toBeCloseTo(0.05, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000 }, pricing)).toBeCloseTo(0.625, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheTTL: '1h' }, pricing))
+          .toBeCloseTo(1, 6);
+      });
+
+      it('lands on the published <=100K per-MTok rates', () => {
+        const pricing = haiku55();
+        // Scale 100K-token calls up to per-MTok: 10x the cost of 100K tokens.
+        expect(calculateCost({ inputTokens: 100_000, outputTokens: 0 }, pricing) * 10).toBeCloseTo(0.1, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 100_000 }, pricing) * 10).toBeCloseTo(0.5, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 100_000 }, pricing) * 10).toBeCloseTo(0.01, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 100_000 }, pricing) * 10).toBeCloseTo(0.125, 6);
+        expect(calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 100_000, cacheTTL: '1h' }, pricing) * 10)
+          .toBeCloseTo(0.2, 6);
+      });
     });
   });
 

@@ -33,6 +33,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-5': 'anthropic',
   'claude-sonnet-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
+  'claude-haiku-5-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
   // OpenAI models (supported per Codex CLI catalog, 2026-09-07)

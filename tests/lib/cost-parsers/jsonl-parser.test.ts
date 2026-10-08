@@ -602,3 +602,17 @@ describe('normalizeModelName (Sonnet 5.5, PAN-4327)', () => {
     expect(normalizeModelName('claude-sonnet-5').model).toBe('claude-sonnet-5');
   });
 });
+
+describe('normalizeModelName (Haiku 5.5)', () => {
+  it('keeps claude-haiku-5-5 distinct from the bare haiku default', () => {
+    expect(normalizeModelName('claude-haiku-5-5').model).toBe('claude-haiku-5-5');
+    expect(normalizeModelName('anthropic.claude-haiku-5-5').model).toBe('claude-haiku-5-5');
+    expect(normalizeModelName('claude-haiku-5.5').model).toBe('claude-haiku-5-5');
+  });
+
+  it('keeps claude-haiku-4-5 distinct from claude-haiku-5-5', () => {
+    expect(normalizeModelName('claude-haiku-4-5').model).toBe('claude-haiku-4-5');
+    expect(normalizeModelName('claude-haiku-4-5-20251001').model).toBe('claude-haiku-4-5');
+    expect(normalizeModelName('anthropic.claude-haiku-4-5-20251001-v1:0').model).toBe('claude-haiku-4-5');
+  });
+});

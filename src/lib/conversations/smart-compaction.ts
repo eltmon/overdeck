@@ -666,6 +666,9 @@ async function generateTurnPrefixSummary(
 // — code-heavy content tokenizes denser than the 4-chars/token heuristic.
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
+  // Haiku 5.5 has a 1M window, but prompts over 100K tokens cost 5x, and its
+  // tokenizer yields ~30% more tokens per char: keep each chunk under 100K.
+  'claude-haiku-5-5': 240_000,
   'claude-sonnet-5-5': 1_200_000,         // ~300k tokens content, 1M window
   'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
