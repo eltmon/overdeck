@@ -1,7 +1,5 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { ensureMainWorkspace, navigateToWorkspace } from '../workspace/openMainWorkspace';
+import { useMemo, useRef, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useDashboardStore } from '../../lib/store';
 import { PHASE_BY_DERIVED_STATE, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
@@ -168,22 +166,6 @@ export function ProjectOverview({
   onNewWorkspace,
 }: ProjectOverviewProps) {
   const openNewWorkspace = onNewWorkspace ?? ((key: string) => { window.history.pushState({ tab: 'workspace-new' }, '', `/workspaces/new?project=${encodeURIComponent(key)}`); window.dispatchEvent(new PopStateEvent('popstate')); });
-  const queryClient = useQueryClient();
-  const [openingMain, setOpeningMain] = useState(false);
-  // The project's primary checkout lives here, not as a row in the Workspaces
-  // rail; its main workspace is created on first open.
-  const openMainCheckout = async (key: string) => {
-    setOpeningMain(true);
-    try {
-      const id = await ensureMainWorkspace(key);
-      void queryClient.invalidateQueries({ queryKey: ['workspace-registry'] });
-      navigateToWorkspace(id);
-    } catch (error) {
-      toast.error(`Could not open the main checkout: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setOpeningMain(false);
-    }
-  };
   const derivedByIssueId = useDashboardStore(state => state.derivedIssueStateByIssueId);
   const pipelineRef = useRef<HTMLDivElement>(null);
 
@@ -280,24 +262,7 @@ export function ProjectOverview({
       <ProjectCiHealthSection health={ciHealth} />
 
       {projectKey && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            data-testid="project-overview-main-checkout"
-            onClick={() => void openMainCheckout(projectKey)}
-            disabled={openingMain}
-            title={`Open the main checkout of ${projectName}: git status, run command, files, conversations and memory`}
-            style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: 2,
-              cursor: openingMain ? 'wait' : 'pointer',
-              padding: '4px 10px',
-              fontSize: 12,
-              color: 'var(--muted-foreground)',
-            }}
-          >
-            Main checkout
-          </button>
+        <div style={{ display: 'flex' }}>
           <button
             data-testid="project-overview-new-workspace"
             onClick={() => openNewWorkspace(projectKey)}

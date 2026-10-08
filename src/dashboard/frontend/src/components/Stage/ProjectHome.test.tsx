@@ -5,6 +5,11 @@ import { ProjectHome } from './ProjectHome'
 import type { StageApi } from './types'
 import { takePendingTerminal } from '../home/pendingTerminal'
 
+const openMainCheckout = vi.hoisted(() => vi.fn<(projectKey: string) => Promise<void>>())
+vi.mock('../workspace/openMainWorkspace', () => ({
+  useOpenMainCheckout: () => ({ open: openMainCheckout, opening: false }),
+}))
+
 // ProjectHome owns the project rename mutation (PAN-3156), so every render
 // needs a QueryClientProvider. Shadow render() so existing call sites work.
 function render(ui: Parameters<typeof rtlRender>[0]) {
@@ -200,6 +205,15 @@ describe('ProjectHome', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6))
   })
 
+  it('opens the main checkout of a registered project from its Home', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({})))
+    render(<ProjectHome projectName="Mind Your Now" projectKey="myn" api={api()} />)
+
+    fireEvent.click(screen.getByTestId('action-dock-main-checkout'))
+
+    expect(openMainCheckout).toHaveBeenCalledWith('myn')
+  })
+
   it('omits project settings and settings requests without a project key', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -212,6 +226,7 @@ describe('ProjectHome', () => {
     )
 
     expect(screen.queryByText('Project settings')).toBeNull()
+    expect(screen.queryByTestId('action-dock-main-checkout')).toBeNull()
     expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith('/api/projects/'))).toBe(false)
   })
 })

@@ -1,3 +1,6 @@
+import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { fetchWithTimeout } from '../../lib/apiFetch.js';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport.js';
 
@@ -56,4 +59,26 @@ export async function ensureMainWorkspace(projectKey: string): Promise<string> {
 export function navigateToWorkspace(workspaceId: string): void {
   window.history.pushState({ tab: 'workspace' }, '', `/workspace/${encodeURIComponent(workspaceId)}`);
   window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/**
+ * Open a project's main checkout from its Home: the project's primary checkout
+ * lives there, not as a row in the Workspaces rail.
+ */
+export function useOpenMainCheckout(): { open: (projectKey: string) => Promise<void>; opening: boolean } {
+  const queryClient = useQueryClient();
+  const [opening, setOpening] = useState(false);
+  const open = useCallback(async (projectKey: string) => {
+    setOpening(true);
+    try {
+      const id = await ensureMainWorkspace(projectKey);
+      void queryClient.invalidateQueries({ queryKey: ['workspace-registry'] });
+      navigateToWorkspace(id);
+    } catch (error) {
+      toast.error(`Could not open the main checkout: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setOpening(false);
+    }
+  }, [queryClient]);
+  return { open, opening };
 }

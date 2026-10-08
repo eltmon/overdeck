@@ -29,4 +29,16 @@ describe('ActionDock', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Docs/ }))
     expect(onOpen).toHaveBeenCalledWith('docs')
   })
+
+  it('shows Main checkout only when given a handler, and calls it', () => {
+    const onOpen = vi.fn()
+    const { rerender } = render(<ActionDock onOpen={onOpen} actions={['terminal', 'browser']} />)
+    expect(screen.queryByTestId('action-dock-main-checkout')).toBeNull()
+
+    const onOpenMainCheckout = vi.fn()
+    rerender(<ActionDock onOpen={onOpen} actions={['terminal', 'browser']} onOpenMainCheckout={onOpenMainCheckout} />)
+    fireEvent.click(screen.getByTestId('action-dock-main-checkout'))
+    expect(onOpenMainCheckout).toHaveBeenCalledTimes(1)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
 })

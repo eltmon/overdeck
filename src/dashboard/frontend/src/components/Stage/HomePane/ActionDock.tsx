@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Terminal, FileCode, Globe, GitCommit, ListTodo, FileText, Plus } from 'lucide-react'
+import { Terminal, FileCode, Globe, GitCommit, ListTodo, FileText, Plus, Home } from 'lucide-react'
 import type { PaneType } from '../../../lib/panesStore'
 import styles from '../stage.module.css'
 
@@ -12,6 +12,14 @@ export interface ActionDockProps {
    * are issue-scoped (PAN-1561).
    */
   actions?: PaneType[]
+  /**
+   * The project Home's **Main checkout** button: opens the project's main
+   * workspace view (git, run command, files, conversations, memory). Omitted
+   * elsewhere.
+   */
+  onOpenMainCheckout?: () => void
+  /** True while the main checkout is being resolved or created. */
+  mainCheckoutBusy?: boolean
 }
 
 const DEFAULT_ACTIONS: PaneType[] = ['terminal', 'files', 'browser', 'commits', 'plan', 'docs']
@@ -23,7 +31,7 @@ const DEFAULT_ACTIONS: PaneType[] = ['terminal', 'files', 'browser', 'commits', 
  * prop limits which buttons appear so issue-scoped actions don't show on the
  * project Home (PAN-1561).
  */
-export function ActionDock({ onOpen, actions = DEFAULT_ACTIONS }: ActionDockProps) {
+export function ActionDock({ onOpen, actions = DEFAULT_ACTIONS, onOpenMainCheckout, mainCheckoutBusy = false }: ActionDockProps) {
   const [overflowOpen, setOverflowOpen] = useState(false)
   const has = (a: PaneType) => actions.includes(a)
   const hasOverflow = has('plan') || has('docs')
@@ -45,6 +53,19 @@ export function ActionDock({ onOpen, actions = DEFAULT_ACTIONS }: ActionDockProp
         <button type="button" className={`${styles.pill} ${styles.pillTool}`} onClick={() => onOpen('browser')}>
           <Globe size={14} />
           Web
+        </button>
+      )}
+      {onOpenMainCheckout && (
+        <button
+          type="button"
+          data-testid="action-dock-main-checkout"
+          className={`${styles.pill} ${styles.pillTool}`}
+          disabled={mainCheckoutBusy}
+          title="Open the main checkout: git status, run command, files, conversations and memory"
+          onClick={onOpenMainCheckout}
+        >
+          <Home size={14} />
+          Main checkout
         </button>
       )}
       {has('commits') && (

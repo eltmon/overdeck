@@ -17,6 +17,7 @@ import type { StageApi } from './types'
 import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import { ProjectSettingsDisclosure } from '../CommandDeck/ProjectSettingsDisclosure'
+import { useOpenMainCheckout } from '../workspace/openMainWorkspace'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 import styles from './stage.module.css'
 
@@ -96,6 +97,11 @@ export function ProjectHome({
     window.history.pushState({ tab: 'costs' }, '', '/costs')
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
+
+  // The project's primary checkout opens from here; it is not repeated as a
+  // row in the sidebar Workspaces rail.
+  const mainCheckout = useOpenMainCheckout()
+  const openMainCheckout = projectKey ? () => void mainCheckout.open(projectKey) : undefined
 
   const onAgentSelected = async (id: string, message?: string) => {
     if (launchBusy) return
@@ -177,6 +183,8 @@ export function ProjectHome({
                 ? api.toggleTerminal()
                 : api.openPane({ paneType: 'browser', label: 'Web' })
             }
+            onOpenMainCheckout={openMainCheckout}
+            mainCheckoutBusy={mainCheckout.opening}
           />
         }
         detail={
@@ -232,6 +240,8 @@ export function ProjectHome({
               ? api.toggleTerminal()
               : api.openPane({ paneType: 'browser', label: 'Web' })
           }
+          onOpenMainCheckout={openMainCheckout}
+          mainCheckoutBusy={mainCheckout.opening}
         />
       }
       detail={projectKey ? <ProjectSettingsDisclosure projectKey={projectKey} /> : undefined}

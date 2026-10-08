@@ -50,7 +50,8 @@ Representative exports:
   filter by archived state) and `deleteWorkspace()` refuses `kind === 'main'`.
   `archiveWorkspace()` does **not** refuse it. Resolved or lazily created via
   `getMainWorkspace()` / `pan workspace main`, project creation, or the
-  project overview's **Main checkout** button
+  **Main checkout** button on a project's Home (`ProjectHome`'s `ActionDock`, via
+  `useOpenMainCheckout`)
   (`ensureMainWorkspace()` in `frontend/src/components/workspace/openMainWorkspace.ts`,
   which reads the list with `includeArchived=true` and unarchives an archived
   main row rather than tripping the singleton).
@@ -161,9 +162,9 @@ arbitrary path on the host. `project-targets` is registered ahead of the
 **Entry points.** The `+` in the sidebar WORKSPACES header, the
 `New workspace…` command-palette action, and the `New workspace` button on a
 project overview all navigate to `/workspaces/new`; project-scoped entry points
-add `?project=<key>` so the matching chip starts selected. The project overview's
-`Main checkout` button sits beside `New workspace` and opens (or first creates)
-the project's `main` workspace at `/workspace/<id>`. The palette action
+add `?project=<key>` so the matching chip starts selected. The project
+Home's `Main checkout` button, beside Terminal and Web, opens (or first
+creates) the project's `main` workspace at `/workspace/<id>`. The palette action
 answers to both the Actions and Workspaces scope chips through
 `PaletteAction.alsoScopes`, so it is not listed twice under All.
 
@@ -568,8 +569,8 @@ user-facing surfaces default to what the operator made:
   indistinguishable row. Main rows are not pipeline worktrees, so they are not
   counted in the collapsed row either. They stay in Cmd-K, labelled with the
   row's `projectName` (a list-DTO field the route fills from the `projects`
-  table, falling back to the project key), and open from the project overview's
-  **Main checkout** button.
+  table, falling back to the project key), and open from the **Main checkout**
+  button on the project's Home.
 - Hidden rows collapse into an expandable "N pipeline worktrees" count row in
   **both** surfaces — the rail's row uses the same pattern as the Archived row,
   and Cmd-K carries an equivalent entry whose keywords include the hidden
