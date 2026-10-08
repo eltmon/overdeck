@@ -10,6 +10,22 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.67.0" description="2026-10-08">
+  #### New
+
+  - **Claude Haiku 5.5:** `claude-haiku-5-5`, released by Anthropic on 2026-10-07, is in the model pickers, the model catalog and cost tracking. It has a 1M-token context, 128K output and adaptive thinking (default effort `medium`). Cost tracking applies its tiered pricing: &#36;0.10 / &#36;0.50 per MTok in/out for prompts up to 100K tokens, and five times that above 100K. Launching it needs **Claude Code 2.1.293 or newer**; Overdeck refuses the launch on an older CLI and says so. The built-in cheap and background defaults still use Haiku 4.5.
+
+  #### Fixed
+
+  - **The configured Claude model is the one that launches:** Overdeck passed the short `opus` and `haiku` aliases to Claude Code for Opus 4.8, 4.7, 4.6 and Haiku 4.5. Current Claude Code resolves those aliases to Opus 5.5 and Haiku 5.5, so a role set to Opus 4.8 actually ran Opus 5.5. Every model now launches by its full ID.
+  - **Default expensive model is Opus 5.5:** the expensive workhorse (plan, review, strike, sequencer, knowledge) and the Flywheel defaulted to `claude-opus-4-8`, which the alias above had been launching as Opus 5.5. The defaults are now `claude-opus-5-5`, so nothing changes for installs on the defaults; Opus 5.5 is also cheaper (&#36;4 / &#36;20 per MTok). An explicit `claude-opus-4-8` in your config now really runs Opus 4.8.
+  - **Sonnet 5.5 cache reads cost &#36;0.10 per MTok,** matching Anthropic's 2026-10-07 price cut.
+  - **Starting the Flywheel again works:** `pan flywheel start --fresh` and the Flywheel page's Start failed with "FOREIGN KEY constraint failed" once the previous Flywheel conversation had a handed-off successor. The old conversation is now kept under a retired name and archived instead of deleted.
+  - **Workspaces rail:** a project's main checkout no longer appears as an anonymous "main" row in the sidebar's Workspaces list (it only appeared for some projects). Each project's Home has a **Main checkout** button next to Terminal and Web that opens it, creating its workspace the first time. Favorite a main checkout to keep it in the rail, where it shows under the project's name; Cmd-K lists every main checkout by project name.
+
+  [Compare v0.66.0...v0.67.0](https://github.com/eltmon/overdeck/compare/v0.66.0...v0.67.0)
+</Update>
+
 <Update label="v0.66.0" description="2026-10-04">
   #### Fixed
 
