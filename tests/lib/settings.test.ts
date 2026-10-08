@@ -243,6 +243,7 @@ describe('settings', () => {
         'claude-haiku-4-5',
       ]);
       expect(getClaudeModelFlag('claude-opus-5-5')).toBe('claude-opus-5-5');
+      expect(getClaudeModelFlag('claude-haiku-4-5')).toBe('claude-haiku-4-5');
     });
 
     it('should return empty arrays for providers without API keys', async () => {

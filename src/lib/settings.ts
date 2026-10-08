@@ -268,34 +268,18 @@ function isAnthropicModelSync(modelId: ModelId | string): boolean {
 }
 
 /**
- * Get the Claude CLI model flag for an Anthropic model
- * Maps our model IDs to Claude's expected format
+ * Get the Claude CLI model flag for an Anthropic model.
+ *
+ * Every model ID passes through unchanged as its full API ID. The `claude`
+ * CLI's short aliases (`opus`, `sonnet`, `haiku`) follow whatever model the
+ * installed Claude Code treats as current: 2.1.284 points `sonnet` at Sonnet
+ * 5.5 (PAN-4327), 2.1.293 points `haiku` at Haiku 5.5, and `opus` resolves to
+ * Opus 5.5. Mapping a configured ID to an alias would launch a different model
+ * than the one configured, so no ID maps to an alias. Unknown IDs (a newer
+ * release, a dated ID) pass through the same way.
  */
 export function getClaudeModelFlag(modelId: ModelId | string): string {
-  const modelMap: Record<string, string> = {
-    // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
-    // API model ID through to `--model`.
-    'claude-fable-5-1': 'claude-fable-5-1',
-    'claude-fable-5': 'claude-fable-5',
-    // Pass the full API ID through: the CLI's short `opus` alias may still
-    // resolve to Opus 4.8 depending on installed Claude Code version.
-    'claude-opus-5-5': 'claude-opus-5-5',
-    'claude-opus-5': 'claude-opus-5',
-    'claude-opus-4-8': 'opus',
-    'claude-opus-4-7': 'opus',
-    'claude-opus-4-6': 'opus',
-    // Pass full Sonnet IDs: Claude Code 2.1.284 resolves the short `sonnet`
-    // alias to Sonnet 5.5, so the alias would launch a different model (PAN-4327).
-    'claude-sonnet-5-5': 'claude-sonnet-5-5',
-    'claude-sonnet-5': 'claude-sonnet-5',
-    'claude-sonnet-4-6': 'claude-sonnet-4-6',
-    'claude-sonnet-4-5': 'claude-sonnet-4-5',
-    'claude-haiku-4-5': 'haiku',
-  };
-  // Unknown IDs (a newer release, a dated ID) pass through unchanged: the
-  // `claude` CLI accepts full model IDs, and swapping in an alias would launch
-  // a different model than the one configured.
-  return modelMap[modelId] ?? modelId;
+  return modelId;
 }
 
 /**

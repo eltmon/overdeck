@@ -76,7 +76,7 @@ interface RoleDefinition {
 }
 
 const DEFAULT_WORKHORSES: Required<Record<WorkhorseSlot, ModelRef>> = {
-  expensive: 'claude-opus-4-8',
+  expensive: 'claude-opus-5-5',
   mid: 'claude-sonnet-5-5',
   cheap: 'claude-haiku-4-5',
 };
@@ -147,7 +147,7 @@ const ROLES: RoleDefinition[] = [
     name: 'Flywheel',
     icon: InfinityIcon,
     description: 'Runs the singleton Fix-All Flywheel orchestrator.',
-    defaultModel: 'claude-opus-4-8',
+    defaultModel: 'claude-opus-5-5',
   },
   {
     id: 'sequencer',

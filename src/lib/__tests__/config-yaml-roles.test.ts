@@ -152,7 +152,9 @@ describe('role model configuration', () => {
     expect(config.roles).toEqual(DEFAULT_ROLES);
     expect(config.roles?.review?.mode).toBe('quick');
     expect(config.roles?.work?.sub).toBeUndefined();
-    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-8');
+    expect(resolveModel('review', 'security', config)).toBe('claude-opus-5-5');
+    expect(resolveModel('flywheel', undefined, config)).toBe('claude-opus-5-5');
+    expect(DEFAULT_WORKHORSES.expensive).toBe('claude-opus-5-5');
   });
 
   it('uses project review mode over lower-precedence global review mode', () => {

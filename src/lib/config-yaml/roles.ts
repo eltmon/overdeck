@@ -21,7 +21,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   review: 'workhorse:expensive',
   test: 'workhorse:mid',
   ship: 'workhorse:mid',
-  flywheel: 'claude-opus-4-8',
+  flywheel: 'claude-opus-5-5',
   // Strike merges directly to main — precision matters, so default to the
   // expensive workhorse slot (same as plan/review).
   strike: 'workhorse:expensive',
@@ -31,7 +31,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
-  expensive: 'claude-opus-4-8',
+  expensive: 'claude-opus-5-5',
   mid: 'claude-sonnet-5-5',
   cheap: 'claude-haiku-4-5',
 };
@@ -58,7 +58,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   knowledge: { model: 'workhorse:expensive' },
   worker: { model: 'workhorse:mid' },
   flywheel: {
-    model: 'claude-opus-4-8',
+    model: 'claude-opus-5-5',
     effort: 'high',
     minAgents: 20,
     maxAgents: 30,

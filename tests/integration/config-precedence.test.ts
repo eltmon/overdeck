@@ -48,7 +48,8 @@ describe('configuration precedence for role model routing', () => {
   it('resolves role defaults through default workhorse slots', () => {
     const { config } = mergeConfigs(null);
 
-    expect(resolveModel('plan', undefined, config)).toBe('claude-opus-4-8');
+    // The expensive slot is Opus 5.5: the short `opus` alias already launched it.
+    expect(resolveModel('plan', undefined, config)).toBe('claude-opus-5-5');
     // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
     expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-5-5');
     expect(resolveModel('review', 'requirements', config)).toBe('claude-sonnet-5-5');
