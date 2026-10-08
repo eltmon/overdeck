@@ -91,9 +91,9 @@ A steer never falls back silently to a queued message. A harness without steer a
   never the short `opus`, `sonnet` or `haiku` alias. Claude Code moves those
   aliases to each new release: 2.1.293 points `haiku` at Haiku 5.5, and
   `opus` resolves to Opus 5.5, so an alias launches a different model than
-  the one configured. The `workhorses.expensive` slot and the `flywheel` role
-  default to `claude-opus-5-5`, the model the `opus` alias had been
-  launching for them.
+  the one configured.
+- The `workhorses.expensive` slot and the `flywheel` role default to
+  `claude-opus-5-5` (from v0.67.0; previously `claude-opus-4-8`).
 - To set the workhorse slots, roles, tiers and background models to one
   provider's eval-backed lineup in one step, use a
   [model preset](/configuration/model-presets).
