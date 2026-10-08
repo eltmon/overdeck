@@ -70,13 +70,30 @@ A steer never falls back silently to a queued message. A harness without steer a
   on the Anthropic account.
 - The model picker includes Claude Sonnet 5.5 (`claude-sonnet-5-5`): 1M
   context, 128K maximum output, adaptive thinking, and low through max
-  effort. API pricing is &#36;2/M input and &#36;10/M output. It requires Claude
+  effort. API pricing is &#36;2/M input, &#36;10/M output and &#36;0.10/M cache
+  reads (cut from &#36;0.20/M on 2026-10-07). It requires Claude
   Code 2.1.284 or newer; older versions treat it as an unrecognized model
   with a 200K window. It is the default for the Sonnet tier
   (`workhorses.mid`, the default conversation model, status review, fork
   summaries and provider fallback). Overdeck omits `temperature` for models
   that reject sampling parameters (Sonnet 5 and newer, Opus 4.7 and newer,
-  Fable).
+  Haiku 5.5, Fable).
+- The model picker includes Claude Haiku 5.5 (`claude-haiku-5-5`): 1M
+  context, 128K maximum output, adaptive thinking on by default with
+  medium as the default effort, and low through max effort. Manual extended
+  thinking (`budget_tokens`) and non-default sampling parameters return 400.
+  API pricing depends on prompt size: up to 100K tokens it is &#36;0.10/M
+  input, &#36;0.50/M output and &#36;0.01/M cache reads; above 100K tokens every
+  rate is 5×. Its tokenizer counts about 30% more tokens than Haiku 4.5 for
+  the same text. It requires Claude Code 2.1.293 or newer. Haiku 4.5 remains
+  the default for the cheap slot and background calls.
+- Overdeck passes every Claude model to `claude --model` as its full API ID,
+  never the short `opus`, `sonnet` or `haiku` alias. Claude Code moves those
+  aliases to each new release: 2.1.293 points `haiku` at Haiku 5.5, and
+  `opus` resolves to Opus 5.5, so an alias launches a different model than
+  the one configured. The `workhorses.expensive` slot and the `flywheel` role
+  default to `claude-opus-5-5`, the model the `opus` alias had been
+  launching for them.
 - To set the workhorse slots, roles, tiers and background models to one
   provider's eval-backed lineup in one step, use a
   [model preset](/configuration/model-presets).
@@ -113,6 +130,7 @@ before every `claude-code` launch:
 | --- | --- |
 | Claude Fable 5.1 (`claude-fable-5-1`) | 2.1.255 |
 | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
+| Claude Haiku 5.5 (`claude-haiku-5-5`) | 2.1.293 |
 
 A launch whose Claude Code is too old is refused before a terminal session is
 created. The error names the model, the installed and required versions, the

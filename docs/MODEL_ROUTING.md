@@ -40,7 +40,7 @@ Overdeck supports eight model providers — seven cloud, plus a local one:
 
 | Provider | Auth Method | Notes |
 |----------|-------------|-------|
-| **Anthropic** | Claude Code subscription login (default, always enabled) | Opus 4.6, Sonnet 4.6, Haiku 4.5 |
+| **Anthropic** | Claude Code subscription login (default, always enabled) | Fable 5.1/5, Opus 5.5/5/4.8/4.7/4.6, Sonnet 5.5/5/4.6, Haiku 5.5/4.5 |
 | **OpenAI** | Codex subscription login (via CLIProxyAPI sidecar) or API key | GPT-5.4, O3, O4 Mini |
 | **Google** | API key | Gemini 3.1 Pro, 3 Flash, 3.1 Flash Lite |
 | **Kimi (Moonshot)** | API key | K2.6-code-preview, K2.5 |

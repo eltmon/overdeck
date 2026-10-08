@@ -23,7 +23,7 @@ Complete guide to configuring Overdeck's multi-model routing system.
 1. **Pick your model slots** (optional, in `~/.overdeck/config.yaml`; the built-in defaults work without this):
    ```yaml
    workhorses:
-     expensive: claude-opus-4-8
+     expensive: claude-opus-5-5
      mid: claude-sonnet-5-5
      cheap: claude-haiku-4-5
    ```
@@ -64,7 +64,7 @@ models:
 
 # Model slots that roles reference as workhorse:<slot>
 workhorses:
-  expensive: claude-opus-4-8
+  expensive: claude-opus-5-5
   mid: claude-sonnet-5-5
   cheap: claude-haiku-4-5
 
@@ -75,7 +75,7 @@ roles:
   review:
     sub:
       security:
-        model: claude-opus-4-8
+        model: claude-opus-5-5
 
 # Permission mode for spawned Claude Code agents.
 # 'auto' (default) — Claude Code's classifier blocks destructive ops
@@ -104,7 +104,7 @@ roles:
     mode: full
     sub:
       security:
-        model: claude-opus-4-8   # Never compromise on security here
+        model: claude-opus-5-5   # Never compromise on security here
 ```
 
 ### API Keys: `~/.overdeck.env`
@@ -293,7 +293,7 @@ roles:
     mode: full
     sub:
       security:
-        model: claude-opus-4-8
+        model: claude-opus-5-5
       correctness:
         model: claude-sonnet-4-6
 ```
