@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-09T13:41:27.796973Z · model: claude-opus-5-5 · open: 821_
+_Last sequenced: 2026-10-09T23:52:05.690670Z · model: claude-opus-5-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1156,7 +1156,7 @@ New since the prior run: conversations that never progress make Overdeck unusabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-09T13:41:27.796973Z",
+  "generatedAt": "2026-10-09T23:52:05.690670Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 821,
