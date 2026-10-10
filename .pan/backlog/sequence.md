@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-10T20:39:26.982396Z · model: claude-opus-5-5 · open: 822_
+_Last sequenced: 2026-10-10T20:40:34.900379Z · model: claude-opus-5-5 · open: 822_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1157,7 +1157,7 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-10T20:39:26.982396Z",
+  "generatedAt": "2026-10-10T20:40:34.900379Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 822,
