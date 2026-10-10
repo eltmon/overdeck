@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-10T19:39:11.124900Z · model: claude-opus-5-5 · open: 821_
+_Last sequenced: 2026-10-10T19:43:08.998365Z · model: claude-opus-5-5 · open: 822_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-10-10T19:39:11.124900Z · model: claude-opus-5-5 · open: 
 | 3 | PAN-4532 | M | critical | ok |  | PAN-4527 | Dashboard restart during verification drops review dispatch; re-request re-runs 25-45 min of passed gates. TENET-10: supervised handoff |
 | 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
+| 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -849,6 +850,10 @@ A run certain to fail holds the machine-wide admission slot while seven waiters 
 
 Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.
 
+### PAN-4553 (rank 6)
+
+New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
+
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -1145,10 +1150,6 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 
 Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
 
-### PAN-4269 (rank 99)
-
-New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1156,10 +1157,10 @@ New since the prior run: conversations that never progress make Overdeck unusabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-10T19:39:11.124900Z",
+  "generatedAt": "2026-10-10T19:43:08.998365Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 821,
+  "openCount": 822,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11376,6 +11377,19 @@ New since the prior run: conversations that never progress make Overdeck unusabl
       "rationale": "New since the prior run: a follow-up to the three fresh-WSL2-host fixes in v0.66.0, ranked in the first-run reliability band beside PAN-2572 because unfixed setup hints and hidden first-launch dialogs block new hosts before any pipeline work can start.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4553",
+      "rank": 6,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json",
+      "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12687,6 +12701,13 @@ New since the prior run: conversations that never progress make Overdeck unusabl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.35
+    },
+    {
+      "from": "PAN-4553",
+      "to": "PAN-4390",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
