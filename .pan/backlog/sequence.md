@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-10T20:40:34.900379Z · model: claude-opus-5-5 · open: 822_
+_Last sequenced: 2026-10-10T20:43:13.541406Z · model: claude-opus-5-5 · open: 823_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,6 +11,7 @@ _Last sequenced: 2026-10-10T20:40:34.900379Z · model: claude-opus-5-5 · open: 
 | 4 | PAN-4531 | S | critical | ok |  |  | Verification runs ~25 min of local gates on a head whose CI test already failed, holding the CPU slot. TENET-10: supervised handoff |
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
+| 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -854,6 +855,10 @@ Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow r
 
 New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
 
+### PAN-4554 (rank 7)
+
+New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
+
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -1146,10 +1151,6 @@ Scheduler yield never self-clears — yielded work agents stay paused hours afte
 
 Verification/review feedback silently queued to stopped-by-user agents, never re-driven on delivery.
 
-### PAN-2569 (rank 98)
-
-Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1157,10 +1158,10 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-10T20:40:34.900379Z",
+  "generatedAt": "2026-10-10T20:43:13.541406Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 822,
+  "openCount": 823,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11390,6 +11391,19 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
       "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4554",
+      "rank": 7,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
+      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12708,6 +12722,13 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4553",
+      "to": "PAN-4554",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
