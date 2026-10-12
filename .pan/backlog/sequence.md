@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-12T07:44:27.526919Z · model: claude-opus-5-5 · open: 823_
+_Last sequenced: 2026-10-12T11:01:23.563567Z · model: claude-opus-5-5 · open: 823_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1158,7 +1158,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-12T07:44:27.526919Z",
+  "generatedAt": "2026-10-12T11:01:23.563567Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 823,
