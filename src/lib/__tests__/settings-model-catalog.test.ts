@@ -34,12 +34,15 @@ const gpt6Additions = [
   { id: 'gpt-6-luna', name: 'GPT-6 Luna (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 0.3 },
 ];
 const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
+// Muse Wonder (2026-10-12) is an addition after the fixture was captured.
+const museWonderId = 'muse-wonder-1.0';
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; meta: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
+    meta: catalog.meta.filter((model) => model.id !== museWonderId),
   };
 }
 

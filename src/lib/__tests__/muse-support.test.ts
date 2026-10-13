@@ -50,12 +50,12 @@ vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
   return { ...actual, materializeMuseContext: vi.fn(async () => '/tmp/fake-muse-context.md') };
 });
 
-const models = ['muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
+const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
 describe('Muse model and harness support', () => {
-  it('registers both tiers without changing their exact identity', () => {
+  it('registers every Muse model without changing its exact identity', () => {
     expect(KNOWN_HARNESSES.has('muse')).toBe(true);
     expect(getHarnessBehavior('muse').executableName).toBe('muse');
     expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual(models);
@@ -67,7 +67,8 @@ describe('Muse model and harness support', () => {
     expect(canUseHarness('muse', 'claude-sonnet-5', undefined).allowed).toBe(false);
     expect(applyFallback(models[0], new Set(['meta']), 'claude-sonnet-5')).toBe(models[0]);
     expect(() => applyFallback(models[0], new Set(['anthropic']), 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
-    expect(getAvailableModelsApi().meta[1].name).toContain('training data');
+    expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-spark-1.3-contributor')?.name).toContain('training data');
+    expect(getAvailableModelsApi().meta[0]).toMatchObject({ id: 'muse-wonder-1.0', name: 'Muse Wonder 1.0 (1M context)', costPer1MTokens: 12 });
   });
 
   it('preserves opt-in provider settings and Muse-specific context', () => {
@@ -167,7 +168,7 @@ describe('Muse model and harness support', () => {
     const price = getPricing('custom', model)!;
     expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
     expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
-    expect(result?.cost).toBeCloseTo(model.endsWith('contributor') ? 0.251 : 4.95);
+    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251 }[model]);
   });
 
   it('reads real Muse 1.0.2 echo turns without rendering private reasoning or duplicating user intents', async () => {

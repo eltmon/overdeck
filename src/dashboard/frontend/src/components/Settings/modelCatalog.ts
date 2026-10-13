@@ -39,6 +39,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   meta: {
     name: 'Meta (Muse)',
     models: [
+      { id: 'muse-wonder-1.0', name: 'Muse Wonder 1.0', icon: Sparkles, costPer1MTokens: 12, capabilities: ['code', 'reasoning', 'large-context'], description: 'Frontier model: $4.00 input / $0.20 cached input / $20.00 output per million tokens.' },
       { id: 'muse-spark-1.3', name: 'Muse Spark 1.3 Standard', icon: Sparkles, costPer1MTokens: 2.75, capabilities: ['code', 'reasoning', 'large-context'], description: 'Standard: $1.25 input / $0.15 cached input / $4.25 output per million tokens.' },
       { id: 'muse-spark-1.3-contributor', name: 'Muse Spark 1.3 Contributor (training data)', icon: Sparkles, costPer1MTokens: 0.15, capabilities: ['code', 'reasoning', 'large-context', 'cost-efficient'], description: 'Contributor: $0.10 input / $0.002 cached input / $0.20 output per million tokens. Prompts and replies may train Meta models.' },
     ],

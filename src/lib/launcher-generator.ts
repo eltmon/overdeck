@@ -978,11 +978,11 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   ];
 }
 
-/** Persistent native TUI, verified against Muse Code 1.0.2. */
+/** Persistent native TUI, verified against Muse Code 1.0.2; Wonder IDs checked against the 1.4.7 catalog. */
 function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
   const model = config.museModel ?? config.model;
-  if (model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor') {
-    throw new Error('Muse launcher requires an explicit supported Muse Spark model');
+  if (model !== 'muse-wonder-1.0' && model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor') {
+    throw new Error('Muse launcher requires an explicit supported Muse model');
   }
   const agentId = config.overdeckEnv?.agentId;
   if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');

@@ -19,6 +19,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minima
  * Map of model ID to provider
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
+  'muse-wonder-1.0': 'meta',
   'muse-spark-1.3': 'meta',
   'muse-spark-1.3-contributor': 'meta',
   // Anthropic models

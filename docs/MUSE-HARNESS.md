@@ -1,9 +1,16 @@
 # Muse Code integration
 
 The canonical harness ID is `muse`; the provider ID is `meta`. Only
-`muse-spark-1.3` and `muse-spark-1.3-contributor` route to this harness.
-Neither model is selected as an implicit fallback. Contributor is an explicit
-choice because its discounted price requires contributing training data.
+`muse-wonder-1.0`, `muse-spark-1.3` and `muse-spark-1.3-contributor` route to
+this harness. No Muse model is selected as an implicit fallback. Contributor is
+an explicit choice because its discounted price requires contributing training
+data.
+
+`muse-wonder-1.0` (Muse Wonder, released 2026-10-12) is Meta's frontier model.
+Its ID and prices were read from the Muse Code 1.4.7 catalog and the Meta Model
+API model list. Meta publishes no Contributor tier for Wonder. Muse Wonder Full
+is not supported yet: it is available only on the Muse Code Power Usage and
+Maximum Usage plans, and Meta has not published its model ID.
 
 ## Launch and context
 

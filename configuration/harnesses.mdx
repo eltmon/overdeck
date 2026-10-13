@@ -166,13 +166,19 @@ use `muse auth set --api-key-stdin`; Muse owns its credentials. Overdeck uses
 the installed `muse` binary and does not route these models through CLIProxy.
 The integration is verified with Muse Code 1.0.2.
 
-Enable **Meta (Muse)** in Settings → Providers, then choose either model in
-the model picker. Both use a 1,048,576-token context window:
+Enable **Meta (Muse)** in Settings → Providers, then choose a model in the
+model picker. All three use a 1,048,576-token context window:
 
 | Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
 | --- | --- | --- | --- |
+| `muse-wonder-1.0` | &#36;4.00 | &#36;0.20 | &#36;20.00 |
 | `muse-spark-1.3` | &#36;1.25 | &#36;0.15 | &#36;4.25 |
 | `muse-spark-1.3-contributor` | &#36;0.10 | &#36;0.002 | &#36;0.20 |
+
+Muse Wonder (`muse-wonder-1.0`) is Meta's frontier model, released on
+2026-10-12. Muse Wonder Full is not in the picker yet: Meta offers it only on
+the Muse Code Power Usage and Maximum Usage plans and has not published its
+model ID.
 
 The Contributor tier requires contributing prompts and completions for model
 training. Choose it explicitly when that data use fits your work. Standard

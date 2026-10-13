@@ -83,6 +83,7 @@ export interface ModelPricing {
 
 export const DEFAULT_PRICING: ModelPricing[] = [
   // Meta published 1.3 rates, per 1K tokens (2026-09-08).
+  { provider: 'custom', model: 'muse-wonder-1.0', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3', inputPer1k: 0.00125, outputPer1k: 0.00425, cacheReadPer1k: 0.00015, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
   // TypeSafe Jev (PAN-4369): $0.042/Mtok input, output free. The exact -free row is required:
