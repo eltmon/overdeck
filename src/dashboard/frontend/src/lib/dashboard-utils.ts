@@ -71,6 +71,8 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('o1')) return 'O1';
 
   // Google models
+  if (backingModel.includes('gemini-4-argon')) return 'Gemini 4 Argon';
+  if (backingModel.includes('gemini-4')) return 'Gemini 4';
   if (backingModel.includes('gemini-3.1-pro-preview') || backingModel.includes('gemini-3.1-pro')) return 'Gemini 3.1 Pro';
   if (backingModel.includes('gemini-3-flash')) return 'Gemini 3 Flash';
   if (backingModel.includes('gemini-3')) return 'Gemini 3';

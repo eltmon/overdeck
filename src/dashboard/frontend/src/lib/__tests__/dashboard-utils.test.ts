@@ -15,6 +15,12 @@ describe('getFriendlyModelName', () => {
     expect(getFriendlyModelName('claude-haiku-4-5')).toBe('Haiku 4.5');
   });
 
+  it('names Gemini 4 Argon before the Gemini 3 patterns', () => {
+    expect(getFriendlyModelName('gemini-4-argon')).toBe('Gemini 4 Argon');
+    expect(getFriendlyModelName('google/gemini-4-argon')).toBe('Gemini 4 Argon');
+    expect(getFriendlyModelName('gemini-3.1-pro-preview')).toBe('Gemini 3.1 Pro');
+  });
+
   it('matches Sonnet 5.5 before the broader Sonnet 5 pattern (PAN-4327)', () => {
     expect(getFriendlyModelName('claude-sonnet-5-5')).toBe('Sonnet 5.5');
     expect(getFriendlyModelName('claude-sonnet-5')).toBe('Sonnet 5');

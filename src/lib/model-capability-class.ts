@@ -24,6 +24,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'gpt-6.1-sol': 'frontier',
   'gpt-5.6-sol': 'frontier',
   'gpt-5.6-sol[372k]': 'frontier',
+  'gemini-4-argon': 'frontier',
   'gemini-3.1-pro-preview': 'frontier',
   'gemini-3.8-flash': 'frontier',
   'k3': 'frontier',

@@ -49,6 +49,7 @@ function ompProviderDef(providerName: string): OmpProviderDef | undefined {
       apiKey: 'GEMINI_API_KEY',
       api: 'google-generative-ai',
       models: [
+        { id: 'gemini-4-argon', name: 'Gemini 4 Argon', cost: { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 } },
         { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', cost: { input: 1.5, output: 9, cacheRead: 0.15, cacheWrite: 0 } },
         { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', cost: { input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0 } },
       ].map((model) => ({ ...model, reasoning: true, supportsTools: true, contextWindow: 1048576, maxTokens: 65536 })),

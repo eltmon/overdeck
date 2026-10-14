@@ -190,4 +190,19 @@ describe('model capabilities', () => {
     expect(capabilityClassOf('claude-haiku-5-5')).toBe('small');
     expect(MODEL_CAPABILITIES['claude-haiku-4-5'].contextWindow).toBe(200000);
   });
+
+  it('registers Gemini 4 Argon as a frontier Google model with low/medium/high thinking', () => {
+    expect(MODEL_CAPABILITIES['gemini-4-argon']).toMatchObject({
+      model: 'gemini-4-argon',
+      provider: 'google',
+      displayName: 'Gemini 4 Argon',
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+      effortLevels: ['low', 'medium', 'high'],
+      supportsSamplingParams: false,
+      costPer1MTokens: 6,
+    });
+    expect(capabilityClassOf('gemini-4-argon')).toBe('frontier');
+    expect(modelSupportsSamplingParams('gemini-4-argon')).toBe(false);
+  });
 });

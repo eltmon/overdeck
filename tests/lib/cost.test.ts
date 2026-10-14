@@ -184,6 +184,14 @@ describe('cost module', () => {
       expect(pricing).toBeNull();
     });
 
+    it('prices gemini-4-argon at its introductory rates', () => {
+      const argon = getPricing('google', 'gemini-4-argon');
+      expect(argon?.model).toBe('gemini-4-argon');
+      expect(argon?.inputPer1k).toBe(0.002);
+      expect(argon?.outputPer1k).toBe(0.010);
+      expect(argon?.cacheReadPer1k).toBe(0.0001);
+    });
+
     it('prices gpt-6.1-sol distinctly from gpt-6-sol', () => {
       const sol61 = getPricing('openai', 'gpt-6.1-sol');
       const sol6 = getPricing('openai', 'gpt-6-sol');

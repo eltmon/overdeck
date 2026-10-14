@@ -8,6 +8,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | GPT-5.6 `[372k]` choices | 372,000 | Explicit opt-in; launch strips the Overdeck suffix while retaining the larger configuration. |
 | Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5.5/5, Haiku 5.5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
 | Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Conservative managed budget; older extended-context entitlements vary by plan. |
+| Gemini 4 Argon | 1,048,576 | Window shared by input, thinking and output; 65,536 max output per stream (32,768 non-streaming). Provisioned into the omp registry; Pi passes the id through its google provider. |
 | Gemini 3.8 Flash, 3.5 Flash Lite | 1,048,576 | Google input limit; 65,536 max output. New models provisioned into the omp registry. |
 | GLM 5.3 / 5.2 | 1,000,000 | 128K max output. GLM 5.3 accepts Low/High/Max and always reasons. |
 | GLM 5.1 | 200,000 | Retained previous model. |
@@ -52,6 +53,7 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 - [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview): `claude-sonnet-5-5`, 1M context, 128K maximum output, $2/M input, $10/M output, $0.10/M cache reads (cut from $0.20/M on 2026-10-07); requires Claude Code 2.1.284 or newer.
 - [Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview): `claude-haiku-5-5`, released 2026-10-07, 1M context, 128K maximum output; prompts up to 100K tokens $0.10/M input, $0.50/M output, $0.01/M cache reads, and prompts over 100K tokens $0.50/M, $2.50/M and $0.05/M; adaptive thinking on by default at medium effort; `budget_tokens` and non-default sampling parameters return 400; its tokenizer counts about 30% more tokens than Haiku 4.5; requires Claude Code 2.1.293 or newer.
 - [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview) and [pricing changes](https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1): $10/M input, $50/M output, $0.25/M cache reads.
+- [Gemini 4 Argon](https://ai.google.dev/gemini-api/docs/generate-content/latest-model): `gemini-4-argon`, GA 2026-10-13; introductory $2/M input, $10/M output, $0.10/M cached input through 2026-11-30, then $4/M, $20/M and $0.20/M; thinking levels low/medium/high; sampling parameters ignored; explicit context caching removed.
 - [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models), [3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [3.5 Flash Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 - [GLM 5.3](https://docs.z.ai/guides/llm/glm-5.3): some accounts with a Coding Plan history currently require the OpenAI-compatible endpoint; the Anthropic route is not universally available.
 - [MiniMax model catalog](https://platform.minimax.io/docs/guides/models-intro).

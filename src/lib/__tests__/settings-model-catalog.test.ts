@@ -36,12 +36,21 @@ const gpt6Additions = [
 const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
 // Muse Wonder (2026-10-12) is an addition after the fixture was captured.
 const museWonderId = 'muse-wonder-1.0';
+// Gemini 4 Argon (GA 2026-10-13) is an addition after the fixture was captured.
+const geminiArgon = {
+  id: 'gemini-4-argon',
+  name: 'Gemini 4 Argon (1M context)',
+  contextWindow: 1048576,
+  effortLevels: ['low', 'medium', 'high'],
+  costPer1MTokens: 6,
+};
 
-function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; meta: Array<{ id: string }> }>(catalog: T): T {
+function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
     anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
+    google: catalog.google.filter((model) => model.id !== geminiArgon.id),
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
   };
 }
@@ -56,6 +65,7 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.findIndex((model) => model.id === haiku55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-haiku-4-5'));
     expect(existing.openai.slice(0, 4).map((model) => model.id)).toEqual(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']);
     expect(existing.openai.filter((model) => gpt6AdditionIds.has(model.id))).toEqual(gpt6Additions);
+    expect(existing.google[0]).toEqual(geminiArgon);
     expect(withoutOpus55(existing)).toEqual(previousCatalog);
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);

@@ -63,6 +63,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-4o-mini': 'openai',
 
   // Google models (current)
+  'gemini-4-argon': 'google',
   'gemini-3.8-flash': 'google',
   'gemini-3.5-flash-lite': 'google',
   'gemini-3.1-pro-preview': 'google',
@@ -158,6 +159,7 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-4o-mini': 'claude-haiku-4-5', // economy-tier → Haiku
 
   // Google → Anthropic
+  'gemini-4-argon': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3.1-pro-preview': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku

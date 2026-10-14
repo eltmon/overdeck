@@ -83,6 +83,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   google: {
     name: 'Google',
     models: [
+      { id: 'gemini-4-argon' as ModelId, name: 'Gemini 4 Argon (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 6, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship for complex coding and agentic work. Introductory pricing through 2026-11-30, then $4/$20 per MTok.' },
       { id: 'gemini-3.8-flash' as ModelId, name: 'Gemini 3.8 Flash (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 5.25, capabilities: ['reasoning', 'large-context', 'code'], description: 'Current model; see provider documentation for availability and pricing.' },
       { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro (1M context)', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
       { id: 'gemini-3.5-flash-lite' as ModelId, name: 'Gemini 3.5 Flash Lite (1M context)', icon: Zap, tier: 'fast', costPer1MTokens: 1.4, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Current model; see provider documentation for availability and pricing.' },

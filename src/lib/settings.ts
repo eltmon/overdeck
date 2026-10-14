@@ -34,7 +34,7 @@ export type OpenAIModel =
   | 'o3-deep-research'
   | 'gpt-4o'
   | 'gpt-4o-mini';
-export type GoogleModel = 'gemini-3.8-flash' | 'gemini-3.5-flash-lite' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+export type GoogleModel = 'gemini-4-argon' | 'gemini-3.8-flash' | 'gemini-3.5-flash-lite' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type KimiModel = 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2'
   | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
@@ -214,7 +214,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview']
+    ? ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview']
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi

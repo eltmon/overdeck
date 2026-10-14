@@ -71,6 +71,7 @@ describe('model-fallback', () => {
     });
 
     it('should return google for Gemini models', () => {
+      expect(getModelProvider('gemini-4-argon')).toBe('google');
       expect(getModelProvider('gemini-3-pro-preview')).toBe('google');
       expect(getModelProvider('gemini-3-flash-preview')).toBe('google');
     });
@@ -147,13 +148,14 @@ describe('model-fallback', () => {
 
     it('should return all Google models', () => {
       const models = getModelsByProvider('google');
+      expect(models).toContain('gemini-4-argon');
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).toContain('gemini-3-pro-preview'); // legacy
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
-      expect(models).toHaveLength(8);
+      expect(models).toHaveLength(9);
     });
 
     it('should return all Nous Portal models', () => {
@@ -314,6 +316,7 @@ describe('model-fallback', () => {
     });
 
     it('should return fallback for Google models', () => {
+      expect(getFallbackModel('gemini-4-argon', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
       expect(getFallbackModel('gemini-3-pro-preview', PROVIDER_FALLBACK)).toBe('claude-sonnet-5-5');
       expect(getFallbackModel('gemini-3-flash-preview', PROVIDER_FALLBACK)).toBe('claude-haiku-4-5');
     });
@@ -390,7 +393,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(34); // 12 Anthropic + 10 OpenAI + 5 Google + 7 Kimi
+      expect(models.length).toBe(35); // 12 Anthropic + 10 OpenAI + 6 Google + 7 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -421,7 +424,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
-      expect(models.length).toBe(17); // 12 Anthropic + 5 current Google
+      expect(models.length).toBe(18); // 12 Anthropic + 6 current Google
     });
   });
 

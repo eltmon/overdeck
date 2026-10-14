@@ -89,6 +89,31 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Released 2026-10-07. Requires Claude Code 2.1.293 or newer, which also makes it the target of the short `haiku` alias. Native 1M context, 128K max output. Adaptive thinking on by default with Medium default effort; manual extended thinking (budget_tokens) and non-default temperature/top_p/top_k return 400. Tiered API pricing: prompts up to 100K tokens $0.10/M input, $0.50/M output, $0.01/M cache read; prompts over 100K tokens 5x that ($0.50/M input, $2.50/M output, $0.05/M cache read). Newer tokenizer: the same text is about 30% more tokens than on Haiku 4.5. Skill scores inherit the Haiku 4.5 baseline until benchmarked.',
   },
 
+  'gemini-4-argon': {
+    model: 'gemini-4-argon',
+    provider: 'google',
+    displayName: 'Gemini 4 Argon',
+    costPer1MTokens: 6, // $2 in / $10 out (introductory through 2026-11-30)
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 93,
+      'code-review': 90,
+      debugging: 88,
+      planning: 88,
+      documentation: 90,
+      testing: 88,
+      security: 82,
+      performance: 88,
+      synthesis: 92,
+      speed: 75,
+      'context-length': 100,
+    },
+    effortLevels: ['low', 'medium', 'high'],
+    supportsSamplingParams: false,
+    notes: 'GA 2026-10-13. 1,048,576-token window shared by input, thinking and output; thinking counts toward max output. Output cap 65,536 per stream (harnesses stream) and 32,768 per non-streaming request. Thinking levels low/medium (default)/high. Sampling parameters are ignored and explicit context caching (cachedContents) returns an error; implicit caching applies from 4,096 prompt tokens. Introductory pricing through 2026-11-30: $2/M input, $10/M output, $0.10/M cached input; from 2026-12-01 $4/M, $20/M and $0.20/M. Skill scores inherit the Gemini 3.1 Pro baseline until benchmarked.',
+  },
+
   'gemini-3.8-flash': {
     model: 'gemini-3.8-flash',
     provider: 'google',
