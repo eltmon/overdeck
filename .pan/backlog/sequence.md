@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-14T04:32:41.611589Z · model: claude-opus-5-5 · open: 823_
+_Last sequenced: 2026-10-14T11:16:09.269877Z · model: claude-opus-5-5 · open: 824_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -828,6 +828,7 @@ _Last sequenced: 2026-10-14T04:32:41.611589Z · model: claude-opus-5-5 · open: 
 | 870 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
 | 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 873 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
 
 ## Rationale detail
 
@@ -1158,10 +1159,10 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-14T04:32:41.611589Z",
+  "generatedAt": "2026-10-14T11:16:09.269877Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 823,
+  "openCount": 824,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11404,6 +11405,19 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4555",
+      "rank": 873,
+      "size": "XS",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then.",
+      "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
+      "gate": "auto",
+      "planning": "skip"
     }
   ],
   "edges": [
@@ -12728,6 +12742,13 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "to": "PAN-4554",
       "type": "informs",
       "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-4555",
+      "type": "informs",
+      "source": "github-ref",
       "confidence": 0.5
     }
   ]
