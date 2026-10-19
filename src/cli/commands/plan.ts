@@ -74,7 +74,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
     spinner.succeed(`${options.auto ? 'Auto-planning' : 'Planning'} session started for ${issueId}${sessionName ? ` (${sessionName})` : ''}`);
   } catch (error) {
     spinner.fail(error instanceof Error ? error.message : String(error));
-    printPlanningConnectionError(issueId);
+    printPlanningConnectionError(issueId, error);
     return exitCli(1);
   }
 }

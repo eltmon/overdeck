@@ -103,7 +103,9 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      exit $?
       "
     `);
   });
@@ -129,7 +131,9 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
       export CAVEMAN_DEFAULT_MODE="active"
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      exit $?
       "
     `);
   });
@@ -155,7 +159,9 @@ describe('generateLauncherScript', () => {
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      exec claude --agent pan-work-agent \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-123' --model 'gpt-5.4'
+      set -m
+      claude --agent pan-work-agent \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-123' --model 'gpt-5.4'
+      exit $?
       "
     `);
   });
@@ -598,6 +604,7 @@ describe('generateLauncherScript', () => {
       trap '' HUP
       prompt=$(cat '/tmp/init-prompt.txt')
       echo "[launcher] Claude starting at $(date)" >> '/tmp/pan-launcher-debug.log'
+      set -m
       claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} "$prompt"
       CLAUDE_EXIT=$?
       echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> '/tmp/pan-launcher-debug.log'
@@ -927,7 +934,9 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
-      exec claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model 'claude-sonnet-4-6' "$prompt"
+      set -m
+      claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model 'claude-sonnet-4-6' "$prompt"
+      exit $?
       "
     `);
   });
@@ -943,7 +952,7 @@ describe('generateLauncherScript', () => {
     });
 
     expect(script).not.toContain('prompt=$(cat');
-    expect(script).toContain("exec claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-abc' < '/tmp/prompt.md'");
+    expect(script).toContain("set -m\nclaude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-abc' < '/tmp/prompt.md'");
   });
 
   it('review sub-role launcher owns the synthesis signal (PAN-977)', () => {
@@ -1032,7 +1041,9 @@ describe('generateLauncherScript', () => {
       unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       prompt=$(cat '/tmp/identity.md')
-      exec claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
+      set -m
+      claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
+      exit $?
       "
     `);
   });
@@ -1060,7 +1071,9 @@ describe('generateLauncherScript', () => {
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      exit $?
       "
     `);
   });
@@ -1100,6 +1113,7 @@ describe('generateLauncherScript', () => {
       if [ -f '<OVERDECK_HOME>/launch/sess-conv/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '<OVERDECK_HOME>/launch/sess-conv/deft.env'; fi
       cd -- '/workspace/project'
       trap '' HUP
+      set -m
       claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} \${PAN_SKILL_PLUGIN_DIR:+--plugin-dir "$PAN_SKILL_PLUGIN_DIR"} --session-id 'sess-conv' --effort "high"
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
@@ -1108,7 +1122,7 @@ describe('generateLauncherScript', () => {
     `);
   });
 
-  it('conversation panel execs Claude Code when asked (Herdr, PAN-3921)', () => {
+  it('conversation panel runs Claude Code as its own foreground job and exits with it (Herdr, PAN-3921)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -1119,7 +1133,8 @@ describe('generateLauncherScript', () => {
       keepAlive: false,
       execConversationHarness: true,
     });
-    expect(script).toContain("exec claude ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-conv'");
+    expect(script).toContain("set -m\nclaude ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-conv'\nexit $?\n");
+    expect(script).not.toContain('exec claude');
     expect(script).not.toContain('while true; do sleep 60; done');
   });
 
@@ -1151,6 +1166,7 @@ describe('generateLauncherScript', () => {
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       trap '' HUP
+      set -m
       claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-resume'
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
@@ -1178,7 +1194,9 @@ describe('generateLauncherScript', () => {
       export SKIP_DOCS_INDEX=1
       export PATH="/usr/local/bin:$PATH"
       prompt=$(cat '/workspace/.pan/prompts/agent.md')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
+      exit $?
       "
     `);
   });
@@ -1220,7 +1238,9 @@ describe('generateLauncherScript', () => {
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
+      exit $?
       "
     `);
   });
@@ -1243,7 +1263,9 @@ describe('generateLauncherScript', () => {
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} 'Please read the continuation prompt and continue.'
+      set -m
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} 'Please read the continuation prompt and continue.'
+      exit $?
       "
     `);
   });
@@ -1284,7 +1306,9 @@ describe('generateLauncherScript', () => {
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
-      exec claude --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      set -m
+      claude --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
+      exit $?
       "
     `);
   });
@@ -1315,7 +1339,8 @@ describe('generateLauncherScript', () => {
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent',
     });
-    expect(script).toContain('exec claude --agent pan-work-agent');
+    expect(script).toContain('claude --agent pan-work-agent');
+    expect(script).not.toContain('exec claude');
     expect(script).not.toMatch(/--model/);
     expect(script).not.toMatch(/--dangerously-skip-permissions/);
     expect(script).not.toMatch(/--permission-mode/);
@@ -1635,7 +1660,9 @@ describe('generateLauncherWrapper', () => {
           `if [ -d '${tempHome}/launch/sess-abc/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='${tempHome}/launch/sess-abc/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
           `if [ -f '${tempHome}/launch/sess-abc/deft.env' ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < '${tempHome}/launch/sess-abc/deft.env'; fi`,
           "cd -- '/workspace/project'",
-          "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-abc'",
+          'set -m',
+          "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-abc'",
+          'exit $?',
           '',
         ].join('\n'),
       );
