@@ -40,6 +40,7 @@ vi.mock('@xterm/xterm', () => ({
     reset = vi.fn();
     scrollToBottom = vi.fn();
     buffer = { active: { viewportY: 0, length: 0 } };
+    modes = { mouseTrackingMode: 'none' };
     constructor() {
       (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
     }

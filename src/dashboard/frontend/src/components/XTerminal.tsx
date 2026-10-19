@@ -371,6 +371,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const handleForcedSelectionMouseDown = useCallback((event: MouseEvent) => {
     if (!event.isTrusted || event.button !== 0) return;
     if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+    // With mouse reporting off, xterm treats Shift+mousedown as "extend the
+    // existing selection", so a forced Shift would swallow every plain drag.
+    const term = terminalInstance.current;
+    if (!term || term.modes.mouseTrackingMode === 'none') return;
     const target = event.target;
     if (!(target instanceof Element)) return;
     event.stopPropagation();
@@ -541,9 +545,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       term.attachCustomKeyEventHandler(handleKeyEvent);
 
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
-      // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
-      // drag-selection disappear. Re-dispatch primary-button mousedown with shiftKey
-      // so xterm enters selection mode while leaving wheel scrolling untouched.
+      // when Shift is held. While the pty app has mouse reporting on, plain
+      // drag-selection disappears, so re-dispatch primary-button mousedown with
+      // shiftKey to force selection mode. With reporting off the handler steps
+      // aside and xterm selects normally.
       terminalRef.current.addEventListener('mousedown', handleForcedSelectionMouseDown, true);
 
       // Wheel/trackpad gestures stay inside the terminal surface. xterm still
