@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-18T20:11:12.264657Z · model: claude-opus-5-5 · open: 824_
+_Last sequenced: 2026-10-19T04:13:19.673324Z · model: claude-opus-5-5 · open: 825_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -394,238 +394,239 @@ _Last sequenced: 2026-10-18T20:11:12.264657Z · model: claude-opus-5-5 · open: 
 | 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
 | 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 430 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 431 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 432 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 433 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 434 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
-| 435 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 436 | PAN-4480 | M | medium | ok |  | PAN-4475, PAN-4330 | Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330 |
-| 437 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 438 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 439 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 440 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 441 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 442 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 443 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 447 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
-| 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 449 | PAN-4481 | M | medium | needs-refinement |  | PAN-4475 | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 450 | PAN-4482 | S | medium | ok |  | PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
-| 451 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 452 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 453 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 454 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 455 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 456 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 457 | PAN-4402 | L | medium | ok |  |  | Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed |
-| 458 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 459 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 460 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 461 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 462 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 463 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 464 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 465 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 466 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 467 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 468 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 469 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 470 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 471 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 472 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 473 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 474 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 475 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 476 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 479 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 481 | PAN-4403 | M | medium | ok |  |  | Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403 |
-| 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 483 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 484 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 485 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 486 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 487 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 488 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 489 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 490 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 491 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 492 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 493 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 494 | PAN-4404 | L | medium | ok |  | PAN-4402 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
-| 495 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 496 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 497 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 498 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 499 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 500 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 501 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 502 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 503 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 504 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 505 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 506 | PAN-4405 | M | medium | ok |  | PAN-4402 | Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity |
-| 507 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 508 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 509 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 510 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 511 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 512 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 513 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 514 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 515 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 516 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 517 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 518 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 519 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 520 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 521 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 522 | PAN-3863 | L | medium | ok |  | PAN-4402, PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog |
-| 523 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 524 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 525 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 526 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 527 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 528 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 529 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 530 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 531 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 532 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 533 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 534 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 535 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 536 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 537 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 541 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 545 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 546 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 547 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 548 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 549 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 550 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 551 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 552 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 553 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 554 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 555 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 556 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 557 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 558 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 559 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 560 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 561 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 562 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 563 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 564 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 565 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 566 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere Fly track: restore auto-reap of finished remote agents (removed with deacon patrol in the Cut); blocks hosted capacity |
-| 567 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 568 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 569 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 570 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 571 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 572 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 573 | PAN-1676 | M | medium | ok |  | PAN-4295 | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 574 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 575 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 576 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 577 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 578 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 579 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 580 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 581 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 582 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 583 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 584 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 585 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 586 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 587 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 588 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 589 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 590 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 591 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 592 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 593 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 594 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 595 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 596 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 597 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 598 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 599 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 600 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 601 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 602 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
-| 603 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 604 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 605 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 606 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 607 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 608 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 609 | PAN-4308 | S | medium | ok |  | PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
-| 610 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 611 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 612 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 613 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 614 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 615 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 616 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 617 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 618 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 619 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 620 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 621 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 622 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 623 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 624 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 625 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 626 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 627 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 628 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 629 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 630 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 631 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 632 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 633 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 634 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 635 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 636 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 637 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 638 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 639 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 640 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 641 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 642 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 643 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 644 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 645 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 646 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 647 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 648 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 649 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 650 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 651 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 655 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 656 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 657 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 658 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 659 | PAN-2352 | M | low | needs-refinement |  | PAN-2354 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
-| 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 430 | PAN-4557 | S | medium | ok |  |  | Herdr attach snapshot drops bracketed-paste mode; dashboard multi-line paste reaches agents as separate Enter-terminated lines |
+| 431 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 432 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 433 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
+| 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 437 | PAN-4480 | M | medium | ok |  | PAN-4475, PAN-4330 | Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330 |
+| 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 441 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 442 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 443 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 444 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 445 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 446 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 447 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
+| 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 450 | PAN-4481 | M | medium | needs-refinement |  | PAN-4475 | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 458 | PAN-4402 | L | medium | ok |  |  | Anywhere desktop half: connection catalog, environment switcher, version gating; PAN-3762 server half has closed |
+| 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 462 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 463 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 464 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 465 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 466 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 467 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 468 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 469 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 470 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 471 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 472 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 473 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 474 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 475 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 476 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 477 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 478 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 479 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 480 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 481 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 482 | PAN-4403 | M | medium | ok |  |  | Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403 |
+| 483 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 484 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 485 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 486 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 487 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 488 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 489 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 490 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 491 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 492 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 493 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 494 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 495 | PAN-4404 | L | medium | ok |  | PAN-4402 | Desktop-managed SSH launch and loopback forward for remote environments; the one SSH stack PAN-3863 builds on |
+| 496 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 497 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 498 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 499 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 500 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 501 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 502 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 503 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 504 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 505 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 506 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 507 | PAN-4405 | M | medium | ok |  | PAN-4402 | Aggregated cross-environment overview, Needs-You and search, after the PAN-4402 switcher reaches parity |
+| 508 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 509 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 510 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 511 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 512 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 513 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 514 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 515 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 516 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 517 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 518 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 519 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 523 | PAN-3863 | L | medium | ok |  | PAN-4402, PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 and the PAN-4402 desktop catalog |
+| 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 527 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 528 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 529 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 530 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 531 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 532 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 533 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 534 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 535 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 536 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 537 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 538 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 539 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 540 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 541 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 542 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 543 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 544 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 545 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 546 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 547 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 548 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 549 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 550 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 551 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 552 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 553 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 554 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 555 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 556 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 557 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 558 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 559 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 560 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 561 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 562 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 563 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 567 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere Fly track: restore auto-reap of finished remote agents (removed with deacon patrol in the Cut); blocks hosted capacity |
+| 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 571 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 572 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 573 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 574 | PAN-1676 | M | medium | ok |  | PAN-4295 | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 575 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 576 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 577 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 578 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 579 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 580 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 581 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 582 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 583 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 584 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 588 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 592 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 593 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 594 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 595 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 596 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 597 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 598 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 599 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
+| 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 607 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 608 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 609 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 610 | PAN-4308 | S | medium | ok |  | PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
+| 611 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 612 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 613 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 614 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 615 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 616 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 617 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 618 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 619 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 620 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 621 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 622 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 623 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 624 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 625 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 626 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 627 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 628 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 629 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 630 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 631 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 632 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 633 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 634 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 635 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 636 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 637 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 638 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 639 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 640 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 641 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 642 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 643 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 644 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 645 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 646 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 647 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 648 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 649 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 650 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 651 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 652 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 653 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 654 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 655 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 656 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 660 | PAN-2352 | M | low | needs-refinement |  | PAN-2354 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
+| 661 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
+| 662 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 663 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
@@ -1159,10 +1160,10 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-18T20:11:12.264657Z",
+  "generatedAt": "2026-10-19T04:13:19.673324Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 824,
+  "openCount": 825,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1228,6 +1229,32 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "dependsOn": [],
       "why": "CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10",
       "rationale": "Both CI failures observed on 2026-10-04 reached agents as 'no failing workflow runs were found', so agents re-run tests locally through the serialized queue to rediscover failures. Building failures from check runs puts the failing test in the feedback and removes that queue load. Fourth member of the verification bundle.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4553",
+      "rank": 6,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json",
+      "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4554",
+      "rank": 7,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
+      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5196,6 +5223,19 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "planning": "skip"
     },
     {
+      "issue": "PAN-4552",
+      "rank": 362,
+      "size": "M",
+      "importance": "medium",
+      "score": 61,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs",
+      "rationale": "New since the prior run: a follow-up to the three fresh-WSL2-host fixes in v0.66.0, ranked in the first-run reliability band beside PAN-2572 because unfixed setup hints and hidden first-launch dialogs block new hosts before any pipeline work can start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2670",
       "rank": 363,
       "size": "S",
@@ -6020,8 +6060,21 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "planning": "auto"
     },
     {
-      "issue": "PAN-1571",
+      "issue": "PAN-4557",
       "rank": 430,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr attach snapshot drops bracketed-paste mode; dashboard multi-line paste reaches agents as separate Enter-terminated lines",
+      "rationale": "New since the prior run. Observed via Playwright on /conv/3259: the browser xterm never sees ?2004h after a Herdr attach, so pastes are sent unwrapped and split into lines at the agent. Placed just ahead of PAN-1571 (multi-line pastes land unsubmitted) because it is a concrete, reproduced mechanism for the same operator-facing symptom; the open question is whether Herdr exposes pane mode state for ws-terminal.ts to replay.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1571",
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6033,7 +6086,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1565",
-      "rank": 431,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6045,7 +6098,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1530",
-      "rank": 432,
+      "rank": 433,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6057,7 +6110,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1461",
-      "rank": 433,
+      "rank": 434,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6069,7 +6122,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1449",
-      "rank": 434,
+      "rank": 435,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6081,7 +6134,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1446",
-      "rank": 435,
+      "rank": 436,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6093,7 +6146,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4480",
-      "rank": 436,
+      "rank": 437,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6109,7 +6162,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1445",
-      "rank": 437,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6121,7 +6174,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3616",
-      "rank": 438,
+      "rank": 439,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6133,7 +6186,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2982",
-      "rank": 439,
+      "rank": 440,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6145,7 +6198,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2981",
-      "rank": 440,
+      "rank": 441,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6157,7 +6210,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2976",
-      "rank": 441,
+      "rank": 442,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6169,7 +6222,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1444",
-      "rank": 442,
+      "rank": 443,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6181,7 +6234,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2469",
-      "rank": 443,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6194,7 +6247,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1433",
-      "rank": 444,
+      "rank": 445,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6206,7 +6259,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1416",
-      "rank": 445,
+      "rank": 446,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6218,7 +6271,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1392",
-      "rank": 446,
+      "rank": 447,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6231,7 +6284,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4151",
-      "rank": 447,
+      "rank": 448,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -6245,7 +6298,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1330",
-      "rank": 448,
+      "rank": 449,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6257,7 +6310,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4481",
-      "rank": 449,
+      "rank": 450,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -6271,7 +6324,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4482",
-      "rank": 450,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6293,7 +6346,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1226",
-      "rank": 451,
+      "rank": 452,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6305,7 +6358,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1173",
-      "rank": 452,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6317,7 +6370,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1154",
-      "rank": 453,
+      "rank": 454,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6329,7 +6382,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3354",
-      "rank": 454,
+      "rank": 455,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -6341,7 +6394,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3178",
-      "rank": 455,
+      "rank": 456,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -6354,7 +6407,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3017",
-      "rank": 456,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6366,7 +6419,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4402",
-      "rank": 457,
+      "rank": 458,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6378,7 +6431,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3873",
-      "rank": 458,
+      "rank": 459,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6391,7 +6444,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1150",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6403,7 +6456,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1149",
-      "rank": 460,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6415,7 +6468,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1130",
-      "rank": 461,
+      "rank": 462,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6427,7 +6480,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1129",
-      "rank": 462,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6439,7 +6492,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1128",
-      "rank": 463,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6451,7 +6504,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1113",
-      "rank": 464,
+      "rank": 465,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6463,7 +6516,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1068",
-      "rank": 465,
+      "rank": 466,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6475,7 +6528,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3938",
-      "rank": 466,
+      "rank": 467,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -6488,7 +6541,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-933",
-      "rank": 467,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6500,7 +6553,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-932",
-      "rank": 468,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6512,7 +6565,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-927",
-      "rank": 469,
+      "rank": 470,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6524,7 +6577,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-900",
-      "rank": 470,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6536,7 +6589,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-886",
-      "rank": 471,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6548,7 +6601,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-778",
-      "rank": 472,
+      "rank": 473,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6560,7 +6613,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-681",
-      "rank": 473,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6572,7 +6625,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3732",
-      "rank": 474,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6584,7 +6637,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3700",
-      "rank": 475,
+      "rank": 476,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6596,7 +6649,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3290",
-      "rank": 476,
+      "rank": 477,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -6608,7 +6661,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3132",
-      "rank": 477,
+      "rank": 478,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6620,7 +6673,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3909",
-      "rank": 478,
+      "rank": 479,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6633,7 +6686,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2659",
-      "rank": 479,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6646,7 +6699,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3831",
-      "rank": 480,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6659,7 +6712,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4403",
-      "rank": 481,
+      "rank": 482,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6671,7 +6724,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-538",
-      "rank": 482,
+      "rank": 483,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -6683,7 +6736,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1164",
-      "rank": 483,
+      "rank": 484,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -6695,7 +6748,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3563",
-      "rank": 484,
+      "rank": 485,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6708,7 +6761,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1041",
-      "rank": 485,
+      "rank": 486,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -6720,7 +6773,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-924",
-      "rank": 486,
+      "rank": 487,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -6732,7 +6785,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3770",
-      "rank": 487,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6744,7 +6797,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3731",
-      "rank": 488,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6756,7 +6809,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3530",
-      "rank": 489,
+      "rank": 490,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6768,7 +6821,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3131",
-      "rank": 490,
+      "rank": 491,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -6780,7 +6833,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3061",
-      "rank": 491,
+      "rank": 492,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -6792,7 +6845,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3057",
-      "rank": 492,
+      "rank": 493,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -6805,7 +6858,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3892",
-      "rank": 493,
+      "rank": 494,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -6818,7 +6871,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4404",
-      "rank": 494,
+      "rank": 495,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -6832,7 +6885,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-863",
-      "rank": 495,
+      "rank": 496,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6844,7 +6897,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-817",
-      "rank": 496,
+      "rank": 497,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6856,7 +6909,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-802",
-      "rank": 497,
+      "rank": 498,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6868,7 +6921,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-713",
-      "rank": 498,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6880,7 +6933,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-700",
-      "rank": 499,
+      "rank": 500,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6892,7 +6945,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-646",
-      "rank": 500,
+      "rank": 501,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -6905,7 +6958,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-532",
-      "rank": 501,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6917,7 +6970,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2896",
-      "rank": 502,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -6929,7 +6982,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2685",
-      "rank": 503,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -6941,7 +6994,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2626",
-      "rank": 504,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -6953,7 +7006,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2625",
-      "rank": 505,
+      "rank": 506,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -6965,7 +7018,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4405",
-      "rank": 506,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -6979,7 +7032,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2608",
-      "rank": 507,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -6991,7 +7044,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2582",
-      "rank": 508,
+      "rank": 509,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7003,7 +7056,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2566",
-      "rank": 509,
+      "rank": 510,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7017,7 +7070,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2565",
-      "rank": 510,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7030,7 +7083,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3735",
-      "rank": 511,
+      "rank": 512,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7042,7 +7095,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3335",
-      "rank": 512,
+      "rank": 513,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7054,7 +7107,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3054",
-      "rank": 513,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7066,7 +7119,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2977",
-      "rank": 514,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7080,7 +7133,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2557",
-      "rank": 515,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7092,7 +7145,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2553",
-      "rank": 516,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7104,7 +7157,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2521",
-      "rank": 517,
+      "rank": 518,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7116,7 +7169,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2493",
-      "rank": 518,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7128,7 +7181,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3772",
-      "rank": 519,
+      "rank": 520,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7140,7 +7193,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3853",
-      "rank": 520,
+      "rank": 521,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7153,7 +7206,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3830",
-      "rank": 521,
+      "rank": 522,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7166,7 +7219,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3863",
-      "rank": 522,
+      "rank": 523,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -7182,7 +7235,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4367",
-      "rank": 523,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7194,7 +7247,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2443",
-      "rank": 524,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7206,7 +7259,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2442",
-      "rank": 525,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7218,7 +7271,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2409",
-      "rank": 526,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7230,7 +7283,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2392",
-      "rank": 527,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7243,7 +7296,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2335",
-      "rank": 528,
+      "rank": 529,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7255,7 +7308,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2295",
-      "rank": 529,
+      "rank": 530,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7267,7 +7320,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3767",
-      "rank": 530,
+      "rank": 531,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7279,7 +7332,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3615",
-      "rank": 531,
+      "rank": 532,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7291,7 +7344,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3558",
-      "rank": 532,
+      "rank": 533,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7303,7 +7356,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3469",
-      "rank": 533,
+      "rank": 534,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7315,7 +7368,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3333",
-      "rank": 534,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7327,7 +7380,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3058",
-      "rank": 535,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7339,7 +7392,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2288",
-      "rank": 536,
+      "rank": 537,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -7351,7 +7404,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2065",
-      "rank": 537,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7363,7 +7416,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2031",
-      "rank": 538,
+      "rank": 539,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7375,7 +7428,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2026",
-      "rank": 539,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7387,7 +7440,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2025",
-      "rank": 540,
+      "rank": 541,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7399,7 +7452,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4366",
-      "rank": 541,
+      "rank": 542,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7411,7 +7464,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2004",
-      "rank": 542,
+      "rank": 543,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7423,7 +7476,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1995",
-      "rank": 543,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7435,7 +7488,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3739",
-      "rank": 544,
+      "rank": 545,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -7447,7 +7500,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4393",
-      "rank": 545,
+      "rank": 546,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7459,7 +7512,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1985",
-      "rank": 546,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7471,7 +7524,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1968",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7483,7 +7536,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1967",
-      "rank": 548,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7496,7 +7549,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1965",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7508,7 +7561,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1937",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7520,7 +7573,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1926",
-      "rank": 551,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7532,7 +7585,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1916",
-      "rank": 552,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7544,7 +7597,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1854",
-      "rank": 553,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7556,7 +7609,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1853",
-      "rank": 554,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7568,7 +7621,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1852",
-      "rank": 555,
+      "rank": 556,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -7580,7 +7633,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1844",
-      "rank": 556,
+      "rank": 557,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7592,7 +7645,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1840",
-      "rank": 557,
+      "rank": 558,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7604,7 +7657,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1839",
-      "rank": 558,
+      "rank": 559,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7616,7 +7669,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1776",
-      "rank": 559,
+      "rank": 560,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -7628,7 +7681,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3706",
-      "rank": 560,
+      "rank": 561,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -7640,7 +7693,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3539",
-      "rank": 561,
+      "rank": 562,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -7652,7 +7705,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3502",
-      "rank": 562,
+      "rank": 563,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -7664,7 +7717,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4409",
-      "rank": 563,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7676,7 +7729,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4410",
-      "rank": 564,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7690,7 +7743,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2978",
-      "rank": 565,
+      "rank": 566,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7705,7 +7758,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4295",
-      "rank": 566,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7720,7 +7773,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1754",
-      "rank": 567,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7732,7 +7785,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1751",
-      "rank": 568,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7744,7 +7797,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1750",
-      "rank": 569,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7756,7 +7809,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1748",
-      "rank": 570,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7768,7 +7821,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1691",
-      "rank": 571,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7780,7 +7833,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1685",
-      "rank": 572,
+      "rank": 573,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -7792,7 +7845,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1676",
-      "rank": 573,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -7807,7 +7860,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1667",
-      "rank": 574,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -7819,7 +7872,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1657",
-      "rank": 575,
+      "rank": 576,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -7831,7 +7884,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1656",
-      "rank": 576,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -7843,7 +7896,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1655",
-      "rank": 577,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -7855,7 +7908,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1654",
-      "rank": 578,
+      "rank": 579,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -7867,7 +7920,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1653",
-      "rank": 579,
+      "rank": 580,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -7879,7 +7932,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1623",
-      "rank": 580,
+      "rank": 581,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -7891,7 +7944,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1561",
-      "rank": 581,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -7903,7 +7956,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1550",
-      "rank": 582,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -7915,7 +7968,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1545",
-      "rank": 583,
+      "rank": 584,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -7927,7 +7980,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1542",
-      "rank": 584,
+      "rank": 585,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -7939,7 +7992,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1524",
-      "rank": 585,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -7951,7 +8004,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1490",
-      "rank": 586,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -7963,7 +8016,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1485",
-      "rank": 587,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -7975,7 +8028,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1473",
-      "rank": 588,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -7987,7 +8040,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1443",
-      "rank": 589,
+      "rank": 590,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8000,7 +8053,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1442",
-      "rank": 590,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8012,7 +8065,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1432",
-      "rank": 591,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8024,7 +8077,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1223",
-      "rank": 592,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8036,7 +8089,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1165",
-      "rank": 593,
+      "rank": 594,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8048,7 +8101,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1151",
-      "rank": 594,
+      "rank": 595,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8060,7 +8113,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4360",
-      "rank": 595,
+      "rank": 596,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8072,7 +8125,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1060",
-      "rank": 596,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8084,7 +8137,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1051",
-      "rank": 597,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8096,7 +8149,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1037",
-      "rank": 598,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8108,7 +8161,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-958",
-      "rank": 599,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8120,7 +8173,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-949",
-      "rank": 600,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8132,7 +8185,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3157",
-      "rank": 601,
+      "rank": 602,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8145,7 +8198,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4296",
-      "rank": 602,
+      "rank": 603,
       "size": "L",
       "importance": "medium",
       "score": 34,
@@ -8160,7 +8213,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-947",
-      "rank": 603,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8172,7 +8225,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-938",
-      "rank": 604,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8184,7 +8237,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-903",
-      "rank": 605,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8196,7 +8249,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-902",
-      "rank": 606,
+      "rank": 607,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8208,7 +8261,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-901",
-      "rank": 607,
+      "rank": 608,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8220,7 +8273,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-818",
-      "rank": 608,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8232,7 +8285,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4308",
-      "rank": 609,
+      "rank": 610,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -8247,7 +8300,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3322",
-      "rank": 610,
+      "rank": 611,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8259,7 +8312,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-678",
-      "rank": 611,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8271,7 +8324,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-675",
-      "rank": 612,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8284,7 +8337,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-654",
-      "rank": 613,
+      "rank": 614,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8296,7 +8349,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-649",
-      "rank": 614,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8308,7 +8361,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-637",
-      "rank": 615,
+      "rank": 616,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8320,7 +8373,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-629",
-      "rank": 616,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8332,7 +8385,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-613",
-      "rank": 617,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8344,7 +8397,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-607",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8356,7 +8409,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-606",
-      "rank": 619,
+      "rank": 620,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8368,7 +8421,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-548",
-      "rank": 620,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8380,7 +8433,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-546",
-      "rank": 621,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8392,7 +8445,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-537",
-      "rank": 622,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8404,7 +8457,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-531",
-      "rank": 623,
+      "rank": 624,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -8416,7 +8469,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-452",
-      "rank": 624,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8428,7 +8481,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-450",
-      "rank": 625,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8440,7 +8493,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1126",
-      "rank": 626,
+      "rank": 627,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8452,7 +8505,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-1066",
-      "rank": 627,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8464,7 +8517,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3441",
-      "rank": 628,
+      "rank": 629,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -8476,7 +8529,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2968",
-      "rank": 629,
+      "rank": 630,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8488,7 +8541,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2941",
-      "rank": 630,
+      "rank": 631,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8501,7 +8554,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2936",
-      "rank": 631,
+      "rank": 632,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8513,7 +8566,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4373",
-      "rank": 632,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8525,7 +8578,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2868",
-      "rank": 633,
+      "rank": 634,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8537,7 +8590,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2767",
-      "rank": 634,
+      "rank": 635,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8549,7 +8602,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2679",
-      "rank": 635,
+      "rank": 636,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8561,7 +8614,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2662",
-      "rank": 636,
+      "rank": 637,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8573,7 +8626,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2645",
-      "rank": 637,
+      "rank": 638,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8585,7 +8638,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2635",
-      "rank": 638,
+      "rank": 639,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -8597,7 +8650,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2630",
-      "rank": 639,
+      "rank": 640,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8609,7 +8662,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2629",
-      "rank": 640,
+      "rank": 641,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8621,7 +8674,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3443",
-      "rank": 641,
+      "rank": 642,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -8633,7 +8686,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4350",
-      "rank": 642,
+      "rank": 643,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8645,7 +8698,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4003",
-      "rank": 643,
+      "rank": 644,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -8658,7 +8711,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-4368",
-      "rank": 644,
+      "rank": 645,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8670,7 +8723,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2628",
-      "rank": 645,
+      "rank": 646,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8682,7 +8735,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2622",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8694,7 +8747,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2600",
-      "rank": 647,
+      "rank": 648,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -8706,7 +8759,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2533",
-      "rank": 648,
+      "rank": 649,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -8718,7 +8771,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2527",
-      "rank": 649,
+      "rank": 650,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8730,7 +8783,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2514",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8742,7 +8795,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2354",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -8755,7 +8808,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2505",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8767,7 +8820,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2504",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -8779,7 +8832,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2449",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -8791,7 +8844,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-3940",
-      "rank": 655,
+      "rank": 656,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -8805,7 +8858,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2424",
-      "rank": 656,
+      "rank": 657,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -8819,7 +8872,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2406",
-      "rank": 657,
+      "rank": 658,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -8832,7 +8885,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2394",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -8844,7 +8897,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2352",
-      "rank": 659,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -8859,7 +8912,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2355",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -8872,7 +8925,7 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
     },
     {
       "issue": "PAN-2353",
-      "rank": 661,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -11368,45 +11421,6 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "planning": "auto"
     },
     {
-      "issue": "PAN-4552",
-      "rank": 362,
-      "size": "M",
-      "importance": "medium",
-      "score": 61,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs",
-      "rationale": "New since the prior run: a follow-up to the three fresh-WSL2-host fixes in v0.66.0, ranked in the first-run reliability band beside PAN-2572 because unfixed setup hints and hidden first-launch dialogs block new hosts before any pipeline work can start.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4553",
-      "rank": 6,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json",
-      "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4554",
-      "rank": 7,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
-      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4555",
       "rank": 873,
       "size": "XS",
@@ -12750,6 +12764,20 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4557",
+      "to": "PAN-1571",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4557",
+      "to": "PAN-3944",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
