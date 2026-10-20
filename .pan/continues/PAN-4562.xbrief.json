@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T03:56:40.128Z",
+  "updated": "2026-10-20T03:56:41.339Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,11 @@
     "fake-runtime-contract": {
       "status": "completed",
       "doneAt": "2026-10-20T03:56:40.127Z"
+    },
+    "ratchet-lower": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:56:41.339Z"
     }
   }
 }
