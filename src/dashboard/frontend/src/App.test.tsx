@@ -37,7 +37,7 @@ const {
       agentsById: {},
       backendPanesById: {},
       derivedIssueStateByIssueId: {},
-      issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
+      issuesRaw: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
       agentsWithPendingAskUserQuestion: [],
@@ -132,13 +132,13 @@ vi.mock('./lib/store', () => ({
       }
       return [];
     }),
-    { setState: vi.fn() },
+    { setState: vi.fn(), getState: () => mockDashboardState },
   ),
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
   selectPendingInputSubjects: () => [],
-  selectIssues: (state: { issues: unknown[] }) => state.issues,
+  selectIssues: (state: { issuesRaw: unknown[] }) => state.issuesRaw,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
   selectPendingInputSubjects: () => [],
   selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
@@ -206,7 +206,7 @@ function renderApp() {
 beforeEach(() => {
   mockDashboardState.agents = []
   mockDashboardState.agentsById = {}
-  mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
+  mockDashboardState.issuesRaw = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
   mockDashboardState.agentsWithPendingAskUserQuestion = []

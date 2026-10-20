@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
 import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../../components/ConfirmationDialog';
 import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDialog';
@@ -13,7 +14,7 @@ import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAs
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
-import type { Agent, Issue } from '../../types';
+import type { Issue } from '../../types';
 import {
   fetchConfirmations,
   respondToChannelPermission,
@@ -33,13 +34,27 @@ type ConvAskUserQuestionRow = {
   pendingPermission?: TerminalPendingPermission;
 };
 
-interface UsePendingInputDialogsArgs {
-  agents: Agent[];
-  issues: Issue[];
+/**
+ * Issue id → title of the first issue with that id, cached per `issuesRaw`
+ * identity. A `useShallow` selector over it keeps the dialog host from
+ * re-rendering when an issue changes a field other than its title (PAN-4560).
+ */
+const issueTitleCache = new WeakMap<object, Record<string, string | undefined>>();
+function issueTitlesById(issuesRaw: unknown[]): Record<string, string | undefined> {
+  let map = issueTitleCache.get(issuesRaw);
+  if (!map) {
+    map = {};
+    for (const issue of issuesRaw as Issue[]) {
+      if (!(issue.id in map)) map[issue.id] = issue.title;
+    }
+    issueTitleCache.set(issuesRaw, map);
+  }
+  return map;
 }
 
-export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialogsArgs) {
+export function usePendingInputDialogs() {
   const queryClient = useQueryClient();
+  const issueTitleById = useDashboardStore(useShallow((s) => issueTitlesById(s.issuesRaw)));
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
   const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
   const agentsWithProposedPlan = useDashboardStore(selectAgentsWithPendingProposedPlan);
@@ -131,8 +146,10 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     (request) => !optimisticallyResolvedChannelPermissionRequestIds.has(request.requestId)
   );
   const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
-  const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
-    ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
+  const channelPermissionAgentId = currentChannelPermissionRequest?.agentId;
+  const channelPermissionAgentIssueId = useDashboardStore((s) =>
+    channelPermissionAgentId ? s.agentsById[channelPermissionAgentId]?.issueId : undefined);
+  const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId ?? channelPermissionAgentIssueId;
 
   // PAN-1520 / PAN-1705: poll only the dedicated pending-input feed for
   // conversation AskUserQuestion rows.
@@ -162,9 +179,9 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       kind: 'agent' as const,
       id: a.id,
       issueId: a.issueId ?? null,
-      issueTitle: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      issueTitle: a.issueId ? (issueTitleById[a.issueId] ?? null) : null,
       kindLabel: 'Agent',
-      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      title: a.issueId ? (issueTitleById[a.issueId] ?? null) : null,
       pendingProposedPlan: a.pendingProposedPlan,
       askedAt: a.pendingProposedPlan?.askedAt ?? '',
     })),
@@ -174,7 +191,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         kind: 'conv' as const,
         id: c.name,
         issueId: c.issueId ?? null,
-        issueTitle: c.issueId ? (issues.find((i) => i.id === c.issueId)?.title ?? null) : null,
+        issueTitle: c.issueId ? (issueTitleById[c.issueId] ?? null) : null,
         kindLabel: 'Conversation',
         title: c.title ?? null,
         pendingProposedPlan: c.pendingProposedPlan,
@@ -201,9 +218,9 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       kind: 'agent' as const,
       id: a.id,
       issueId: a.issueId ?? null,
-      issueTitle: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      issueTitle: a.issueId ? (issueTitleById[a.issueId] ?? null) : null,
       kindLabel: 'Agent',
-      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      title: a.issueId ? (issueTitleById[a.issueId] ?? null) : null,
       pendingAskUserQuestion: a.pendingAskUserQuestion,
       askedAt: a.pendingAskUserQuestion?.askedAt ?? '',
     })),
@@ -211,7 +228,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       kind: 'conv' as const,
       id: c.name,
       issueId: c.issueId ?? null,
-      issueTitle: c.issueId ? (issues.find((i) => i.id === c.issueId)?.title ?? null) : null,
+      issueTitle: c.issueId ? (issueTitleById[c.issueId] ?? null) : null,
       kindLabel: 'Conversation',
       title: c.title ?? null,
       harness: c.harness ?? null,
@@ -292,7 +309,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       const toolUseId = a.pendingAskUserQuestion?.toolUseId;
       if (!toolUseId) continue;
       const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      const label = (a.issueId ? issues.find((i) => i.id === a.issueId)?.title : undefined) ?? a.issueId ?? a.id;
+      const label = (a.issueId ? issueTitleById[a.issueId] : undefined) ?? a.issueId ?? a.id;
       announce(`agent::${a.id}::${toolUseId}`, a.id, `${label} is waiting on you`, body);
     }
     for (const c of convAskUserQuestionRows) {
@@ -309,7 +326,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     for (const p of agentsWithProposedPlan) {
       const toolUseId = p.pendingProposedPlan?.toolUseId;
       if (!toolUseId) continue;
-      const label = (p.issueId ? issues.find((i) => i.id === p.issueId)?.title : undefined) ?? p.issueId ?? p.id;
+      const label = (p.issueId ? issueTitleById[p.issueId] : undefined) ?? p.issueId ?? p.id;
       announce(`agent-plan::${p.id}::${toolUseId}`, p.id, `${label} has a plan awaiting approval`, 'Review and approve the plan to start implementation.');
     }
     for (const c of convAskUserQuestionRows) {
@@ -337,7 +354,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     for (const k of notifiedPendingInputRef.current) {
       if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
     }
-  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issues]);
+  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issueTitleById]);
 
   const askUserQuestionAnswerMutation = useMutation({
     mutationFn: async ({ kind, id, answers, questions, harness, toolUseId }: {
