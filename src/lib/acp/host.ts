@@ -39,6 +39,9 @@ import {
 } from "./session-runtime.js";
 import { AcpTranscriptWriter, readOwedAcpPrompts } from "./transcript.js";
 import { ACP_TRANSCRIPT_FILE } from "../runtimes/storage/acp.js";
+import { acpCaptureProtocolLogging } from "../protocol-capture/acp-logging.js";
+import { protocolCaptureFromEnv } from "../protocol-capture/capture.js";
+import { defaultScrubContext } from "../protocol-capture/scrub.js";
 
 const FILE_MODE = 0o600;
 const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
@@ -840,11 +843,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const isOpenCode = args.provider === "opencode" || args.provider === "opencode-go";
   const openCodePort = isOpenCode ? await reserveOpenCodePort() : undefined;
   const scope = await Effect.runPromise(Scope.make());
+  const capture = protocolCaptureFromEnv(process.env, { harness: "acp", scrub: defaultScrubContext({ cwd: args.workspace, overdeckHome: process.env.OVERDECK_HOME, home: homedir() }) });
+  capture?.setHeader({ provider: args.provider });
   let scopeClosed = false;
   const closeScope = async () => {
     if (scopeClosed) return;
     scopeClosed = true;
     await Effect.runPromise(Scope.close(scope, Exit.void));
+    await capture?.close();
   };
   try {
     const runtime = await Effect.runPromise(
@@ -862,6 +868,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           },
           environment: process.env,
           ...(openCodePort === undefined ? {} : { port: openCodePort }),
+          ...(capture ? { protocolLogging: acpCaptureProtocolLogging(capture) } : {}),
         });
       }).pipe(
         Effect.provideService(Scope.Scope, scope),

@@ -7,8 +7,10 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as Effect from 'effect/Effect';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppServerTransport } from '../../codex/app-server-transport.js';
+import { acpCaptureProtocolLogging } from '../acp-logging.js';
 import {
   captureAppServerTransport,
   createProtocolCaptureSink,
@@ -244,5 +246,36 @@ describe('capture sink', () => {
       ['out', 'request'],
       ['in', 'response'],
     ]);
+  });
+});
+
+describe('acpCaptureProtocolLogging', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'pan-acp-capture-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('turns raw events into frames and ignores decoded events', async () => {
+    const sink = createProtocolCaptureSink({ path: join(dir, 'acp.jsonl'), harness: 'acp', scrub: context });
+    const logging = acpCaptureProtocolLogging(sink);
+    expect(logging).toMatchObject({ logIncoming: true, logOutgoing: true });
+    const log = logging.logger!;
+    Effect.runSync(log({ direction: 'outgoing', stage: 'raw', payload: '{"jsonrpc":"2.0","id":0,"method":"initialize"}\n' }));
+    Effect.runSync(log({ direction: 'incoming', stage: 'raw', payload: '{"jsonrpc":"2.0","id":0,"res' }));
+    Effect.runSync(log({ direction: 'incoming', stage: 'decoded', payload: { jsonrpc: '2.0', id: 0, result: {} } }));
+    Effect.runSync(log({ direction: 'incoming', stage: 'raw', payload: 'ult":{"protocolVersion":1}}\n' }));
+    await sink.close();
+
+    const { frames } = await loadProtocolFixture(sink.path);
+    expect(frames.map(frame => [frame.dir, frameKind(frame)])).toEqual([
+      ['out', 'request'],
+      ['in', 'response'],
+    ]);
+    expect(frames[1]!.message).toEqual({ jsonrpc: '2.0', id: 0, result: { protocolVersion: 1 } });
   });
 });
