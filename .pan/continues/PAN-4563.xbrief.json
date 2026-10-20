@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:53:08.494Z",
+  "updated": "2026-10-20T21:07:08.729Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -374,5 +374,6 @@
     "acp-case-interrupt.ac3": {
       "status": "cancelled"
     }
-  }
+  },
+  "feedback": []
 }
