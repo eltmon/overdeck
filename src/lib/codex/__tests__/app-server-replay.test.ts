@@ -127,3 +127,34 @@ describe('codex case 1: idle status vs turn/completed', () => {
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
+
+describe('codex case 2: interrupt response before the interrupted state', () => {
+  it('keeps the turn active after the interrupt response and ends it on turn/completed interrupted', async () => {
+    const { replay, manager, host } = await start('interrupt');
+    const facts = fixtureFacts(replay.fixture);
+    const interruptRequest = facts.frames.find(frame => frame.dir === 'out' && frame.message?.method === 'turn/interrupt');
+    const interruptResponseIndex = facts.index(frame =>
+      frame.dir === 'in' && frameKind(frame) === 'response' && frame.message?.id === interruptRequest?.message?.id);
+    expect(interruptResponseIndex, 're-check case 2 against the new CLI: no turn/interrupt response recorded').toBeGreaterThanOrEqual(0);
+    expect(interruptResponseIndex, 're-check case 2 against the new CLI: turn/completed now precedes the interrupt response')
+      .toBeLessThan(facts.ownerCompletedIndex);
+
+    const awaitingInterrupt = replay.awaitingClient({ dir: 'out', method: 'turn/interrupt' });
+    expect(await host.handleOp({ op: 'message', content: prompt(replay) })).toMatchObject({ status: 200 });
+    await awaitingInterrupt;
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+
+    const completedPause = replay.pauseBefore({ method: 'turn/completed', threadId: facts.ownerThreadId });
+    expect(await host.handleOp({ op: 'interrupt' })).toMatchObject({ status: 200 });
+    await completedPause;
+    // The interrupt response alone does not end the turn.
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+
+    replay.resume();
+    await replay.done;
+    expect(facts.ownerTurnStatus).toBe('interrupted');
+    expect(manager.getState()).toMatchObject({ state: 'idle', activeTurnId: undefined, lastTurnStatus: facts.ownerTurnStatus });
+    expect(host.status().lastTurnStatus).toBe('interrupted');
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
