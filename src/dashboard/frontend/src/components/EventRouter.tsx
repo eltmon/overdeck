@@ -21,7 +21,7 @@ import { useEffect, useRef } from 'react'
 import { useDashboardStore } from '../lib/store'
 import { createRecoveryCoordinator, type RecoveryCoordinator } from '../lib/recoveryCoordinator'
 import { getTransport, resetTransport, type PanRpcProtocolClient } from '../lib/wsTransport'
-import type { DomainEvent, DashboardSnapshot } from '@overdeck/contracts'
+import type { DomainEvent, DashboardSnapshot, ReplayEventsResult } from '@overdeck/contracts'
 import { WS_METHODS } from '@overdeck/contracts'
 import { Stream } from 'effect'
 import { loadSnapshotCacheEntry } from '../lib/snapshotCache'
@@ -272,27 +272,46 @@ export function EventRouter() {
     }
 
     // ── Replay: fetch missed events ──────────────────────────────────────────
-    async function replay(fromSequence: number) {
+    // Returns the outcome instead of acting on it: replay() also runs inside
+    // bootstrap(), where calling bootstrap() again would await itself.
+    async function replay(fromSequence: number): Promise<'caught-up' | 'too-far-behind' | 'failed'> {
       coordinator.beginReplayRecovery()
       try {
-        const events = await getTransport().request((client) =>
+        const result = (await getTransport().request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.replayEvents]({ fromSequence }),
-        )
-        const typed = (events as DomainEvent[]).filter(isSequencedDomainEvent)
+        )) as ReplayEventsResult
+        if ('tooFarBehind' in result) {
+          // PAN-4559: the gap exceeds the server's replay cap. failRecovery()
+          // ends the replay phase, defers live events and queues the small
+          // replay that follows the snapshot; the caller re-bootstraps.
+          console.warn(`[EventRouter] replay from ${fromSequence} is too far behind — falling back to a snapshot`)
+          coordinator.failRecovery()
+          return 'too-far-behind'
+        }
+        const typed = (result as DomainEvent[]).filter(isSequencedDomainEvent)
         if (typed.length > 0) {
           applyEvents(typed)
           coordinator.markEventBatchApplied(typed[typed.length - 1]!.sequence)
         }
         const needsAnotherReplay = coordinator.completeReplayRecovery()
         if (needsAnotherReplay) {
-          await replay(coordinator.getState().latestSequence)
-          return
+          return await replay(coordinator.getState().latestSequence)
         }
         drainDeferredEvents()
+        return 'caught-up'
       } catch (err) {
         console.error('[EventRouter] replay failed:', err)
         coordinator.failRecovery()
+        return 'failed'
       }
+    }
+
+    // A live sequence gap: replay, and re-bootstrap through getSnapshot on the
+    // existing transport when the gap is past the replay cap (PAN-4559).
+    function recoverFromGap() {
+      void replay(coordinator.getState().latestSequence).then((outcome) => {
+        if (outcome === 'too-far-behind') bootstrapWithReconnectRetry()
+      })
     }
 
     function drainDeferredEvents() {
@@ -308,7 +327,7 @@ export function EventRouter() {
         }
         pendingBatch.current.push(event)
         if (classification === 'recover') {
-          replay(coordinator.getState().latestSequence).catch(console.error)
+          recoverFromGap()
           break
         }
       }
@@ -359,8 +378,7 @@ export function EventRouter() {
       }
       if (classification === 'recover') {
         pendingBatch.current.push(event)
-        const currentSeq = coordinator.getState().latestSequence
-        replay(currentSeq).catch(console.error)
+        recoverFromGap()
         return
       }
       // 'apply'
