@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T05:20:15.332Z",
+  "updated": "2026-10-20T05:20:30.274Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -238,6 +238,10 @@
     "wi8-claude-ws-window.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T05:20:15.331Z"
+    },
+    "wi9-fullparse-ws-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:30.274Z"
     }
   }
 }
