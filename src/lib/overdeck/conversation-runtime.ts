@@ -187,7 +187,7 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
   await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
   await closeConversationPane(conv.tmuxSession);
   // D3: a pane close can kill the Prime host before it reaps its private daemon.
-  if (conv.harness === 'prime-agent') {
+  if (getHarnessBehavior(conv.harness).capabilities.reapsPrivateDaemonOnStop) {
     await reapPrimeAgentDaemon(conv.tmuxSession).catch((error: unknown) => {
       console.warn(`[conversations] failed to reap the Prime Agent daemon for ${name}: ${error instanceof Error ? error.message : String(error)}`);
     });
@@ -962,13 +962,15 @@ export async function startConversationRuntime(
   const waitReady = deps.waitReady ?? waitForConversationRuntimeReady;
   const deliver = deps.deliver ?? deliverAgentMessage;
   const stop = deps.stop ?? stopConversationRuntime;
+  const caps = getHarnessBehavior(harness).capabilities;
+  const contextInFirstMessage = caps.contextChannel === 'initial-message-envelope' && !launchContext.bareContext;
   try {
     await spawn(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness, false, launchContext);
     console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
     await waitReady(tmuxSession, harness, 'spawn');
-    if (message || (harness === 'kimi-code' && !launchContext.bareContext)) {
+    if (message || contextInFirstMessage) {
       const method = resolveConversationDeliveryMethod(conv);
-      const delivery = harness === 'kimi-code' && !launchContext.bareContext
+      const delivery = contextInFirstMessage
         ? await deliver(
             tmuxSession,
             message,
@@ -977,17 +979,15 @@ export async function startConversationRuntime(
             { kimiContext: { workspace: cwd } },
           )
         : await deliver(tmuxSession, message, 'conversation-message', method);
-      if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'prime-agent') && !delivery.ok) {
+      if (caps.initialPromptMustLand && !delivery.ok) {
         throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
     }
   } catch (spawnErr: unknown) {
     const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
     console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
-    // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
-    // acp — a failed capture must not leave a running tmux session with
-    // no owned native identity presented as a healthy conversation.
-    if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') await stop(conv, name);
+    // PAN-1837: a failed capture must not leave a running session with no owned native identity.
+    if (caps.stopRuntimeOnStartFailure) await stop(conv, name);
     updateSpawnError(name, msg);
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
   }
@@ -1113,12 +1113,13 @@ export async function handleConversationResume(
       }
     }
     const respawn = markRespawnPending(conv.tmuxSession);
+    const caps = getHarnessBehavior(harness).capabilities;
     try {
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
       const method = resolveConversationDeliveryMethod(conv);
-      if (harness === 'kimi-code' && !conv.bareContext) {
+      if (caps.contextChannel === 'initial-message-envelope' && !conv.bareContext) {
         await deliverMandatoryKimiResumeContext(conv.tmuxSession, conv.cwd, method);
       }
       // The harness may open its own blocking gate on resume. The operator owns
@@ -1130,14 +1131,12 @@ export async function handleConversationResume(
         method,
         sendResumeContract,
       );
-      if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
+      if (caps.resumeContractMustLand) assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, effort: getConversationByName(name)?.effort ?? conv.effort, harness, reattached: false, sessionAlive: true, ...(requestedName !== name ? { redirectedFrom: requestedName } : {}) });
     } catch (error) {
-      // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
-      // acp — a failed capture must not leave a running tmux session with no
-      // owned native identity presented as a healthy conversation.
-      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') await stopConversationRuntime(conv, name);
+      // PAN-1837: a failed capture must not leave a running session with no owned native identity.
+      if (caps.stopRuntimeOnStartFailure) await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
