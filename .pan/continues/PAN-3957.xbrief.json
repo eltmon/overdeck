@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T21:53:35.214Z",
+  "updated": "2026-10-20T22:08:53.970Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "w1-fact-store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-20T21:53:35.214Z"
+      "claimedAt": "2026-10-20T21:53:35.214Z",
+      "doneAt": "2026-10-20T22:08:53.970Z"
     }
   }
 }
