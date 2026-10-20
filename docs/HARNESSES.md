@@ -11,3 +11,4 @@
 | Proposal — loading curated skill bundles into a single conversation | [`reference/template-conversations.mdx`](../reference/template-conversations.mdx) |
 | Storage paths — `src/lib/runtimes/storage/<harness>.ts` owns every transcript/session/home path; `npm run lint:harness-storage` enforces it | [`configuration/harnesses.mdx`](../configuration/harnesses.mdx) ("Storage paths") |
 | Prime Agent harness internals — host process, socket ops, per-agent daemon, decisions, version bumps | [`PRIME-AGENT-HARNESS.md`](PRIME-AGENT-HARNESS.md) |
+| Protocol replay tests — capture mode, recorder, fixtures, replay tests | [`PROTOCOL-REPLAY-TESTS.md`](PROTOCOL-REPLAY-TESTS.md) |
