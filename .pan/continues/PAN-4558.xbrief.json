@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:12:59.788Z",
+  "updated": "2026-10-20T03:16:41.080Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-20T03:12:54.452Z"
     },
     "wi3-extract-claude-stream": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T03:12:59.788Z"
+      "claimedAt": "2026-10-20T03:12:59.788Z",
+      "doneAt": "2026-10-20T03:16:41.079Z"
     }
   }
 }
