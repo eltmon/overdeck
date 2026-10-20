@@ -99,7 +99,41 @@ reachable (see the provenance note below).
 The two Kimi fixtures were **not** recorded against a Kimi model. The local Kimi
 login had expired and no Kimi credits were available, so they were recorded with
 the real Kimi Code CLI 2.0.2 (`kimi acp`) driving **gpt-6-luna through the local
-CLIProxy** (model alias `luna`, `--model luna`), using a throwaway Kimi home:
+CLIProxy** (model alias `luna`, `--model luna`), using a throwaway Kimi home.
+
+To build that Kimi home on a machine that lacks it (CLIProxy must be running on
+port 8317), create the directory and write its config. Replace the `api_key`
+placeholder with the first entry under `api-keys` in
+`~/.overdeck/cliproxy/config.yaml`; never paste a real key into this doc or a
+commit.
+
+```bash
+mkdir -p ~/.overdeck/kimi-cliproxy-home
+chmod 700 ~/.overdeck/kimi-cliproxy-home
+cat > ~/.overdeck/kimi-cliproxy-home/config.toml <<'EOF'
+default_model = "luna"
+
+[models."luna"]
+provider = "cliproxy"
+model = "gpt-6-luna"
+max_context_size = 200000
+capabilities = []
+
+[providers."cliproxy"]
+type = "openai"
+base_url = "http://localhost:8317/v1"
+api_key = "<first entry under api-keys in ~/.overdeck/cliproxy/config.yaml>"
+EOF
+chmod 600 ~/.overdeck/kimi-cliproxy-home/config.toml
+```
+
+Smoke-test it; the reply should be `OK`:
+
+```bash
+KIMI_CODE_HOME=$HOME/.overdeck/kimi-cliproxy-home kimi -p 'Reply with exactly OK.' -m luna
+```
+
+Then record:
 
 ```bash
 KIMI_CODE_HOME=$HOME/.overdeck/kimi-cliproxy-home KIMI_CLI_NO_AUTO_UPDATE=1 \
