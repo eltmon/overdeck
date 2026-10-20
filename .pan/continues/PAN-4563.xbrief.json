@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:00:59.950Z",
+  "updated": "2026-10-20T03:01:10.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4563",
       "claimedAt": "2026-10-20T02:58:35.639Z",
       "doneAt": "2026-10-20T03:00:59.950Z"
+    },
+    "capture-sink": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:01:10.246Z"
     }
   }
 }
