@@ -43,11 +43,11 @@ function renderIssueActions(issueId: string) {
     </QueryClientProvider>
   );
   const renders = { count: 0 };
-  renderHook(() => {
+  const hook = renderHook(() => {
     renders.count += 1;
     return useIssueActions(issueId);
   }, { wrapper });
-  return { client, renders };
+  return { client, renders, result: hook.result };
 }
 
 /** Lets the hook's mount-time queries resolve, then zeroes the render count. */
@@ -94,12 +94,14 @@ describe('useIssueActions render isolation', () => {
     expect(renders.count).toBe(0);
   });
 
-  it('re-renders when its own agent changes', async () => {
-    const { client, renders } = renderIssueActions('PAN-1');
+  it('re-renders when its own agent changes and returns the updated status', async () => {
+    const { client, renders, result } = renderIssueActions('PAN-1');
     await settle(client, renders);
+    expect(result.current.state.agent?.status).toBe('running');
 
     applyStoreEvents([statusChanged(1, 'stopped', 1)]);
 
     expect(renders.count).toBeGreaterThanOrEqual(1);
+    expect(result.current.state.agent?.status).toBe('stopped');
   });
 });
