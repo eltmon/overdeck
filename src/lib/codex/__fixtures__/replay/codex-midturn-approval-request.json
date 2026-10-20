@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "protocol": "codex-app-server",
+  "recordedAt": "2026-10-20T10:00:00.000Z",
+  "frames": [
+    {
+      "direction": "outgoing",
+      "message": {
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "clientInfo": {
+            "name": "overdeck",
+            "title": "Overdeck",
+            "version": "0.0.0"
+          },
+          "capabilities": {
+            "experimentalApi": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "id": 1,
+        "result": {}
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "method": "initialized"
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "id": 2,
+        "method": "thread/start",
+        "params": {
+          "model": "gpt-5-preview",
+          "cwd": "/workspace",
+          "approvalPolicy": "on-request",
+          "sandbox": "workspace-write",
+          "experimentalRawEvents": false
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "id": 2,
+        "result": {
+          "thread": {
+            "id": "th-parent-101",
+            "status": {
+              "type": "idle"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "id": 3,
+        "method": "turn/start",
+        "params": {
+          "threadId": "th-parent-101",
+          "input": [
+            {
+              "type": "text",
+              "text": "Run dangerous command",
+              "text_elements": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "id": 3,
+        "result": {
+          "turn": {
+            "id": "turn-201",
+            "status": "inProgress"
+          }
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "method": "turn/started",
+        "params": {
+          "turn": {
+            "id": "turn-201",
+            "status": "inProgress"
+          },
+          "threadId": "th-parent-101"
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "id": "req-approval-999",
+        "method": "item/command/requestApproval",
+        "params": {
+          "threadId": "th-parent-101",
+          "turnId": "turn-201",
+          "command": "rm -rf /tmp/danger",
+          "reason": "Test approval"
+        }
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "id": "req-approval-999",
+        "result": {
+          "decision": "accept"
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "requestId": "req-approval-999"
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "method": "turn/completed",
+        "params": {
+          "turn": {
+            "id": "turn-201",
+            "status": "completed"
+          },
+          "threadId": "th-parent-101"
+        }
+      }
+    }
+  ]
+}
