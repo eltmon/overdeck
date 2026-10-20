@@ -4,17 +4,17 @@
     "created": "2026-10-20T02:47:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4565: pan handoff --fresh: start a clean conversation with no summary and no parent link",
-    "updated": "2026-10-20T02:50:55.404Z"
+    "updated": "2026-10-20T02:51:43.633Z"
   },
   "plan": {
     "id": "pan-4565",
     "title": "pan handoff --fresh: start a clean conversation with no summary and no parent link",
-    "status": "proposed",
+    "status": "running",
     "uid": "6023e130-630c-423c-a108-9341bcfefd05",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T02:47:22Z",
-    "updated": "2026-10-20T02:50:55.404Z",
+    "updated": "2026-10-20T02:51:43.633Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4565",
@@ -705,5 +705,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
