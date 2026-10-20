@@ -83,7 +83,6 @@ interface AppRoutesProps {
 
 export function AppRoutes({
   activeTab,
-  issues,
   selectedConvId,
   conversationViewMode,
   selectedProjectKey,
@@ -123,7 +122,6 @@ export function AppRoutes({
       {activeTab === 'command-deck' && (
         <div className="w-full h-full">
           <CommandDeck
-            issues={issues}
             convId={selectedConvId}
             conversationViewMode={conversationViewMode}
             onConvIdChange={onConvIdChange}

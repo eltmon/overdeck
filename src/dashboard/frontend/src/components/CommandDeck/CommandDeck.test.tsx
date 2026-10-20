@@ -432,7 +432,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <CommandDeck issues={[]} {...props} />
+      <CommandDeck {...props} />
     </QueryClientProvider>,
   );
 }

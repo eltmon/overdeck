@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
@@ -26,8 +27,9 @@ import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { NewConversationSplitButton } from '../newConversation/NewConversationSplitButton';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
-import { useDashboardStore, selectAgents } from '../../lib/store';
+import { useDashboardStore } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
+import { agentIdsByIssueKey, issueCreatedAtById, issueTitlesByKey } from './agentIdsByIssueKey';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -150,7 +152,6 @@ interface ContainerStats {
 }
 
 interface CommandDeckProps {
-  issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
   conversationViewMode?: ViewMode;
@@ -194,7 +195,6 @@ function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
 }
 
 export function CommandDeck({
-  issues = [],
   convId,
   pendingConversationTarget = null,
   onPendingConversationTargetConsumed,
@@ -441,9 +441,12 @@ export function CommandDeck({
     return () => clearInterval(interval);
   }, [projectsWithSessions]);
 
-  // Agents from the dashboard store — used to scope issue tabs' Files/Commits
-  // panes to the issue's workspace agent (PAN-1561).
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  // PAN-4560: flat lookup maps instead of the whole agent and issue slices, so
+  // the deck re-renders only when an entry it reads changes. Handlers read the
+  // store at call time.
+  const agentIdByIssue = useDashboardStore(useShallow((s) => agentIdsByIssueKey(s.agentsById)));
+  const issueTitles = useDashboardStore(useShallow((s) => issueTitlesByKey(s.issuesRaw as Issue[])));
+  const createdAtByIssue = useDashboardStore(useShallow((s) => issueCreatedAtById(s.issuesRaw as Issue[])));
 
   // PAN-1985: confirmation for the destructive harness/model switch paths on
   // work and review sessions. Resumed sessions (no model/harness change) skip
@@ -469,17 +472,6 @@ export function CommandDeck({
 
     return { issueCosts: costs, issueCostDetails: detailsByIssue };
   }, [costData]);
-
-  // Build title map from issues (memoized to avoid new object identity per render)
-  const issueTitles = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const issue of issues) {
-      if (!issue.identifier) continue;
-      map[issue.identifier.toLowerCase()] = issue.title;
-      map[issue.identifier] = issue.title;
-    }
-    return map;
-  }, [issues]);
 
   const { data: conversationList = [] } = useQuery({
     queryKey: ['conversations'],
@@ -847,7 +839,7 @@ export function CommandDeck({
       // restart-fresh route after a typed confirmation.
       const isWorkSession = !sessionType || sessionType === 'work';
       const currentAgent = isWorkSession
-        ? (agents as unknown as Agent[]).find((a) => a.id === sessionId)
+        ? useDashboardStore.getState().agentsById[sessionId] as unknown as Agent | undefined
         : undefined;
       const currentHarness = currentAgent?.harness ?? undefined;
       const currentModel = currentAgent?.model ?? undefined;
@@ -1018,7 +1010,7 @@ export function CommandDeck({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to restart session');
     }
-  }, [queryClient, projectsWithSessions, sessionTreeMap, confirm, agents]);
+  }, [queryClient, projectsWithSessions, sessionTreeMap, confirm]);
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
@@ -1043,6 +1035,7 @@ export function CommandDeck({
   }, []);
 
   const handleOpenPlanDialog = useCallback((issueId: string) => {
+    const issues = useDashboardStore.getState().issuesRaw as Issue[];
     const found = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
     // Never silently no-op: if the issue isn't in the loaded `issues` list (filtered/
     // paginated/out-of-sync), synthesize a minimal one so the dialog still opens.
@@ -1051,7 +1044,7 @@ export function CommandDeck({
       priority: 0, labels: [], url: '', createdAt: '', updatedAt: '',
     } as unknown as Issue);
     setPlanDialogIssue(issue);
-  }, [issues]);
+  }, []);
 
   const handleViewJsonl = useCallback((sessionId: string) => {
     // Highlight the owning issue and open its tab so its transcript is reachable.
@@ -1337,14 +1330,12 @@ export function CommandDeck({
     (issueId: string) => {
       const key = issueId.toLowerCase();
       const title = issueTitles[key] || issueTitles[issueId] || issueId;
-      const createdAt = issues.find(i => i.identifier === issueId)?.createdAt;
+      const createdAt = createdAtByIssue[issueId];
       const branch = selectedProjectData?.features.find(f => f.issueId === issueId)?.branch;
-      const agentId =
-        agents.find(a => a.issueId?.toLowerCase() === key && a.id.startsWith('agent-'))?.id
-        ?? agents.find(a => a.issueId?.toLowerCase() === key)?.id;
+      const agentId = agentIdByIssue[key];
       return { title, createdAt, branch, agentId };
     },
-    [issueTitles, issues, selectedProjectData, agents],
+    [issueTitles, createdAtByIssue, selectedProjectData, agentIdByIssue],
   );
 
   return (
