@@ -68,7 +68,9 @@ it judges, with its verdict badge (`PENDING` until it files one). A lane that
 needs you also gets its own row in **Needs you**. A lane whose
 launcher is not on the page keeps its own row. A handoff or fork successor
 always keeps its own row, with a `continues ← #<id>` link to the conversation
-it continues, so a live successor never hides under an ended predecessor.
+it continues, so a live successor never hides under an ended predecessor —
+except a `pan handoff --fresh` successor, which has no parent link and shows
+no `continues ←` at all.
 
 Click a row to preview it: the right pane shows its header, its issue and PR,
 and its live transcript, and the list stays in view. Use `↑` / `↓` to move the
@@ -112,7 +114,9 @@ left pane closed to hide it. **Live** in the top bar goes back.
 
 Lanes nest under the conversation that launched them, and handoff and fork
 successors nest under their predecessor; a lane shows `<role letter> <lane key>
-i<n>` before its label and a successor shows a `continues ← #<id>` link.
+i<n>` before its label and a successor shows a `continues ← #<id>` link —
+except a `pan handoff --fresh` successor, which has no parent link, nests
+nowhere, and shows no `continues ←` link.
 A critic or verifier lane nests under the builder it judges, not under the
 conversation that launched it, and carries its verdict. History shows at most
 two levels of nesting. A deeper row keeps its place
