@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:50:43.180Z",
+  "updated": "2026-10-20T20:51:01.402Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -330,6 +330,10 @@
     "acp-case-turn-completion.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:50:43.179Z"
+    },
+    "acp-case-turn-completion.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:01.402Z"
     }
   }
 }
