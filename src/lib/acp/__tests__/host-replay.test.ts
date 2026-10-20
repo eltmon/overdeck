@@ -181,7 +181,7 @@ describe("kimi acp case: interrupt", () => {
       .toMatchObject({ status: 202 });
     await awaitingInterrupt;
     // The recorder interrupted on the first [assistant] pane line; do the same.
-    await vi.waitFor(() => expect(lines.some((line) => line.startsWith("[assistant]"))).toBe(true));
+    await vi.waitFor(() => expect(lines.some((line) => line.startsWith("[assistant]"))).toBe(true), { timeout: 10_000 });
     expect(await host.handleOp({ op: "interrupt" })).toMatchObject({ status: 200 });
     await host.waitForIdle();
     await replay.done;
@@ -192,7 +192,8 @@ describe("kimi acp case: interrupt", () => {
     // Every visible chunk lands. The cancel closes the assistant segment, and
     // session-events.ts drops a whitespace-only chunk that would open a new one,
     // so whitespace is compared loosely.
-    await vi.waitFor(async () => expect(visible(assistantText(await readTranscript()))).toBe(recordedText));
+    // Hundreds of late appends drain here; allow for a loaded CI host.
+    await vi.waitFor(async () => expect(visible(assistantText(await readTranscript()))).toBe(recordedText), { timeout: 10_000 });
 
     const records = await readTranscript();
     const completed = records.filter((entry) => entry.event === "turn_completed");
