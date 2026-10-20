@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:29:18.923Z",
+  "updated": "2026-10-20T04:29:37.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -302,6 +302,10 @@
     "ratchet-lower.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T04:29:18.923Z"
+    },
+    "docs-capabilities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:37.130Z"
     }
   }
 }
