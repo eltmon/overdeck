@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:41:30.688Z",
+  "updated": "2026-10-20T20:41:41.900Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "capture-sink.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T20:41:30.688Z"
+    },
+    "capture-sink.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:41.899Z"
     }
   }
 }
