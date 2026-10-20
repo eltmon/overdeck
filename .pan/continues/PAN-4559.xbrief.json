@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T03:43:27.227Z",
+  "updated": "2026-10-20T04:01:12.171Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-20T03:43:19.833Z"
     },
     "client-gap-fallback": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4559",
-      "claimedAt": "2026-10-20T03:43:27.227Z"
+      "claimedAt": "2026-10-20T03:43:27.227Z",
+      "doneAt": "2026-10-20T04:01:12.171Z"
     }
   }
 }
