@@ -1,0 +1,379 @@
+{
+  "version": "1",
+  "issueId": "PAN-4563",
+  "created": "2026-10-20T02:58:35.639Z",
+  "updated": "2026-10-20T21:07:08.729Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "format-scrub": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T02:58:35.639Z",
+      "doneAt": "2026-10-20T03:00:59.950Z"
+    },
+    "capture-sink": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:01:10.246Z",
+      "doneAt": "2026-10-20T03:03:03.388Z"
+    },
+    "codex-capture-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:04:28.450Z",
+      "doneAt": "2026-10-20T03:06:42.809Z"
+    },
+    "acp-capture-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:06:44.669Z",
+      "doneAt": "2026-10-20T03:08:54.493Z"
+    },
+    "codex-turn-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:09:00.558Z",
+      "doneAt": "2026-10-20T03:10:37.172Z"
+    },
+    "codex-user-input-shape": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:10:45.935Z",
+      "doneAt": "2026-10-20T03:11:33.987Z"
+    },
+    "replay-engine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:12:24.555Z",
+      "doneAt": "2026-10-20T03:14:46.038Z"
+    },
+    "codex-replay-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:14:52.439Z",
+      "doneAt": "2026-10-20T03:16:58.233Z"
+    },
+    "acp-replay-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:17:00.144Z",
+      "doneAt": "2026-10-20T03:19:20.607Z"
+    },
+    "recorder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:19:29.871Z",
+      "doneAt": "2026-10-20T03:24:56.525Z"
+    },
+    "codex-case-turn-idle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:25:07.109Z",
+      "doneAt": "2026-10-20T03:27:10.921Z"
+    },
+    "acp-case-turn-completion": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T20:08:29.948Z",
+      "doneAt": "2026-10-20T20:10:32.929Z"
+    },
+    "codex-case-interrupt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:30:00.671Z",
+      "doneAt": "2026-10-20T03:31:01.385Z"
+    },
+    "codex-case-subagent": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:31:13.551Z",
+      "doneAt": "2026-10-20T03:32:34.586Z"
+    },
+    "codex-case-approval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:32:42.872Z",
+      "doneAt": "2026-10-20T03:34:34.911Z"
+    },
+    "codex-case-user-input": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:34:43.322Z",
+      "doneAt": "2026-10-20T03:35:50.290Z"
+    },
+    "acp-case-interrupt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T20:10:41.900Z",
+      "doneAt": "2026-10-20T20:14:57.526Z"
+    },
+    "fixture-hygiene": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T20:15:24.080Z",
+      "doneAt": "2026-10-20T20:15:52.332Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T20:15:53.405Z",
+      "doneAt": "2026-10-20T20:17:22.913Z"
+    },
+    "format-scrub.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:40:44.889Z"
+    },
+    "format-scrub.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:40:57.123Z"
+    },
+    "format-scrub.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:08.054Z"
+    },
+    "format-scrub.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:19.468Z"
+    },
+    "capture-sink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:30.688Z"
+    },
+    "capture-sink.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:41.899Z"
+    },
+    "capture-sink.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:52.899Z"
+    },
+    "capture-sink.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:03.951Z"
+    },
+    "codex-capture-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:15.012Z"
+    },
+    "codex-capture-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:26.125Z"
+    },
+    "acp-capture-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:37.464Z"
+    },
+    "acp-capture-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:48.680Z"
+    },
+    "acp-capture-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:59.648Z"
+    },
+    "codex-turn-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:10.807Z"
+    },
+    "codex-turn-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:22.059Z"
+    },
+    "codex-turn-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:33.846Z"
+    },
+    "codex-turn-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:45.394Z"
+    },
+    "codex-user-input-shape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:56.661Z"
+    },
+    "codex-user-input-shape.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:08.362Z"
+    },
+    "replay-engine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:19.497Z"
+    },
+    "replay-engine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:30.597Z"
+    },
+    "replay-engine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:42.639Z"
+    },
+    "replay-engine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:53.852Z"
+    },
+    "replay-engine.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:05.970Z"
+    },
+    "codex-replay-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:19.179Z"
+    },
+    "codex-replay-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:32.945Z"
+    },
+    "codex-replay-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:45.861Z"
+    },
+    "acp-replay-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:57.103Z"
+    },
+    "acp-replay-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:08.129Z"
+    },
+    "acp-replay-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:19.571Z"
+    },
+    "recorder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:31.440Z"
+    },
+    "recorder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:42.815Z"
+    },
+    "recorder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:53.848Z"
+    },
+    "codex-case-turn-idle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:05.882Z"
+    },
+    "codex-case-turn-idle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:17.716Z"
+    },
+    "codex-case-turn-idle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:29.072Z"
+    },
+    "codex-case-interrupt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:40.890Z"
+    },
+    "codex-case-interrupt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:51.932Z"
+    },
+    "codex-case-interrupt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:03.148Z"
+    },
+    "codex-case-subagent.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:14.446Z"
+    },
+    "codex-case-subagent.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:26.165Z"
+    },
+    "codex-case-subagent.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:37.332Z"
+    },
+    "codex-case-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:48.977Z"
+    },
+    "codex-case-approval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:00.240Z"
+    },
+    "codex-case-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:11.717Z"
+    },
+    "codex-case-user-input.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:23.683Z"
+    },
+    "codex-case-user-input.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:35.214Z"
+    },
+    "codex-case-user-input.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:46.747Z"
+    },
+    "codex-case-user-input.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:49:58.143Z"
+    },
+    "acp-case-turn-completion.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:50:10.317Z"
+    },
+    "acp-case-turn-completion.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:50:23.806Z"
+    },
+    "acp-case-turn-completion.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:50:43.179Z"
+    },
+    "acp-case-turn-completion.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:01.402Z"
+    },
+    "acp-case-interrupt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:17.134Z"
+    },
+    "acp-case-interrupt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:30.269Z"
+    },
+    "fixture-hygiene.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:42.004Z"
+    },
+    "fixture-hygiene.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:51:53.841Z"
+    },
+    "fixture-hygiene.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:05.984Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:18.591Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:31.185Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:43.567Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:55.940Z"
+    },
+    "acp-case-interrupt.ac3": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": []
+}

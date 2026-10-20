@@ -1,0 +1,1429 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T02:47:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4563: Replay-backed protocol tests for codex app-server and ACP transports",
+    "updated": "2026-10-20T02:58:21.207Z"
+  },
+  "plan": {
+    "id": "pan-4563",
+    "title": "Replay-backed protocol tests for codex app-server and ACP transports",
+    "status": "running",
+    "uid": "31e5e57a-4f75-4d48-af95-cdeeaa757935",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-20T02:47:32Z",
+    "updated": "2026-10-20T02:58:21.207Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4563",
+        "label": "PAN-4563",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4563.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "codex",
+      "acp",
+      "kimi",
+      "testing",
+      "protocol",
+      "replay"
+    ],
+    "narratives": {
+      "Problem": "Codex app-server and ACP transports are tested only against hand-written mocks, so provider ordering changes (idle status vs turn completion, interrupt response vs interrupted state, sub-agent completion before the parent, mid-turn approval/user-input requests) leave tests green while the dashboard breaks. Reading the code also shows two defects: Codex state cannot report an interrupted turn (D-1), and user-input answers are sent in a non-schema shape (D-2).",
+      "Proposal": "Add src/lib/protocol-capture/: a scrubbed JSONL fixture format, a capture sink enabled by OVERDECK_PROTOCOL_CAPTURE_DIR (Codex via an AppServerTransport wrapper in the manager, ACP via protocolLogging raw events from host main), a replay engine that plays fixtures to the real client code with id rewriting and strict client-frame matching, and a recorder script that drives the real hosts through named scenarios. Record five Codex fixtures and two Kimi ACP fixtures and write replay tests asserting manager/host state and the ACP transcript. Fix D-1 (lastTurnStatus) and D-2 (answer shape). Document recording and replay in docs/PROTOCOL-REPLAY-TESTS.md. Full detail: .pan/drafts/PAN-4563.md.",
+      "NonGoals": "- Deduplicating or changing the two acp-mock-peer.ts files\n- Replaying the Codex native Unix-socket (WebSocket) transport\n- An ACP sub-agent or ACP approval replay case\n- An OpenCode ACP fixture\n- Regenerating or committing a new app-server-schema.json\n- Any dashboard UI change, including showing lastTurnStatus in the frontend\n- Enabling capture for any production launch or exposing it in settings or the CLI\n- Changing packages/effect-acp\n- Hand-written fixtures, except the single documented synthetic user-input fallback"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kimi is the ACP agent recorded for the ACP cases",
+        "rationale": "The acp harness defaults its provider to kimi (src/lib/runtimes/acp.ts:77) and harness policy denies non-Kimi models on acp, so Kimi is the production ACP path."
+      },
+      {
+        "summary": "Codex replay replaces only the child process via the existing spawnProcess and readVersion options; no new manager option",
+        "rationale": "It runs the real stdio NDJSON framing and needs no production change; the native socket carries the same JSON, so it is a non-goal."
+      },
+      {
+        "summary": "ACP capture uses protocolLogging raw events passed from host main(); ACP replay provides a ChildProcessSpawner",
+        "rationale": "protocolLogging already passes through makeKimiAcpRuntime/makeOpenCodeAcpRuntime, and the spawner seam already has a working in-memory pattern in session-runtime.test.ts."
+      },
+      {
+        "summary": "Scrub at capture time with five fixed rules, plus a hygiene test over committed fixtures",
+        "rationale": "Raw secrets never reach disk, and the hygiene test is a mechanical backstop against push-protection failures and personal-data leaks."
+      },
+      {
+        "summary": "Add lastTurnStatus to Codex manager state and host status() (D-1)",
+        "rationale": "The issue requires asserting interrupted state, and Overdeck currently has no field that records it; one state field and one status line is the smallest honest fix."
+      },
+      {
+        "summary": "Fix the user-input answer shape in this PR (D-2) and land it before the user-input recording",
+        "rationale": "The schema requires { answers: string[] } per question; recording with the old shape would capture a rejected answer."
+      },
+      {
+        "summary": "The only synthetic fixture allowed is Codex user-input, flagged in its header with a follow-up issue",
+        "rationale": "default_mode_request_user_input is 'under development' in codex 0.159.0 and user input was not offered in default mode on 0.153.4, so a live recording may be impossible; every other case must be live."
+      },
+      {
+        "summary": "Defects found by the new tests are fixed in this PR when the fix stays inside planned files and is at most 40 changed lines; otherwise filed and pinned",
+        "rationale": "Satisfies the issue's 'fixed or filed' criterion with a mechanical rule instead of a judgment call."
+      },
+      {
+        "summary": "Recorder lives in src/lib/protocol-capture/record.ts and runs via node --import tsx",
+        "rationale": "Keeps the plan within the projected-surface limits and matches the existing main-guard pattern in codex and ACP host modules; it uses persistent app-server/acp sessions, not one-shot execs."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-10-20-PAN-4563-replay-backed-protocol-tests-for-codex-app-server-and-acp-transports.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "format-scrub",
+        "title": "Define the overdeck-protocol-capture/1 fixture format and the capture-time scrubber",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/fixture.ts",
+            "src/lib/protocol-capture/scrub.ts",
+            "src/lib/protocol-capture/__tests__/capture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/protocol-capture/__tests__/capture.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "capture.test.ts scrubValue and parseProtocolFixture tests pass",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "capture-sink",
+            "replay-engine",
+            "fixture-hygiene",
+            "codex-replay-harness",
+            "acp-replay-harness"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1: create src/lib/protocol-capture/fixture.ts (PROTOCOL_CAPTURE_FORMAT, header/frame types, frameKind, parseProtocolFixture, loadProtocolFixture) and src/lib/protocol-capture/scrub.ts (ScrubContext, defaultScrubContext, scrubValue with the five rules: path tokens longest-first, anchored secret-key regex, secret-value regexes, email, 8192-char truncation). Node built-ins only, no Effect. Add the scrub and parse tests to capture.test.ts; build secret-shaped test inputs at runtime, never as literals (GitHub push protection)."
+        },
+        "items": [
+          {
+            "id": "format-scrub.ac1",
+            "title": "Given a frame whose string contains the cwd, codex home, overdeck home, and home dir, when scrubValue runs, then it returns the string with <CWD>, <CODEX_HOME>, <OVERDECK_HOME>, <HOME> tokens, longest path first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-scrub.ac2",
+            "title": "Given keys access_token/apiKey and a string holding an sk- key, a JWT, a Bearer header, and an email, scrubValue returns <REDACTED> and <EMAIL> in their place while tokenUsage.total.inputTokens survives unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-scrub.ac3",
+            "title": "Given a string longer than 8192 characters, scrubValue returns \"<TRUNCATED:<length>>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-scrub.ac4",
+            "title": "parseProtocolFixture throws when line 1 is not a header with format overdeck-protocol-capture/1, and throws when frame seq values are not consecutive from 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "capture-sink",
+        "title": "Add the async capture sink, env-var gate, and Codex transport wrapper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/capture.ts",
+            "src/lib/protocol-capture/__tests__/capture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/protocol-capture/__tests__/capture.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "capture.test.ts capture sink tests pass",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 in src/lib/protocol-capture/capture.ts: PROTOCOL_CAPTURE_DIR_ENV = 'OVERDECK_PROTOCOL_CAPTURE_DIR', ProtocolCaptureSink (setHeader before first frame, recordMessage, recordText, per-direction recordChunk line buffer, close), createProtocolCaptureSink writing through one fs/promises appendFile promise chain with the header as the first line, protocolCaptureFromEnv returning undefined when the env var is unset, empty, or relative, and captureAppServerTransport wrapping an AppServerTransport (import type only). Add the sink tests to capture.test.ts."
+        },
+        "items": [
+          {
+            "id": "capture-sink.ac1",
+            "title": "Given three recordMessage calls, when close() resolves, then the file contains the header on line 1 followed by three frames with seq 0,1,2 in call order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capture-sink.ac2",
+            "title": "Given one JSON object split across two recordChunk calls and two lines in a third chunk, the sink records exactly three frames, and an unparsable line produces a frame with a text field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capture-sink.ac3",
+            "title": "protocolCaptureFromEnv returns undefined when OVERDECK_PROTOCOL_CAPTURE_DIR is unset or relative, and creates <dir>/codex-app-server-<timestamp>-<pid>.jsonl when it is absolute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capture-sink.ac4",
+            "title": "captureAppServerTransport records one out frame on send() and one in frame per received line before the inner handler receives it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-capture-hook",
+        "title": "Wire protocol capture into CodexAppServerManager.useTransport",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "app-server-manager.test.ts passes including the two capture tests",
+            "typecheck exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: add protocolCapture?: ProtocolCaptureSink to CodexAppServerManagerOptions, default it in the constructor from protocolCaptureFromEnv(process.env, { harness: 'codex-app-server', scrub: defaultScrubContext({...}) }), call setHeader({ cliVersion }) right after assertSupportedVersion in start(), wrap the transport at the top of useTransport (rename the parameter to rawTransport), and call void this.capture?.close() in stop(). Add two manager tests using createFakeAppServer and a temp dir."
+        },
+        "items": [
+          {
+            "id": "codex-capture-hook.ac1",
+            "title": "Given a manager with an explicit protocolCapture sink over createFakeAppServer, when start() and stop() run and the sink closes, then the file records header cliVersion 0.153.4 and frames out initialize, in response, out initialized in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-capture-hook.ac2",
+            "title": "Given no protocolCapture option and OVERDECK_PROTOCOL_CAPTURE_DIR unset, when the manager starts and stops, then the temp capture dir contains no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-capture-hook",
+        "title": "Wire protocol capture into the ACP host through protocolLogging",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/acp-logging.ts",
+            "src/lib/acp/host.ts",
+            "src/lib/protocol-capture/__tests__/capture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/protocol-capture/__tests__/capture.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "capture.test.ts acpCaptureProtocolLogging test passes",
+            "typecheck exits 0",
+            "file-size lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: create src/lib/protocol-capture/acp-logging.ts exporting acpCaptureProtocolLogging(sink) that logs only stage 'raw' string payloads into sink.recordChunk (outgoing -> out, incoming -> in). In src/lib/acp/host.ts main(), build the sink with protocolCaptureFromEnv(process.env, { harness: 'acp', ... }), setHeader({ provider }), pass protocolLogging into support.makeRuntime only when the sink exists, and await capture?.close() after the scope closes. Keep the host.ts change at 10 lines or fewer."
+        },
+        "items": [
+          {
+            "id": "acp-capture-hook.ac1",
+            "title": "Given an outgoing raw NDJSON request, an incoming raw response split across two events, and one decoded event, when fed to acpCaptureProtocolLogging(sink).logger, then the sink records exactly two frames: out request and in response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-capture-hook.ac2",
+            "title": "git diff --stat origin/main -- src/lib/acp/host.ts shows 10 or fewer changed lines and the file stays at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-capture-hook.ac3",
+            "title": "When OVERDECK_PROTOCOL_CAPTURE_DIR is unset, main() passes no protocolLogging key to support.makeRuntime (the spread adds nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-turn-status",
+        "title": "Expose the owner's last turn outcome as lastTurnStatus (fixes D-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "app-server-manager.test.ts lastTurnStatus tests pass",
+            "typecheck exits 0",
+            "file-size lint exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: add lastTurnStatus?: 'completed' | 'interrupted' | 'failed' to CodexAppServerState; in applyNotification clear it on owner turn/started and set it from params.turn.status on owner turn/completed (only those three values). Add one line lastTurnStatus: managerState.lastTurnStatus to CodexAppServerHost.status(). Add manager tests for set, clear, and descendant-ignored."
+        },
+        "items": [
+          {
+            "id": "codex-turn-status.ac1",
+            "title": "Given an owner turn/completed with turn.status 'interrupted', getState() returns lastTurnStatus 'interrupted' and state 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-turn-status.ac2",
+            "title": "Given a following owner turn/started, getState() returns lastTurnStatus undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-turn-status.ac3",
+            "title": "Given a descendant thread's turn/completed with status 'interrupted', the owner's lastTurnStatus stays undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-turn-status.ac4",
+            "title": "CodexAppServerHost.status() returns the manager's lastTurnStatus and src/lib/codex/app-server-host.ts stays at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-user-input-shape",
+        "title": "Send the schema shape for user-input answers (fixes D-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "app-server-manager.test.ts user-input shape test passes",
+            "typecheck exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: change CodexAppServerManager.answerUserInput to wrap each Record<string, string[]> entry as { answers: string[] } per ToolRequestUserInputResponse. Checkpoint: run codex app-server generate-json-schema into a temp dir with the installed CLI and confirm ToolRequestUserInputAnswer still requires answers: string[]; follow the newer schema if it changed and say so in the commit message; do not commit the regenerated schema. The host op shape stays Record<string, string[]>."
+        },
+        "items": [
+          {
+            "id": "codex-user-input-shape.ac1",
+            "title": "Given answerUserInput(7, { color: ['red'] }), the manager sends { id: 7, result: { answers: { color: { answers: ['red'] } } } } to the transport",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-user-input-shape.ac2",
+            "title": "The host op { op: 'user-input', requestId, answers: { color: ['red'] } } still returns status 200 and sends the wrapped shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "replay-engine",
+        "title": "Build the fixture replay engine with id rewriting, matching, and breakpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/replay.ts",
+            "src/lib/protocol-capture/__tests__/replay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/protocol-capture/__tests__/replay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "replay.test.ts passes all eleven behavior tests",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "codex-replay-harness",
+            "acp-replay-harness",
+            "codex-case-turn-idle",
+            "acp-case-turn-completion"
+          ],
+          "parallelSafeReason": "It creates only new files (replay.ts and its test) that no concurrently ready item touches."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: src/lib/protocol-capture/replay.ts exporting ReplayMatcher, ReplayMismatchError, ProtocolReplay, and createProtocolReplay(fixture, { schedule }). Deliver in frames one per setImmediate tick, block at out frames until a matching client line arrives, queue early client lines, rewrite recorded client-request ids in responses to live ids, keep server-request ids, compare client responses by id and deep-equal result, treat out frames after the last in frame as an optional tail, support pauseBefore/awaitingClient/resume (both reject at once when no frame from the cursor onward matches) and unmatchedClientLines. Write the eleven named behavior tests from WI-7 with fixtures built inside the test."
+        },
+        "items": [
+          {
+            "id": "replay-engine.ac1",
+            "title": "Given a recorded response to client request id 3 and a live client that used id \"a7\", the engine delivers the response with id \"a7\" while server-request ids are delivered unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replay-engine.ac2",
+            "title": "When the client sends a different method than the recorded out frame, done rejects with ReplayMismatchError whose message contains the frame seq, the expected method, and the actual line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replay-engine.ac3",
+            "title": "Given a client line that arrives before its recorded position, the engine queues it and matches it when the cursor reaches that out frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replay-engine.ac4",
+            "title": "Given pauseBefore(matcher), delivery stops before the first matching in frame until resume(), and done resolves even when a trailing out notification after the last in frame never arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replay-engine.ac5",
+            "title": "replay.test.ts contains and passes all eleven behaviors listed in PRD WI-7, including pauseBefore/awaitingClient rejecting at once when no later frame matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-replay-harness",
+        "title": "Add the Codex replay child adapter and harness smoke test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__tests__/replay-app-server.ts",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts smoke test passes",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: src/lib/codex/__tests__/replay-app-server.ts exporting createReplayAppServer(replay) (fake ChildProcessWithoutNullStreams on PassThrough streams, modeled on createFakeAppServer) and startCodexReplay(fixtureName, { overdeckHome }) that builds a real CodexAppServerManager (readVersion from the fixture header, spawnProcess returning the fake child, requestTimeoutMs 600000) and a real CodexAppServerHost with that manager, then awaits manager.start() without host.start(). Create app-server-replay.test.ts with beforeEach fake timers (setTimeout, clearTimeout, setInterval, clearInterval only), a temp overdeckHome, and a smoke describe over an inline initialize fixture."
+        },
+        "items": [
+          {
+            "id": "codex-replay-harness.ac1",
+            "title": "Given an inline fixture of initialize, its response, and initialized, when startCodexReplay runs, then manager.getState().state returns 'ready', replay.done resolves, and unmatchedClientLines() returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-replay-harness.ac2",
+            "title": "The harness spawns no child process: spawnProcess returns the PassThrough-backed fake child and the test never imports node:child_process spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-replay-harness.ac3",
+            "title": "afterEach restores real timers, stops the manager, and deletes the temp overdeckHome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-replay-harness",
+        "title": "Add the ACP replay ChildProcessSpawner and harness smoke test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/__tests__/fixtures/replay-spawner.ts",
+            "src/lib/acp/__tests__/host-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/acp/__tests__/host-replay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "host-replay.test.ts smoke test passes",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9: src/lib/acp/__tests__/fixtures/replay-spawner.ts exporting makeReplaySpawnerFromFixture(replay) built like makeReplaySpawner in session-runtime.test.ts (stdin sink line-splits into replay.acceptClientLine, server lines offered to the stdout queue as NDJSON bytes) and startKimiReplay(fixtureName, { overdeckHome }) that builds makeKimiAcpRuntime with that spawner inside a Scope with NodeServices.layer and constructs a real AcpHost with provider 'kimi'. Check the installed effect Queue API for a sync/unsafe offer first (hazard H-5). Create host-replay.test.ts with process.env.OVERDECK_HOME set to a temp dir per test and a smoke test over an inline initialize/authenticate/session-new fixture."
+        },
+        "items": [
+          {
+            "id": "acp-replay-harness.ac1",
+            "title": "Given an inline initialize, authenticate, and session/new fixture, when host.start() resolves, then host.status().state returns 'ready' and status().sessionId returns the fixture's session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-replay-harness.ac2",
+            "title": "After host.stop(), replay.done resolves and unmatchedClientLines() returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-replay-harness.ac3",
+            "title": "The spawner returns a handle whose stdout is fed only by the replay; no real process is spawned and process.env.OVERDECK_HOME is restored after each test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recorder",
+        "title": "Add the scenario recorder script for Codex and Kimi ACP",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/record.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --import tsx src/lib/protocol-capture/record.ts --help",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "--help output lists seven scenarios",
+            "typecheck exits 0",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "parallelSafeReason": "It creates only record.ts, a new file no other item edits; it imports finished modules read-only."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10: src/lib/protocol-capture/record.ts runnable as node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp> --scenario <name> --out <path> [--model] [--effort], with defaults gpt-5.6-luna/low for Codex and k3 for Kimi. It drives the real CodexAppServerManager+CodexAppServerHost (temp CODEX_HOME via mkdtemp + initCodexHome; user-input adds [features] default_mode_request_user_input = true) or the real Kimi ACP runtime+AcpHost, with an explicit capture sink and the scenario table from WI-10 (approval uses the curl prompt). After each scenario's terminal event keep capturing until 2 s pass with no frame, then stop. 300 s hard timeout, temp dirs removed with fs/promises rm. No codex exec or claude -p."
+        },
+        "items": [
+          {
+            "id": "recorder.ac1",
+            "title": "node --import tsx src/lib/protocol-capture/record.ts --help prints all seven scenarios (codex turn-idle, interrupt, subagent, approval, user-input; acp turn-completion, interrupt)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recorder.ac2",
+            "title": "Given an unknown --scenario value, the recorder prints the scenario table to stderr and exits 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recorder.ac3",
+            "title": "Given a scenario run, the recorder writes the --out file whose header records scenario, hostOptions (model, effort, prompt), cliVersion, and provider, and it closes the session only after 2 s pass with no frame following the terminal event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-case-turn-idle",
+        "title": "Record and replay Codex case 1: idle status around turn/completed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__fixtures__/replay/*.jsonl",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts codex case 1 passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11: record turn-idle.jsonl live with the recorder, review it by hand for unscrubbed personal data, and add describe('codex case 1') to app-server-replay.test.ts. Derive ownerTurnId from the fixture, pause before the owner idle thread/status/changed and before the owner turn/completed, and assert running state at each pause before turn/completed and idle after done. Apply the WI-11 checkpoint if no owner idle status exists, and the Decision 15 triage rule for any defect found."
+        },
+        "items": [
+          {
+            "id": "codex-case-turn-idle.ac1",
+            "title": "Given the fixture, at every pause before the owner turn/completed is delivered, manager.getState() returns state 'running' and activeTurnId equal to the fixture's owner turn id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-turn-idle.ac2",
+            "title": "After replay.done resolves, getState() returns state 'idle', activeTurnId undefined, lastTurnStatus 'completed', and host.status().pendingRequests returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-turn-idle.ac3",
+            "title": "The pane output contains exactly one '[turn] started' line followed by exactly one '[turn] completed' line, and unmatchedClientLines() returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-case-interrupt",
+        "title": "Record and replay Codex case 2: interrupt response before interrupted state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__fixtures__/replay/*.jsonl",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts codex case 2 passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-12: record interrupt.jsonl live, review it, and add describe('codex case 2'). If the first recording shows turn/completed before the interrupt response, follow the WI-12 checkpoint instead of the default flow. Assert the fixture precondition that the turn/interrupt response precedes the owner turn/completed, wait with awaitingClient for the turn/interrupt out frame, arm pauseBefore the owner turn/completed, send host.handleOp({ op: 'interrupt' }), and assert the turn is still active at the pause and interrupted after done."
+        },
+        "items": [
+          {
+            "id": "codex-case-interrupt.ac1",
+            "title": "When host.handleOp({ op: 'interrupt' }) returns 200 and delivery is paused before the owner turn/completed, manager.getState().activeTurnId still returns the owner turn id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-interrupt.ac2",
+            "title": "After replay.done resolves, getState() returns state 'idle', activeTurnId undefined, and lastTurnStatus 'interrupted', and host.status().lastTurnStatus returns 'interrupted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-interrupt.ac3",
+            "title": "The test fails with a message naming case 2 when the fixture order differs from the order the test asserts (the recorded order is stated in the Findings table)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-case-subagent",
+        "title": "Record and replay Codex case 3: child turn completes before the parent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__fixtures__/replay/*.jsonl",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts codex case 3 passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-13: record subagent.jsonl live, review it, and add describe('codex case 3'). Derive childThreadId from the owner's spawnAgent collabAgentToolCall receiverThreadIds, assert the precondition that the child's turn/completed precedes the owner's, pause before the owner turn/completed, and assert the owner turn is still running while the child is classified as a descendant."
+        },
+        "items": [
+          {
+            "id": "codex-case-subagent.ac1",
+            "title": "Given delivery paused before the owner turn/completed after the child's turn/completed, manager.getState() returns state 'running' and the owner turn id as activeTurnId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-subagent.ac2",
+            "title": "At that pause, manager.threadScope(childThreadId) returns 'descendant' and the pane output contains '[turn sub:<last 8 chars of childThreadId>] completed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-subagent.ac3",
+            "title": "After replay.done resolves, getState() returns state 'idle' and lastTurnStatus 'completed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-case-approval",
+        "title": "Record and replay Codex case 4a: approval request mid-turn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__fixtures__/replay/*.jsonl",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts codex case 4a passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-14: record approval.jsonl live (switch to the curl prompt per the WI-14 checkpoint if no requestApproval arrives), review it, and add describe('codex case 4a'). Wait with awaitingClient for the client response to the first requestApproval server request, assert the pending state, answer through host.handleOp approval with the recorded decision, and assert the request clears and the turn ends."
+        },
+        "items": [
+          {
+            "id": "codex-case-approval.ac1",
+            "title": "When the replay waits for the approval answer, host.status() returns state 'awaiting-approval' and pendingRequests equal to the fixture's approval request id, method, and params",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-approval.ac2",
+            "title": "When host.handleOp({ op: 'approval', requestId, decision }) runs with the recorded decision, it returns 200 and the replay accepts the client response by deep-equal result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-approval.ac3",
+            "title": "After replay.done resolves, pendingRequests returns [], state returns 'idle', and lastTurnStatus returns 'completed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-case-user-input",
+        "title": "Record and replay Codex case 4b: user-input request mid-turn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/__fixtures__/replay/*.jsonl",
+            "src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "app-server-replay.test.ts codex case 4b passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9"
+          ],
+          "parallelSafeReason": "It runs after the rest of the Codex case chain by edges and adds only its own fixture and describe block."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-15: record user-input.jsonl live with the feature flag set by the recorder; if no item/tool/requestUserInput arrives after two prompt variants, build the synthetic fixture from approval.jsonl exactly as WI-15 describes, set synthetic, syntheticNote, and followUpIssue (file the follow-up with gh issue create). Add describe('codex case 4b'): answer through host.handleOp user-input with answers unwrapped from the recorded response, so the deep-equal match proves the WI-6 wire shape."
+        },
+        "items": [
+          {
+            "id": "codex-case-user-input.ac1",
+            "title": "When the replay waits for the user-input answer, host.status() returns pendingRequests containing the fixture's item/tool/requestUserInput request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-user-input.ac2",
+            "title": "When host.handleOp({ op: 'user-input', requestId, answers }) runs, it returns 200 and the replay accepts a client result of the form { answers: { <questionId>: { answers: [...] } } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-user-input.ac3",
+            "title": "After replay.done resolves, pendingRequests returns [] and state returns 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-case-user-input.ac4",
+            "title": "Given a synthetic fixture, its header contains synthetic true, a non-empty syntheticNote, and a followUpIssue naming an open GitHub issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-case-turn-completion",
+        "title": "Record and replay the Kimi ACP turn-completion case",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/__tests__/fixtures/replay/*.jsonl",
+            "src/lib/acp/__tests__/host-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/acp/__tests__/host-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "host-replay.test.ts acp turn completion passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-16: record kimi-turn-completion.jsonl live (escalate with pan tell flywheel-orchestrator and an issue comment if Kimi authentication fails; no synthetic fallback), review it, and add describe('acp turn completion') to host-replay.test.ts. Send the prompt, await host.waitForIdle(), and assert the acp-session.jsonl transcript against the text and stopReason derived from the fixture."
+        },
+        "items": [
+          {
+            "id": "acp-case-turn-completion.ac1",
+            "title": "Given the replay, acp-session.jsonl records prompt_queued, user, assistant records, then turn_completed, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-case-turn-completion.ac2",
+            "title": "The transcript contains assistant records whose concatenated contents equal the concatenated agent_message_chunk texts the fixture delivers before the session/prompt response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-case-turn-completion.ac3",
+            "title": "The transcript contains exactly one turn_completed record, with stopReason equal to the fixture's session/prompt result.stopReason, and contains no prompt_failed record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-case-turn-completion.ac4",
+            "title": "After host.stop(), replay.done resolves and unmatchedClientLines() returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-case-interrupt",
+        "title": "Record and replay the Kimi ACP interrupt case",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/__tests__/fixtures/replay/*.jsonl",
+            "src/lib/acp/__tests__/host-replay.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/acp/__tests__/host-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "host-replay.test.ts acp interrupt passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-17: record kimi-interrupt.jsonl live, review it, and add describe('acp interrupt'). Wait with awaitingClient for the session/cancel out frame, send host.handleOp({ op: 'interrupt' }), await host.waitForIdle() and replay.done, then assert one cancelled turn_completed and no assistant record after it. Apply the Decision 15 triage rule if real provider ordering breaks an assertion."
+        },
+        "items": [
+          {
+            "id": "acp-case-interrupt.ac1",
+            "title": "When host.handleOp({ op: 'interrupt' }) returns 200, the transcript records exactly one turn_completed for the prompt with stopReason 'cancelled' and no prompt_failed record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-case-interrupt.ac2",
+            "title": "The transcript contains no assistant record after that turn_completed record, or the assertion preserves current behavior with a comment naming the filed issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-case-interrupt.ac3",
+            "title": "The fixture's late session/prompt response is delivered without the host writing an '[error]' pane line, and replay.done resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fixture-hygiene",
+        "title": "Add the fixture hygiene test over all committed replay fixtures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/__tests__/fixture-hygiene.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/protocol-capture/__tests__/fixture-hygiene.test.ts"
+          ],
+          "expected_outputs": [
+            "fixture-hygiene.test.ts passes over seven fixtures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-18: src/lib/protocol-capture/__tests__/fixture-hygiene.test.ts scans every *.jsonl in src/lib/codex/__fixtures__/replay/ and src/lib/acp/__tests__/fixtures/replay/, resolved with new URL(..., import.meta.url), and checks parse, size, absolute home paths, secret and email patterns, synthetic header fields, and the expected seven fixture names. Put the per-line checks in one hygieneProblems(fileName, text) function tested against inline bad lines, and run it over the committed fixtures expecting no problems."
+        },
+        "items": [
+          {
+            "id": "fixture-hygiene.ac1",
+            "title": "Given the committed fixtures, the test passes and covers the five Codex fixtures and the two Kimi fixtures by name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-hygiene.ac2",
+            "title": "Given inline bad lines containing /home/, a runtime-built sk- string, or an email, hygieneProblems returns one problem per line naming the file and line number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-hygiene.ac3",
+            "title": "Given an inline oversized text or a synthetic header without followUpIssue and syntheticNote, hygieneProblems returns a problem naming the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document capture, recording, replay tests, and findings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4563",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PROTOCOL-REPLAY-TESTS.md",
+            "docs/CODEX-APP-SERVER-PROTOCOL.md",
+            "docs/HARNESSES.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c OVERDECK_PROTOCOL_CAPTURE_DIR docs/PROTOCOL-REPLAY-TESTS.md",
+            "grep -n 'PROTOCOL-REPLAY-TESTS.md' docs/HARNESSES.md docs/CODEX-APP-SERVER-PROTOCOL.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints a count of at least 1",
+            "grep prints a match in both files",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-19: write docs/PROTOCOL-REPLAY-TESTS.md with the sections listed in WI-19 (capture mode, recording, scrubbing and review checklist, fixture format, writing a replay test with a startCodexReplay example, re-recording after a CLI update, synthetic policy, Findings table). Add a Replay fixtures section to docs/CODEX-APP-SERVER-PROTOCOL.md stating the recorded CLI version and the observed orderings, a row in docs/HARNESSES.md, and a protocol-capture bullet in .overdeck/context/codebase/architecture.md with a fresh last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/PROTOCOL-REPLAY-TESTS.md contains OVERDECK_PROTOCOL_CAPTURE_DIR, the exact recorder command, and all seven scenario names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/PROTOCOL-REPLAY-TESTS.md contains a Findings table that records D-1 and D-2 as fixed in this PR plus every defect the case items found with its PR or issue link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/CODEX-APP-SERVER-PROTOCOL.md contains a '## Replay fixtures' section that links PROTOCOL-REPLAY-TESTS.md and states the recorded codex-cli version and the observed interrupt ordering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/HARNESSES.md contains a table row linking PROTOCOL-REPLAY-TESTS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "format-scrub",
+        "to": "capture-sink",
+        "type": "blocks"
+      },
+      {
+        "from": "format-scrub",
+        "to": "replay-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "capture-sink",
+        "to": "codex-capture-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "capture-sink",
+        "to": "acp-capture-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-capture-hook",
+        "to": "codex-turn-status",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-turn-status",
+        "to": "codex-user-input-shape",
+        "type": "blocks"
+      },
+      {
+        "from": "replay-engine",
+        "to": "codex-replay-harness",
+        "type": "blocks"
+      },
+      {
+        "from": "replay-engine",
+        "to": "acp-replay-harness",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-capture-hook",
+        "to": "recorder",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-capture-hook",
+        "to": "recorder",
+        "type": "blocks"
+      },
+      {
+        "from": "recorder",
+        "to": "codex-case-turn-idle",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-replay-harness",
+        "to": "codex-case-turn-idle",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-turn-status",
+        "to": "codex-case-turn-idle",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-turn-idle",
+        "to": "codex-case-interrupt",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-interrupt",
+        "to": "codex-case-subagent",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-subagent",
+        "to": "codex-case-approval",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-approval",
+        "to": "codex-case-user-input",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-user-input-shape",
+        "to": "codex-case-user-input",
+        "type": "blocks"
+      },
+      {
+        "from": "recorder",
+        "to": "acp-case-turn-completion",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-replay-harness",
+        "to": "acp-case-turn-completion",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-case-turn-completion",
+        "to": "acp-case-interrupt",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-user-input",
+        "to": "fixture-hygiene",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-case-interrupt",
+        "to": "fixture-hygiene",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-case-user-input",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-case-interrupt",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

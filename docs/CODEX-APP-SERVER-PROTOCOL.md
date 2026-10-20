@@ -151,6 +151,31 @@ needed for Codex CLI 0.144.x.
    choice, not a schema restriction. The generated `RequestId` allows string or
    integer IDs; Overdeck uses integers.
 
+## Replay fixtures
+
+Recorded fixtures of live `codex app-server` sessions drive replay tests of the
+real stdio transport, manager, and host. How to record, review, and replay them
+is in [PROTOCOL-REPLAY-TESTS.md](PROTOCOL-REPLAY-TESTS.md). The committed
+fixtures were recorded from codex-cli 0.159.0 (`gpt-5.6-luna`, effort `low`)
+and show these orderings:
+
+1. **Idle status vs turn completion.** The owner `thread/status/changed` with
+   `status.type: idle` arrives immediately before the owner `turn/completed`.
+   `turn/completed` is the end of the turn.
+2. **Interrupt.** The `turn/interrupt` response arrives first, then the owner
+   idle status, then `turn/completed` with `turn.status: interrupted`.
+3. **Sub-agent.** Codex sends no `thread/started` for the child. The owner's
+   `collabAgentToolCall` `spawnAgent` `item/started` has empty
+   `receiverThreadIds`; the matching `item/completed` is the first frame that
+   names the child, and the child's `turn/started` can arrive just before it
+   (PAN-4568). The child's `turn/completed` precedes the owner's.
+4. **Approval and user input.** `item/commandExecution/requestApproval` and
+   `item/tool/requestUserInput` arrive mid-turn, each preceded by a
+   `thread/status/changed` with `activeFlags` `waitingOnApproval` or
+   `waitingOnUserInput`, and followed by `serverRequest/resolved` after the
+   client answers. The user-input answer shape is
+   `{ answers: { <questionId>: { answers: string[] } } }`.
+
 ## Native Terminal Attachment (PAN-3835)
 
 A Codex conversation's app-server can take a second client: the native Codex

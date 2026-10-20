@@ -1,4 +1,11 @@
+import { once } from 'node:events';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProtocolCaptureSink, PROTOCOL_CAPTURE_DIR_ENV } from '../../protocol-capture/capture.js';
+import { loadProtocolFixture } from '../../protocol-capture/fixture.js';
+import { defaultScrubContext } from '../../protocol-capture/scrub.js';
 import { CodexAppServerManager, codexModelMinimumVersion, parseCodexCliVersion } from '../app-server-manager.js';
 import { createFakeAppServer, createFakeNativeTransport, type FakeNativeTransport } from './fake-app-server.js';
 
@@ -644,5 +651,122 @@ describe('parseCodexCliVersion (PAN-4363)', () => {
 
   it('returns undefined when no version is present', () => {
     expect(parseCodexCliVersion('garbage')).toBeUndefined();
+  });
+});
+
+describe('CodexAppServerManager protocol capture (PAN-4563)', () => {
+  const dirs: string[] = [];
+  const savedCaptureDir = process.env[PROTOCOL_CAPTURE_DIR_ENV];
+
+  afterEach(async () => {
+    if (savedCaptureDir === undefined) delete process.env[PROTOCOL_CAPTURE_DIR_ENV];
+    else process.env[PROTOCOL_CAPTURE_DIR_ENV] = savedCaptureDir;
+    for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
+  });
+
+  async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'pan-codex-capture-'));
+    dirs.push(dir);
+    return dir;
+  }
+
+  function handshakeServer() {
+    return createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+    });
+  }
+
+  it('writes the CLI version and the three handshake frames to an explicit sink', async () => {
+    const dir = await tempDir();
+    const sink = createProtocolCaptureSink({
+      path: join(dir, 'capture.jsonl'),
+      harness: 'codex-app-server',
+      scrub: defaultScrubContext({ cwd: dir }),
+    });
+    const fake = handshakeServer();
+    const manager = new CodexAppServerManager({ cwd: dir, readVersion: async () => 'codex-cli 0.153.4', spawnProcess: () => fake.child, protocolCapture: sink });
+    await manager.start();
+    manager.stop();
+    await sink.close();
+
+    const fixture = await loadProtocolFixture(sink.path);
+    expect(fixture.header).toMatchObject({ harness: 'codex-app-server', cliVersion: '0.153.4' });
+    expect(fixture.frames.map(frame => [frame.dir, frame.message?.method ?? 'response'])).toEqual([
+      ['out', 'initialize'],
+      ['in', 'response'],
+      ['out', 'initialized'],
+    ]);
+  });
+
+  it('writes no file when neither the option nor the env var is set', async () => {
+    const dir = await tempDir();
+    delete process.env[PROTOCOL_CAPTURE_DIR_ENV];
+    const fake = handshakeServer();
+    const manager = new CodexAppServerManager({ cwd: dir, readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    manager.stop();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(await readdir(dir)).toEqual([]);
+  });
+});
+
+describe('CodexAppServerManager lastTurnStatus (PAN-4563)', () => {
+  async function ownedManager() {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === 'thread/start') server.send({ id: message.id, result: { thread: { id: 'owner-thread' } } });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    await manager.startThread({ model: 'gpt-5.6-luna' });
+    const deliver = async (message: Record<string, unknown>) => {
+      const seen = once(manager, 'notification');
+      fake.send(message);
+      await seen;
+    };
+    return { manager, deliver };
+  }
+
+  it('records an interrupted owner turn and clears it when the next turn starts', async () => {
+    const { manager, deliver } = await ownedManager();
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't1' } } });
+    await deliver({ method: 'turn/completed', params: { threadId: 'owner-thread', turn: { id: 't1', status: 'interrupted' } } });
+    expect(manager.getState()).toMatchObject({ state: 'idle', lastTurnStatus: 'interrupted' });
+
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't2' } } });
+    expect(manager.getState().lastTurnStatus).toBeUndefined();
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: 't2' });
+    manager.stop();
+  });
+
+  it('ignores a sub-agent turn completion', async () => {
+    const { manager, deliver } = await ownedManager();
+    await deliver({
+      method: 'item/completed',
+      params: {
+        threadId: 'owner-thread',
+        item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner-thread', receiverThreadIds: ['sub-thread'] },
+      },
+    });
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't1' } } });
+    await deliver({ method: 'turn/completed', params: { threadId: 'sub-thread', turn: { id: 'sub-turn', status: 'completed' } } });
+    expect(manager.threadScope('sub-thread')).toBe('descendant');
+    expect(manager.getState().lastTurnStatus).toBeUndefined();
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: 't1' });
+    manager.stop();
+  });
+});
+
+describe('CodexAppServerManager answerUserInput (PAN-4563)', () => {
+  it('wraps each answer list in the ToolRequestUserInputAnswer shape', async () => {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    manager.answerUserInput(7, { color: ['red'] });
+    await vi.waitFor(() => expect(fake.messages).toHaveLength(3));
+    expect(fake.messages[2]).toEqual({ id: 7, result: { answers: { color: { answers: ['red'] } } } });
+    manager.stop();
   });
 });

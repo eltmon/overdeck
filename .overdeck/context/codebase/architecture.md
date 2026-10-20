@@ -33,6 +33,11 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   its `HarnessBehavior.capabilities` (`packages/contracts/src/harness-capabilities.ts`)
   declares every per-harness behavior decision, and the `lint:harness-branches` ratchet
   keeps harness-name comparisons in `src/` from growing.
+- `protocol-capture/` (PAN-4563) — recorded-protocol tests for the Codex app-server and
+  ACP transports: capture mode (`OVERDECK_PROTOCOL_CAPTURE_DIR`, off by default), the
+  capture-time scrubber, the recorder (`record.ts`), and the replay engine (`replay.ts`).
+  Fixtures live in `src/lib/codex/__fixtures__/replay/` and
+  `src/lib/acp/__tests__/fixtures/replay/`. See `docs/PROTOCOL-REPLAY-TESTS.md`.
 - `harness-policy.ts` — sync, pure launchability gate `canUseHarness()`. Denies ohmypi or
   prime-agent + Anthropic + subscription (ToS), non-Kimi models on acp/kimi-code,
   cross-routing of opencode and Muse ids, Ollama off claude-code, and subscription-only
@@ -203,4 +208,4 @@ from `DerivedIssueState.pr`, not from links; the conversation list's badge
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
 
-<!-- last-verified: 2026-10-19 -->
+<!-- last-verified: 2026-10-20 -->
