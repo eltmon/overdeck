@@ -9,13 +9,14 @@
  * Timers stay real: these fixtures never exercise session/load, whose
  * replay-idle gap is the only ACP delay. A fixture that does must fake timers.
  */
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { PROTOCOL_CAPTURE_FORMAT, type ProtocolFixture, type ProtocolFrame } from "../../protocol-capture/fixture.js";
+import { frameKind, PROTOCOL_CAPTURE_FORMAT, type ProtocolFixture, type ProtocolFrame } from "../../protocol-capture/fixture.js";
+import { ACP_TRANSCRIPT_FILE } from "../../runtimes/storage/acp.js";
 import { startKimiReplay, type KimiReplay } from "./fixtures/replay-spawner.js";
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -38,6 +39,54 @@ afterEach(async () => {
 async function start(fixture: string | ProtocolFixture): Promise<KimiReplay> {
   active = await startKimiReplay(fixture, { overdeckHome });
   return active;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+/** Facts the ACP cases read from their fixture instead of hard-coding them. */
+function promptFacts(fixture: ProtocolFixture) {
+  const frames = fixture.frames;
+  const promptIndex = frames.findIndex((frame) => frame.dir === "out" && frame.message?.method === "session/prompt");
+  const promptId = frames[promptIndex]?.message?.id;
+  const responseIndex = frames.findIndex((frame) =>
+    frame.dir === "in" && frameKind(frame) === "response" && frame.message?.id === promptId);
+  const update = (frame: ProtocolFrame) => record(record(frame.message?.params).update);
+  const chunkText = (from: number, to: number) => frames.slice(from, to)
+    .filter((frame) => frame.dir === "in" && frame.message?.method === "session/update" && update(frame).sessionUpdate === "agent_message_chunk")
+    .map((frame) => String(record(update(frame).content).text ?? ""))
+    .join("");
+  return {
+    frames,
+    promptIndex,
+    responseIndex,
+    stopReason: record(frames[responseIndex]?.message?.result).stopReason,
+    chunkText,
+  };
+}
+
+interface TranscriptRecord {
+  role: string;
+  content: string;
+  event?: string;
+  stopReason?: string;
+}
+
+async function readTranscript(): Promise<TranscriptRecord[]> {
+  const text = await readFile(join(overdeckHome, "agents", "agent-replay", ACP_TRANSCRIPT_FILE), "utf-8");
+  return text.trim().split("\n").map((line) => JSON.parse(line) as TranscriptRecord);
+}
+
+/** The lifecycle shape of a transcript: assistant runs collapse to one entry. */
+function lifecycle(records: TranscriptRecord[]): string[] {
+  const shape: string[] = [];
+  for (const entry of records) {
+    const label = entry.event ?? entry.role;
+    if (label === "assistant" && shape[shape.length - 1] === "assistant") continue;
+    shape.push(label);
+  }
+  return shape;
 }
 
 function inlineFixture(messages: Array<["out" | "in", Record<string, unknown>]>): ProtocolFixture {
@@ -83,6 +132,33 @@ describe("kimi acp replay harness", () => {
     await replay.done;
     await host.stop();
     active = undefined;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+describe("kimi acp case: turn completion", () => {
+  it("records the prompt lifecycle and the assistant text in order, ending on the recorded stop reason", async () => {
+    const { host, replay } = await start("kimi-turn-completion");
+    const facts = promptFacts(replay.fixture);
+    expect(facts.responseIndex, "re-check the ACP turn-completion case: no session/prompt response recorded").toBeGreaterThan(facts.promptIndex);
+    const recordedText = facts.chunkText(facts.promptIndex, facts.responseIndex);
+
+    await host.start();
+    expect(await host.handleOp({ op: "message", content: String(replay.fixture.header.hostOptions?.prompt) }))
+      .toMatchObject({ status: 202 });
+    await host.waitForIdle();
+
+    const records = await readTranscript();
+    expect(lifecycle(records)).toEqual(["prompt_queued", "user", "assistant", "turn_completed"]);
+    expect(records.filter((entry) => entry.role === "assistant").map((entry) => entry.content).join("")).toBe(recordedText);
+    expect(records.filter((entry) => entry.event === "turn_completed")).toEqual([
+      expect.objectContaining({ stopReason: facts.stopReason }),
+    ]);
+    expect(records.some((entry) => entry.event === "prompt_failed")).toBe(false);
+
+    await host.stop();
+    active = undefined;
+    await replay.done;
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });

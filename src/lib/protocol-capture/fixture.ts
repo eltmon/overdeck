@@ -26,6 +26,8 @@ export interface ProtocolFixtureHeader {
   synthetic?: true;
   syntheticNote?: string;
   followUpIssue?: string;
+  /** Free-text provenance from the recorder's --note, e.g. a non-default model backend. */
+  note?: string;
 }
 
 export interface ProtocolFrame {

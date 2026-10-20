@@ -3,7 +3,7 @@
  * production code.
  *
  *   node --import tsx src/lib/protocol-capture/record.ts \
- *     --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>]
+ *     --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]
  *
  * It drives the real host classes through one named scenario with capture on,
  * against a live `codex app-server` or `kimi acp` session, and writes one
@@ -94,7 +94,7 @@ const DEFAULTS: Record<Harness, { model: string; effort: string }> = {
 export function scenarioTable(): string {
   const rows = SCENARIOS.map(scenario => `  ${scenario.harness.padEnd(6)} ${scenario.name.padEnd(16)} ${scenario.actions}`);
   return [
-    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>]',
+    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]',
     '',
     'Scenarios:',
     `  ${'HARNESS'.padEnd(6)} ${'SCENARIO'.padEnd(16)} SCRIPTED ACTIONS`,
@@ -157,6 +157,8 @@ interface RecordInput {
   out: string;
   model: string;
   effort: string;
+  /** Provenance written to the fixture header, e.g. a non-default model backend. */
+  note: string | undefined;
   cwd: string;
   overdeckHome: string;
 }
@@ -175,7 +177,11 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
     harness: 'codex-app-server',
     scrub: defaultScrubContext({ cwd, codexHome, overdeckHome, home: homedir() }),
   }));
-  tracked.sink.setHeader({ scenario: scenario.name, hostOptions: { model, effort, prompt: scenario.prompt } });
+  tracked.sink.setHeader({
+    scenario: scenario.name,
+    hostOptions: { model, effort, prompt: scenario.prompt },
+    ...(input.note ? { note: input.note } : {}),
+  });
 
   const manager = new CodexAppServerManager({ cwd, codexHome, protocolCapture: tracked.sink });
   const host = new CodexAppServerHost({
@@ -255,6 +261,7 @@ async function recordAcp(input: RecordInput): Promise<void> {
     cliVersion: await kimiVersion(),
     scenario: scenario.name,
     hostOptions: { model, effort, prompt: scenario.prompt },
+    ...(input.note ? { note: input.note } : {}),
   });
 
   const scope = await Effect.runPromise(Scope.make());
@@ -334,6 +341,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         out: { type: 'string' },
         model: { type: 'string' },
         effort: { type: 'string' },
+        note: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     }));
@@ -368,6 +376,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       out,
       model: typeof values.model === 'string' ? values.model : DEFAULTS[harness].model,
       effort: typeof values.effort === 'string' ? values.effort : DEFAULTS[harness].effort,
+      note: typeof values.note === 'string' && values.note ? values.note : undefined,
       cwd,
       overdeckHome,
     };

@@ -26,7 +26,7 @@ export const PROTOCOL_CAPTURE_DIR_ENV = 'OVERDECK_PROTOCOL_CAPTURE_DIR';
 export interface ProtocolCaptureSink {
   readonly path: string;
   /** Before the first frame only; later calls are ignored. */
-  setHeader(fields: Partial<Pick<ProtocolFixtureHeader, 'cliVersion' | 'scenario' | 'hostOptions' | 'provider'>>): void;
+  setHeader(fields: Partial<Pick<ProtocolFixtureHeader, 'cliVersion' | 'scenario' | 'hostOptions' | 'provider' | 'note'>>): void;
   /** Scrub, then queue. */
   recordMessage(dir: FrameDirection, message: unknown): void;
   /** JSON.parse to a message, else a text frame; scrub; queue. */
