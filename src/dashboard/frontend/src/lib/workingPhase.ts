@@ -5,6 +5,7 @@
  * uses to pick an appropriate icon and tooltip for the active spinner.
  */
 
+import { hasToolResult } from '@overdeck/contracts';
 import type { ChatMessage, WorkLogEntry } from '../components/chat/chat-types';
 
 // ─── Phase types ─────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ export function getWorkingPhase(
   // Find the most recent pending tool (tool sent but no result yet)
   for (let i = workLog.length - 1; i >= 0; i--) {
     const entry = workLog[i];
-    if (entry.tone === 'tool' && !entry.result && entry.toolTitle) {
+    if (entry.tone === 'tool' && !hasToolResult(entry) && entry.toolTitle) {
       return toolNameToPhase(entry.toolTitle);
     }
   }
@@ -159,7 +160,7 @@ export function isSpinnerPhase(phase: WorkingPhase): boolean {
 export function getPendingToolEntry(workLog: WorkLogEntry[]): WorkLogEntry | undefined {
   for (let i = workLog.length - 1; i >= 0; i--) {
     const entry = workLog[i];
-    if (entry.tone === 'tool' && !entry.result) return entry;
+    if (entry.tone === 'tool' && !hasToolResult(entry)) return entry;
   }
   return undefined;
 }

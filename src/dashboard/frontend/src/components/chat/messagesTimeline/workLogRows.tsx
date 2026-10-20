@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Circle, Wrench } from 'lucide-react';
+import { hasToolResult } from '@overdeck/contracts';
 import type { SubagentSummary, WorkLogEntry } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { MAX_VISIBLE_WORK_LOG_ENTRIES } from './helpers';
+import { useToolBody } from './toolBodyLoader';
 
 interface WorkLogGroupProps {
   entries: WorkLogEntry[];
@@ -303,6 +305,10 @@ function ToolUseExpanded({
   );
 }
 
+function formatResultSize(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
 function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSubagent }: {
   entry: WorkLogEntry;
   cwd?: string;
@@ -311,6 +317,9 @@ function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSu
   onOpenSubagent?: (toolUseId: string) => void;
 }) {
   const [showResult, setShowResult] = useState(false);
+  // PAN-4558: a row whose body the server omitted loads the full entry on expand.
+  const body = useToolBody(entry, showResult);
+  const shown = body.entry;
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--muted-foreground)',
     tool: 'var(--primary)',
@@ -320,7 +329,7 @@ function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSu
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
   const isThinking = entry.tone === 'thinking';
-  const hasResult = !!entry.result;
+  const hasResult = hasToolResult(entry);
   const hasToolBody = !!entry.toolInput && (entry.tone === 'tool' || entry.tone === 'error');
   const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
   const displayDetail = getWorkLogDisplayDetail(entry);
@@ -357,6 +366,9 @@ function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSu
             {displayDetail.length > WORK_LOG_DETAIL_MAX ? '…' : ''}
           </span>
         )}
+        {entry.resultBytes !== undefined && !showResult && (
+          <span className={styles.workLogDetail}>{formatResultSize(entry.resultBytes)}</span>
+        )}
         {isExpandable && (
           <ChevronRight
             size={10}
@@ -372,18 +384,20 @@ function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSu
       </div>
       {showResult && (
         <>
-          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} subagentByToolUseId={subagentByToolUseId} onOpenSubagent={onOpenSubagent} />}
+          {body.loading && <div className={styles.workLogResult}>Loading full output…</div>}
+          {body.failed && <div className={styles.workLogResult}>Could not load the full output.</div>}
+          {hasToolBody && <ToolUseExpanded entry={shown} cwd={cwd} issueId={issueId} subagentByToolUseId={subagentByToolUseId} onOpenSubagent={onOpenSubagent} />}
           {isThinking && entry.detail && (
             <div className={styles.workLogResult}>
               <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />
             </div>
           )}
-          {entry.result && (
+          {shown.result && (
             isTerminal ? (
-              <pre className={styles.workLogResult}>{entry.result}</pre>
+              <pre className={styles.workLogResult}>{shown.result}</pre>
             ) : (
               <div className={styles.workLogResult}>
-                <ChatMarkdown text={entry.result} cwd={cwd} issueId={issueId} />
+                <ChatMarkdown text={shown.result} cwd={cwd} issueId={issueId} />
               </div>
             )
           )}

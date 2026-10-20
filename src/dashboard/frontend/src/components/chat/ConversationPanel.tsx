@@ -45,6 +45,7 @@ import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import { buildMessagesQueryFn, fetchMessages, type MessagesResponse } from './messagesQuery';
 import { useOlderHistory } from './useOlderHistory';
+import { ToolBodyLoaderContext, toolBodyLoaderFor } from './messagesTimeline/toolBodyLoader';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
@@ -1180,6 +1181,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
       : `/api/conversations/${encodeURIComponent(conversation.name)}/messages`,
     history: messagesData?.history,
   });
+  const toolBodyLoader = useMemo(() => toolBodyLoaderFor(agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation/tool-body`
+    : `/api/conversations/${encodeURIComponent(conversation.name)}/tool-body`), [agentId, conversation.name]);
 
   // When forkStatus transitions from non-null to null (fork completed),
   // immediately re-fetch messages so the user doesn't see a stale empty state.
@@ -1399,6 +1403,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           </p>
         </div>
       ) : (
+        <ToolBodyLoaderContext.Provider value={toolBodyLoader}>
         <MessagesTimeline
           messages={messages}
           workLog={workLog}
@@ -1433,6 +1438,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
         />
+        </ToolBodyLoaderContext.Provider>
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a
           banner linking to the sibling that continues the work. The composer/resume bar

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isConversationWorking, TURN_STALL_MS } from '../workingPhase';
+import { getPendingToolEntry, getWorkingPhase, isConversationWorking, TURN_STALL_MS } from '../workingPhase';
 import type { ChatMessage, WorkLogEntry } from '../../components/chat/chat-types';
 
 const NOW = Date.parse('2026-08-24T12:00:00.000Z');
@@ -75,5 +75,24 @@ describe('isConversationWorking', () => {
   it('treats fresh tool activity as working when there is no comparable message timestamp', () => {
     const log = [work({ createdAt: new Date(NOW - 10_000).toISOString() })];
     expect(isConversationWorking(true, [], log, NOW)).toBe(true);
+  });
+});
+
+describe('elided tool results (PAN-4558)', () => {
+  const elided: WorkLogEntry = {
+    id: 'toolu_elided', createdAt: '2026-10-19T00:00:00.000Z', label: 'Bash', toolTitle: 'Bash', tone: 'tool',
+    resultBytes: 9_000, bodyOmitted: true,
+  };
+  const pending: WorkLogEntry = { ...elided, id: 'toolu_pending', resultBytes: undefined, bodyOmitted: undefined };
+
+  it('does not treat a tool with resultBytes as pending', () => {
+    expect(getPendingToolEntry([elided])).toBeUndefined();
+    expect(getPendingToolEntry([pending])?.id).toBe('toolu_pending');
+  });
+
+  it('does not report a tool phase for a tool whose result was elided', () => {
+    const turn = [{ role: 'assistant' }];
+    expect(getWorkingPhase(turn, [pending])).not.toEqual(getWorkingPhase(turn, []));
+    expect(getWorkingPhase(turn, [elided])).toEqual(getWorkingPhase(turn, []));
   });
 });
