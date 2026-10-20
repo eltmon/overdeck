@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
 import { selectIssues, useBackendPanes, useDashboardStore, useDerivedIssueState } from '../../lib/store';
 import {
@@ -182,6 +183,32 @@ function findAgentForSession(
     (session.tmuxSession && agent.sessionId === session.tmuxSession) ||
     agent.id === session.tmuxSession,
   );
+}
+
+/** The ids an agent can match a session by: its session id and its tmux/pane name. */
+function sessionAgentKeys(activity: ActivityResponse | undefined): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const section of activity?.sections ?? []) {
+    keys.add(section.sessionId);
+    if (section.tmuxSession) keys.add(section.tmuxSession);
+  }
+  return keys;
+}
+
+/**
+ * The agents `findAgentForSession` can match for these sessions, in store
+ * order. Selected through `useShallow`, so a change to an agent of another
+ * issue does not re-render this issue's view (PAN-4560).
+ */
+function pickSessionAgents(
+  agentsById: Record<string, AgentSnapshot>,
+  keys: ReadonlySet<string>,
+): Record<string, AgentSnapshot> {
+  const picked: Record<string, AgentSnapshot> = {};
+  for (const [id, agent] of Object.entries(agentsById)) {
+    if (keys.has(agent.id) || (agent.sessionId !== undefined && keys.has(agent.sessionId))) picked[id] = agent;
+  }
+  return picked;
 }
 
 function findCostForSession(session: SessionNode, costs?: IssueCostData): string | undefined {
@@ -483,12 +510,10 @@ export function useIssueView(
   const costs = useIssueCostsQuery(issueId);
   const workspace = useWorkspaceQuery(issueId);
   const activity = useActivityQuery(issueId);
-  const agentsById = useDashboardStore((s) => s.agentsById);
-  const issues = (useDashboardStore(selectIssues) as Issue[] | undefined) ?? [];
-  const issue = useMemo(
-    () => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()),
-    [issueId, issues],
-  );
+  const sessionKeys = useMemo(() => sessionAgentKeys(activity.data), [activity.data]);
+  const agentsById = useDashboardStore(useShallow((s) => pickSessionAgents(s.agentsById, sessionKeys)));
+  const issue = useDashboardStore((s) =>
+    ((selectIssues(s) as Issue[] | undefined) ?? []).find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()));
 
   return useMemo(
     () =>

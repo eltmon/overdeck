@@ -22,6 +22,7 @@ import {
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectAgents, useBackendPanes, useDerivedIssueState, useDashboardStore } from '../../../lib/store'
+import { useShallow } from 'zustand/react/shallow'
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
 import { currentPhase, phaseLabel, type Phase } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
@@ -401,11 +402,11 @@ function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQu
 }
 
 export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline }: IssueMissionControlProps) {
-  const allAgents = useDashboardStore(selectAgents) as Agent[]
-  const issueAgents = useMemo(
-    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
-    [allAgents, issueId],
-  )
+  // PAN-4560: the filter returns existing entries, so useShallow keeps the
+  // array while this issue's agents are unchanged and another issue's agent
+  // changes do not re-render the cockpit.
+  const issueAgents = useDashboardStore(useShallow((s) =>
+    (selectAgents(s) as Agent[]).filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase())))
   const routeSelection = useMemo(
     () => resolveTabSelection(typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('tab')),
     [],
