@@ -8,9 +8,11 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HttpServerResponse } from 'effect/unstable/http';
 
 vi.mock('../../conversations/summary-fork.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../conversations/summary-fork.js')>()),
+  reserveSummaryForkSession: vi.fn(async () => ({ sessionId: `fork-${Math.random().toString(36).slice(2)}` })),
   authorHandoffExternal: vi.fn(async () => { throw new Error('authorHandoffExternal must not be called for a fresh fork'); }),
   requestHandoffFromAgent: vi.fn(async () => { throw new Error('requestHandoffFromAgent must not be called for a fresh fork'); }),
   generateSummaryForFork: vi.fn(async () => { throw new Error('generateSummaryForFork must not be called for a fresh fork'); }),
@@ -22,12 +24,16 @@ vi.mock('../conversation-runtime.js', async (importOriginal) => ({
   isInsideGitWorkTree: vi.fn(async () => true),
 }));
 
-const { runForkPipeline, recoverStuckForks, buildForkRequest, __setForkPipelineRuntimeOverridesForTest, __resetForkPipelineRuntimeOverridesForTest, waitForInFlightForkPipelines } = await import('../conversation-forks.js');
+const { handleConversationSummaryFork, runForkPipeline, recoverStuckForks, buildForkRequest, __setForkPipelineRuntimeOverridesForTest, __resetForkPipelineRuntimeOverridesForTest, waitForInFlightForkPipelines } = await import('../conversation-forks.js');
 const forksModule = await import('../conversation-forks.js');
 const summaryForkModule = await import('../../conversations/summary-fork.js');
 const { sessionFilePath } = await import('../../runtimes/storage/claude-code.js');
-const { createConversation, getConversationByName, setForkRequest } = await import('../conversations.js');
+const { createConversation, getConversationByName, listConversations, setForkRequest } = await import('../conversations.js');
 const { readHeldKickoff } = await import('../conversation-kickoff-store.js');
+
+async function readBody(response: HttpServerResponse.HttpServerResponse): Promise<Record<string, unknown>> {
+  return JSON.parse(await HttpServerResponse.toWeb(response).text()) as Record<string, unknown>;
+}
 
 let testHome: string;
 let originalHome: string | undefined;
@@ -213,5 +219,126 @@ describe('fresh pipeline (PAN-4565)', () => {
     await expect(recoverStuckForks()).resolves.toBe(1);
 
     expectNoAuthoring();
+  });
+});
+
+async function forkRoute(source: string, body: Record<string, unknown>) {
+  const response = await handleConversationSummaryFork(source, body);
+  return { status: response.status, body: await readBody(response) };
+}
+
+describe('fresh route (PAN-4565)', () => {
+  it('creates a root successor', async () => {
+    vi.spyOn(forksModule, 'injectForkSummary').mockResolvedValue('submitted');
+    const { status, body } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true, focus: 'start a fort' });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as { name: string; parentConversationId: number | null; parentConversationName: string | null; forkStatus: string | null };
+    expect(conversation.parentConversationId).toBeNull();
+    expect(conversation.parentConversationName).toBeNull();
+    expect(conversation.forkStatus).toBe('spawning');
+    const stored = getConversationByName(conversation.name);
+    expect(JSON.parse(stored?.forkRequest ?? '{}')).toMatchObject({ fresh: true, forkMode: 'handoff' });
+    await vi.waitFor(() => expect(getConversationByName(conversation.name)?.forkStatus).toBeNull());
+    expectNoAuthoring();
+  });
+
+  it('inherits model, cwd and effort when omitted', async () => {
+    seed('parent-model-conv', { model: 'claude-sonnet-4-5', effort: 'low' });
+    const { status, body } = await forkRoute('parent-model-conv', { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as { model: string | null; cwd: string; effort: string | null };
+    expect(conversation.model).toBe('claude-sonnet-4-5');
+    expect(conversation.cwd).toBe(parentCwd);
+    expect(conversation.effort).toBe('low');
+  });
+
+  it('overrides model and cwd when given', async () => {
+    seed('parent-model-conv2', { model: 'claude-sonnet-4-5', effort: 'low' });
+    const overrideCwd = join(testHome, 'override-cwd');
+    mkdirSync(overrideCwd, { recursive: true });
+    const { status, body } = await forkRoute('parent-model-conv2', {
+      forkMode: 'handoff',
+      fresh: true,
+      model: 'claude-haiku-4-5',
+      cwd: overrideCwd,
+    });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as { model: string | null; cwd: string };
+    expect(conversation.model).toBe('claude-haiku-4-5');
+    expect(conversation.cwd).toBe(overrideCwd);
+  });
+
+  it('titles from the focus without a Handoff prefix', async () => {
+    vi.spyOn(forksModule, 'injectForkSummary').mockResolvedValue('submitted');
+    const { body } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true, focus: 'start a fort' });
+    const conversation = body['conversation'] as { title: string };
+    expect(conversation.title).toBe('start a fort');
+  });
+
+  it('titles New conversation with no focus', async () => {
+    const { body } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true });
+    const conversation = body['conversation'] as { title: string };
+    expect(conversation.title).toBe('New conversation');
+  });
+
+  it('a custom title wins over the focus', async () => {
+    vi.spyOn(forksModule, 'injectForkSummary').mockResolvedValue('submitted');
+    const { body } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true, focus: 'start a fort', title: 'My Fort' });
+    const conversation = body['conversation'] as { title: string };
+    expect(conversation.title).toBe('My Fort');
+  });
+
+  it('does not inherit the source issue', async () => {
+    seed('parent-with-issue', { issueId: 'PAN-9001' });
+    const { status, body } = await forkRoute('parent-with-issue', { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(200);
+    const conversation = body['conversation'] as { issueId: string | null };
+    expect(conversation.issueId).toBeNull();
+  });
+
+  it('rejects fresh with forkMode summary or plain', async () => {
+    const before = listConversations().length;
+    const summaryResult = await forkRoute('parent-conv', { forkMode: 'summary', fresh: true });
+    expect(summaryResult.status).toBe(400);
+    expect(summaryResult.body['error']).toBe('fresh is only valid with forkMode "handoff"');
+    const plainResult = await forkRoute('parent-conv', { forkMode: 'plain', fresh: true });
+    expect(plainResult.status).toBe(400);
+    expect(plainResult.body['error']).toBe('fresh is only valid with forkMode "handoff"');
+    expect(listConversations().length).toBe(before);
+  });
+
+  it('rejects fresh with hold and no focus', async () => {
+    const before = listConversations().length;
+    const { status, body } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true, hold: true });
+    expect(status).toBe(400);
+    expect(body['error']).toBe('fresh with hold needs focus text: there is nothing to hold');
+    expect(listConversations().length).toBe(before);
+  });
+
+  it('succeeds when the source has no session file', async () => {
+    const noSessionParent = createConversation({
+      name: 'parent-no-session-route',
+      tmuxSession: 'conv-parent-no-session-route',
+      cwd: parentCwd,
+      claudeSessionId: 'missing-route-session',
+      harness: 'claude-code',
+    });
+    const { status } = await forkRoute(noSessionParent.name, { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(200);
+  });
+
+  it('leaves the source untouched', async () => {
+    const before = getConversationByName('parent-conv');
+    await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true });
+    const after = getConversationByName('parent-conv');
+    expect(after?.handoffTargetConvId ?? null).toBe(before?.handoffTargetConvId ?? null);
+    expect(after?.handoffDocPath ?? null).toBe(before?.handoffDocPath ?? null);
+    expect(after?.title).toBe(before?.title);
+  });
+
+  it('succeeds with conversations.handoff_author_model unset', async () => {
+    vi.spyOn(forksModule, 'injectForkSummary').mockResolvedValue('submitted');
+    const { status } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true, focus: 'start a fort' });
+    expect(status).toBe(200);
   });
 });
