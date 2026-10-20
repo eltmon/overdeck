@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:17:05.456Z",
+  "updated": "2026-10-20T04:17:24.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "ratchet-script.ac5": {
       "status": "completed",
       "doneAt": "2026-10-20T04:17:05.456Z"
+    },
+    "runtime-readiness-kinds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:17:24.793Z"
     }
   }
 }
