@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T03:31:23.900Z",
+  "updated": "2026-10-20T03:31:25.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4562",
       "claimedAt": "2026-10-20T03:28:17.611Z",
       "doneAt": "2026-10-20T03:31:23.900Z"
+    },
+    "binary-caps": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:31:25.443Z"
     }
   }
 }
