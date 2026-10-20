@@ -92,7 +92,7 @@ the public contract and lists every allowed value.
 | `issue_closed_out` | `variant=close_out_variant` | A dashboard close-out action completed. |
 | `bulk_close_out_initiated` | `issue_count=count_bucket` | The operator started bulk close-out. |
 | `auto_merge_toggled` | `auto_merge=boolean; variant=auto_merge_variant` | The operator changed an issue's auto-merge mode. |
-| `conversation_forked` | `fork_intent=fork_kind; fork_mode=fork_kind; fast_summary=boolean; launch_harness=harness` | A conversation fork was launched. |
+| `conversation_forked` | `fork_intent=fork_kind; fork_mode=fork_kind; fast_summary=boolean; launch_harness=harness; fresh_start=boolean` | A conversation fork was launched. |
 | `plan_approved` | `subject_kind=decision_subject` | An operator approved a plan decision. |
 | `plan_changes_requested` | `subject_kind=decision_subject` | An operator requested plan changes. |
 | `agent_question_answered` | `subject_kind=decision_subject; answer_type=answer_type; question_count=count_bucket` | An operator answered an agent question. |

@@ -246,6 +246,13 @@ the same `--run`, and sees every lane of the run with `pan lane list --run <key>
 A successor is never a lane: continuing a lane's own work in a fresh
 conversation is `pan lane start --reuse`, not `pan handoff`.
 
+`pan handoff --fresh` is refused (400) when the source is a lane or any
+conversation in a lane's successor chain: a `--fresh` successor has no
+parent link and shows no `continues ←` link, which would silently drop the
+lane standing (`run`/`key`/`role`) that a lane only carries through that
+link. Use a normal handoff, or `pan lane start --reuse`, to continue a
+lane's work.
+
 ## Configuration
 
 Per-project defaults live in the optional `gauntlet` block of

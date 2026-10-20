@@ -86,6 +86,28 @@ A **handoff fork** asks the live source agent to write the seed text itself, the
 
 The pipeline lives in `src/lib/overdeck/conversation-forks.ts` and its seed helpers in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.
 
+### Fresh start (PAN-4565)
+
+`pan handoff <conversation> --fresh` (or the dashboard's "Fresh start" checkbox under Agent handoff) starts a **clean** conversation that borrows only the source's defaults — project, cwd, model, effort. It is a boolean on a handoff request (`forkMode: 'handoff'`, `fresh: true`), not a fourth fork mode.
+
+**What a fresh start never does:**
+- No handoff document is authored and no summary is generated.
+- The source transcript is never read — a fresh start succeeds even when the source has no session file on disk, and even when `conversations.handoff_author_model` is unset.
+- The successor gets no parent link: `parentConversationId`/`parentConversationName` are null, it is a root conversation, and it shows no `continues ← #<id>` in the Command Deck or Agents History.
+- The successor does not inherit the source's issue: `issueId` is only explicit (`--issue`) or detected from the effective cwd's git branch, never carried over from the source.
+
+**Focus = first message:**
+- The `--focus` text (if any) is delivered verbatim as the successor's first message — it is never handed to an author or summarizer.
+- No focus: the successor launches and waits for the operator's first message, same as starting a conversation with nothing queued.
+- `--fresh --hold` with no focus is rejected (`fresh with hold needs focus text: there is nothing to hold`) — there would be nothing to hold. `--fresh --hold` with a focus holds the focus the same way `--hold` holds a normal kickoff.
+- `--fresh` combined with `--author source` or `--author-model` is rejected — there is no document to author.
+
+**Title:** without `--title`, the successor is titled from the focus directly (no `Handoff:` prefix), truncated the same way as a normal handoff title; `New conversation` with no focus.
+
+**Lane refusal:** a fresh start is refused (400) when the source is a gauntlet lane or any conversation in a lane's successor chain — a fresh start's missing parent link would silently drop the lane standing (`run`/`key`/`role`) that a lane only carries through that link (PAN-4223 D21). Use a normal handoff, or `pan lane start --reuse`.
+
+**Recovery:** a dashboard restart during a fresh start replays it as a fresh start — `recoverStuckForks()` forwards the persisted `ForkRequest.fresh` to `runForkPipeline()`, which still never authors or reads the source transcript.
+
 ## Fork Options
 
 When forking from the dashboard, you can configure:
@@ -196,14 +218,16 @@ map; no global, project, or issue skill store is touched.
 
 The fork pipeline lives in `src/lib/overdeck/conversation-forks.ts`; the seed and session helpers it calls live in `src/lib/conversations/summary-fork.ts`.
 
-Every fork mode (`plain`, `summary`, `handoff`) stamps `parent_conversation_id` = the source conversation's id on the new row, in the `createConversation` call inside `handleConversationSummaryFork` (PAN-4223 WI-14). The link is a write-once launch-time fact: the successor nests under its source on the Command Deck and in the Agents History and shows `continues ← #<id>`. `fork_request` and `handoff_target_conv_id` are unchanged and keep their meaning; the three gauntlet lane columns stay null, because a successor is never a lane.
+Every fork mode (`plain`, `summary`, `handoff`) stamps `parent_conversation_id` = the source conversation's id on the new row, in the `createConversation` call inside `handleConversationSummaryFork` (PAN-4223 WI-14) — except a `handoff` request with `fresh: true` (PAN-4565), which creates a root row with no `parent_conversation_id`. The link is otherwise a write-once launch-time fact: the successor nests under its source on the Command Deck and in the Agents History and shows `continues ← #<id>`. `fork_request` and `handoff_target_conv_id` are unchanged and keep their meaning; the three gauntlet lane columns stay null, because a successor is never a lane.
 
 Key functions:
 - `handleConversationSummaryFork()` (`src/lib/overdeck/conversation-forks.ts`) — request handler; reserves the new session with `reserveSummaryForkSession()`, then starts the pipeline with that `sessionId`
-- `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — receives the reserved `sessionId` (`recoverStuckForks()` passes the persisted one after a restart) and orchestrates seed generation, spawn and summary injection
+- `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — receives the reserved `sessionId` (`recoverStuckForks()` passes the persisted one after a restart) and orchestrates seed generation, spawn and summary injection; a `fresh` fork takes a dedicated branch that never resolves the source session file
 - `reserveSummaryForkSession()` — reserves the new session id and file path
 - `requestHandoffFromAgent()` — live-agent handoff prompt delivery, doc/sentinel polling, and validation
 - `validateHandoffDoc()` — handoff document contract check
 - `generateSummaryForFork()` — calls the LLM summarizer with fork-specific settings
 - `generateFallbackSummary()` — heuristic summary when LLM is unavailable
 - `copySessionFromCompactBoundary()` — raw JSONL copy with thinking sanitization for plain fork
+- `fork-source-session.ts` — leaf module holding `resolveForkSourceSessionFile()`/`resolvePlainForkTargetSessionFile()`, extracted out of `conversation-forks.ts` (PAN-4565 WI-1)
+- `fork-fresh.ts` — leaf module holding `freshStartTitle()` and `freshStartLaneRefusal()` (PAN-4565)

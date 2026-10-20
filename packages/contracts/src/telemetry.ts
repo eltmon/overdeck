@@ -173,6 +173,7 @@ export const TELEMETRY_EVENT_CATALOG = {
     fork_mode: "fork_kind",
     fast_summary: "boolean",
     launch_harness: "harness",
+    fresh_start: "boolean",
   },
   plan_approved: { subject_kind: "decision_subject" },
   plan_changes_requested: { subject_kind: "decision_subject" },

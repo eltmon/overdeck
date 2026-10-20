@@ -411,6 +411,7 @@ program
   .option('--skill <name>', 'Turn this skill on for the new conversation only (repeatable); a pack skill is <pack>/<skill>', (value: string, previous: string[]) => [...previous, value], [] as string[])
   .option('--pack <id>', 'Turn every skill of this cached skill pack on for the new conversation only (repeatable)', (value: string, previous: string[]) => [...previous, value], [] as string[])
   .option('--hold', 'Create and launch the new conversation without sending the kickoff; start it with Send in the dashboard or pan handoff start <conv>')
+  .option('--fresh', 'Start a clean conversation: no handoff document, no summary, no parent link; the focus is its first message. Project, cwd, model and effort still default from the source')
   .action(lazyAction(() => import('./commands/handoff.js'), 'handoffCommand'));
 
 program

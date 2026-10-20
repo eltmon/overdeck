@@ -76,7 +76,8 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
 
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
-  subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+  subscribes to `subscribeDomainEvents` stream, applies events to Zustand store; on a
+  sequence gap it calls `replayEvents` — see "Gap replay" under Degraded mode.
 - The snapshot's agent `status` is derived when it is served, not copied from the stored
   record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
   backend inventory is served `stopped`. Every agent-to-pane join in the server, including
@@ -774,6 +775,18 @@ Precedence is `restarting` > `unauthorized` > `unreachable` > `delayed` > `live`
   attempt a no-op, so a late answer never overwrites newer state. The 2 s
   fallback poller runs until the first bootstrap succeeds, and it stands down
   while a backoff reconnect is scheduled.
+- **Gap replay (PAN-4559).** The server's `replayEvents` reads with
+  `readFromBounded` (`src/dashboard/server/event-store.ts`), a `LIMIT`ed
+  statement, and returns at most `REPLAY_MAX_EVENTS` (500) stored rows and
+  `REPLAY_MAX_PAYLOAD_BYTES` (1 MiB) of payload. Past either cap it answers
+  `{ tooFarBehind: true }` (contract `ReplayEventsResult` in
+  `packages/contracts/src/rpc.ts`) and reads no further. On a live gap the
+  client then re-bootstraps through `getSnapshot` on the same transport (no
+  `resetTransport()`), and a follow-up small replay drains the live events it
+  deferred. If the replay right after a fresh snapshot is already too far
+  behind, that bootstrap attempt counts as failed and the normal reconnect
+  backoff applies. A replay that fails for another reason still only resets
+  the coordinator (tracked in PAN-4566).
 - **Retry.** The banner's and first-load screen's Retry calls
   `requestReconnect()`. EventRouter registers that on mount: it abandons any
   in-flight attempt (even one that will never settle), resets the backoff, and
@@ -862,7 +875,9 @@ successor keeps its own row and does not pull its ended predecessor into the liv
 live lane still pulls in its ended launcher. In the Live view a lane with its parent on the page is
 a child line of the parent row (a needs-you lane also keeps its own row), and a successor always
 keeps its own row with its `continues ←` link. History nests both by `parentId`, capped at two
-levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent.
+levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent. A
+`pan handoff --fresh` successor (PAN-4565) has no parent link at all — its row has no `parentId`
+and no `continuesFrom` — so it renders as a root entry with no `continues ←`.
 
 **Command Deck conversation groups (PAN-4223).** `conversation-tree.ts` nests every conversation
 whose parent link names a row in the rendered list, lanes and successors alike, in pre-order at

@@ -207,3 +207,78 @@ describe('ForkModal ACP source capabilities', () => {
     expect(onConfirm.mock.calls[0][14]).toEqual({ skills: ['grilling'], packs: ['mattpocock'], hold: true });
   });
 });
+
+describe('ForkModal fresh start (PAN-4565)', () => {
+  it('checking Fresh start sends no author and fresh: true', () => {
+    const onConfirm = vi.fn();
+
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        initialMode="handoff"
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Fresh start — no summary, no parent link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm.mock.calls[0][3]).toBe('handoff');
+    expect(onConfirm.mock.calls[0][10]).toBeUndefined();
+    expect(onConfirm.mock.calls[0][11]).toBeUndefined();
+    expect(onConfirm.mock.calls[0][14]).toEqual({ fresh: true });
+  });
+
+  it('renders the checkbox checked and the focus textarea trimmed from --fresh in the composer text', () => {
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        initialMode="handoff"
+        initialFocus="--fresh build a fort"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.getByRole('checkbox', { name: 'Fresh start — no summary, no parent link' })).toBeChecked();
+    expect(screen.getByLabelText('First message (optional)')).toHaveValue('build a fort');
+  });
+
+  it('hides the Authored by legend when Fresh start is checked', () => {
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        initialMode="handoff"
+        initialFocus="--fresh build a fort"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Advanced options'));
+
+    expect(screen.queryByText('Authored by')).not.toBeInTheDocument();
+  });
+
+  it('disables Continue when Fresh start + Hold have no first message', () => {
+    render(
+      <ForkModal
+        conversation={ACP_CONVERSATION}
+        initialMode="handoff"
+        initialFocus="--fresh"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hold — start it myself' }));
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  });
+});
