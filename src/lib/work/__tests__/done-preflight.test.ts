@@ -118,4 +118,13 @@ describe('filterUncommittedPorcelainLines (MIN-896/MIN-898 generated-harness exc
     const out = filterUncommittedPorcelainLines('?? devdist\n?? devops/\n?? .devcontainer.bak\n');
     expect(out).toEqual(['?? devdist', '?? devops/', '?? .devcontainer.bak']);
   });
+
+  it('keeps a .overdeck/memory line and drops .overdeck/continue.json (PAN-3957 D17)', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    const out = filterUncommittedPorcelainLines([
+      '?? .overdeck/memory/be-decisive.md',
+      '?? .overdeck/continue.json',
+    ].join('\n'));
+    expect(out).toEqual(['?? .overdeck/memory/be-decisive.md']);
+  });
 });

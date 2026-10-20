@@ -7,6 +7,8 @@ import {
   getMainDivergence,
   isGeneratedGitHookPath,
   isOverdeckOwnedOnlyStatus,
+  isOverdeckWorkspaceRuntimePath,
+  isProjectMemoryPath,
   isStatePlaneOnlyDiff,
   isStatePlaneOnlyStatus,
   parsePorcelainStatusPaths,
@@ -278,5 +280,31 @@ describe('isOverdeckOwnedOnlyStatus with generated hook output (PAN-3266)', () =
 
   it('still treats an edit to a tracked hook source as real work', () => {
     expect(isOverdeckOwnedOnlyStatus(' M .husky/pre-push')).toBe(false);
+  });
+});
+
+describe('isOverdeckWorkspaceRuntimePath curated-memory carve-out (PAN-3957 D17)', () => {
+  it('is false for .overdeck/memory paths and still true for .overdeck/continue.json', () => {
+    expect(isOverdeckWorkspaceRuntimePath('.overdeck/memory')).toBe(false);
+    expect(isOverdeckWorkspaceRuntimePath('.overdeck/memory/be-decisive.md')).toBe(false);
+    expect(isOverdeckWorkspaceRuntimePath('.overdeck/continue.json')).toBe(true);
+    expect(isOverdeckWorkspaceRuntimePath('.overdeck')).toBe(true);
+  });
+
+  it('isProjectMemoryPath matches the directory itself and its contents only', () => {
+    expect(isProjectMemoryPath('.overdeck/memory')).toBe(true);
+    expect(isProjectMemoryPath('.overdeck/memory/be-decisive.md')).toBe(true);
+    expect(isProjectMemoryPath('.overdeck/memory-other')).toBe(false);
+    expect(isProjectMemoryPath('.overdeck/continue.json')).toBe(false);
+  });
+});
+
+describe('isOverdeckOwnedOnlyStatus curated-memory carve-out (PAN-3957 D17)', () => {
+  it('is false for "?? .overdeck/memory/x.md"', () => {
+    expect(isOverdeckOwnedOnlyStatus('?? .overdeck/memory/x.md')).toBe(false);
+  });
+
+  it('still treats plain .overdeck/ runtime files as owned-only', () => {
+    expect(isOverdeckOwnedOnlyStatus('?? .overdeck/continue.json')).toBe(true);
   });
 });

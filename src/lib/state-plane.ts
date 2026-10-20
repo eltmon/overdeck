@@ -67,15 +67,25 @@ export function isStatePlaneOnlyStatus(porcelain: string): boolean {
   return parsePorcelainStatusPaths(porcelain).every(isStatePlanePath);
 }
 
+/** PAN-3957: curated project facts are committed work product, unlike the rest of `.overdeck/`. */
+export const PROJECT_MEMORY_PATH = '.overdeck/memory';
+export function isProjectMemoryPath(relativePath: string): boolean {
+  const normalized = relativePath.trim().replace(/\\/g, '/');
+  return normalized === PROJECT_MEMORY_PATH || normalized.startsWith(`${PROJECT_MEMORY_PATH}/`);
+}
+
 /**
  * PAN-3245 / PAN-3042: anything under the Overdeck workspace runtime
  * directories (`.pan/`, `.overdeck/`) is pipeline-owned, never operator or
  * agent work product. Dirty-workspace gates use the blanket prefix; the
  * narrow STATE_PLANE_PATHS allowlist above exists for diff classification
  * (isStatePlanePath / isStatePlaneOnlyDiff) and must stay narrow.
+ * PAN-3957 D17: curated facts under `.overdeck/memory/` are carved out — they
+ * are committed work product, not pipeline runtime.
  */
 export function isOverdeckWorkspaceRuntimePath(relativePath: string): boolean {
   const normalized = relativePath.trim().replace(/\\/g, '/');
+  if (isProjectMemoryPath(normalized)) return false;
   return normalized === '.pan' || normalized.startsWith('.pan/')
     || normalized === '.overdeck' || normalized.startsWith('.overdeck/');
 }
