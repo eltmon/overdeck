@@ -4,17 +4,17 @@
     "created": "2026-10-20T02:48:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4558: Conversation open sends the whole transcript: bound the initial window and page older history",
-    "updated": "2026-10-20T02:55:17.754Z"
+    "updated": "2026-10-20T02:56:12.196Z"
   },
   "plan": {
     "id": "pan-4558",
     "title": "Conversation open sends the whole transcript: bound the initial window and page older history",
-    "status": "proposed",
+    "status": "running",
     "uid": "6124fbde-3fba-4f8a-9322-8d8c9e9d54a5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T02:48:23Z",
-    "updated": "2026-10-20T02:55:17.754Z",
+    "updated": "2026-10-20T02:56:12.196Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4558",
@@ -1552,5 +1552,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
