@@ -489,6 +489,32 @@ describe('scanner', () => {
     });
   });
 
+  // PAN-4562: workspace resolution reads the declared workspaceResolution capability.
+  it('resolves opencode from its agent dir and leaves muse unresolved without a first-message cwd', async () => {
+    const agentsRoot = join(odb.home, '.overdeck', 'agents');
+    const opencodeDir = join(agentsRoot, 'agent-opencode-scanner');
+    const opencodePath = join(opencodeDir, 'acp-session.jsonl');
+    mkdirSync(opencodeDir, { recursive: true });
+    writeFileSync(join(opencodeDir, 'state.json'), JSON.stringify({ harness: 'opencode' }), 'utf8');
+    writeFileSync(opencodePath, ACP_SESSION_JSONL, 'utf8');
+    seedAgent(odb, 'agent-opencode-scanner', '/home/user/Projects/opencode-owned', 'opencode', 'opencode/big-pickle');
+    const musePath = join(agentsRoot, 'agent-muse-scanner', 'muse-data', 'muse', 'sessions', '2026', '07', '02', '01900000-0000-7000-8000-000000004562', 'session.jsonl');
+    mkdirSync(dirname(musePath), { recursive: true });
+    writeFileSync(musePath, `${JSON.stringify({ payload_type: 'runtime.event' })}\n`, 'utf8');
+    seedAgent(odb, 'agent-muse-scanner', '/home/user/Projects/muse-owned', 'muse', 'muse-spark-1.3');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const sessions = findDiscoveredSessions();
+
+    expect(result.errors).toBe(0);
+    expect(sessions.find((s) => s.jsonlPath === opencodePath)).toMatchObject({
+      harness: 'opencode',
+      sessionId: 'acp-session-1',
+      workspacePath: '/home/user/Projects/opencode-owned',
+    });
+    expect(sessions.find((s) => s.jsonlPath === musePath)).toMatchObject({ harness: 'muse', workspacePath: null });
+  });
+
   it('resolves codex workspace from the owning agent dir when rollout metadata has no cwd', async () => {
     const owned = join(
       odb.home,
