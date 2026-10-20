@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:19:48.228Z",
+  "updated": "2026-10-20T05:20:01.490Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "cockpit-agent-isolation.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T05:19:48.227Z"
+    },
+    "cockpit-agent-isolation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:01.490Z"
     }
   }
 }
