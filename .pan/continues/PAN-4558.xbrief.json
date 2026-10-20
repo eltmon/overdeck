@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:58:02.331Z",
+  "updated": "2026-10-20T03:58:10.904Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-4558",
       "claimedAt": "2026-10-20T03:56:43.192Z",
       "doneAt": "2026-10-20T03:58:02.330Z"
+    },
+    "wi10-extract-messages-query": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:58:10.903Z"
     }
   }
 }
