@@ -6,6 +6,10 @@
  *   npm --prefix src/dashboard/frontend run preview:profile   # :3010, proxies to :3011
  *   cd src/dashboard/frontend && PROFILE_LABEL=baseline npx playwright test tests/profiling/render-profile.spec.ts
  *
+ * S2 and S4 open the project home `/command-deck/<PROFILE_PROJECT>` (default
+ * `overdeck`): a bare `/command-deck` auto-selects the first conversation, so
+ * only a project deep link leaves no conversation open.
+ *
  * Results go to .tmp/pan-4560-profile/<label>.json and <label>.md.
  *
  * Read-only by design: the spec never clicks a control that mutates server
@@ -27,6 +31,7 @@ const FRONTEND_ROOT = path.resolve(HERE, '..', '..');
 const OUT_DIR = path.resolve(FRONTEND_ROOT, '..', '..', '..', '.tmp', 'pan-4560-profile');
 const BASE_URL = (process.env.DASHBOARD_URL ?? 'http://localhost:3010').replace(/\/$/, '');
 const LABEL = process.env.PROFILE_LABEL ?? 'baseline';
+const PROJECT_HOME = `/command-deck/${encodeURIComponent(process.env.PROFILE_PROJECT ?? 'overdeck')}`;
 
 const STREAM_DELTAS = 40;
 const STREAM_DELTA_GAP_MS = 250;
@@ -35,6 +40,19 @@ const BURST_BATCH_GAP_MS = 16;
 const TYPED_TEXT = 'the quick brown fox jumps over the lazy dog';
 const TICKER_WINDOW_MS = 65_000;
 const TOP_COMPONENTS = 15;
+/** The surfaces PAN-4560's fixes target, reported in every scenario so baseline and after compare directly. */
+const WATCHED_COMPONENTS = [
+  'App',
+  'AppChrome',
+  'CommandDeck',
+  'ProjectNode',
+  'FeatureItem',
+  'IssueMissionControl',
+  'ConversationList',
+  'ConversationRow',
+  'ConversationPanel',
+  'ComposerFooter',
+];
 
 interface ScenarioResult {
   record: ScenarioRecord | null;
@@ -172,8 +190,7 @@ async function runStreaming(browser: Browser): Promise<ScenarioResult> {
 }
 
 async function runBurst(browser: Browser): Promise<ScenarioResult> {
-  // A fresh context opens the Command Deck on its home pane: no conversation open.
-  const page = await openProfiledPage(browser, '/command-deck');
+  const page = await openProfiledPage(browser, PROJECT_HOME);
   try {
     await beginWindow(page, 'S2 domain-event burst');
     const applied = await page.evaluate(async ({ batches, gapMs }) => {
@@ -265,11 +282,11 @@ async function runTyping(browser: Browser): Promise<ScenarioResult> {
 }
 
 async function runTickers(browser: Browser): Promise<ScenarioResult> {
-  const page = await openProfiledPage(browser, '/command-deck');
+  const page = await openProfiledPage(browser, PROJECT_HOME);
   try {
     await beginWindow(page, 'S4 idle tickers');
     await page.waitForTimeout(TICKER_WINDOW_MS);
-    return { record: await endWindow(page), triggers: TICKER_WINDOW_MS / 60_000, triggerUnit: 'minute' };
+    return { record: await endWindow(page), triggers: Number((TICKER_WINDOW_MS / 60_000).toFixed(2)), triggerUnit: 'minute' };
   } finally {
     await page.context().close();
   }
@@ -284,6 +301,15 @@ function formatScenario(title: string, result: ScenarioResult): string {
     return lines.join('\n');
   }
   lines.push(`store sets: ${record.storeSets} · commits: ${record.commits} · triggers: ${result.triggers} ${result.triggerUnit}(s)`, '');
+  lines.push(`Watched surfaces:`, '');
+  lines.push(`| component | updates | mounts | total self ms | updates per ${result.triggerUnit} |`);
+  lines.push('| --- | ---: | ---: | ---: | ---: |');
+  for (const name of WATCHED_COMPONENTS) {
+    const stats = record.byComponent[name] ?? { updates: 0, mounts: 0, selfMs: 0 };
+    const perTrigger = result.triggers > 0 ? stats.updates / result.triggers : 0;
+    lines.push(`| ${name} | ${stats.updates} | ${stats.mounts} | ${stats.selfMs.toFixed(2)} | ${perTrigger.toFixed(2)} |`);
+  }
+  lines.push('', `Top ${TOP_COMPONENTS} by updates:`, '');
   lines.push(`| component | updates | mounts | total self ms | mean ms per render | updates per ${result.triggerUnit} |`);
   lines.push('| --- | ---: | ---: | ---: | ---: | ---: |');
   const rows = Object.entries(record.byComponent)
@@ -308,9 +334,9 @@ test.describe('PAN-4560 render profile', () => {
     test.setTimeout(10 * 60_000);
     const scenarios: Array<[string, ScenarioResult]> = [
       ['S1 — streaming conversation', await runStreaming(browser)],
-      ['S2 — domain-event burst, no conversation open', await runBurst(browser)],
+      [`S2 — domain-event burst, no conversation open (${PROJECT_HOME})`, await runBurst(browser)],
       ['S3 — composer typing', await runTyping(browser)],
-      ['S4 — idle tickers (65 s)', await runTickers(browser)],
+      [`S4 — idle tickers, 65 s (${PROJECT_HOME})`, await runTickers(browser)],
     ];
 
     mkdirSync(OUT_DIR, { recursive: true });
