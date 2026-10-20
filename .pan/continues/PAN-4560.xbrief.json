@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:21:03.259Z",
+  "updated": "2026-10-20T05:21:18.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "streaming-composer-isolation.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T05:21:03.259Z"
+    },
+    "conversation-list-item-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:18.151Z"
     }
   }
 }
