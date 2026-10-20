@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:42:07.228Z",
+  "updated": "2026-10-20T03:52:47.435Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-20T03:41:57.734Z"
     },
     "wi8-claude-ws-window": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T03:42:07.228Z"
+      "claimedAt": "2026-10-20T03:42:07.228Z",
+      "doneAt": "2026-10-20T03:52:47.435Z"
     }
   }
 }
