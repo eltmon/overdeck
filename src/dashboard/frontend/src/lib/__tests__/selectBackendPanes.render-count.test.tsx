@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import type { BackendPane, DomainEvent } from '@overdeck/contracts';
-import { selectBackendPanes, useBackendPanes, useDashboardStore } from '../store';
+import { selectBackendPanes, selectMemoryObservations, useBackendPanes, useDashboardStore } from '../store';
 import {
   applyStoreEvents,
   createRenderCounter,
@@ -54,6 +54,16 @@ describe('selectBackendPanes', () => {
     const after = select(useDashboardStore.getState());
     expect(after).not.toBe(before);
     expect(after[0]?.state).toBe('idle');
+  });
+});
+
+describe('selectMemoryObservations', () => {
+  it('returns the same empty array for an issue with no observations', () => {
+    const select = selectMemoryObservations('PAN-9');
+    const first = select(useDashboardStore.getState());
+    applyStoreEvents([paneChanged(pane('p-2', 'PAN-2', 'idle'), 1)]);
+    expect(first).toEqual([]);
+    expect(select(useDashboardStore.getState())).toBe(first);
   });
 });
 
