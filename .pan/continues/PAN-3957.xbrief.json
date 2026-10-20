@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T23:30:40.997Z",
+  "updated": "2026-10-20T23:38:27.508Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-20T23:30:36.731Z"
     },
     "w13-autocommit-carveout": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-20T23:30:40.997Z"
+      "claimedAt": "2026-10-20T23:30:40.997Z",
+      "doneAt": "2026-10-20T23:38:27.507Z"
     }
   }
 }
