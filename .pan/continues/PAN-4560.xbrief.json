@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:21:32.542Z",
+  "updated": "2026-10-20T05:21:47.028Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,10 @@
     "conversation-list-item-isolation.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T05:21:32.542Z"
+    },
+    "conversation-list-item-isolation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:47.028Z"
     }
   }
 }
