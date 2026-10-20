@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:19:34.843Z",
+  "updated": "2026-10-20T05:19:48.228Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "app-shell-subscriptions.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T05:19:34.842Z"
+    },
+    "cockpit-agent-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:19:48.227Z"
     }
   }
 }
