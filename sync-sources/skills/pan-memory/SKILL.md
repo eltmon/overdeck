@@ -30,6 +30,8 @@ pan memory pin <doc-path> [--project <id> | --workspace <id>] [--json]
 pan memory unpin <doc-path> [--project <id> | --workspace <id>] [--json]
 pan memory pins [--project <id> | --workspace <id>] [--json]
 pan memory config [--json]
+pan memory show <id> [--project <key> | --user | --here]
+pan memory list [--type <t>] [--query <q>] [--review] [--project <key> | --user | --here] [--json]
 ```
 
 ## Notes
@@ -46,3 +48,4 @@ pan memory config [--json]
 - `doctor` exits non-zero when an active agent has no successful extraction in the last hour.
 - `backfill` reads historical Claude Code JSONL transcripts under `~/.claude/projects/` and extracts observations for sessions whose first-message cwd maps to a registered workspace; unmatched sessions are skipped. Read-only on the JSONL files — `--dry-run` reports matches without extracting or writing anything.
 - `pin`/`unpin`/`pins` manage docs injected under the knowledge budget at prompt time. `--workspace` overrides `--project`; paths are stored project-relative regardless of scope.
+- `show`/`list` read curated memory facts (PAN-3957) — short, human-reviewable markdown files with frontmatter, committed in the repo and distinct from the observation substrate above. `--project <key>` always reads that project's primary checkout; with neither `--project` nor `--user`, `show`/`list` default to the primary checkout too (the store the launch-time index was rendered from) — pass `--here` to read the cwd checkout's own store instead (useful inside a workspace before its branch merges). `list` defaults to active facts only; `--review` shows only facts carrying a review marker, and `list` exits non-zero when any fact file fails to parse, printing a `Problems:` block.

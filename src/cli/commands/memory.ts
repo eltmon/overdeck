@@ -15,6 +15,7 @@ import {
   type MemoryDoctorResult,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
+import { registerMemoryFactCommands } from './memory-facts.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
@@ -409,6 +410,8 @@ export function createMemoryCommand(): Command {
         console.log(`Rollup pending threshold: ${summary.rollupPendingThreshold}`);
       }
     });
+
+  registerMemoryFactCommands(memory);
 
   return memory;
 }
