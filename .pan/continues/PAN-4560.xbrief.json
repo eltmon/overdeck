@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:20:16.810Z",
+  "updated": "2026-10-20T05:20:32.024Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,10 @@
     "cockpit-agent-isolation.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T05:20:16.810Z"
+    },
+    "streaming-composer-isolation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:32.024Z"
     }
   }
 }
