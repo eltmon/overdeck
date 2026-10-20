@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:16:41.080Z",
+  "updated": "2026-10-20T03:16:47.496Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4558",
       "claimedAt": "2026-10-20T03:12:59.788Z",
       "doneAt": "2026-10-20T03:16:41.079Z"
+    },
+    "wi4-window-selection": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:16:47.496Z"
     }
   }
 }
