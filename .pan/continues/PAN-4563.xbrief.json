@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:45:05.970Z",
+  "updated": "2026-10-20T20:45:19.179Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "replay-engine.ac5": {
       "status": "completed",
       "doneAt": "2026-10-20T20:45:05.970Z"
+    },
+    "codex-replay-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:19.179Z"
     }
   }
 }
