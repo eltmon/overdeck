@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T03:58:21.493Z",
+  "updated": "2026-10-20T04:14:34.792Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
       "claimedBy": "agent-pan-4562",
       "claimedAt": "2026-10-20T03:57:17.872Z",
       "doneAt": "2026-10-20T03:58:21.493Z"
+    },
+    "capabilities-foundation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:14:34.791Z"
     }
   }
 }
