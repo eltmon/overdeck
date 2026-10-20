@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:26:03.151Z",
+  "updated": "2026-10-20T04:26:20.660Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -258,6 +258,10 @@
     "activity-table.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T04:26:03.150Z"
+    },
+    "row-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:20.660Z"
     }
   }
 }
