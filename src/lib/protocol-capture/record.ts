@@ -83,7 +83,8 @@ export const SCENARIOS: readonly Scenario[] = [
 
 const DEFAULTS: Record<Harness, { model: string; effort: string | undefined }> = {
   codex: { model: 'gpt-5.6-luna', effort: 'low' },
-  acp: { model: 'k3', effort: undefined },
+  // K3 refuses to launch without an effort level (resolveKimiNativeEffort).
+  acp: { model: 'k3', effort: 'low' },
 };
 
 export function scenarioTable(): string {
@@ -95,7 +96,7 @@ export function scenarioTable(): string {
     `  ${'HARNESS'.padEnd(6)} ${'SCENARIO'.padEnd(16)} SCRIPTED ACTIONS`,
     ...rows,
     '',
-    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model}.`,
+    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model} effort ${DEFAULTS.acp.effort}.`,
   ].join('\n');
 }
 
@@ -353,6 +354,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   const tempDirs: string[] = [];
+  const out = resolve(values.out);
   try {
     const cwd = await mkdtemp(join(tmpdir(), 'pan-capture-cwd-'));
     tempDirs.push(cwd);
@@ -360,7 +362,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     tempDirs.push(overdeckHome);
     const input: RecordInput = {
       scenario,
-      out: resolve(values.out),
+      out,
       model: typeof values.model === 'string' ? values.model : DEFAULTS[harness].model,
       effort: typeof values.effort === 'string' ? values.effort : DEFAULTS[harness].effort,
       cwd,
@@ -372,6 +374,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   } catch (error) {
     process.stderr.write(`[record] ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+    // A failed run leaves a partial fixture; never let it be committed by accident.
+    await rm(out, { force: true });
     return 1;
   } finally {
     for (const dir of tempDirs) await rm(dir, { recursive: true, force: true });
