@@ -76,7 +76,7 @@ import { writeConversationPaneRole } from './conversation-pane-role.js';
 import { getIssueWorkspacePath } from './issue-projects.js';
 import { isAgentRole, type AgentRole } from '@overdeck/contracts';
 import { resolveForkSourceSessionFile, resolvePlainForkTargetSessionFile } from './fork-source-session.js';
-import { freshStartTitle } from './fork-fresh.js';
+import { freshStartLaneRefusal, freshStartTitle } from './fork-fresh.js';
 import * as self from './conversation-forks.js';
 
 // Canonical model-id shape (allows the `[1m]` suffix) — see model-validation.ts (PAN-2979).
@@ -697,6 +697,10 @@ export async function handleConversationSummaryFork(
     }
     if (fresh && forkMode !== 'handoff') {
       return jsonResponse({ error: 'fresh is only valid with forkMode "handoff"' }, { status: 400 });
+    }
+    if (fresh) {
+      const laneRefusal = freshStartLaneRefusal(conv.name);
+      if (laneRefusal) return jsonResponse({ error: laneRefusal }, { status: 400 });
     }
     const hold = body['hold'] === true;
     if (hold && forkMode === 'plain') {

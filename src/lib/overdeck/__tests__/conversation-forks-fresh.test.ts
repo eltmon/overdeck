@@ -315,6 +315,30 @@ describe('fresh route (PAN-4565)', () => {
     expect(listConversations().length).toBe(before);
   });
 
+  it('refuses a fresh start from a gauntlet lane', async () => {
+    seed('orch-root', {});
+    seed('builder-lane', { parentName: 'orch-root', lane: { run: 'hotel', key: '663', role: 'builder' } });
+    const before = listConversations().length;
+    const { status, body } = await forkRoute('builder-lane', { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(400);
+    expect(body['error']).toContain('a fresh start cannot be made from a gauntlet lane');
+    expect(listConversations().length).toBe(before);
+  });
+
+  it('refuses a fresh start from a lane successor', async () => {
+    seed('orch-root-2', {});
+    seed('builder-lane-2', { parentName: 'orch-root-2', lane: { run: 'hotel', key: '664', role: 'builder' } });
+    seed('lane-successor', { parentName: 'builder-lane-2' });
+    const { status, body } = await forkRoute('lane-successor', { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(400);
+    expect(body['error']).toContain('a fresh start cannot be made from a gauntlet lane');
+  });
+
+  it('allows a fresh start from a root with no lane ancestry', async () => {
+    const { status } = await forkRoute('parent-conv', { forkMode: 'handoff', fresh: true });
+    expect(status).toBe(200);
+  });
+
   it('succeeds when the source has no session file', async () => {
     const noSessionParent = createConversation({
       name: 'parent-no-session-route',
