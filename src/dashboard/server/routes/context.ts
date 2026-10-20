@@ -37,6 +37,7 @@ import {
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
 import { configDisabledRuleNames } from '../../../lib/context-layers/render.js';
+import { renderManagedMemorySections } from '../../../lib/memory/facts/render.js';
 import { getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjectsAsync, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
@@ -395,13 +396,26 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
     .join('\n\n---\n\n');
 }
 
-async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
+async function previewForHarness(
+  layers: readonly ResolvedLayer[],
+  drafts: ReadonlyMap<string, string>,
+  harness: Harness,
+  memory: string,
+): Promise<string> {
   const title = getHarnessBehavior(harness).displayName;
   return [
     `# Overdeck injected context preview (${title})`,
     renderLayerSections(layers, drafts, harness),
+    memory,
     await renderBundledRulesAsync(harness),
   ].filter((section) => section.trim().length > 0).join('\n\n---\n\n');
+}
+
+/** The registered checkout of the project the preview is scoped to, if any (PAN-3957). */
+function previewProjectRoot(projects: readonly ProjectEntry[], layers: readonly ResolvedLayer[]): string | null {
+  const scoped = layers.find((layer) => layer.kind !== 'global');
+  if (!scoped) return null;
+  return projects.find((entry) => entry.key === scoped.projectKey)?.config.path ?? null;
 }
 
 function fullPromptPreview(previews: Record<Harness, string>): string {
@@ -492,9 +506,12 @@ export async function previewContextLayers(
   requireLayer(state, request.selectedLayer);
   const drafts = draftContentByTarget(state, request.drafts);
   const layers = applicableLayers(state, request.selectedLayer);
+  const memory = renderManagedMemorySections(previewProjectRoot(projects, layers), {
+    userDir: join(overdeckHome, 'context', 'memory'),
+  });
   const previews = {} as Record<Harness, string>;
   for (const harness of PREVIEW_HARNESSES) {
-    previews[harness] = await previewForHarness(layers, drafts, harness);
+    previews[harness] = await previewForHarness(layers, drafts, harness, memory);
   }
   return {
     operation: 'preview',

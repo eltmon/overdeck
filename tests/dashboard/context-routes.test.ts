@@ -133,4 +133,55 @@ describe('dashboard context route helpers', () => {
       content: 'escape',
     }, panHome)).rejects.toThrow('Context layer is not registered');
   });
+
+  describe('curated memory sections in the preview (PAN-3957)', () => {
+    it('project-scoped preview contains ## Project memory for a project with facts', async () => {
+      await mkdir(join(projectRoot, '.overdeck', 'memory'), { recursive: true });
+      await writeFile(
+        join(projectRoot, '.overdeck', 'memory', 'be-decisive.md'),
+        '---\ntype: feedback\ndescription: Make routine reversible calls yourself.\n---\nBody.\n',
+        'utf-8',
+      );
+
+      const response = await previewContextLayers(projects, {
+        operation: 'preview',
+        selectedLayer: { kind: 'workspace', projectKey: 'overdeck', workspacePath },
+        drafts: [],
+      }, panHome);
+
+      expect(response.previews['claude-code']).toContain('## Project memory');
+      expect(response.previews['claude-code']).toContain('feedback/be-decisive: Make routine reversible calls yourself.');
+      expect(response.previews.codex).toContain('## Project memory');
+    });
+
+    it('global-only preview contains ## Operator memory and no Project memory', async () => {
+      await mkdir(join(panHome, 'context', 'memory'), { recursive: true });
+      await writeFile(
+        join(panHome, 'context', 'memory', 'terse-answers.md'),
+        '---\ntype: feedback\ndescription: Keep answers terse.\n---\nBody.\n',
+        'utf-8',
+      );
+
+      const response = await previewContextLayers(projects, {
+        operation: 'preview',
+        selectedLayer: { kind: 'global' },
+        drafts: [],
+      }, panHome);
+
+      expect(response.previews['claude-code']).toContain('## Operator memory');
+      expect(response.previews['claude-code']).toContain('feedback/terse-answers: Keep answers terse.');
+      expect(response.previews['claude-code']).not.toContain('## Project memory');
+    });
+
+    it('no memory heading when the injected project has no store and panHome has no context/memory', async () => {
+      const response = await previewContextLayers(projects, {
+        operation: 'preview',
+        selectedLayer: { kind: 'workspace', projectKey: 'overdeck', workspacePath },
+        drafts: [],
+      }, panHome);
+
+      expect(response.previews['claude-code']).not.toContain('## Project memory');
+      expect(response.previews['claude-code']).not.toContain('## Operator memory');
+    });
+  });
 });
