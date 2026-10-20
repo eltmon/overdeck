@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:45:45.861Z",
+  "updated": "2026-10-20T20:45:57.103Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,10 @@
     "codex-replay-harness.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:45:45.861Z"
+    },
+    "acp-replay-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:45:57.103Z"
     }
   }
 }
