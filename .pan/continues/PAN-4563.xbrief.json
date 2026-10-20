@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:46:53.849Z",
+  "updated": "2026-10-20T20:47:05.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "recorder.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:46:53.848Z"
+    },
+    "codex-case-turn-idle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:05.882Z"
     }
   }
 }
