@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:42:26.125Z",
+  "updated": "2026-10-20T20:42:37.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "codex-capture-hook.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T20:42:26.125Z"
+    },
+    "acp-capture-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:42:37.464Z"
     }
   }
 }
