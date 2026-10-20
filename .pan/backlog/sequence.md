@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T20:07:27Z · model: claude-opus-5-5 · open: 832_
+_Last sequenced: 2026-10-20T20:08:09Z · model: claude-opus-5-5 · open: 830_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,13 +12,11 @@ _Last sequenced: 2026-10-20T20:07:27Z · model: claude-opus-5-5 · open: 832_
 | 5 | PAN-4534 | S | critical | ok |  |  | CI failure feedback names no failing test because the relay lists completed failed runs while the run is in progress. TENET-10 |
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 8 | PAN-4562 | L | high | ok |  |  | ~205 harness-name branches in 74 files; each new harness leaves silent gaps. Declared capabilities + lint ratchet. In pipeline. |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 15 | PAN-4558 | M | high | ok |  |  | Conversation open sends the whole multi-MB transcript on HTTP and WS; bound the first window, page older rows. Carries #3778 server cap. |
 | 16 | PAN-4563 | M | medium | ok |  |  | Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline. |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -208,7 +206,7 @@ _Last sequenced: 2026-10-20T20:07:27Z · model: claude-opus-5-5 · open: 832_
 | 220 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 223 | PAN-3778 | S | medium | ok |  | PAN-4558 | Client mitigation is on main; server snapshot cap moved to #4558. Resume-from-offset on resubscribe is still open here. |
+| 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -868,10 +866,6 @@ New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup fa
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4562 (rank 8)
-
-New and already in the pipeline. Architecture-labeled substrate work: harness-name checks are the recurring cause of non-Claude harness gaps (codex, kimi, ACP, opencode), and a capability record plus a count ratchet removes that bug class. Ranked high per the substrate-first floor and placed in a free top slot because it is in flight.
-
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -891,10 +885,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 ### PAN-4551 (rank 14)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
-
-### PAN-4558 (rank 15)
-
-New and already in the pipeline. It takes over the server-side snapshot cap that PAN-3778 left open, on both the HTTP messages route and the WS subscribe, and adds paging plus a payload budget test. Full snapshots on resubscribe are the documented trigger of the reconnect loop, so this is dashboard stability work, not polish.
 
 ### PAN-4563 (rank 16)
 
@@ -1160,6 +1150,14 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 
 npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
 
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
+### PAN-2758 (rank 94)
+
+Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1167,10 +1165,10 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T20:07:27Z",
+  "generatedAt": "2026-10-20T20:08:09Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 832,
+  "openCount": 830,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1266,19 +1264,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "planning": "auto"
     },
     {
-      "issue": "PAN-4562",
-      "rank": 8,
-      "size": "L",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "~205 harness-name branches in 74 files; each new harness leaves silent gaps. Declared capabilities + lint ratchet. In pipeline.",
-      "rationale": "New and already in the pipeline. Architecture-labeled substrate work: harness-name checks are the recurring cause of non-Claude harness gaps (codex, kimi, ACP, opencode), and a capability record plus a count ratchet removes that bug class. Ranked high per the substrate-first floor and placed in a free top slot because it is in flight.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4546",
       "rank": 10,
       "size": "S",
@@ -1346,19 +1331,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4558",
-      "rank": 15,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Conversation open sends the whole multi-MB transcript on HTTP and WS; bound the first window, page older rows. Carries #3778 server cap.",
-      "rationale": "New and already in the pipeline. It takes over the server-side snapshot cap that PAN-3778 left open, on both the HTTP messages route and the WS subscribe, and adds paging plus a payload budget test. Full snapshots on resubscribe are the documented trigger of the reconnect loop, so this is dashboard stability work, not polish.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3770,11 +3742,9 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4558"
-      ],
-      "why": "Client mitigation is on main; server snapshot cap moved to #4558. Resume-from-offset on resubscribe is still open here.",
-      "rationale": "Re-ranked up from 721. A 2026-10-19 comment moved the server-side snapshot cap to PAN-4558 and states that resume-from-offset (direction 1) is still open here, so this is no longer finished work awaiting close-out. It now follows PAN-4558, which bounds the snapshot that resume-from-offset would otherwise replay.",
+      "dependsOn": [],
+      "why": "Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked.",
+      "rationale": "Rank held at 223. PAN-4558 closed as completed on 2026-10-20, so the server-side snapshot cap this issue depended on has landed and the dependency edge is removed. The remaining resume-from-offset work is now unblocked, but its impact is unchanged, so the rank and score stay where they were.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12877,20 +12847,6 @@ npm run build intermittently produces stale frontend bundles, deploying pre-edit
     {
       "from": "PAN-4557",
       "to": "PAN-3944",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4558",
-      "to": "PAN-3778",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4562",
-      "to": "PAN-4563",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
