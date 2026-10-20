@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:29:01.202Z",
+  "updated": "2026-10-20T04:29:16.627Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "handler-bounded-replay.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T04:29:01.201Z"
+    },
+    "client-gap-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:16.627Z"
     }
   }
 }
