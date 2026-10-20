@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:48:37.332Z",
+  "updated": "2026-10-20T20:48:48.977Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -290,6 +290,10 @@
     "codex-case-subagent.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:48:37.332Z"
+    },
+    "codex-case-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:48:48.977Z"
     }
   }
 }
