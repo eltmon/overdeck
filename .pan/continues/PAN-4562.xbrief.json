@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:21:43.402Z",
+  "updated": "2026-10-20T04:22:02.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "launcher-caps.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T04:21:43.402Z"
+    },
+    "launcher-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:22:02.799Z"
     }
   }
 }
