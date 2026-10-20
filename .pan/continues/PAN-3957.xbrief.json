@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T22:49:14.410Z",
+  "updated": "2026-10-20T22:49:20.628Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-3957",
       "claimedAt": "2026-10-20T22:38:54.958Z",
       "doneAt": "2026-10-20T22:49:14.410Z"
+    },
+    "w5a-cli-read-verbs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T22:49:20.628Z"
     }
   }
 }
