@@ -226,3 +226,30 @@ describe('codex case 4a: approval request mid-turn', () => {
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
+
+describe('codex case 4b: user-input request mid-turn', () => {
+  it('surfaces the question as pending and answers it in the schema shape', async () => {
+    const { replay, manager, host } = await start('user-input');
+    const facts = fixtureFacts(replay.fixture);
+    const inputFrame = facts.frames.find(frame =>
+      frame.dir === 'in' && frameKind(frame) === 'request' && frame.message?.method === 'item/tool/requestUserInput');
+    expect(inputFrame, 're-check case 4b against the new CLI: no item/tool/requestUserInput recorded').toBeDefined();
+    const request = inputFrame!.message!;
+    const answer = facts.frames.find(frame => frame.dir === 'out' && frameKind(frame) === 'response' && frame.message?.id === request.id);
+    // The host op takes Record<string, string[]>; unwrap the recorded { answers } values.
+    const answers = Object.fromEntries(Object.entries(record(record(answer?.message?.result).answers))
+      .map(([questionId, value]) => [questionId, record(value).answers as string[]]));
+
+    const awaitingAnswer = replay.awaitingClient({ dir: 'out', where: frame => frameKind(frame) === 'response' && frame.message?.id === request.id });
+    expect(await host.handleOp({ op: 'message', content: prompt(replay) })).toMatchObject({ status: 200 });
+    await awaitingAnswer;
+    expect(host.status().pendingRequests).toEqual([{ id: request.id, method: request.method, params: request.params }]);
+
+    // The replay matches the client response by deep-equal result, so this also proves the wire shape.
+    expect(await host.handleOp({ op: 'user-input', requestId: request.id, answers })).toEqual({ status: 200, body: { ok: true } });
+    await replay.done;
+    expect(host.status().pendingRequests).toEqual([]);
+    expect(manager.getState()).toMatchObject({ state: 'idle', activeTurnId: undefined, lastTurnStatus: facts.ownerTurnStatus });
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
