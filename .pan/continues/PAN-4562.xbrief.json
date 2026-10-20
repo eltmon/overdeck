@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:24:42.980Z",
+  "updated": "2026-10-20T04:25:04.023Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "scanner-table.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T04:24:42.980Z"
+    },
+    "activity-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:25:04.022Z"
     }
   }
 }
