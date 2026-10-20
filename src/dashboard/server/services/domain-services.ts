@@ -11,7 +11,7 @@
 
 import { Effect, Layer, Queue, Context, Stream } from 'effect';
 import { initEventStore } from '../event-store.js';
-import type { StoredEvent } from '../event-store.js';
+import type { StoredEvent, ReplayWindow } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
 import { startSessionContextWriter } from './session-context-writer.js';
 import { markEventStoreProjectionReady } from './project-ci-refill-startup.js';
@@ -29,6 +29,8 @@ export interface EventStoreServiceShape {
   readonly appendAsync: (event: Record<string, unknown>) => Effect.Effect<number>;
   /** Return all stored events with sequence > fromSequence. */
   readonly readFrom: (fromSequence: number) => Effect.Effect<StoredEvent[]>;
+  /** PAN-4559: bounded gap replay; tooFarBehind past REPLAY_MAX_EVENTS / REPLAY_MAX_PAYLOAD_BYTES. */
+  readonly readFromBounded: (fromSequence: number) => Effect.Effect<ReplayWindow>;
   /** Return events of a given type, most recent first, capped at limit. */
   readonly queryByType: (type: string, limit?: number) => Effect.Effect<StoredEvent[]>;
   /** Return the latest sequence number (0 if empty). */
@@ -316,6 +318,7 @@ export const EventStoreServiceLive = Layer.effect(
       append: (event) => Effect.sync(() => store.append(event as never)),
       appendAsync: (event) => Effect.promise(() => store.appendAsync(event as never)),
       readFrom: (fromSequence) => Effect.sync(() => store.readFrom(fromSequence)),
+      readFromBounded: (fromSequence) => Effect.sync(() => store.readFromBounded(fromSequence)),
       queryByType: (type, limit) => Effect.sync(() => store.queryByType(type, limit)),
       getLatestSequence: Effect.sync(() => store.getLatestSequence()),
       streamEvents,

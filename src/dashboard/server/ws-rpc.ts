@@ -836,8 +836,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── replayEvents ─────────────────────────────────────────────────────────
       [WS_METHODS.replayEvents]: (input) =>
-        eventStore.readFrom(input.fromSequence).pipe(
-          Effect.map((stored) => stored.map(storedToDomainEvent).filter(passesDomainEventSchema)),
+        eventStore.readFromBounded(input.fromSequence).pipe(
+          Effect.map((bounded) => (bounded.tooFarBehind ? { tooFarBehind: true as const } : bounded.events.map(storedToDomainEvent).filter(passesDomainEventSchema))),
           Effect.mapError(
             (cause) =>
               new PanRpcError({

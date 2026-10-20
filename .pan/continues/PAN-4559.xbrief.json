@@ -1,0 +1,131 @@
+{
+  "version": "1",
+  "issueId": "PAN-4559",
+  "created": "2026-10-20T02:52:39.553Z",
+  "updated": "2026-10-20T04:30:54.966Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-bounded-read": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T02:52:39.553Z",
+      "doneAt": "2026-10-20T03:05:01.820Z"
+    },
+    "service-bounded-read": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T03:05:12.290Z",
+      "doneAt": "2026-10-20T03:17:39.319Z"
+    },
+    "contract-replay-result": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T03:17:47.824Z",
+      "doneAt": "2026-10-20T03:31:11.073Z"
+    },
+    "handler-bounded-replay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T03:31:18.810Z",
+      "doneAt": "2026-10-20T03:43:19.833Z"
+    },
+    "client-gap-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T03:43:27.227Z",
+      "doneAt": "2026-10-20T04:01:12.171Z"
+    },
+    "client-bootstrap-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T04:01:19.895Z",
+      "doneAt": "2026-10-20T04:16:17.055Z"
+    },
+    "docs-replay-cap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T04:16:24.005Z",
+      "doneAt": "2026-10-20T04:17:26.198Z"
+    },
+    "store-bounded-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:04.550Z"
+    },
+    "store-bounded-read.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:19.515Z"
+    },
+    "store-bounded-read.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:34.072Z"
+    },
+    "store-bounded-read.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:49.051Z"
+    },
+    "service-bounded-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:08.082Z"
+    },
+    "service-bounded-read.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:25.100Z"
+    },
+    "contract-replay-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:40.026Z"
+    },
+    "contract-replay-result.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:54.230Z"
+    },
+    "contract-replay-result.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:11.189Z"
+    },
+    "handler-bounded-replay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:30.953Z"
+    },
+    "handler-bounded-replay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:45.728Z"
+    },
+    "handler-bounded-replay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:01.201Z"
+    },
+    "client-gap-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:16.627Z"
+    },
+    "client-gap-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:32.001Z"
+    },
+    "client-gap-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:50.753Z"
+    },
+    "client-bootstrap-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:07.083Z"
+    },
+    "client-bootstrap-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:23.134Z"
+    },
+    "docs-replay-cap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:38.316Z"
+    },
+    "docs-replay-cap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:54.965Z"
+    }
+  }
+}
