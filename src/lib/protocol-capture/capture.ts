@@ -10,7 +10,7 @@
  * order equals call order. A write failure is reported once on stderr and never
  * reaches the session being captured.
  */
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { AppServerTransport } from '../codex/app-server-transport.js';
 import {
@@ -69,14 +69,16 @@ export function createProtocolCaptureSink(input: {
   let chain: Promise<void> = Promise.resolve();
   let madeDir = false;
 
-  const append = (line: string): void => {
+  /** The header write truncates, so one sink always yields one fixture. */
+  const append = (line: string, options: { truncate?: boolean } = {}): void => {
     chain = chain
       .then(async () => {
         if (!madeDir) {
           await mkdir(dirname(input.path), { recursive: true });
           madeDir = true;
         }
-        await appendFile(input.path, `${line}\n`, { mode: 0o600 });
+        if (options.truncate) await writeFile(input.path, `${line}\n`, { mode: 0o600 });
+        else await appendFile(input.path, `${line}\n`, { mode: 0o600 });
       })
       .catch((error: unknown) => {
         if (reportedError) return;
@@ -88,7 +90,7 @@ export function createProtocolCaptureSink(input: {
   const queueHeader = (): void => {
     if (headerQueued) return;
     headerQueued = true;
-    append(JSON.stringify(scrubValue(header, input.scrub)));
+    append(JSON.stringify(scrubValue(header, input.scrub)), { truncate: true });
   };
 
   const queueFrame = (dir: FrameDirection, body: Pick<ProtocolFrame, 'message' | 'text'>): void => {

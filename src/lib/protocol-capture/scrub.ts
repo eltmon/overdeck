@@ -4,15 +4,17 @@
  * Every frame is scrubbed before it reaches disk, so raw secrets and personal
  * paths never land in a fixture. The rules, applied recursively:
  *
- * 1. Paths: each known path value becomes its placeholder, longest first.
+ * 1. Paths: each known path value (and the host name) becomes its placeholder,
+ *    longest first.
  * 2. Secret keys: a value under an anchored secret key name becomes `<REDACTED>`
- *    (anchored so `tokenUsage` and `inputTokens` survive).
+ *    (anchored so `tokenUsage` and `inputTokens` survive). `installationId`, a
+ *    stable device id codex reports in `remoteControl/status/changed`, counts.
  * 3. Secret values: API keys, GitHub/Slack tokens, JWTs, and Bearer headers
  *    inside any string become `<REDACTED>`.
  * 4. Emails become `<EMAIL>`.
  * 5. A string longer than 8192 characters becomes `<TRUNCATED:<length>>`.
  */
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 
 export interface ScrubContext {
   paths: ReadonlyArray<{ value: string; placeholder: string }>;
@@ -22,7 +24,10 @@ export const SCRUB_MAX_STRING_LENGTH = 8192;
 export const REDACTED = '<REDACTED>';
 export const EMAIL_PLACEHOLDER = '<EMAIL>';
 
-const SECRET_KEY = /^(access_?token|refresh_?token|id_?token|api_?key|authorization|cookie|password|secret|client_?secret|bearer|auth_?token)$/i;
+const SECRET_KEY = /^(access_?token|refresh_?token|id_?token|api_?key|authorization|cookie|password|secret|client_?secret|bearer|auth_?token|installation_?id)$/i;
+
+/** Shorter host names are skipped: replacing them would rewrite ordinary text. */
+const MIN_HOSTNAME_LENGTH = 4;
 
 /** Secret-shaped substrings. Shared with the fixture hygiene test. */
 export const SECRET_VALUE_PATTERNS: readonly RegExp[] = [
@@ -40,12 +45,15 @@ export function defaultScrubContext(input: {
   codexHome?: string;
   overdeckHome?: string;
   home?: string;
+  hostname?: string;
 }): ScrubContext {
+  const host = input.hostname ?? hostname();
   const candidates: Array<{ value: string | undefined; placeholder: string }> = [
     { value: input.cwd, placeholder: '<CWD>' },
     { value: input.codexHome, placeholder: '<CODEX_HOME>' },
     { value: input.overdeckHome, placeholder: '<OVERDECK_HOME>' },
     { value: input.home ?? homedir(), placeholder: '<HOME>' },
+    { value: host.length >= MIN_HOSTNAME_LENGTH ? host : undefined, placeholder: '<HOSTNAME>' },
   ];
   return {
     paths: candidates.filter((entry): entry is { value: string; placeholder: string } => Boolean(entry.value)),

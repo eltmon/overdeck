@@ -25,6 +25,7 @@ const context = defaultScrubContext({
   codexHome: '/home/dev/.overdeck/agents/a1/codex',
   overdeckHome: '/home/dev/.overdeck',
   home: '/home/dev',
+  hostname: 'devbox-1',
 });
 
 const header = JSON.stringify({
@@ -54,6 +55,12 @@ describe('scrubValue', () => {
     expect(scrubValue(input, context)).toBe(
       '<CWD>/src/x.ts <CODEX_HOME>/sessions/r.jsonl <OVERDECK_HOME>/logs <HOME>/notes.md',
     );
+  });
+
+  it('replaces the host name and redacts the codex installation id', () => {
+    const message = { params: { serverName: 'devbox-1', installationId: '761dcfd9-0000', note: 'on devbox-1 now' } };
+    expect(scrubValue(message, context)).toEqual({ params: { serverName: '<HOSTNAME>', installationId: '<REDACTED>', note: 'on <HOSTNAME> now' } });
+    expect(defaultScrubContext({ home: '/h', hostname: 'pc' }).paths.map(entry => entry.placeholder)).toEqual(['<HOME>']);
   });
 
   it('scrubs a nested thread path under the codex home', () => {
@@ -168,6 +175,17 @@ describe('capture sink', () => {
       [1, 'in', 'response'],
       [2, 'out', 'initialized'],
     ]);
+  });
+
+  it('replaces an existing file instead of appending to it', async () => {
+    const first = makeSink();
+    first.recordMessage('out', { id: 1, method: 'old' });
+    await first.close();
+    const second = makeSink();
+    second.recordMessage('out', { id: 1, method: 'new' });
+    await second.close();
+    const { frames } = await loadProtocolFixture(second.path);
+    expect(frames.map(frame => frame.message?.method)).toEqual(['new']);
   });
 
   it('joins a JSON object split across two chunks into one frame', async () => {
