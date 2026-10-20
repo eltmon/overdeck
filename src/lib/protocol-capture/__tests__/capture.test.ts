@@ -4,8 +4,18 @@
  * Secret-shaped inputs are built at runtime: literal fake tokens trip GitHub
  * push protection.
  */
-import { describe, expect, it } from 'vitest';
-import { frameKind, parseProtocolFixture, PROTOCOL_CAPTURE_FORMAT } from '../fixture.js';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { AppServerTransport } from '../../codex/app-server-transport.js';
+import {
+  captureAppServerTransport,
+  createProtocolCaptureSink,
+  PROTOCOL_CAPTURE_DIR_ENV,
+  protocolCaptureFromEnv,
+} from '../capture.js';
+import { frameKind, loadProtocolFixture, parseProtocolFixture, PROTOCOL_CAPTURE_FORMAT } from '../fixture.js';
 import { defaultScrubContext, scrubValue } from '../scrub.js';
 
 const context = defaultScrubContext({
@@ -115,5 +125,124 @@ describe('parseProtocolFixture', () => {
     expect(() => parseProtocolFixture(gap)).toThrow(/expected seq 1/);
     const late = [header, frameLine(1, 'out', { id: 1, method: 'a' })].join('\n');
     expect(() => parseProtocolFixture(late)).toThrow(/expected seq 0/);
+  });
+});
+
+describe('capture sink', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'pan-capture-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  function makeSink() {
+    let clock = 1000;
+    return createProtocolCaptureSink({
+      path: join(dir, 'nested', 'capture.jsonl'),
+      harness: 'codex-app-server',
+      scrub: context,
+      now: () => (clock += 5),
+    });
+  }
+
+  it('writes the header first and frames in call order', async () => {
+    const sink = makeSink();
+    sink.setHeader({ cliVersion: '0.159.0', scenario: 'turn-idle' });
+    sink.recordMessage('out', { id: 1, method: 'initialize' });
+    sink.setHeader({ cliVersion: 'ignored' });
+    sink.recordText('in', '{"id":1,"result":{}}');
+    sink.recordMessage('out', { method: 'initialized' });
+    await sink.close();
+
+    const lines = (await readFile(sink.path, 'utf8')).trim().split('\n');
+    expect(JSON.parse(lines[0]!)).toMatchObject({ type: 'header', format: PROTOCOL_CAPTURE_FORMAT, cliVersion: '0.159.0', scenario: 'turn-idle' });
+    const fixture = await loadProtocolFixture(sink.path);
+    expect(fixture.frames.map(frame => [frame.seq, frame.dir, frame.message?.method ?? 'response'])).toEqual([
+      [0, 'out', 'initialize'],
+      [1, 'in', 'response'],
+      [2, 'out', 'initialized'],
+    ]);
+  });
+
+  it('joins a JSON object split across two chunks into one frame', async () => {
+    const sink = makeSink();
+    sink.recordChunk('in', '{"jsonrpc":"2.0","id":0,');
+    sink.recordChunk('in', '"result":{"ok":true}}\n');
+    await sink.close();
+    const { frames } = await loadProtocolFixture(sink.path);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]!.message).toEqual({ jsonrpc: '2.0', id: 0, result: { ok: true } });
+  });
+
+  it('splits two lines in one chunk into two frames', async () => {
+    const sink = makeSink();
+    sink.recordChunk('out', '{"id":1,"method":"a"}\n{"id":2,"method":"b"}\n');
+    await sink.close();
+    const { frames } = await loadProtocolFixture(sink.path);
+    expect(frames.map(frame => frame.message?.method)).toEqual(['a', 'b']);
+  });
+
+  it('stores an unparsable line as a text frame', async () => {
+    const sink = makeSink();
+    sink.recordChunk('in', 'warning: not json\n');
+    sink.recordChunk('in', 'trailing partial');
+    await sink.close();
+    const { frames } = await loadProtocolFixture(sink.path);
+    expect(frames.map(frame => frame.text)).toEqual(['warning: not json', 'trailing partial']);
+  });
+
+  it('writes a cwd path in a frame as <CWD>', async () => {
+    const sink = makeSink();
+    sink.recordMessage('out', { id: 1, method: 'thread/start', params: { cwd: '/home/dev/projects/app' } });
+    await sink.close();
+    const text = await readFile(sink.path, 'utf8');
+    expect(text).toContain('"cwd":"<CWD>"');
+    expect(text).not.toContain('/home/dev');
+  });
+
+  it('returns undefined from the env when the capture dir is unset, empty, or relative', () => {
+    const input = { harness: 'codex-app-server' as const, scrub: context };
+    expect(protocolCaptureFromEnv({}, input)).toBeUndefined();
+    expect(protocolCaptureFromEnv({ [PROTOCOL_CAPTURE_DIR_ENV]: '' }, input)).toBeUndefined();
+    expect(protocolCaptureFromEnv({ [PROTOCOL_CAPTURE_DIR_ENV]: 'relative/dir' }, input)).toBeUndefined();
+  });
+
+  it('names an env capture file after the harness, time, and pid inside the capture dir', async () => {
+    const sink = protocolCaptureFromEnv({ [PROTOCOL_CAPTURE_DIR_ENV]: dir }, { harness: 'acp', scrub: context });
+    expect(sink?.path).toMatch(new RegExp(`^${dir}/acp-\\d{4}-\\d{2}-\\d{2}T[\\d-]+Z-${process.pid}\\.jsonl$`));
+    await sink?.close();
+    expect(await readdir(dir)).toHaveLength(1);
+  });
+
+  it('records an out and an in frame around a wrapped transport', async () => {
+    const sink = makeSink();
+    const sent: unknown[] = [];
+    let deliver: (text: string) => void = () => undefined;
+    const inner: AppServerTransport = {
+      send: message => sent.push(message),
+      onMessage: handler => {
+        deliver = handler;
+      },
+      onClose: () => undefined,
+      close: () => undefined,
+    };
+    const received: string[] = [];
+    const transport = captureAppServerTransport(inner, sink);
+    transport.onMessage(text => received.push(text));
+    transport.send({ id: 1, method: 'initialize' });
+    deliver('{"id":1,"result":{}}');
+    await sink.close();
+
+    expect(sent).toEqual([{ id: 1, method: 'initialize' }]);
+    expect(received).toEqual(['{"id":1,"result":{}}']);
+    const { frames } = await loadProtocolFixture(sink.path);
+    expect(frames.map(frame => [frame.dir, frameKind(frame)])).toEqual([
+      ['out', 'request'],
+      ['in', 'response'],
+    ]);
   });
 });
