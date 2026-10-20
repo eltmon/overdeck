@@ -15,7 +15,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PROTOCOL_CAPTURE_FORMAT, type ProtocolFixture } from '../../protocol-capture/fixture.js';
+import { frameKind, PROTOCOL_CAPTURE_FORMAT, type ProtocolFixture, type ProtocolFrame } from '../../protocol-capture/fixture.js';
 import { startCodexReplay, type CodexReplay } from './replay-app-server.js';
 
 let overdeckHome: string;
@@ -36,6 +36,38 @@ afterEach(async () => {
 async function start(fixture: string | ProtocolFixture): Promise<CodexReplay> {
   active = await startCodexReplay(fixture, { overdeckHome });
   return active;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function params(frame: ProtocolFrame): Record<string, unknown> {
+  return record(frame.message?.params);
+}
+
+function frameThread(frame: ProtocolFrame): unknown {
+  return params(frame).threadId ?? record(params(frame).thread).id;
+}
+
+/** Facts every case reads from its fixture instead of hard-coding ids. */
+function fixtureFacts(fixture: ProtocolFixture) {
+  const frames = fixture.frames;
+  const threadStart = frames.find(frame => frame.dir === 'out' && frame.message?.method === 'thread/start');
+  const threadStartResponse = frames.find(frame =>
+    frame.dir === 'in' && frameKind(frame) === 'response' && frame.message?.id === threadStart?.message?.id);
+  const ownerThreadId = record(record(threadStartResponse?.message?.result).thread).id as string;
+  const isOwner = (frame: ProtocolFrame) => frameThread(frame) === ownerThreadId;
+  const index = (predicate: (frame: ProtocolFrame) => boolean) => frames.findIndex(predicate);
+  const ownerTurnStarted = frames.find(frame => frame.dir === 'in' && frame.message?.method === 'turn/started' && isOwner(frame));
+  const ownerTurnId = record(params(ownerTurnStarted ?? { type: 'frame', seq: -1, dir: 'in', t: 0 }).turn).id as string;
+  const ownerCompletedIndex = index(frame => frame.dir === 'in' && frame.message?.method === 'turn/completed' && isOwner(frame));
+  const ownerTurnStatus = record(params(frames[ownerCompletedIndex]!).turn).status;
+  return { frames, ownerThreadId, ownerTurnId, ownerCompletedIndex, ownerTurnStatus, isOwner, index };
+}
+
+function prompt(replay: CodexReplay['replay']): string {
+  return String(replay.fixture.header.hostOptions?.prompt);
 }
 
 describe('codex replay harness', () => {
@@ -61,6 +93,37 @@ describe('codex replay harness', () => {
     const { manager, replay } = await start(fixture);
     expect(manager.getState().state).toBe('ready');
     await replay.done;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+describe('codex case 1: idle status vs turn/completed', () => {
+  it('keeps the owner turn running until turn/completed, whatever the idle status says', async () => {
+    const { replay, manager, host, lines } = await start('turn-idle');
+    const facts = fixtureFacts(replay.fixture);
+    const isIdleStatus = (frame: ProtocolFrame) =>
+      frame.message?.method === 'thread/status/changed' && facts.isOwner(frame) && record(params(frame).status).type === 'idle';
+    const idleIndex = facts.index(frame => frame.dir === 'in' && isIdleStatus(frame));
+    expect(idleIndex, 're-check case 1 against the new CLI: no owner idle thread/status/changed recorded').toBeGreaterThanOrEqual(0);
+    expect(idleIndex, 're-check case 1 against the new CLI: the idle status no longer precedes turn/completed').toBeLessThan(facts.ownerCompletedIndex);
+
+    const idlePause = replay.pauseBefore({ dir: 'in', where: isIdleStatus });
+    const completedPause = replay.pauseBefore({ method: 'turn/completed', threadId: facts.ownerThreadId });
+    expect(await host.handleOp({ op: 'message', content: prompt(replay) })).toMatchObject({ status: 200 });
+
+    await idlePause;
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+    replay.resume();
+    await completedPause;
+    // The idle status has been delivered; the turn is still running.
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+    replay.resume();
+    await replay.done;
+
+    expect(manager.getState()).toMatchObject({ state: 'idle', activeTurnId: undefined, lastTurnStatus: facts.ownerTurnStatus });
+    expect(facts.ownerTurnStatus).toBe('completed');
+    expect(host.status().pendingRequests).toEqual([]);
+    expect(lines.filter(line => line.startsWith('[turn]'))).toEqual(['[turn] started', '[turn] completed']);
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
