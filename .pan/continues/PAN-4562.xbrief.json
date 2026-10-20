@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:28:43.022Z",
+  "updated": "2026-10-20T04:29:01.010Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -294,6 +294,10 @@
     "fake-runtime-contract.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T04:28:43.022Z"
+    },
+    "ratchet-lower.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:01.010Z"
     }
   }
 }
