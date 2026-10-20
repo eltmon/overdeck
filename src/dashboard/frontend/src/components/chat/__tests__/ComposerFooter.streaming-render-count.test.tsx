@@ -7,10 +7,11 @@
  * calls on every render, so a memo bail-out counts as zero.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationPanel } from '../ConversationPanel';
 import type { ConversationMessagesCache } from '../useConversationMessagesStream';
+import { useStableComposerProps } from '../useStableComposerProps';
 
 const counts = vi.hoisted(() => ({ composer: 0 }));
 
@@ -147,5 +148,30 @@ describe('ComposerFooter under a streamed delta', () => {
 
     await vi.waitFor(() => expect(screen.getByTestId('timeline')).toHaveTextContent('Measuring the render counts'));
     expect(counts.composer).toBe(composerRendersBefore);
+  });
+});
+
+describe('useStableComposerProps', () => {
+  it('keeps onSend stable across deltas and sends with the latest messages', () => {
+    const addOptimistic = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ messages }: { messages: ConversationMessagesCache['messages'] }) =>
+        useStableComposerProps({ conversation, data: seed, serverMessages: messages, addOptimistic }),
+      { initialProps: { messages: seed.messages } },
+    );
+    const firstOnSend = result.current.onSend;
+    const firstUsage = result.current.contextWindowUsage;
+
+    const grown = [...seed.messages, { id: 'm-3', role: 'assistant' as const, text: 'More', createdAt: '2026-10-19T00:00:02Z' }];
+    rerender({ messages: seed.messages.map((m) => ({ ...m })) });
+    rerender({ messages: grown });
+
+    expect(result.current.onSend).toBe(firstOnSend);
+    expect(result.current.contextWindowUsage).toBe(firstUsage);
+    result.current.onSend('hello', 'client-1');
+    expect(addOptimistic).toHaveBeenCalledWith('test-conv', 'hello', 3, {
+      clientMessageId: 'client-1',
+      echoBaselineIds: ['m-1', 'm-2', 'm-3'],
+    });
   });
 });
