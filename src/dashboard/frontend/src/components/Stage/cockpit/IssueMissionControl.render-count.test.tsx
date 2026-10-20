@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { DomainEvent } from '@overdeck/contracts'
 import {
@@ -68,7 +68,11 @@ vi.mock('./TasksRail', async () => {
 })
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div /> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div /> }))
-vi.mock('../../issue-detail/IssueDetail', () => ({ IssueDetail: () => <div /> }))
+vi.mock('../../issue-detail/IssueDetail', () => ({
+  IssueDetail: ({ agents }: { agents?: Array<{ id: string; status: string }> }) => (
+    <div data-testid="issue-detail-agents">{(agents ?? []).map((a) => `${a.id}:${a.status}`).join(',')}</div>
+  ),
+}))
 
 import { IssueMissionControl } from './IssueMissionControl'
 
@@ -127,11 +131,13 @@ describe('IssueMissionControl agent isolation', () => {
     expect(counter.count('cockpit')).toBe(0)
   })
 
-  it('re-renders when its own agent changes', () => {
+  it('re-renders and shows the new status when its own agent changes', () => {
     const counter = renderCockpit()
+    expect(screen.getByTestId('issue-detail-agents')).toHaveTextContent('agent-pan-1:running')
 
     applyStoreEvents([statusChanged('agent-pan-1', 'PAN-1', 1)])
 
     expect(counter.count('cockpit')).toBeGreaterThanOrEqual(1)
+    expect(screen.getByTestId('issue-detail-agents')).toHaveTextContent('agent-pan-1:stopped')
   })
 })
