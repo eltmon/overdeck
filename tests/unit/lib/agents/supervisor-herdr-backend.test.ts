@@ -112,11 +112,13 @@ describe('launcher shape without the supervisor', () => {
     baseCommand: 'claude --permission-mode bypassPermissions --name agent-pan-3705',
   };
 
-  it('execs the harness directly, so the pane\'s foreground process is the harness', () => {
+  it('runs the harness directly as its own foreground job, so Herdr detects it (PAN-4564)', () => {
     const script = generateLauncherScript({ ...launcherConfig, useSupervisor: false });
 
-    const execLine = script.trimEnd().split('\n').at(-1) ?? '';
-    expect(execLine.startsWith('exec claude ')).toBe(true);
+    const [jobControl, harnessLine, exitLine] = script.trimEnd().split('\n').slice(-3);
+    expect(jobControl).toBe('set -m');
+    expect(harnessLine?.startsWith('claude ')).toBe(true);
+    expect(exitLine).toBe('exit $?');
     expect(script).not.toContain('pty-supervisor.js');
   });
 

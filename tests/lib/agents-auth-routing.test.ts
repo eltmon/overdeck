@@ -359,7 +359,7 @@ describe('agents auth routing', () => {
     });
 
     expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
-    expect(launcher).toContain("exec claude --agent pan-work-agent --model 'kimi-k2.7-code'");
+    expect(launcher).toContain("set -m\nclaude --agent pan-work-agent --model 'kimi-k2.7-code'");
   });
 
   it.each([
@@ -388,7 +388,7 @@ describe('agents auth routing', () => {
 
     expect(launcher).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
     expect(launcher).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
-    expect(launcher).toContain(`exec claude --agent pan-work-agent --model '${model === 'k3' ? 'k3-256k' : model}'`);
+    expect(launcher).toContain(`set -m\nclaude --agent pan-work-agent --model '${model === 'k3' ? 'k3-256k' : model}'`);
   });
 
   it('sanitizes and sets both context limits for programmatic K3 spawns', async () => {

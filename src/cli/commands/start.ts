@@ -934,7 +934,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           return;
         } catch (error) {
           spinner.fail(error instanceof Error ? error.message : String(error));
-          printPlanningConnectionError(id);
+          printPlanningConnectionError(id, error);
           return exitCli(1);
         }
       }

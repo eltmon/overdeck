@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildStartPlanningBody } from '../planning-stream.js';
+import { buildStartPlanningBody, printPlanningConnectionError } from '../planning-stream.js';
 
 describe('buildStartPlanningBody', () => {
   it('sends workModel for the work agent while the planning model stays unset', () => {
@@ -36,5 +36,21 @@ describe('buildStartPlanningBody', () => {
     }));
     expect(body.model).toBe('claude-fable-5');
     expect(body.workModel).toBe('kimi-k3-1m');
+  });
+});
+
+describe('printPlanningConnectionError', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('prints the dashboard-down hint when fetch could not reach the server', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    printPlanningConnectionError('PAN-1', new TypeError('fetch failed'));
+    expect(errors.mock.calls.flat().join('\n')).toContain('dashboard is not responding');
+  });
+
+  it('stays silent for a failure the dashboard reported (PAN-4564)', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    printPlanningConnectionError('PAN-1', new Error('herdr detected no agent in pane wD:p3 within 60000ms'));
+    expect(errors).not.toHaveBeenCalled();
   });
 });

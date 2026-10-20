@@ -89,9 +89,12 @@ export function buildStartPlanningBody(input: {
 }
 
 /**
- * Print the dashboard-down error for the start-planning route.
+ * Print the dashboard-down error for the start-planning route. A failure the
+ * dashboard itself reported (bad request, launch failure) is not an outage, so
+ * the hint prints only when Node's fetch could not reach the server.
  */
-export function printPlanningConnectionError(issueId: string): void {
+export function printPlanningConnectionError(issueId: string, error: unknown): void {
+  if (!(error instanceof TypeError && error.message === 'fetch failed')) return;
   console.error(chalk.red(`Planning failed for ${issueId}: dashboard is not responding.`));
   console.error(chalk.dim('Make sure the dashboard is running: pan up'));
   console.error(chalk.dim(`Or start offline with: pan start ${issueId} --plan skip`));

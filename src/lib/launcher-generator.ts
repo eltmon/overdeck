@@ -13,6 +13,7 @@ import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-co
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
+import { harnessLaunchLines } from './launcher-job-control.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -213,7 +214,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
 
   // Post-claude behavior
   keepAlive?: boolean;
-  /** Conversation Claude Code line runs as `exec`: Herdr detects the pane's foreground process (PAN-3921). */
+  /** Conversation Claude Code line ends the launcher when it exits (PAN-3921); see `harnessLaunchLines`. */
   execConversationHarness?: boolean;
   debugLog?: string;
   useScriptWrapper?: boolean;
@@ -480,10 +481,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   }
 
   // Build the main command
-  const commandParts = buildCommand(config);
-  if (commandParts.length > 0) {
-    lines.push(...commandParts);
-  }
+  lines.push(...harnessLaunchLines(config, buildCommand(config)));
 
   // Debug log — exit
   if (config.debugLog) {
