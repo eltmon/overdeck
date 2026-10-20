@@ -4,17 +4,17 @@
     "created": "2026-10-20T03:20:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4560: Profile dashboard re-renders under live event load and fix the top offenders",
-    "updated": "2026-10-20T03:12:15.126Z"
+    "updated": "2026-10-20T03:13:10.378Z"
   },
   "plan": {
     "id": "pan-4560",
     "title": "Profile dashboard re-renders under live event load and fix the top offenders",
-    "status": "proposed",
+    "status": "running",
     "uid": "e84d516e-b14d-407e-973b-b131680888c0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T03:20:00Z",
-    "updated": "2026-10-20T03:12:15.126Z",
+    "updated": "2026-10-20T03:13:10.378Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4560",
@@ -1154,5 +1154,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
