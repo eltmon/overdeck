@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:42:59.648Z",
+  "updated": "2026-10-20T20:43:10.807Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -174,6 +174,10 @@
     "acp-capture-hook.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:42:59.648Z"
+    },
+    "codex-turn-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:43:10.807Z"
     }
   }
 }
