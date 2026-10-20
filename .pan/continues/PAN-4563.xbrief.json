@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:44:19.497Z",
+  "updated": "2026-10-20T20:44:30.597Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "replay-engine.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T20:44:19.497Z"
+    },
+    "replay-engine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:44:30.597Z"
     }
   }
 }
