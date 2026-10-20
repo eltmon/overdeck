@@ -6081,6 +6081,14 @@
   opacity: 0.7;
 }
 
+/* PAN-4558: top-of-timeline paging state ("Loading earlier messages…" / "Start of conversation"). */
+.timelineHistoryEdge {
+  padding: 8px 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
 .compactingIndicator {
   display: flex;
   align-items: center;

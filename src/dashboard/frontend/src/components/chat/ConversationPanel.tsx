@@ -44,6 +44,7 @@ import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import { buildMessagesQueryFn, fetchMessages, type MessagesResponse } from './messagesQuery';
+import { useOlderHistory } from './useOlderHistory';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
@@ -1171,6 +1172,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
   const queryClient = useQueryClient();
+  // PAN-4558: the transcript opens on its newest window; older rows page in on scroll.
+  const olderHistory = useOlderHistory({
+    queryKey: conversationMessagesQueryKey(conversation.name),
+    pagePath: agentId
+      ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+      : `/api/conversations/${encodeURIComponent(conversation.name)}/messages`,
+    history: messagesData?.history,
+  });
 
   // When forkStatus transitions from non-null to null (fork completed),
   // immediately re-fetch messages so the user doesn't see a stale empty state.
@@ -1421,6 +1430,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          history={olderHistory}
+          onLoadOlder={olderHistory.loadOlder}
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a

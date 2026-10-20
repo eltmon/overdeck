@@ -4,7 +4,8 @@ import { SubagentComposer } from './SubagentComposer';
 import { MessagesTimeline } from './MessagesTimeline';
 import type { SubagentSummary } from './chat-types';
 import { getWorkingPhase } from '../../lib/workingPhase';
-import { useSubagentTranscript } from './useConversationMessagesStream';
+import { subagentTranscriptQueryKey, useSubagentTranscript } from './useConversationMessagesStream';
+import { useOlderHistory } from './useOlderHistory';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 interface SubagentTranscriptProps {
@@ -35,6 +36,12 @@ export function SubagentTranscript({
   onTargetMessageHandled,
 }: SubagentTranscriptProps) {
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
+  // PAN-4558: older rows of the subagent transcript page in on scroll.
+  const olderHistory = useOlderHistory({
+    queryKey: subagentTranscriptQueryKey(conversation.name, subagent.agentId),
+    pagePath: `/api/conversations/${encodeURIComponent(conversation.name)}/messages?agentId=${encodeURIComponent(subagent.agentId)}`,
+    history: transcript.data?.history,
+  });
   // Codex snapshots deliberately report streaming=false. Child lifecycle comes
   // from the subagent list; the parent's activity must never light up this view.
   const isWorking = !conversation.endedAt && conversation.sessionAlive
@@ -82,6 +89,8 @@ export function SubagentTranscript({
             targetMessageIndex={targetMessageIndex}
             targetMessageNonce={targetMessageNonce}
             onTargetMessageHandled={onTargetMessageHandled}
+            history={olderHistory}
+            onLoadOlder={olderHistory.loadOlder}
           />
         )}
       </div>

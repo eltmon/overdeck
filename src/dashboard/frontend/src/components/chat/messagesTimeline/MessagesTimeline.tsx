@@ -52,6 +52,9 @@ import {
   highlightSearchTermsInElement,
 } from './helpers';
 
+/** PAN-4558: scrolling within this distance of the top loads the next older page. */
+const LOAD_OLDER_THRESHOLD_PX = 400;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -85,6 +88,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
   bookmarksEnabled = false,
+  history,
+  onLoadOlder,
 }: MessagesTimelineProps) {
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -116,12 +121,20 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [flashRowId, setFlashRowId] = useState<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
+  // PAN-4558 FR-14: a boundary older than the oldest loaded row would render
+  // at the top of a partial history, so show it only once its rows are loaded.
+  const visibleCompactBoundaries = useMemo(() => {
+    if (!compactBoundaries || !history?.hasOlder) return compactBoundaries;
+    const oldestLoaded = timelineEntries.find((entry) => entry.createdAt)?.createdAt;
+    if (!oldestLoaded) return compactBoundaries;
+    return compactBoundaries.filter((boundary) => boundary.timestamp >= oldestLoaded);
+  }, [compactBoundaries, history?.hasOlder, timelineEntries]);
   // Compact boundaries are interleaved (and split work groups) inside
   // deriveMessagesTimelineRows — injecting them here against grouped rows
   // pushed mid-group boundaries to the end of the timeline (PAN-2576).
   const baseRows = useMemo(
-    () => deriveMessagesTimelineRows(timelineEntries, streaming, compactBoundaries),
-    [timelineEntries, streaming, compactBoundaries],
+    () => deriveMessagesTimelineRows(timelineEntries, streaming, visibleCompactBoundaries),
+    [timelineEntries, streaming, visibleCompactBoundaries],
   );
   const rows = useMemo(() => {
     let result = baseRows;
@@ -254,6 +267,24 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     return () => ro.disconnect();
   }, []);
 
+  // PAN-4558: keep the visible content still when older rows are prepended.
+  // The anchor records the first row and the scroll geometry after every
+  // render and scroll; a new first row that pushed the old one down shifts
+  // scrollTop by the height the prepend added.
+  const prependAnchorRef = useRef<{ firstRowId: string; scrollHeight: number; scrollTop: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    const firstRowId = rows[0]?.id;
+    const anchor = prependAnchorRef.current;
+    if (el && anchor && firstRowId && firstRowId !== anchor.firstRowId && !isPinnedToBottomRef.current
+      && rows.some((row) => row.id === anchor.firstRowId)) {
+      el.scrollTop = anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight);
+    }
+    prependAnchorRef.current = el && firstRowId
+      ? { firstRowId, scrollHeight: el.scrollHeight, scrollTop: el.scrollTop }
+      : null;
+  }, [rows]);
+
   // Auto-scroll to bottom when row count changes (new message added)
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -312,6 +343,11 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+    if (prependAnchorRef.current) {
+      prependAnchorRef.current.scrollTop = el.scrollTop;
+      prependAnchorRef.current.scrollHeight = el.scrollHeight;
+    }
+    if (el.scrollTop < LOAD_OLDER_THRESHOLD_PX && history?.hasOlder && !history.loadingOlder) onLoadOlder?.();
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     const atBottom = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
     if (atBottom) {
@@ -327,7 +363,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isPinnedToBottomRef.current = false;
       setShowScrollToBottom(true);
     }
-  }, []);
+  }, [history?.hasOlder, history?.loadingOlder, onLoadOlder]);
 
   const searchMatches = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
@@ -489,6 +525,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         style={{ flex: 1 }}
       >
       <div ref={innerRef} className={styles.messagesTimelineInner}>
+        {history?.loadingOlder && <div className={styles.timelineHistoryEdge}>Loading earlier messages…</div>}
+        {!history?.loadingOlder && history?.loadedOlder && !history.hasOlder && (
+          <div className={styles.timelineHistoryEdge}>Start of conversation</div>
+        )}
         {/* Virtual section — rows stack in normal flow under one translated
             wrapper, so two rows can never overlap while a measurement is
             pending (PAN-4497). */}
