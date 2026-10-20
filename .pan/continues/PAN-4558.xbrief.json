@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T04:00:23.784Z",
+  "updated": "2026-10-20T04:04:03.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-10-20T04:00:08.052Z"
     },
     "wi11-client-cache-merge": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T04:00:23.784Z"
+      "claimedAt": "2026-10-20T04:00:23.784Z",
+      "doneAt": "2026-10-20T04:04:03.123Z"
     }
   }
 }
