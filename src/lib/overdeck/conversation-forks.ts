@@ -110,6 +110,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
     ...(params.title !== undefined ? { title: params.title } : {}),
     ...(params.hold ? { hold: true } : {}),
+    ...(params.fresh ? { fresh: true } : {}),
   };
 }
 
@@ -358,9 +359,20 @@ export async function runForkPipeline(
   handoffAuthorHarness?: RuntimeName,
   customTitle?: string,
   hold = false,
+  fresh = false,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
+  if (fresh) {
+    // PAN-4565: the source is a defaults donor only — never read its transcript.
+    updateForkStatus(convName, 'spawning');
+    await self.ensureForkSessionReady(conv, sessionId, false);
+    if (handoffFocus && !hold) return self.deliverForkSeed(conv, handoffFocus, 'fresh-start');
+    if (handoffFocus) holdKickoff(convName, handoffFocus);
+    markConversationActive(convName);
+    updateForkStatus(convName, null);
+    return;
+  }
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
   if (forkMode === 'plain') {
@@ -600,6 +612,7 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthorHarness,
         request.title,
         request.hold === true,
+        request.fresh === true,
       ));
       recovered += 1;
     } catch (error) {
