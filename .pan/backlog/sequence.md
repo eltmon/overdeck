@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T20:05:03Z · model: claude-opus-5-5 · open: 835_
+_Last sequenced: 2026-10-20T20:06:47Z · model: claude-opus-5-5 · open: 833_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,7 +13,6 @@ _Last sequenced: 2026-10-20T20:05:03Z · model: claude-opus-5-5 · open: 835_
 | 6 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 7 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 8 | PAN-4562 | L | high | ok |  |  | ~205 harness-name branches in 74 files; each new harness leaves silent gaps. Declared capabilities + lint ratchet. In pipeline. |
-| 9 | PAN-4559 | S | high | ok |  |  | replayEvents reads every missed event unbounded on the main thread (~141k rows); cap it and fall back to a snapshot. In pipeline. |
 | 10 | PAN-4546 | S | high | ok |  |  | Two concurrent quality-gate slots (resources.quality_gate_slots=2) with PSI fallback to one; operator-decided. TENET-10: supervised handoff |
 | 11 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -22,7 +21,6 @@ _Last sequenced: 2026-10-20T20:05:03Z · model: claude-opus-5-5 · open: 835_
 | 15 | PAN-4558 | M | high | ok |  |  | Conversation open sends the whole multi-MB transcript on HTTP and WS; bound the first window, page older rows. Carries #3778 server cap. |
 | 16 | PAN-4563 | M | medium | ok |  |  | Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline. |
 | 17 | PAN-4560 | M | medium | ok |  |  | No measurement of dashboard re-renders under live event load; profile four scenarios, fix top offenders, add render-count tests. |
-| 18 | PAN-4565 | S | medium | ok |  |  | pan handoff has no clean-start mode; add --fresh: no summary, no author session, no parent link. In pipeline. |
 | 19 | PAN-4572 | M | medium | ok |  | PAN-4560 | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -63,7 +61,7 @@ _Last sequenced: 2026-10-20T20:05:03Z · model: claude-opus-5-5 · open: 835_
 | 60 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
 | 61 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 62 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 63 | PAN-4566 | S | high | ok |  | PAN-4559 | A failed replayEvents leaves the coordinator un-bootstrapped; the tab defers every live event with no banner. Reuse PAN-4559 fallback. |
+| 63 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -875,10 +873,6 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 
 New and already in the pipeline. Architecture-labeled substrate work: harness-name checks are the recurring cause of non-Claude harness gaps (codex, kimi, ACP, opencode), and a capability record plus a count ratchet removes that bug class. Ranked high per the substrate-first floor and placed in a free top slot because it is in flight.
 
-### PAN-4559 (rank 9)
-
-New and already in the pipeline. An unbounded synchronous SQLite read on gap recovery blocks the dashboard event loop for every client after a laptop sleep. Small, well-specified fix with clear ACs, so it sits in the top tier next to the other in-flight dashboard stability work.
-
 ### PAN-4546 (rank 10)
 
 Operator decision 2026-10-04: the single admission slot, not agent count, bounded overnight throughput (5-7 PRs waiting 1-2 h at near-zero PSI). Doubling slots under low pressure is the largest throughput lever on the board. Ranks after the bundle because PAN-4531/4532 remove wasted slot time first.
@@ -910,10 +904,6 @@ New and already in the pipeline. Replay fixtures catch provider ordering changes
 ### PAN-4560 (rank 17)
 
 New and already in the pipeline. Measurement-first performance work that also produces the before numbers PAN-4561 (React 19 + compiler) needs, so it should land first.
-
-### PAN-4565 (rank 18)
-
-New and already in the pipeline. Small, self-contained CLI and dialog option with clear ACs; saves the authoring cost when source context is irrelevant.
 
 ### PAN-4572 (rank 19)
 
@@ -1077,7 +1067,7 @@ Found cutting v0.65.0: CI was green but the local release check failed on two ho
 
 ### PAN-4566 (rank 63)
 
-New since the prior run. A failed replay silently freezes a dashboard tab on stale state: live events are deferred, the staleness watchdog is reset by each one, and no banner shows. The fix is small and well specified, and it routes the failure to the snapshot fallback that in-pipeline PAN-4559 adds, so it ranks in the top tier right after that work lands.
+Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
 ### PAN-2940 (rank 67)
 
@@ -1163,6 +1153,14 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
+### PAN-2422 (rank 90)
+
+Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
+
+### PAN-2699 (rank 91)
+
+npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1170,10 +1168,10 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T20:05:03Z",
+  "generatedAt": "2026-10-20T20:06:47Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 835,
+  "openCount": 833,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1278,19 +1276,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "dependsOn": [],
       "why": "~205 harness-name branches in 74 files; each new harness leaves silent gaps. Declared capabilities + lint ratchet. In pipeline.",
       "rationale": "New and already in the pipeline. Architecture-labeled substrate work: harness-name checks are the recurring cause of non-Claude harness gaps (codex, kimi, ACP, opencode), and a capability record plus a count ratchet removes that bug class. Ranked high per the substrate-first floor and placed in a free top slot because it is in flight.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4559",
-      "rank": 9,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "replayEvents reads every missed event unbounded on the main thread (~141k rows); cap it and fall back to a snapshot. In pipeline.",
-      "rationale": "New and already in the pipeline. An unbounded synchronous SQLite read on gap recovery blocks the dashboard event loop for every client after a laptop sleep. Small, well-specified fix with clear ACs, so it sits in the top tier next to the other in-flight dashboard stability work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1401,19 +1386,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "dependsOn": [],
       "why": "No measurement of dashboard re-renders under live event load; profile four scenarios, fix top offenders, add render-count tests.",
       "rationale": "New and already in the pipeline. Measurement-first performance work that also produces the before numbers PAN-4561 (React 19 + compiler) needs, so it should land first.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4565",
-      "rank": 18,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan handoff has no clean-start mode; add --fresh: no summary, no author session, no parent link. In pipeline.",
-      "rationale": "New and already in the pipeline. Small, self-contained CLI and dialog option with clear ACs; saves the authoring cost when source context is irrelevant.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1933,11 +1905,9 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "importance": "high",
       "score": 72,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4559"
-      ],
-      "why": "A failed replayEvents leaves the coordinator un-bootstrapped; the tab defers every live event with no banner. Reuse PAN-4559 fallback.",
-      "rationale": "New since the prior run. A failed replay silently freezes a dashboard tab on stale state: live events are deferred, the staleness watchdog is reset by each one, and no banner shows. The fix is small and well specified, and it routes the failure to the snapshot fallback that in-pipeline PAN-4559 adds, so it ranks in the top tier right after that work lands.",
+      "dependsOn": [],
+      "why": "A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed.",
+      "rationale": "Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12944,25 +12914,11 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
       "confidence": 0.85
     },
     {
-      "from": "PAN-4559",
-      "to": "PAN-3778",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4562",
       "to": "PAN-4563",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4559",
-      "to": "PAN-4566",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
     },
     {
       "from": "PAN-4563",
