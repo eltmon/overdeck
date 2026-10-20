@@ -13,6 +13,7 @@
  * See docs/PROTOCOL-REPLAY-TESTS.md.
  */
 import { execFile } from 'node:child_process';
+import { once } from 'node:events';
 import { appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -39,6 +40,8 @@ const execFileAsync = promisify(execFile);
 
 export const RECORD_TIMEOUT_MS = 300_000;
 export const QUIET_GAP_MS = 2_000;
+const EXIT_WAIT_MS = 5_000;
+const EXIT_LOG_GRACE_MS = 500;
 
 type Harness = 'codex' | 'acp';
 
@@ -232,6 +235,7 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
     });
   });
 
+  const exited = once(manager, 'exit');
   try {
     await manager.start();
     const sent = await host.handleOp({ op: 'message', content: scenario.prompt });
@@ -241,6 +245,10 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
   } finally {
     await host.stop();
     await tracked.sink.close();
+    // The host logs the app-server exit into the temp Overdeck home; let that
+    // write land before the temp dirs are removed, or it recreates them.
+    await Promise.race([exited, new Promise(resolveWait => setTimeout(resolveWait, EXIT_WAIT_MS))]);
+    await new Promise(resolveWait => setTimeout(resolveWait, EXIT_LOG_GRACE_MS));
   }
 }
 
@@ -353,10 +361,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     process.stdout.write(`${scenarioTable()}\n`);
     return 0;
   }
-  const harness = values.harness;
-  const scenario = SCENARIOS.find(entry => entry.harness === harness && entry.name === values.scenario);
-  if ((harness !== 'codex' && harness !== 'acp') || !scenario) {
-    process.stderr.write(`Unknown harness/scenario: ${String(harness)} ${String(values.scenario)}\n\n${scenarioTable()}\n`);
+  const scenario = SCENARIOS.find(entry => entry.harness === values.harness && entry.name === values.scenario);
+  if (!scenario) {
+    process.stderr.write(`Unknown harness/scenario: ${String(values.harness)} ${String(values.scenario)}\n\n${scenarioTable()}\n`);
     return 2;
   }
   if (typeof values.out !== 'string' || !values.out) {
@@ -364,6 +371,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 2;
   }
 
+  const harness = scenario.harness;
   const tempDirs: string[] = [];
   const out = resolve(values.out);
   try {
@@ -380,8 +388,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       cwd,
       overdeckHome,
     };
-    if (harness === 'codex') await recordCodex(input, tempDirs);
-    else await recordAcp(input);
+    const recorders: Record<Harness, () => Promise<void>> = {
+      codex: () => recordCodex(input, tempDirs),
+      acp: () => recordAcp(input),
+    };
+    await recorders[harness]();
     process.stderr.write(`[record] wrote ${input.out}\n`);
     return 0;
   } catch (error) {
@@ -390,7 +401,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     await rm(out, { force: true });
     return 1;
   } finally {
-    for (const dir of tempDirs) await rm(dir, { recursive: true, force: true });
+    // The provider child gets SIGTERM without a wait and may still be writing
+    // into its temp home; rm retries ENOTEMPTY/EBUSY.
+    for (const dir of tempDirs) await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     if (scenario.name === 'approval') await rm(APPROVAL_PROBE, { force: true });
   }
 }

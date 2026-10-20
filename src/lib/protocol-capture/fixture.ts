@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 export const PROTOCOL_CAPTURE_FORMAT = 'overdeck-protocol-capture/1';
 
 export type FrameDirection = 'out' | 'in';
+const FIXTURE_HARNESSES: ReadonlySet<unknown> = new Set(['codex-app-server', 'acp']);
 export type FrameKind = 'request' | 'notification' | 'response' | 'raw';
 
 export interface ProtocolFixtureHeader {
@@ -81,7 +82,7 @@ export function parseProtocolFixture(text: string): ProtocolFixture {
   if (!isRecord(header) || header.type !== 'header' || header.format !== PROTOCOL_CAPTURE_FORMAT) {
     throw new Error(`protocol fixture line 1 must be a header with format ${PROTOCOL_CAPTURE_FORMAT}`);
   }
-  if (header.harness !== 'codex-app-server' && header.harness !== 'acp') {
+  if (!FIXTURE_HARNESSES.has(header.harness)) {
     throw new Error(`protocol fixture header has unknown harness ${JSON.stringify(header.harness)}`);
   }
 
