@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T02:41:02.849874Z · model: claude-opus-5-5 · open: 832_
+_Last sequenced: 2026-10-20T02:49:17.834433Z · model: claude-opus-5-5 · open: 833_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -62,6 +62,7 @@ _Last sequenced: 2026-10-20T02:41:02.849874Z · model: claude-opus-5-5 · open: 
 | 60 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
 | 61 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
 | 62 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 63 | PAN-4566 | S | high | ok |  | PAN-4559 | A failed replayEvents leaves the coordinator un-bootstrapped; the tab defers every live event with no banner. Reuse PAN-4559 fallback. |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -1068,6 +1069,10 @@ New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The ma
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
+### PAN-4566 (rank 63)
+
+New since the prior run. A failed replay silently freezes a dashboard tab on stale state: live events are deferred, the staleness watchdog is reset by each one, and no banner shows. The fix is small and well specified, and it routes the failure to the snapshot fallback that in-pipeline PAN-4559 adds, so it ranks in the top tier right after that work lands.
+
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1156,10 +1161,6 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 
 Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
 
-### PAN-2699 (rank 91)
-
-npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1167,10 +1168,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T02:41:02.849874Z",
+  "generatedAt": "2026-10-20T02:49:17.834433Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 832,
+  "openCount": 833,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11534,6 +11535,21 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4566",
+      "rank": 63,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4559"
+      ],
+      "why": "A failed replayEvents leaves the coordinator un-bootstrapped; the tab defers every live event with no banner. Reuse PAN-4559 fallback.",
+      "rationale": "New since the prior run. A failed replay silently freezes a dashboard tab on stale state: live events are deferred, the staleness watchdog is reset by each one, and no banner shows. The fix is small and well specified, and it routes the failure to the snapshot fallback that in-pipeline PAN-4559 adds, so it ranks in the top tier right after that work lands.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12908,6 +12924,13 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4559",
+      "to": "PAN-4566",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.85
     }
   ]
 }
