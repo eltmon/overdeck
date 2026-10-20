@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:29:52.927Z",
+  "updated": "2026-10-20T03:30:00.671Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -79,6 +79,11 @@
       "status": "blocked",
       "claimedBy": "agent-pan-4563",
       "claimedAt": "2026-10-20T03:27:25.195Z"
+    },
+    "codex-case-interrupt": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:30:00.671Z"
     }
   }
 }
