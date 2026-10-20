@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3957",
+  "created": "2026-10-20T21:53:35.214Z",
+  "updated": "2026-10-20T21:53:35.214Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-fact-store": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T21:53:35.214Z"
+    }
+  }
+}
