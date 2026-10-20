@@ -62,6 +62,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents',                                          kind: 'http', disposition: 'READ',       door: 'AgentsResolver.list(filter)' },
   { surface: 'GET /api/agents/:id/output',                               kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts' },
   { surface: 'GET /api/agents/:id/conversation',                         kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts' },
+  { surface: 'GET /api/agents/:id/conversation/tool-body/:toolUseId',   kind: 'http', disposition: 'READ',       door: 'TranscriptsResolver.parse' },
   { surface: 'GET /api/agents/:id/subagents',                            kind: 'http', disposition: 'RELOCATE',   door: 'Transcripts (agent subagents, PAN-3920)' },
   { surface: 'GET /api/agent-directory',                                  kind: 'http', disposition: 'AGGREGATE',  door: 'Agents Directory read model: agent states + backend panes + conversations + transcripts, derived on read (PAN-3920)' },
   { surface: 'POST /api/workers/register',                               kind: 'http', disposition: 'WRITE',      door: 'External agent registry: write-once ext-* registration + sessions.json transcript link, shared with pan worker register (PAN-3920 W19)' },

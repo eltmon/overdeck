@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ConversationResponse } from '@overdeck/contracts';
+import type { ConversationResponse, WorkLogEntry } from '@overdeck/contracts';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -19,6 +19,7 @@ import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversat
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
+import { readPageParams, selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../services/conversation/window.js';
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
@@ -143,7 +144,8 @@ async function agentWorkspaceFor(id: string): Promise<string | null> {
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
 type AgentConversationResult =
-  | { status: 200; body: ConversationResponse }
+  /** `transcriptPath` is server-side only; routes send `body`. */
+  | { status: 200; body: ConversationResponse; transcriptPath?: string }
   | { status: 400; body: { error: string } }
   | { status: 404; body: { error: string; checked: string[] } }
   | { status: 500; body: { error: string } };
@@ -211,7 +213,7 @@ export async function buildAgentConversationResult(
     };
 
     if (selected.kind === 'acp') {
-      return { status: 200, body: {
+      return { status: 200, transcriptPath: selected.path, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -223,7 +225,7 @@ export async function buildAgentConversationResult(
         streaming: false,
       } };
     }
-    return { status: 200, body: { ...result, streaming: false } };
+    return { status: 200, transcriptPath: selected.path, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
     return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
@@ -246,7 +248,48 @@ async function buildAgentSubagentResult(
   // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
   const { latestCompactSummary: _latestCompactSummary, ...result } =
     rawResult as typeof rawResult & { latestCompactSummary?: unknown };
-  return { status: 200, body: { ...result, streaming: false } };
+  return { status: 200, transcriptPath: resolved.path, body: { ...result, streaming: false } };
+}
+
+async function transcriptIdAt(path: string | undefined): Promise<string | undefined> {
+  if (!path) return undefined;
+  return stat(path).then(transcriptIdOf, () => undefined);
+}
+
+/**
+ * PAN-4558: `?window=initial` bounds the body to the newest rows plus a
+ * `window` field, and `?before=<cursor>&limit=<n>` returns one older page.
+ * Without either the full body is returned unchanged (export, TerminalPanel,
+ * DirectoryTranscript, SessionTranscript).
+ */
+export async function buildAgentConversationWindowResult(
+  id: string,
+  query: URLSearchParams,
+): Promise<{ status: number; body: unknown }> {
+  const page = readPageParams(query);
+  if (page === 'invalid-cursor') return { status: 400, body: { error: 'Invalid cursor' } };
+  const subagentId = query.get('subagentId');
+  const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
+  if (result.status !== 200) return result;
+  if (page) {
+    return { status: 200, body: selectPageBefore(result.body, page.before, page.limit, await transcriptIdAt(result.transcriptPath)) };
+  }
+  if (query.get('window') === 'initial') {
+    return { status: 200, body: { ...result.body, ...selectInitialWindow(result.body, await transcriptIdAt(result.transcriptPath)) } };
+  }
+  return { status: 200, body: result.body };
+}
+
+/** PAN-4558: the full, unprojected work entry behind an omitted tool body. */
+export async function buildAgentToolBodyResult(
+  id: string,
+  toolUseId: string,
+  opts: { subagentId?: string } = {},
+): Promise<{ status: number; body: unknown }> {
+  const result = await buildAgentConversationResult(id, opts);
+  if (result.status !== 200) return result;
+  const entry: WorkLogEntry | undefined = result.body.workLog.find((candidate) => candidate.id === toolUseId);
+  return entry ? { status: 200, body: { entry } } : { status: 404, body: { error: 'Tool entry not found' } };
 }
 
 /** Compatibility helper retained for callers that only consume a transcript body. */
@@ -263,9 +306,26 @@ export const getAgentConversationRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
+    const query = Option.isSome(urlOpt) ? urlOpt.value.searchParams : new URLSearchParams();
+    return yield* Effect.promise(async () => {
+      const result = await buildAgentConversationWindowResult(id, query);
+      return jsonResponse(result.body, { status: result.status });
+    });
+  })),
+);
+
+export const getAgentConversationToolBodyRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/conversation/tool-body/:toolUseId',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const toolUseId = params['toolUseId'] ?? '';
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
     const subagentId = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('subagentId') : null;
     return yield* Effect.promise(async () => {
-      const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
+      const result = await buildAgentToolBodyResult(id, toolUseId, subagentId === null ? {} : { subagentId });
       return jsonResponse(result.body, { status: result.status });
     });
   })),
