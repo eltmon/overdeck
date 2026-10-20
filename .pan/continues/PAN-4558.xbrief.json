@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T05:16:11.075Z",
+  "updated": "2026-10-20T05:16:25.648Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "wi4-window-selection.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T05:16:11.074Z"
+    },
+    "wi4-window-selection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:16:25.648Z"
     }
   }
 }
