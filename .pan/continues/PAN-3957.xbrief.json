@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T23:38:31.630Z",
+  "updated": "2026-10-20T23:46:41.478Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-10-20T23:38:27.507Z"
     },
     "w14-closeout-carveout": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-20T23:38:31.629Z"
+      "claimedAt": "2026-10-20T23:38:31.629Z",
+      "doneAt": "2026-10-20T23:46:41.478Z"
     }
   }
 }
