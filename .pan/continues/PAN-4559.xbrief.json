@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:29:16.627Z",
+  "updated": "2026-10-20T04:29:32.001Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "client-gap-fallback.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T04:29:16.627Z"
+    },
+    "client-gap-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:32.001Z"
     }
   }
 }
