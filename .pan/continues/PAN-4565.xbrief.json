@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4565",
   "created": "2026-10-20T02:51:57.744Z",
-  "updated": "2026-10-20T03:20:04.630Z",
+  "updated": "2026-10-20T03:28:37.855Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-10-20T03:19:54.939Z"
     },
     "fresh-cli": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4565",
-      "claimedAt": "2026-10-20T03:20:04.629Z"
+      "claimedAt": "2026-10-20T03:20:04.629Z",
+      "doneAt": "2026-10-20T03:28:37.855Z"
     }
   }
 }
