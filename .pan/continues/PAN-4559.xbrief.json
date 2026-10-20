@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:28:30.954Z",
+  "updated": "2026-10-20T04:28:45.728Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "handler-bounded-replay.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T04:28:30.953Z"
+    },
+    "handler-bounded-replay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:45.728Z"
     }
   }
 }
