@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:56:43.192Z",
+  "updated": "2026-10-20T03:58:02.331Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-20T03:56:35.410Z"
     },
     "wi15-payload-budget-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T03:56:43.192Z"
+      "claimedAt": "2026-10-20T03:56:43.192Z",
+      "doneAt": "2026-10-20T03:58:02.330Z"
     }
   }
 }
