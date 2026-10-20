@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T03:09:24.447Z",
+  "updated": "2026-10-20T03:12:15.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-10-20T03:09:14.548Z"
     },
     "ratchet-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4562",
-      "claimedAt": "2026-10-20T03:09:24.447Z"
+      "claimedAt": "2026-10-20T03:09:24.447Z",
+      "doneAt": "2026-10-20T03:12:15.530Z"
     }
   }
 }
