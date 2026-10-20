@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:27:54.230Z",
+  "updated": "2026-10-20T04:28:11.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "contract-replay-result.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T04:27:54.230Z"
+    },
+    "contract-replay-result.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:11.189Z"
     }
   }
 }
