@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T04:55:51.074Z",
+  "updated": "2026-10-20T04:56:06.570Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -117,9 +117,10 @@
       "claimedAt": "2026-10-20T04:43:59.389Z"
     },
     "wi18-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T04:55:51.074Z"
+      "claimedAt": "2026-10-20T04:55:51.074Z",
+      "doneAt": "2026-10-20T04:56:06.570Z"
     }
   }
 }
