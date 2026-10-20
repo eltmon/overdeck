@@ -4,17 +4,17 @@
     "created": "2026-10-20T22:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3957: Overdeck-owned agent memory: project memory stored in the repo, replacing per-harness memory (Claude auto-memory)",
-    "updated": "2026-10-20T21:51:20.554Z"
+    "updated": "2026-10-20T21:51:56.944Z"
   },
   "plan": {
     "id": "pan-3957",
     "title": "Overdeck-owned agent memory: project memory stored in the repo, replacing per-harness memory (Claude auto-memory)",
-    "status": "proposed",
+    "status": "running",
     "uid": "014f8708-4185-42dc-b3dc-69733a2e8354",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T22:30:00Z",
-    "updated": "2026-10-20T21:51:20.554Z",
+    "updated": "2026-10-20T21:51:56.944Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3957",
@@ -1048,5 +1048,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
