@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:17:00.144Z",
+  "updated": "2026-10-20T03:19:20.607Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-10-20T03:16:58.233Z"
     },
     "acp-replay-harness": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4563",
-      "claimedAt": "2026-10-20T03:17:00.144Z"
+      "claimedAt": "2026-10-20T03:17:00.144Z",
+      "doneAt": "2026-10-20T03:19:20.607Z"
     }
   }
 }
