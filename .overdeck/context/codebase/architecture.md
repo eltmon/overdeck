@@ -29,7 +29,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `runtimes/` — harness adapters: `claude-code.ts`, `ohmypi.ts` (+ `ohmypi-fifo.ts`),
   `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
   'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
-  legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`.
+  legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`;
+  its `HarnessBehavior.capabilities` (`packages/contracts/src/harness-capabilities.ts`)
+  declares every per-harness behavior decision, and the `lint:harness-branches` ratchet
+  keeps harness-name comparisons in `src/` from growing.
 - `protocol-capture/` (PAN-4563) — recorded-protocol tests for the Codex app-server and
   ACP transports: capture mode (`OVERDECK_PROTOCOL_CAPTURE_DIR`, off by default), the
   capture-time scrubber, the recorder (`record.ts`), and the replay engine (`replay.ts`).

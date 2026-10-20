@@ -113,6 +113,15 @@ function systemHeartbeatEvent(): DomainEvent {
   } as DomainEvent
 }
 
+/** PAN-4559: the RPC method name each `request()` call targeted, in call order. */
+function requestedMethods(): string[] {
+  return request.mock.calls.map(([execute]: [(client: unknown) => unknown]) => {
+    let name = ''
+    execute(new Proxy({}, { get: (_target, prop) => () => { name = String(prop); return undefined } }))
+    return name
+  })
+}
+
 describe('EventRouter memory updates', () => {
   let fetchControl: ReturnType<typeof installStrictFetchMock>
   let healthResponse: () => Response | Promise<Response>
@@ -674,6 +683,77 @@ describe('EventRouter memory updates', () => {
 
     const observations = useDashboardStore.getState().observationsByIssueId['PAN-1052'] ?? []
     expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-replay-2', 'obs-live-3'])
+  })
+
+  it('falls back to getSnapshot on the live transport when a gap replay is too far behind', async () => {
+    request
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce({ tooFarBehind: true })
+      .mockResolvedValueOnce({ ...snapshot, sequence: 600, timestamp: '2026-05-16T12:10:00.000Z' })
+      .mockResolvedValueOnce([])
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribed).not.toBeNull()
+
+    act(() => {
+      wsTransport.subscribed!(memoryObservationEvent(600))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20)
+    })
+
+    expect(requestedMethods()).toEqual([
+      'pan.getSnapshot',
+      'pan.replayEvents',
+      'pan.getSnapshot',
+      'pan.replayEvents',
+    ])
+    expect(resetTransport).not.toHaveBeenCalled()
+    expect(useDashboardStore.getState().snapshotTimestamp).toBe('2026-05-16T12:10:00.000Z')
+  })
+
+  it('treats a too-far-behind replay right after a snapshot as a failed bootstrap and retries after backoff', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let resolveSnapshot: (value: DashboardSnapshot) => void = () => undefined
+    const snapshotPromise = new Promise<DashboardSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    request
+      .mockReturnValueOnce(snapshotPromise)
+      .mockResolvedValueOnce({ tooFarBehind: true })
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce([])
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribed).not.toBeNull()
+
+    act(() => {
+      wsTransport.subscribed!(memoryObservationEvent(700))
+    })
+
+    await act(async () => {
+      resolveSnapshot(snapshot)
+      await vi.advanceTimersByTimeAsync(20)
+    })
+
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(useConnectionState.getState().streamLive).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500)
+    })
+
+    expect(request.mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect(requestedMethods()[2]).toBe('pan.getSnapshot')
+    error.mockRestore()
   })
 
   it('times out a getSnapshot that never settles and retries after backoff, never showing the overlay', async () => {

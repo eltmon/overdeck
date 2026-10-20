@@ -22,8 +22,9 @@ export function agentSetSignature(agents: Array<{ id: string }>): string {
 }
 
 export function useAgentSetInvalidation(queryClient: QueryClient): void {
-  const agents = useDashboardStore(selectAgents) as Array<{ id: string }>;
-  const signature = agentSetSignature(agents);
+  // A string compares by value, so the caller re-renders only when the set of
+  // agent ids changes, not on every agent update (PAN-4560).
+  const signature = useDashboardStore((s) => agentSetSignature(selectAgents(s) as Array<{ id: string }>));
   const lastSignature = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

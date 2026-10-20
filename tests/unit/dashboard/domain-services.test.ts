@@ -61,6 +61,7 @@ function makeTestService(): EventStoreServiceShape {
   return {
     append: (event) => Effect.sync(() => store.append(event as never)),
     readFrom: (fromSequence) => Effect.sync(() => store.readFrom(fromSequence)),
+    readFromBounded: (fromSequence) => Effect.sync(() => store.readFromBounded(fromSequence)),
     getLatestSequence: Effect.sync(() => store.getLatestSequence()),
     streamEvents,
   };
@@ -172,6 +173,19 @@ describe('EventStoreService', () => {
         }),
       );
       expect(result).toHaveLength(0);
+    });
+
+    it('readFromBounded returns appended events through the service', async () => {
+      const result = await runWithService(
+        Effect.gen(function* () {
+          const svc = yield* EventStoreService;
+          yield* svc.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: {} });
+          yield* svc.append({ type: 'agent.stopped', timestamp: new Date().toISOString(), payload: {} });
+          return yield* svc.readFromBounded(0);
+        }),
+      );
+      expect(result.tooFarBehind).toBe(false);
+      expect(result.events).toHaveLength(2);
     });
   });
 

@@ -79,7 +79,8 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
   const handleExport = useCallback(async () => {
     onClose();
     try {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/messages`);
+      // PAN-4558: window=all exports the whole transcript, not the newest window.
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/messages?window=all`);
       if (!res.ok) throw new Error('fetch failed');
       const data = (await res.json()) as { messages?: Array<{ role: string; text?: string }> };
       const messages = data.messages ?? [];

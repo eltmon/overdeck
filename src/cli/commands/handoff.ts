@@ -23,6 +23,7 @@ interface HandoffOptions {
   skill?: string[];
   pack?: string[];
   hold?: boolean;
+  fresh?: boolean;
 }
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
@@ -82,10 +83,14 @@ export async function handoffCommand(
   // Every harness, not just claude-code: a kimi-code/codex/pi conversation has no
   // claudeSessionId, so the old claude-only sessionFilePath() lookup refused to
   // hand off from one. resolveSessionFile is the shared per-harness resolver.
-  const sessionFile = await resolveSessionFile(conv);
-  if (!sessionFile || !existsSync(sessionFile)) {
-    console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
-    return exitCli(1);
+  // PAN-4565 D2: a --fresh start never reads the source transcript, so it never
+  // needs one to exist.
+  if (!options.fresh) {
+    const sessionFile = await resolveSessionFile(conv);
+    if (!sessionFile || !existsSync(sessionFile)) {
+      console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
+      return exitCli(1);
+    }
   }
 
   const focus = focusArgs.join(' ').trim() || undefined;
@@ -118,8 +123,21 @@ export async function handoffCommand(
     console.log(chalk.yellow(`Invalid --role: ${options.role}. Expected one of ${HANDOFF_ROLES.join(', ')}.`));
     return exitCli(1);
   }
-  console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
-  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
+  if (options.fresh && (options.author === 'source' || options.authorModel !== undefined)) {
+    console.log(chalk.yellow('--fresh authors no handoff document; drop --author/--author-model'));
+    return exitCli(1);
+  }
+  if (options.fresh && options.hold && !focus) {
+    console.log(chalk.yellow('fresh with hold needs focus text: there is nothing to hold'));
+    return exitCli(1);
+  }
+  if (options.fresh) {
+    console.log(chalk.gray(`Starting a fresh conversation from the defaults of ${conv.name} (${conv.title || 'untitled'})`));
+    console.log(chalk.gray('  No handoff document, no summary, no parent link.'));
+  } else {
+    console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
+    console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
+  }
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
@@ -130,7 +148,9 @@ export async function handoffCommand(
   if (role) console.log(chalk.gray(`  Role: ${role}`));
   if (options.skill?.length) console.log(chalk.gray(`  Skills: ${options.skill.join(', ')}`));
   if (options.pack?.length) console.log(chalk.gray(`  Packs: ${options.pack.join(', ')}`));
-  console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
+  if (!options.fresh) {
+    console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
+  }
 
   // PAN-1568: route through the dashboard server, which authors the doc AND
   // spawns the tmux session. The old in-process path never spawned, so the
@@ -147,12 +167,12 @@ export async function handoffCommand(
       forkMode: 'handoff',
       focus,
       title: customTitle,
-      handoffAuthor: author,
-      handoffAuthorModel: options.authorModel,
+      ...(options.fresh ? {} : { handoffAuthor: author, handoffAuthorModel: options.authorModel }),
       allowPrimary: options.allowPrimary,
       skills: options.skill,
       packs: options.pack,
       hold: options.hold,
+      fresh: options.fresh,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {
@@ -177,7 +197,9 @@ export async function handoffCommand(
     console.log(chalk.yellow(`Handoff fell back to summary fork: ${newConv.forkFallbackReason}`));
   }
 
-  console.log(chalk.green(`Handoff forked conversation ${conv.name} → ${newConv.name}`));
+  console.log(chalk.green(options.fresh
+    ? `Started fresh conversation ${newConv.name} (no parent link)`
+    : `Handoff forked conversation ${conv.name} → ${newConv.name}`));
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));

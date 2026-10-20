@@ -551,4 +551,87 @@ describe('handoffCommand', () => {
     const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
     expect(output).toContain('Issue: PAN-9004 (from --issue)');
   });
+
+  describe('--fresh (PAN-4565)', () => {
+    beforeEach(() => {
+      conversationMocks.getConversationByName.mockReturnValue({
+        id: 7, name: 'src', title: 'Zomboid', cwd: '/workspace', claudeSessionId: 'session-id',
+      });
+      forkMocks.forkConversationViaServer.mockResolvedValue({
+        id: 9, name: 'n', tmuxSession: 'conv-n', forkStatus: null,
+      });
+    });
+
+    it('sends fresh with no model or cwd', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await handoffCommand('src', ['start', 'a', 'fort'], { fresh: true });
+
+      expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+        'src',
+        expect.objectContaining({
+          forkMode: 'handoff',
+          fresh: true,
+          model: undefined,
+          cwd: undefined,
+          focus: 'start a fort',
+        }),
+      );
+      const call = forkMocks.forkConversationViaServer.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(call).not.toHaveProperty('handoffAuthor');
+      const output = logSpy.mock.calls.map((callArgs) => callArgs.join(' ')).join('\n');
+      expect(output).toContain('Started fresh conversation n (no parent link)');
+    });
+
+    it('sends fresh with --model and --cwd', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await handoffCommand('src', ['start', 'a', 'fort'], { fresh: true, model: 'claude-haiku-4-5', cwd: '/home/you/Projects/df-wt' });
+
+      expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+        'src',
+        expect.objectContaining({ model: 'claude-haiku-4-5', cwd: '/home/you/Projects/df-wt' }),
+      );
+    });
+
+    it('skips the session-file check', async () => {
+      readsMocks.resolveSessionFile.mockResolvedValue(null);
+      const { handoffCommand } = await import('../handoff.js');
+
+      await handoffCommand('src', ['start', 'a', 'fort'], { fresh: true });
+
+      expect(readsMocks.resolveSessionFile).not.toHaveBeenCalled();
+      expect(forkMocks.forkConversationViaServer).toHaveBeenCalled();
+    });
+
+    it('refuses --author source', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await expect(handoffCommand('src', ['start', 'a', 'fort'], { fresh: true, author: 'source' })).rejects.toThrow('process.exit');
+
+      const output = logSpy.mock.calls.map((callArgs) => callArgs.join(' ')).join('\n');
+      expect(output).toContain('--fresh authors no handoff document; drop --author/--author-model');
+      expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+    });
+
+    it('refuses --author-model', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await expect(handoffCommand('src', ['start', 'a', 'fort'], { fresh: true, authorModel: 'claude-opus-5-5' })).rejects.toThrow('process.exit');
+
+      const output = logSpy.mock.calls.map((callArgs) => callArgs.join(' ')).join('\n');
+      expect(output).toContain('--fresh authors no handoff document; drop --author/--author-model');
+      expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+    });
+
+    it('refuses --hold without focus', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await expect(handoffCommand('src', [], { fresh: true, hold: true })).rejects.toThrow('process.exit');
+
+      const output = logSpy.mock.calls.map((callArgs) => callArgs.join(' ')).join('\n');
+      expect(output).toContain('fresh with hold needs focus text: there is nothing to hold');
+      expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -265,24 +265,6 @@ function removeAgentFromSessionIndex(
   return next
 }
 
-// ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
-
-/**
- * Bump runtimeSnapshotSequence on the corresponding AgentSnapshot (if present)
- * so low-frequency subscribers can cheaply detect a runtime change. No-op if
- * the agent has no lifecycle snapshot yet (a runtime event arrived before
- * agent.created — unusual but defensive).
- */
-function bumpRuntimeSnapshotSequence(
-  agentsById: Record<string, AgentSnapshot>,
-  agentId: string,
-  sequence: number,
-): Record<string, AgentSnapshot> {
-  const agent = agentsById[agentId]
-  if (!agent) return agentsById
-  return { ...agentsById, [agentId]: { ...agent, runtimeSnapshotSequence: sequence } }
-}
-
 // ─── syncSnapshot — bootstrap from a full DashboardSnapshot ──────────────────
 
 export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot): ReadModelState {
@@ -1084,7 +1066,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1107,7 +1088,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1127,7 +1107,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1153,7 +1132,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1171,7 +1149,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1263,7 +1240,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1294,7 +1270,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1328,7 +1303,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
         agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
@@ -1347,7 +1321,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1364,7 +1337,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1384,7 +1356,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 
@@ -1400,7 +1371,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
-        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
       }
     }
 

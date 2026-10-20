@@ -8,7 +8,8 @@ import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../ohmypi-
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
 import { parseKimiConversationMessages } from '../kimi-conversation-parser.js';
 import { parseFromLastCompactBoundary } from './parser.js';
-import type { ConversationActivitySummary } from './types.js';
+import type { ConversationActivitySummary, ParseResult } from './types.js';
+import type { HarnessTranscriptKind } from '@overdeck/contracts';
 
 /**
  * PAN-1635: a conversation whose JSONL hasn't been written in this long is no
@@ -19,6 +20,32 @@ import type { ConversationActivitySummary } from './types.js';
  */
 const WORKING_STALENESS_MS = 180_000;
 export const ACP_STALLED_TURN_MS = 300_000;
+
+type ActivitySource =
+  | { readonly kind: 'projected' } // ACP: projectAcpConversationActivity + stall window
+  | { readonly kind: 'parsed'; readonly parse: (sessionFile: string) => Promise<ParseResult>; readonly toolsInWorkLog: boolean };
+
+/** Rows without a harness read as claude-code, so sniff legacy Pi transcripts before the Claude parser. */
+function parseClaudeOrLegacyPiActivity(sessionFile: string): Promise<ParseResult> {
+  if (isOhmypiSessionFile(sessionFile)) return parseOhmypiConversationMessages(sessionFile);
+  if (isPiSessionFile(sessionFile)) return parsePiConversationMessages(sessionFile);
+  // Parse from the last compact boundary instead of the full file — avoids
+  // re-reading potentially megabytes of history on every list enrichment tick.
+  // Pass an empty priorState so pendingToolUse stays populated rather than being
+  // flushed into workLog. This lets us detect genuinely pending tools.
+  return parseFromLastCompactBoundary(sessionFile, { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 });
+}
+
+/** Where each transcript kind's activity comes from (PAN-4562). toolsInWorkLog = pending tools surface only in the workLog. */
+const ACTIVITY_SOURCES: Record<HarnessTranscriptKind, ActivitySource> = {
+  'acp-jsonl': { kind: 'projected' },
+  'codex-rollout-jsonl': { kind: 'parsed', parse: parseCodexConversationMessages, toolsInWorkLog: true },
+  'ohmypi-jsonl': { kind: 'parsed', parse: parseOhmypiConversationMessages, toolsInWorkLog: false },
+  'muse-jsonl': { kind: 'parsed', parse: parseMuseConversationMessages, toolsInWorkLog: false },
+  'prime-agent-jsonl': { kind: 'parsed', parse: parsePrimeAgentConversationMessages, toolsInWorkLog: false },
+  'kimi-wire-jsonl': { kind: 'parsed', parse: parseKimiConversationMessages, toolsInWorkLog: false },
+  'claude-jsonl': { kind: 'parsed', parse: parseClaudeOrLegacyPiActivity, toolsInWorkLog: false },
+};
 
 /** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
 const ACTIVITY_SUMMARY_CACHE_MAX = 100;
@@ -44,10 +71,10 @@ export async function summarizeConversationActivity(
 ): Promise<ConversationActivitySummary> {
   const fileStats = await stat(sessionFile);
   const cacheKey = `${options.harness ?? 'claude-code'}:${sessionFile}`;
-  const behavior = getHarnessBehavior(options.harness as Parameters<typeof getHarnessBehavior>[0]);
+  const source = ACTIVITY_SOURCES[getHarnessBehavior(options.harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind];
   const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
-    if (behavior.transcriptKind === 'acp-jsonl') {
+    if (source.kind === 'projected') {
       const fileAgeMs = Date.now() - cached.mtimeMs;
       return {
         ...cached.summary,
@@ -60,7 +87,7 @@ export async function summarizeConversationActivity(
     return cached.summary;
   }
 
-  if (behavior.transcriptKind === 'acp-jsonl') {
+  if (source.kind === 'projected') {
     const projected = await projectAcpConversationActivity(sessionFile);
     const fileAgeMs = Date.now() - projected.mtimeMs;
     const lastMsg = projected.messages[projected.messages.length - 1];
@@ -86,20 +113,7 @@ export async function summarizeConversationActivity(
     return cacheActivitySummary(cacheKey, fileStats.mtimeMs, fileStats.size, summary);
   }
 
-  const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
-    : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
-    : behavior.transcriptKind === 'muse-jsonl' ? await parseMuseConversationMessages(sessionFile)
-    : behavior.transcriptKind === 'prime-agent-jsonl' ? await parsePrimeAgentConversationMessages(sessionFile)
-    : behavior.transcriptKind === 'kimi-wire-jsonl' ? await parseKimiConversationMessages(sessionFile)
-    : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
-      // Parse from the last compact boundary instead of the full file — avoids
-      // re-reading potentially megabytes of history on every list enrichment tick.
-      // Pass an empty priorState so pendingToolUse stays populated rather than being
-      // flushed into workLog. This lets us detect genuinely pending tools.
-      : await parseFromLastCompactBoundary(
-          sessionFile,
-          { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
-        );
+  const parsed = await source.parse(sessionFile);
   const { messages, streaming, lastTurnCompletedAt, pendingToolUse, workLog, mtimeMs } = parsed;
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
@@ -153,7 +167,7 @@ export async function summarizeConversationActivity(
         currentTool = entry.toolTitle;
       }
     }
-    if (!currentTool && behavior.transcriptKind === 'codex-rollout-jsonl') {
+    if (!currentTool && source.toolsInWorkLog) {
       for (const entry of workLog) {
         if (entry.tone === 'tool' && !entry.result && (entry.sequence ?? -1) > maxSequence) {
           maxSequence = entry.sequence ?? -1;

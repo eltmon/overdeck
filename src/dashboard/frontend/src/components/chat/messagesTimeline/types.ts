@@ -61,4 +61,10 @@ export interface MessagesTimelineProps {
   onTargetMessageHandled?: () => void;
   /** PAN-4498 — main conversation timeline only: role icons bookmark messages. */
   bookmarksEnabled?: boolean;
+  /** PAN-4558 — older history state: more rows exist before the first loaded row. */
+  history?: { hasOlder: boolean; loadingOlder: boolean; loadedOlder?: boolean };
+  /** PAN-4558 — load the next older page (scroll near the top). */
+  onLoadOlder?: () => void;
+  /** PAN-4558 — load older pages until a message id is loaded; resolves false at the start. */
+  onLoadOlderUntil?: (messageId: string) => Promise<boolean>;
 }

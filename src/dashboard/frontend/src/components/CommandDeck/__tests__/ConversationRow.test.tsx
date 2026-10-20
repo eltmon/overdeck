@@ -11,6 +11,18 @@ vi.mock('../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// PAN-4562: a fake runtime definition reaches the row label with no row code change.
+// Real harness names pass through to the real lookups.
+vi.mock('@overdeck/contracts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@overdeck/contracts')>();
+  const fake = { ...actual.MUSE_BEHAVIOR, displayName: 'Fake Harness' };
+  const isFake = (harness: unknown) => harness === 'fake-harness';
+  return {
+    ...actual,
+    normalizeHarnessName: (harness: unknown) => (isFake(harness) ? 'fake-harness' : actual.normalizeHarnessName(harness)),
+    getRuntimeBehavior: (harness: never) => (isFake(harness) ? fake : actual.getRuntimeBehavior(harness)),
+  };
+});
 
 vi.mock('../../DialogProvider', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
@@ -76,6 +88,28 @@ describe('ConversationRow model metadata', () => {
 
     expect(screen.getByTitle('Harness: Claude Code')).toHaveTextContent('Claude Code');
     expect(screen.getByTitle('Model: k3')).toHaveTextContent('k3');
+  });
+});
+
+describe('ConversationRow harness label from the declared displayName (PAN-4562)', () => {
+  it.each([
+    ['muse', 'Muse Code'],
+    ['ohmypi', 'Pi'],
+    ['pi', 'Pi'],
+    ['codex', 'Codex'],
+  ] as const)('%s renders %s', (harness, label) => {
+    renderRow({ harness, model: null });
+    expect(screen.getByTitle(`Harness: ${label}`)).toHaveTextContent(label);
+  });
+
+  it('renders a fake runtime definition by its declared displayName', () => {
+    renderRow({ harness: 'fake-harness' as Conversation['harness'], model: null });
+    expect(screen.getByTitle('Harness: Fake Harness')).toHaveTextContent('Fake Harness');
+  });
+
+  it('renders an unknown id raw', () => {
+    renderRow({ harness: 'future-harness' as Conversation['harness'], model: null });
+    expect(screen.getByTitle('Harness: future-harness')).toHaveTextContent('future-harness');
   });
 });
 

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
 
 import { HttpServerResponse } from 'effect/unstable/http';
 
@@ -48,7 +47,6 @@ import { ConversationSkillFlagError, parseSkillFlagList, resolveConversationSkil
 import { holdKickoff } from './conversation-kickoff-store.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
-import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   authorHandoffExternal,
   copySessionFromCompactBoundary,
@@ -65,7 +63,7 @@ import {
   type SummaryForkMode,
 } from '../conversations/summary-fork.js';
 import { UnknownModelError } from '../providers.js';
-import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
@@ -77,100 +75,12 @@ import { conversationHarnessAlive, conversationSessionAlive } from './conversati
 import { writeConversationPaneRole } from './conversation-pane-role.js';
 import { getIssueWorkspacePath } from './issue-projects.js';
 import { isAgentRole, type AgentRole } from '@overdeck/contracts';
-import {
-  readLauncherPinnedSessionId,
-  resolveCodexRolloutPath,
-  resolveKimiWirePath,
-  resolvePiSessionPath,
-} from '../agents/transcript-resolver.js';
+import { resolveForkSourceSessionFile, resolvePlainForkTargetSessionFile } from './fork-source-session.js';
+import { freshStartLaneRefusal, freshStartTitle } from './fork-fresh.js';
 import * as self from './conversation-forks.js';
 
 // Canonical model-id shape (allows the `[1m]` suffix) — see model-validation.ts (PAN-2979).
 const SAFE_MODEL_PATTERN = MODEL_ID_PATTERN;
-const SESSION_FILE_MISS_TTL_MS = 2000;
-const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
-
-async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
-  const cached = sessionFileByIdCache.get(sessionId);
-  if (cached) {
-    if (cached.path) {
-      if (existsSync(cached.path)) return cached.path;
-      sessionFileByIdCache.delete(sessionId);
-    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
-      return null;
-    }
-  }
-  try {
-    const claudeProjects = claudeProjectsRoot();
-    const dirs = await readdir(claudeProjects);
-    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-    const candidates = dirs
-      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
-    const STAT_BATCH_SIZE = 50;
-    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
-      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-      const checks = await Promise.all(
-        batch.map(async (candidate) => {
-          try {
-            await stat(candidate);
-            return candidate;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const found = checks.find((candidate): candidate is string => candidate !== null);
-      if (found) {
-        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
-        return found;
-      }
-    }
-  } catch {
-    /* ~/.claude/projects unreadable */
-  }
-  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
-  return null;
-}
-
-async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
-    const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    if (piPath) return piPath;
-  }
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
-    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
-    if (codexPath) return codexPath;
-  }
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
-    // workspaceOverride because a conversation has no AgentState row to derive it from.
-    const kimiPath = await resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
-    if (kimiPath) return kimiPath;
-  }
-  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
-  const sessionId = pinned ?? conv.claudeSessionId;
-  if (sessionId) {
-    const deterministic = sessionFilePath(conv.cwd, sessionId);
-    if (existsSync(deterministic)) return deterministic;
-    const found = await findClaudeSessionFileById(sessionId);
-    if (found) return found;
-    const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
-    return discovered ?? deterministic;
-  }
-  const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
-  if (discovered) return discovered;
-  console.error(
-    `[fork-pipeline] UNRESOLVED claude-code session for conversation '${conv.name}' ` +
-      `(tmux=${conv.tmuxSession}, status=${conv.status}, cwd=${conv.cwd}): no --session-id ` +
-      `pinned in launcher.sh and no recorded claudeSessionId. The fork source transcript cannot be trusted.`,
-  );
-  return null;
-}
-
-function resolvePlainForkTargetSessionFile(conv: Conversation): string | null {
-  if (!conv.claudeSessionId) return null;
-  return sessionFilePath(conv.cwd, conv.claudeSessionId);
-}
 
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
   if (value === undefined || value === null) return { ok: true, focus: undefined };
@@ -201,6 +111,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
     ...(params.title !== undefined ? { title: params.title } : {}),
     ...(params.hold ? { hold: true } : {}),
+    ...(params.fresh ? { fresh: true } : {}),
   };
 }
 
@@ -449,9 +360,20 @@ export async function runForkPipeline(
   handoffAuthorHarness?: RuntimeName,
   customTitle?: string,
   hold = false,
+  fresh = false,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
+  if (fresh) {
+    // PAN-4565: the source is a defaults donor only — never read its transcript.
+    updateForkStatus(convName, 'spawning');
+    await self.ensureForkSessionReady(conv, sessionId, false);
+    if (handoffFocus && !hold) return self.deliverForkSeed(conv, handoffFocus, 'fresh-start');
+    if (handoffFocus) holdKickoff(convName, handoffFocus);
+    markConversationActive(convName);
+    updateForkStatus(convName, null);
+    return;
+  }
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
   if (forkMode === 'plain') {
@@ -691,6 +613,7 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthorHarness,
         request.title,
         request.hold === true,
+        request.fresh === true,
       ));
       recovered += 1;
     } catch (error) {
@@ -744,8 +667,12 @@ export async function handleConversationSummaryFork(
       return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     }
     const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
+    // PAN-4565 D1: a boolean flag, not a fourth forkMode — the source is only
+    // a defaults donor under fresh, so every source-transcript gate below is
+    // skipped for it (D2/D3).
+    const fresh = body['fresh'] === true;
     const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
-    if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
+    if (!fresh && (!sourceSessionFile || !existsSync(sourceSessionFile))) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
     const model = typeof body['model'] === 'string'
@@ -768,6 +695,13 @@ export async function handleConversationSummaryFork(
       console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
       forkMode = 'plain';
     }
+    if (fresh && forkMode !== 'handoff') {
+      return jsonResponse({ error: 'fresh is only valid with forkMode "handoff"' }, { status: 400 });
+    }
+    if (fresh) {
+      const laneRefusal = freshStartLaneRefusal(conv.name);
+      if (laneRefusal) return jsonResponse({ error: laneRefusal }, { status: 400 });
+    }
     const hold = body['hold'] === true;
     if (hold && forkMode === 'plain') {
       return jsonResponse({ error: 'hold is not supported for plain forks' }, { status: 400 });
@@ -777,6 +711,9 @@ export async function handleConversationSummaryFork(
       return jsonResponse({ error: focusResult.error }, { status: 400 });
     }
     const handoffFocus = focusResult.focus;
+    if (fresh && hold && !handoffFocus) {
+      return jsonResponse({ error: 'fresh with hold needs focus text: there is nothing to hold' }, { status: 400 });
+    }
     const requestedIssueId = body['issueId'];
     let explicitIssueId: string | undefined;
     if (requestedIssueId !== undefined) {
@@ -838,7 +775,7 @@ export async function handleConversationSummaryFork(
         error: `Plain forks are not supported for ${sourceAdapter.name} sources — only Claude Code can be the source of a plain fork. Use a summary or handoff fork instead.`,
       }, { status: 400 });
     }
-    if (forkMode === 'handoff' && handoffAuthor === 'source' && !sourceAdapter.supportsSourceAuthoredHandoff) {
+    if (!fresh && forkMode === 'handoff' && handoffAuthor === 'source' && !sourceAdapter.supportsSourceAuthoredHandoff) {
       return jsonResponse({
         error: `Source-authored handoffs are not supported for ${sourceAdapter.name} sources because the harness has no signaling channel for the .done sentinel. Use external authoring (handoffAuthor: "external") instead.`,
       }, { status: 400 });
@@ -872,13 +809,15 @@ export async function handleConversationSummaryFork(
     // when it exists; an explicit cwd still wins.
     const issueWorkspaceCwd = !cwd && explicitIssueId ? await existingIssueWorkspace(explicitIssueId) : undefined;
     const effectiveCwd = cwd || issueWorkspaceCwd || conv.cwd || process.cwd();
-    if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
+    if (forkMode === 'handoff' && !fresh && !(await isInsideGitWorkTree(effectiveCwd))) {
       return jsonResponse({
         error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
       }, { status: 400 });
     }
+    // PAN-4565 FR-10: a fresh successor never inherits the source's issue.
+    const inheritedIssueId = fresh ? undefined : conv.issueId;
     const branchIssueId =
-      explicitIssueId === undefined && conv.issueId == null
+      explicitIssueId === undefined && inheritedIssueId == null
         ? await detectIssueIdFromBranch(effectiveCwd)
         : undefined;
     const launchModel = model || conv.model;
@@ -888,7 +827,7 @@ export async function handleConversationSummaryFork(
     const inheritedEffort = conv.effort && isValidConversationEffort(conv.effort, launchHarness) ? conv.effort : undefined;
     const successorEffort = requestedEffort ?? inheritedEffort;
     const launchEffort = successorEffort
-      ? resolveConversationEffort({ effort: successorEffort, model: launchModel ?? undefined, harness: launchHarness, issueId: explicitIssueId ?? conv.issueId ?? undefined })
+      ? resolveConversationEffort({ effort: successorEffort, model: launchModel ?? undefined, harness: launchHarness, issueId: explicitIssueId ?? inheritedIssueId ?? undefined })
       : undefined;
     const { sessionId } = await reserveSummaryForkSession(effectiveCwd);
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -907,34 +846,39 @@ export async function handleConversationSummaryFork(
         error: `Plain forks cannot launch under ${launchHarness} — it cannot consume Claude session history. Use a summary fork instead.`,
       }, { status: 400 });
     }
-    const defaultTitle = forkMode === 'plain'
-      ? `Fork: ${conv.title || conv.name}`
-      : forkMode === 'handoff'
-        ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
-        : `Summary Fork: ${conv.title || conv.name}`;
+    const defaultTitle = fresh
+      ? freshStartTitle(handoffFocus)
+      : forkMode === 'plain'
+        ? `Fork: ${conv.title || conv.name}`
+        : forkMode === 'handoff'
+          ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
+          : `Summary Fork: ${conv.title || conv.name}`;
     const newConv = createConversation({
       name: newName,
       tmuxSession: newTmux,
       cwd: effectiveCwd,
-      issueId: explicitIssueId ?? conv.issueId ?? branchIssueId ?? undefined,
+      issueId: explicitIssueId ?? inheritedIssueId ?? branchIssueId ?? undefined,
       projectKey: projectResult.projectKey,
       title: customTitle || defaultTitle,
       titleSource: 'manual',
-      titleSeed: forkMode === 'plain'
-        ? `Fork of ${conv.name}`
-        : forkMode === 'handoff'
-          ? `Handoff of ${conv.name}`
-          : `Summary Fork of ${conv.name}`,
+      titleSeed: fresh
+        ? 'Fresh start'
+        : forkMode === 'plain'
+          ? `Fork of ${conv.name}`
+          : forkMode === 'handoff'
+            ? `Handoff of ${conv.name}`
+            : `Summary Fork of ${conv.name}`,
       claudeSessionId: sessionId,
       model: launchModel ?? undefined,
       effort: launchEffort,
       harness: launchHarness,
-      forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
+      forkStatus: fresh ? 'spawning' : forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
       // PAN-4185: a fork of a bare conversation stays bare.
       ...conversationLaunchContext(conv),
       ...(mergedSkillOverrides ? { skillOverrides: mergedSkillOverrides } : {}),
-      // Gauntlet lanes D3: the successor nests under its source. Launch-time fact, written once.
-      parentName: conv.name,
+      // Gauntlet lanes D3: the successor nests under its source — except a
+      // fresh start (PAN-4565), which is a root with no parent link.
+      ...(fresh ? {} : { parentName: conv.name }),
     });
     const forkRequest = buildForkRequest({
       parentConversationName: conv.name,
@@ -951,13 +895,14 @@ export async function handleConversationSummaryFork(
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
       ...(customTitle !== undefined ? { title: customTitle } : {}),
       ...(hold ? { hold: true } : {}),
+      ...(fresh ? { fresh: true } : {}),
     });
     // Every later spawn of this conversation reads its pane role from here.
     await writeConversationPaneRole(newTmux, paneRole);
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(
-      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle, hold),
+      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle, hold, fresh),
     ).catch((err) => {
       handleForkPipelineFailure(newConv.name, err);
     });

@@ -172,6 +172,10 @@ export const WorkLogEntry = Schema.Struct({
   /** Raw tool_use input dict — drives per-tool expanded rendering (PAN-1459). */
   toolInput: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   sequence: Schema.optional(Schema.Number),
+  /** PAN-4558: UTF-8 byte length of a `result` the wire projection removed. */
+  resultBytes: Schema.optional(Schema.Number),
+  /** PAN-4558: the wire projection removed or cut a tool body; fetch the full entry on expand. */
+  bodyOmitted: Schema.optional(Schema.Boolean),
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 
@@ -197,6 +201,24 @@ export const SubagentSummary = Schema.Struct({
 })
 export type SubagentSummary = typeof SubagentSummary.Type
 
+/** PAN-4558: where a windowed response or page sits in the whole transcript. */
+export const ConversationWindow = Schema.Struct({
+  /** Encoded timeline key of the oldest contiguous entry; pass as `before=` for the next older page. */
+  cursor: Schema.NullOr(Schema.String),
+  hasOlder: Schema.Boolean,
+  /** `"<dev>:<ino>"` of the transcript file the window was read from. */
+  transcript: Schema.optional(Schema.String),
+})
+export type ConversationWindow = typeof ConversationWindow.Type
+
+/** PAN-4558: what a resubscribing client already holds. */
+export const ConversationResume = Schema.Struct({
+  afterSequence: Schema.Number,
+  openIds: Schema.Array(Schema.String),
+  transcript: Schema.String,
+})
+export type ConversationResume = typeof ConversationResume.Type
+
 /**
  * Response shape for GET /api/agents/:id/conversation.
  * Shared between the dashboard server route and the frontend TerminalPanel.
@@ -217,6 +239,8 @@ export const ConversationResponse = Schema.Struct({
   observedEffort: Schema.optional(Schema.NullOr(EffortLevelSchema)),
   /** PAN-4255: the effort the agent was launched/pinned with and its EffortSource layer. */
   effortResolution: Schema.optional(Schema.NullOr(Schema.Struct({ effort: EffortLevelSchema, source: Schema.String }))),
+  /** PAN-4558: present on windowed and paged responses only. */
+  window: Schema.optional(ConversationWindow),
 })
 export type ConversationResponse = typeof ConversationResponse.Type
 
@@ -235,6 +259,8 @@ export const ConversationEvent = Schema.Union([
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
     contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
+    /** PAN-4558: set on windowed snapshots; older history is paged in by `window.cursor`. */
+    window: Schema.optional(ConversationWindow),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),
@@ -301,10 +327,21 @@ export const GetSnapshotRpc = Rpc.make(WS_METHODS.getSnapshot, {
   error: PanRpcError,
 })
 
+/**
+ * PAN-4559: the server answers this instead of events when the gap after
+ * fromSequence exceeds its replay cap; the client re-bootstraps via getSnapshot.
+ */
+export const ReplayTooFarBehind = Schema.Struct({ tooFarBehind: Schema.Literal(true) })
+export type ReplayTooFarBehind = typeof ReplayTooFarBehind.Type
+
+/** Replay result: the missed events (unchanged array shape), or ReplayTooFarBehind. */
+export const ReplayEventsResult = Schema.Union([Schema.Array(DomainEvent), ReplayTooFarBehind])
+export type ReplayEventsResult = typeof ReplayEventsResult.Type
+
 /** 5. Replay events since a given sequence number (unary) */
 export const ReplayEventsRpc = Rpc.make(WS_METHODS.replayEvents, {
   payload: Schema.Struct({ fromSequence: SequenceNumber }),
-  success: Schema.Array(DomainEvent),
+  success: ReplayEventsResult,
   error: PanRpcError,
 })
 
@@ -480,6 +517,8 @@ export const SubscribeConversationMessagesRpc = Rpc.make(WS_METHODS.subscribeCon
   payload: Schema.Struct({
     conversationName: Schema.String,
     agentId: Schema.optional(Schema.String),
+    /** PAN-4558: what the client already holds; the server sends only newer or newly settled rows. */
+    resume: Schema.optional(ConversationResume),
   }),
   success: ConversationEvent,
   error: PanRpcError,

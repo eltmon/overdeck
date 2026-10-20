@@ -48,6 +48,8 @@ export interface ForkViaServerOptions {
   packs?: string[];
   /** Launch without sending the kickoff (PAN-4499). */
   hold?: boolean;
+  /** PAN-4565: no summary, no author, no parent link. */
+  fresh?: boolean;
   /** Who is asking; defaults to the caller's own environment. */
   callerKind?: 'operator' | 'agent';
 }
@@ -149,6 +151,7 @@ export async function forkConversationViaServer(
   if (opts.skills?.length) body['skills'] = opts.skills;
   if (opts.packs?.length) body['packs'] = opts.packs;
   if (opts.hold) body['hold'] = true;
+  if (opts.fresh) body['fresh'] = true;
 
   let res: Response;
   try {

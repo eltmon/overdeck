@@ -24,10 +24,15 @@ let running: Promise<unknown>;
 let events: ConversationEvent[];
 // Effect schedules queued offers on the next tick after promises resolve.
 const flush = () => vi.advanceTimersByTimeAsync(1);
-const start = (parse: (path: string) => Promise<ParseResult>, resolve = async () => '/tmp/rollout.jsonl', subagents = false) => {
+const start = (
+  parse: (path: string) => Promise<ParseResult>,
+  resolve = async () => '/tmp/rollout.jsonl',
+  subagents = false,
+  resume?: Parameters<typeof streamResolvedFullParseSnapshots>[5],
+) => {
   controller = new AbortController();
   events = [];
-  running = Effect.runPromise(streamResolvedFullParseSnapshots(resolve, parse, null, false, subagents).pipe(
+  running = Effect.runPromise(streamResolvedFullParseSnapshots(resolve, parse, null, false, subagents, resume).pipe(
     Stream.runForEach(event => Effect.sync(() => { events.push(event); })),
   ), { signal: controller.signal }).catch(() => {});
 };
@@ -109,4 +114,18 @@ describe('full parser stream lifecycle', () => {
     expect(resolve).toHaveBeenCalledTimes(1);
   });
 
+  it('stamps the window with the transcript id and resumes from it (PAN-4558)', async () => {
+    const sequenced = (): ParseResult => ({ ...parsed(), messages: [
+      { id: 'a', role: 'user', text: 'old', createdAt: '2026-09-09', sequence: 1 },
+      { id: 'b', role: 'assistant', text: 'new', createdAt: '2026-09-10', sequence: 2 },
+    ] });
+    start(async () => sequenced());
+    await flush();
+    expect(events[0]).toMatchObject({ snapshot: true, window: { transcript: '1:2', hasOlder: false } });
+    controller.abort(); await flush(); await running;
+
+    start(async () => sequenced(), undefined, false, { afterSequence: 1, openIds: [], transcript: '1:2' });
+    await flush();
+    expect(events[0]).toMatchObject({ snapshot: false, metadataSnapshot: true, messages: [{ id: 'b' }], workLog: [] });
+  });
 });

@@ -45,6 +45,7 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'POST /api/conversations/:name/compact',
   'POST /api/conversations/:name/abort',
   'GET /api/conversations/:name/messages',
+  'GET /api/conversations/:name/tool-body/:toolUseId',
   'GET /api/conversations/:name/message-locator',
   'POST /api/conversations/:name/upload-image',
   'POST /api/conversations/:name/delete-image',
@@ -100,7 +101,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(source).toMatch(/export\s+const\s+conversationsRouteLayer\s*=/);
   });
 
-  it('keeps all 41 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 42 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -123,6 +124,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(41);
+    expect(liveRoutes.size).toBe(42);
   });
 });

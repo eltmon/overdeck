@@ -1,6 +1,6 @@
 ---
 name: pan-handoff
-description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737). Pass --title to name the successor."
+description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. Keep the focus short and steering; the hard cap is 10000 characters (PAN-3737). Pass --title to name the successor. --fresh starts a clean conversation with no summary and no parent link."
 triggers:
   - pan handoff
   - hand off conversation
@@ -116,6 +116,17 @@ pan handoff start 371
 
 This sends the held kickoff exactly once. A second `pan handoff start` on the same conversation — or any attempt on a conversation that was never held — exits 1 with "No held kickoff: the conversation was already started or was never held".
 
+## Fresh start
+
+Use `--fresh` when you want a clean conversation that only borrows the source's defaults (project, cwd, model, effort) — not its context. No handoff document is authored, no summary is generated, the source transcript is never read, and the successor has no parent link. The focus becomes the successor's first message verbatim, instead of being handed to an author.
+
+```bash
+pan handoff self --fresh build a new Dwarf Fortress fort
+pan handoff 2185 --fresh --model claude-haiku-4-5 --cwd /home/you/Projects/df-wt start a new fort
+```
+
+This is the right tool for starting unrelated work from a conversation you're already in — e.g. kicking off a Dwarf Fortress fort on a cheaper model from a Project Zomboid research conversation — without carrying any of that context forward. `--fresh` is handoff-only: combining it with `--author source` or `--author-model` is rejected (there is no document to author), and `--fresh --hold` needs focus text, since there would otherwise be nothing to hold.
+
 ## When to use
 
 - A long-running conversation is near the context wall.
@@ -124,7 +135,7 @@ This sends the held kickoff exactly once. A second `pan handoff start` on the sa
 
 To launch a parallel lane, use `pan lane start`, not `pan handoff`.
 
-The successor nests under the source conversation in the Command Deck and the Agents History, and shows `continues ← #<id>`.
+The successor nests under the source conversation in the Command Deck and the Agents History, and shows `continues ← #<id>` — except a `--fresh` successor, which is a top-level conversation with no `continues ←` link.
 
 Use a normal summary fork when a quick passive summary is enough. Use a plain fork only when staying within Claude Code-compatible raw history.
 

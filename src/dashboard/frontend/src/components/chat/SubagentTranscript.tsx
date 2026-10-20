@@ -1,10 +1,13 @@
+import { useMemo } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { SubagentComposer } from './SubagentComposer';
 import { MessagesTimeline } from './MessagesTimeline';
 import type { SubagentSummary } from './chat-types';
 import { getWorkingPhase } from '../../lib/workingPhase';
-import { useSubagentTranscript } from './useConversationMessagesStream';
+import { subagentTranscriptQueryKey, useSubagentTranscript } from './useConversationMessagesStream';
+import { useOlderHistory } from './useOlderHistory';
+import { ToolBodyLoaderContext, toolBodyLoaderFor } from './messagesTimeline/toolBodyLoader';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 interface SubagentTranscriptProps {
@@ -35,6 +38,16 @@ export function SubagentTranscript({
   onTargetMessageHandled,
 }: SubagentTranscriptProps) {
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
+  // PAN-4558: older rows of the subagent transcript page in on scroll.
+  const olderHistory = useOlderHistory({
+    queryKey: subagentTranscriptQueryKey(conversation.name, subagent.agentId),
+    pagePath: `/api/conversations/${encodeURIComponent(conversation.name)}/messages?agentId=${encodeURIComponent(subagent.agentId)}`,
+    history: transcript.data?.history,
+  });
+  const toolBodyLoader = useMemo(() => toolBodyLoaderFor(
+    `/api/conversations/${encodeURIComponent(conversation.name)}/tool-body`,
+    `?agentId=${encodeURIComponent(subagent.agentId)}`,
+  ), [conversation.name, subagent.agentId]);
   // Codex snapshots deliberately report streaming=false. Child lifecycle comes
   // from the subagent list; the parent's activity must never light up this view.
   const isWorking = !conversation.endedAt && conversation.sessionAlive
@@ -69,6 +82,7 @@ export function SubagentTranscript({
             Couldn&apos;t load this subagent transcript.
           </div>
         ) : (
+          <ToolBodyLoaderContext.Provider value={toolBodyLoader}>
           <MessagesTimeline
             messages={transcript.data?.messages ?? []}
             workLog={transcript.data?.workLog ?? []}
@@ -82,7 +96,11 @@ export function SubagentTranscript({
             targetMessageIndex={targetMessageIndex}
             targetMessageNonce={targetMessageNonce}
             onTargetMessageHandled={onTargetMessageHandled}
+            history={olderHistory}
+            onLoadOlder={olderHistory.loadOlder}
+            onLoadOlderUntil={olderHistory.loadOlderUntil}
           />
+          </ToolBodyLoaderContext.Provider>
         )}
       </div>
       <SubagentComposer key={`${conversation.name}:${subagent.agentId}`} conversation={conversation} subagent={subagent} />

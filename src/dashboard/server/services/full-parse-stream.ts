@@ -2,9 +2,10 @@ import { Effect, Queue, Stream } from 'effect';
 import { watch as fsWatch } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
-import type { ConversationEvent, PanRpcError } from '@overdeck/contracts';
+import type { ConversationEvent, ConversationResume, PanRpcError } from '@overdeck/contracts';
 import type { ParseResult } from './conversation/types.js';
 import { createTranscriptDelta } from './transcript-delta.js';
+import { transcriptIdOf } from './conversation/window.js';
 import { listCodexSubagents } from './conversation/codex-subagents.js';
 import { startSubagentListPolling, type SubagentListPoller } from './conversation/subagents.js';
 
@@ -27,6 +28,8 @@ export function streamResolvedFullParseSnapshots(
   // has its file), so emitting an empty snapshot here never blanks real history.
   unresolvedMeansEmpty = false,
   discoverSubagents = false,
+  /** PAN-4558: what a resubscribing client already holds; applies to the first emission only. */
+  resume?: ConversationResume,
 ): Stream.Stream<ConversationEvent, PanRpcError> {
   return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
     Effect.acquireRelease(
@@ -54,7 +57,7 @@ export function streamResolvedFullParseSnapshots(
         // re-subscribed. We keep re-resolving (and switch to the newest file)
         // until content appears, which also covers a watcher that misses appends.
         let hasContent = false;
-        const delta = createTranscriptDelta(model);
+        const delta = createTranscriptDelta(model, resume);
         let previousFile: { dev: number; ino: number; size: number; mtimeMs: number; generation?: number } | undefined;
 
         const stopDiscovery = () => {
@@ -98,7 +101,7 @@ export function streamResolvedFullParseSnapshots(
               hasContent = true;
               stopDiscovery();
             }
-            const event = delta(result, reset);
+            const event = delta(result, reset, transcriptIdOf(before));
             if (event) offer(event);
             if (discoverSubagents) {
               if (subagentPoller) await subagentPoller.refresh();

@@ -34,6 +34,16 @@ describe('buildSimpleFeedEntries (PAN-3090 WI-1)', () => {
     expect(sys.raw).toBe(kickoff);
   });
 
+  it('treats the first loaded user message as a reply while older history is not loaded (PAN-4558)', () => {
+    const entries = buildSimpleFeedEntries({
+      messages: [msg({ id: 'u9', role: 'user', text: 'a later reply' })],
+      workLog: [],
+      issueTitle: TITLE,
+      hasOlder: true,
+    });
+    expect(entries).toEqual([expect.objectContaining({ kind: 'reply', text: 'a later reply' })]);
+  });
+
   it('renders later user messages as neutral replies, never attributed', () => {
     const entries = buildSimpleFeedEntries({
       messages: [

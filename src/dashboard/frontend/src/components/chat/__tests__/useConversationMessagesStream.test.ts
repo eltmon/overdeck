@@ -2,15 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WS_METHODS } from '@overdeck/contracts';
 import type { ConversationEvent } from '../chat-types';
 
 const transportMock = vi.hoisted(() => ({
   listeners: [] as Array<(event: ConversationEvent) => void>,
+  factories: [] as Array<(client: unknown) => unknown>,
 }));
 
 vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => ({
-    subscribe: (_createStream: unknown, listener: (event: ConversationEvent) => void) => {
+    subscribe: (createStream: (client: unknown) => unknown, listener: (event: ConversationEvent) => void) => {
+      transportMock.factories.push(createStream);
       transportMock.listeners.push(listener);
       return vi.fn();
     },
@@ -33,7 +36,17 @@ function createWrapper() {
 
 beforeEach(() => {
   transportMock.listeners.length = 0;
+  transportMock.factories.length = 0;
 });
+
+/** Runs a recorded subscribe factory, as the transport does on every (re)connect, and returns its payload. */
+function subscribePayload(index: number): Record<string, unknown> {
+  let payload: Record<string, unknown> = {};
+  transportMock.factories[index]!({
+    [WS_METHODS.subscribeConversationMessages]: (input: Record<string, unknown>) => { payload = input; return null; },
+  });
+  return payload;
+}
 
 describe('useConversationMessagesStream', () => {
   const conversation = {
@@ -231,3 +244,45 @@ describe('full parser delta no-loss audit', () => {
       .toMatchObject({ messages: [], workLog: [] });
   });
 });
+
+describe('windowed history (PAN-4558)', () => {
+  const at = (i: number) => new Date(Date.UTC(2026, 9, 19) + i * 1000).toISOString();
+  const message = (i: number) => ({ id: `m${i}`, role: 'user' as const, text: `m${i}`, createdAt: at(i), sequence: i });
+  const cursor = (i: number) => JSON.stringify([at(i), i, 0, `m${i}`]);
+
+  it('keeps paged-in older rows when a windowed snapshot arrives', () => {
+    const previous = {
+      messages: [message(0), message(1), message(2), message(3)],
+      workLog: [],
+      streaming: false,
+      history: { cursor: cursor(0), hasOlder: true, transcript: '1:2' },
+    };
+    const next = applyConversationMessagesEvent(previous, {
+      kind: 'messages', messages: [message(2), message(3), message(4)], workLog: [], streaming: true, snapshot: true,
+      window: { cursor: cursor(2), hasOlder: true, transcript: '1:2' },
+    });
+    expect(next.messages.map((m) => m.id)).toEqual(['m0', 'm1', 'm2', 'm3', 'm4']);
+    expect(next.history).toEqual({ cursor: cursor(0), hasOlder: true, transcript: '1:2' });
+    expect(next.streaming).toBe(true);
+  });
+
+  it('sends no resume on the first subscribe and the cache state on a resubscribe', () => {
+    renderHook(
+      () => useConversationMessagesStream({ id: 1, name: 'conv-resume', sessionAlive: true, harness: 'claude-code' }),
+      { wrapper: createWrapper() },
+    );
+    expect(subscribePayload(0)).toEqual({ conversationName: 'conv-resume' });
+
+    act(() => {
+      transportMock.listeners[0]!({
+        kind: 'messages', messages: [message(0), { ...message(1), role: 'assistant' }], workLog: [], streaming: true, snapshot: true,
+        window: { cursor: cursor(0), hasOlder: false, transcript: '1:2' },
+      });
+    });
+    expect(subscribePayload(0)).toEqual({
+      conversationName: 'conv-resume',
+      resume: { afterSequence: 1, openIds: ['m1'], transcript: '1:2' },
+    });
+  });
+});
+

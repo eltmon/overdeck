@@ -6,6 +6,7 @@ import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { loadConfigSync } from './config-yaml.js';
+import type { HarnessBinaryConfigKey } from '@overdeck/contracts';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
 
@@ -237,10 +238,14 @@ export function harnessBinaryName(harness: RuntimeName): string {
   return HARNESS_BINARY_BY_RUNTIME[harness];
 }
 
+const CONFIGURED_BINARY_PATH: Record<HarnessBinaryConfigKey, () => string | undefined> = {
+  'acp.kimi.binaryPath': () => loadConfigSync().config.acp?.kimi?.binaryPath,
+  'kimiCode.binaryPath': () => loadConfigSync().config.kimiCode?.binaryPath,
+};
+
 export function configuredHarnessBinaryPath(harness: RuntimeName): string | undefined {
-  if (harness === 'acp') return loadConfigSync().config.acp?.kimi?.binaryPath;
-  if (harness === 'kimi-code') return loadConfigSync().config.kimiCode?.binaryPath;
-  return undefined;
+  const key = getHarnessBehavior(harness).capabilities.binaryConfigKey;
+  return key === null ? undefined : CONFIGURED_BINARY_PATH[key]();
 }
 
 function withConfiguredExecutable(
@@ -275,15 +280,7 @@ export async function requireHarnessBinary(
   const { path: resolved, windowsInterop } = await resolveExecutableDetailed(binary, effectiveOptions);
   if (resolved) return resolved;
 
-  const harnessName = harness === 'claude-code'
-    ? 'Claude Code'
-    : harness === 'ohmypi'
-      ? 'OhMyPi'
-      : harness === 'codex'
-        ? 'Codex CLI'
-        : harness === 'kimi-code' || harness === 'acp'
-          ? 'Kimi Code CLI' // acp drives the native Kimi Code CLI binary too
-          : getHarnessBehavior(harness).displayName; // "OpenCode", "Muse Code", "Prime Agent"
+  const { binaryLabel: harnessName, installHint } = getHarnessBehavior(harness).capabilities;
   if (windowsInterop.length > 0) {
     // The only usable-looking candidate is the Windows install reached through
     // WSL interop. Launching it "works" — the pane shows a live TUI — but its
@@ -292,7 +289,7 @@ export async function requireHarnessBinary(
     throw new Error(
       `${harnessName} executable "${binary}" only resolves to a Windows install through WSL interop (${windowsInterop[0]}). ` +
         `Windows binaries run outside this distro and write their transcripts to the Windows user profile, where Overdeck cannot read them. ` +
-        `Install ${harnessName} inside WSL${harness === 'claude-code' ? ' (curl -fsSL https://claude.ai/install.sh | bash)' : ''}, then restart Overdeck. No terminal session was created.`,
+        `Install ${harnessName} inside WSL${installHint ? ` (${installHint})` : ''}, then restart Overdeck. No terminal session was created.`,
     );
   }
   if (effectiveOptions.executablePath) {
@@ -324,7 +321,7 @@ export async function prepareHarnessLaunch(
 ): Promise<{ binaryPath: string; pathExport: string }> {
   const { model, ...resolution } = options ?? {};
   const binaryPath = await requireHarnessBinary(harness, resolution);
-  if (harness === 'claude-code') {
+  if (getHarnessBehavior(harness).capabilities.launchPreflight === 'claude-code-model-minimum') {
     const { assertClaudeCodeSupportsModel } = await import('./claude-code/requirements.js');
     await assertClaudeCodeSupportsModel(binaryPath, model);
   }

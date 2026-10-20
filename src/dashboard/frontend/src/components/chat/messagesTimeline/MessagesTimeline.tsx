@@ -52,6 +52,9 @@ import {
   highlightSearchTermsInElement,
 } from './helpers';
 
+/** PAN-4558: scrolling within this distance of the top loads the next older page. */
+const LOAD_OLDER_THRESHOLD_PX = 400;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -85,6 +88,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
   bookmarksEnabled = false,
+  history,
+  onLoadOlder,
+  onLoadOlderUntil,
 }: MessagesTimelineProps) {
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -116,12 +122,20 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [flashRowId, setFlashRowId] = useState<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
+  // PAN-4558 FR-14: a boundary older than the oldest loaded row would render
+  // at the top of a partial history, so show it only once its rows are loaded.
+  const visibleCompactBoundaries = useMemo(() => {
+    if (!compactBoundaries || !history?.hasOlder) return compactBoundaries;
+    const oldestLoaded = timelineEntries.find((entry) => entry.createdAt)?.createdAt;
+    if (!oldestLoaded) return compactBoundaries;
+    return compactBoundaries.filter((boundary) => boundary.timestamp >= oldestLoaded);
+  }, [compactBoundaries, history?.hasOlder, timelineEntries]);
   // Compact boundaries are interleaved (and split work groups) inside
   // deriveMessagesTimelineRows — injecting them here against grouped rows
   // pushed mid-group boundaries to the end of the timeline (PAN-2576).
   const baseRows = useMemo(
-    () => deriveMessagesTimelineRows(timelineEntries, streaming, compactBoundaries),
-    [timelineEntries, streaming, compactBoundaries],
+    () => deriveMessagesTimelineRows(timelineEntries, streaming, visibleCompactBoundaries),
+    [timelineEntries, streaming, visibleCompactBoundaries],
   );
   const rows = useMemo(() => {
     let result = baseRows;
@@ -254,6 +268,24 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     return () => ro.disconnect();
   }, []);
 
+  // PAN-4558: keep the visible content still when older rows are prepended.
+  // The anchor records the first row and the scroll geometry after every
+  // render and scroll; a new first row that pushed the old one down shifts
+  // scrollTop by the height the prepend added.
+  const prependAnchorRef = useRef<{ firstRowId: string; scrollHeight: number; scrollTop: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    const firstRowId = rows[0]?.id;
+    const anchor = prependAnchorRef.current;
+    if (el && anchor && firstRowId && firstRowId !== anchor.firstRowId && !isPinnedToBottomRef.current
+      && rows.some((row) => row.id === anchor.firstRowId)) {
+      el.scrollTop = anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight);
+    }
+    prependAnchorRef.current = el && firstRowId
+      ? { firstRowId, scrollHeight: el.scrollHeight, scrollTop: el.scrollTop }
+      : null;
+  }, [rows]);
+
   // Auto-scroll to bottom when row count changes (new message added)
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -312,6 +344,11 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+    if (prependAnchorRef.current) {
+      prependAnchorRef.current.scrollTop = el.scrollTop;
+      prependAnchorRef.current.scrollHeight = el.scrollHeight;
+    }
+    if (el.scrollTop < LOAD_OLDER_THRESHOLD_PX && history?.hasOlder && !history.loadingOlder) onLoadOlder?.();
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     const atBottom = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
     if (atBottom) {
@@ -327,7 +364,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isPinnedToBottomRef.current = false;
       setShowScrollToBottom(true);
     }
-  }, []);
+  }, [history?.hasOlder, history?.loadingOlder, onLoadOlder]);
 
   const searchMatches = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
@@ -344,7 +381,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       ? rows.findIndex((row) => row.kind === 'message' && row.message.id === targetMessageId)
       : -1;
     if (byId >= 0) return { row: rows[byId]!, index: byId };
-    if (targetMessageIndex === undefined) return null;
+    // PAN-4558: message indexes count from the first loaded row, so they only
+    // mean the transcript index once nothing older remains to load.
+    if (targetMessageIndex === undefined || history?.hasOlder) return null;
     let messageIndex = 0;
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
       const row = rows[rowIndex]!;
@@ -353,7 +392,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       messageIndex += 1;
     }
     return null;
-  }, [rows, targetMessageId, targetMessageIndex]);
+  }, [rows, targetMessageId, targetMessageIndex, history?.hasOlder]);
   const targetMessageKey = targetMessageId || targetMessageIndex !== undefined
     ? `${targetMessageNonce ?? 'no-nonce'}:${targetMessageId ?? ''}:${targetMessageIndex ?? ''}`
     : null;
@@ -388,6 +427,16 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     scrollToRow(match.index, match.row.id);
   }, [scrollToRow, searchMatches]);
 
+  // PAN-4558: a target outside the loaded window pages older history in until
+  // it appears; the effect below then scrolls to it.
+  const loadingTargetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (targetMessageRow || !targetMessageKey || !targetMessageId || !history?.hasOlder || !onLoadOlderUntil) return;
+    if (loadingTargetKeyRef.current === targetMessageKey) return;
+    loadingTargetKeyRef.current = targetMessageKey;
+    void onLoadOlderUntil(targetMessageId);
+  }, [targetMessageRow, targetMessageKey, targetMessageId, history?.hasOlder, onLoadOlderUntil]);
+
   useEffect(() => {
     if (!targetMessageRow || !targetMessageKey) return;
     if (handledTargetKeyRef.current === targetMessageKey) return;
@@ -396,20 +445,35 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     onTargetMessageHandled?.();
   }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
+  const loadingJumpNonceRef = useRef<number | null>(null);
   useEffect(() => {
     if (!jumpRequest) return;
-    if (handledJumpNonceRef.current === jumpRequest.nonce) return;
-    handledJumpNonceRef.current = jumpRequest.nonce;
-    const index = rows.findIndex((row) => row.kind === 'message' && row.message.id === jumpRequest.messageId);
+    const { nonce, messageId } = jumpRequest;
+    if (handledJumpNonceRef.current === nonce) return;
+    const index = rows.findIndex((row) => row.kind === 'message' && row.message.id === messageId);
     if (index >= 0) {
+      handledJumpNonceRef.current = nonce;
       const row = rows[index]!;
       scrollToRow(index, row.id);
       setFlashRowId(row.id);
-      bookmarksCtx?.resolveJump(jumpRequest.nonce, true);
-    } else {
-      bookmarksCtx?.resolveJump(jumpRequest.nonce, false);
+      bookmarksCtx?.resolveJump(nonce, true);
+      return;
     }
-  }, [jumpRequest, rows, scrollToRow, bookmarksCtx]);
+    // PAN-4558: a bookmark outside the loaded window pages older history in;
+    // this effect re-runs on the new rows and scrolls once the row is loaded.
+    if (history?.hasOlder && onLoadOlderUntil) {
+      if (loadingJumpNonceRef.current === nonce) return;
+      loadingJumpNonceRef.current = nonce;
+      void onLoadOlderUntil(messageId).then((found) => {
+        if (found || handledJumpNonceRef.current === nonce) return;
+        handledJumpNonceRef.current = nonce;
+        bookmarksCtx?.resolveJump(nonce, false);
+      });
+      return;
+    }
+    handledJumpNonceRef.current = nonce;
+    bookmarksCtx?.resolveJump(nonce, false);
+  }, [jumpRequest, rows, scrollToRow, bookmarksCtx, history?.hasOlder, onLoadOlderUntil]);
 
   useEffect(() => {
     if (!flashRowId) return;
@@ -489,6 +553,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         style={{ flex: 1 }}
       >
       <div ref={innerRef} className={styles.messagesTimelineInner}>
+        {history?.loadingOlder && <div className={styles.timelineHistoryEdge}>Loading earlier messages…</div>}
+        {!history?.loadingOlder && history?.loadedOlder && !history.hasOlder && (
+          <div className={styles.timelineHistoryEdge}>Start of conversation</div>
+        )}
         {/* Virtual section — rows stack in normal flow under one translated
             wrapper, so two rows can never overlap while a measurement is
             pending (PAN-4497). */}

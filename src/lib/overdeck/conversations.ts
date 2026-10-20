@@ -231,6 +231,7 @@ export interface ForkRequest {
   title?: string;
   /** PAN-4499: launch without sending the kickoff. */
   hold?: boolean;
+  /** PAN-4565: no summary, no author, no parent link; the focus is the kickoff. */ fresh?: boolean;
 }
 
 /** Gauntlet lane roles (PAN-4223 glossary). Stored verbatim in `conversations.lane_role`. */

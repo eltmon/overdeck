@@ -344,6 +344,8 @@ The dialog keeps the common case to one screen. Everything else lives behind
 If a source-authored handoff stalls or produces an invalid document, Overdeck
 falls back to a summary fork automatically.
 
+Under **Agent handoff**, a **Fresh start** checkbox sits beside Hold. Checking it skips authoring entirely: the Focus field relabels to "First message", the Authored-by controls disappear, and Continue creates a root conversation with no parent link whose first message is the focus text verbatim.
+
 ## The help panel
 
 Every option in the dialog is explained inline — click the **?** to open the
@@ -415,6 +417,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--skill <name>` | Turn this skill on for the new conversation only (repeatable). `<name>` is a native skill name or a pack skill id `<pack>/<skill>`. |
 | `--pack <id>` | Turn on every non-opt-in skill of this cached skill pack, for the new conversation only (repeatable). |
 | `--hold` | Create and launch the new conversation without sending the kickoff. Start it with Send in the dashboard composer, or `pan handoff start <conv>`. |
+| `--fresh` | Start a clean conversation: no handoff document, no summary, no parent link. The focus becomes its first message. Project, cwd, model and effort still default from the source. |
 
 <Note>
 **Focus is hard-capped at 10,000 characters** (PAN-3737; multi-line is fine). A longer focus is rejected with
@@ -439,6 +442,16 @@ text already filled in; pressing Send there starts it. From the terminal, run
 exactly once. A second `pan handoff start` on the same conversation, or one on
 a conversation that was never held, exits 1 with "No held kickoff: the
 conversation was already started or was never held".
+
+### Starting fresh
+
+`--fresh` starts a clean conversation that takes only the source's project, cwd, model and effort — not its context. No handoff document is authored, no summary is generated, the source transcript is never read, and the successor has no parent link (no `continues ← #<id>`). The focus is delivered verbatim as the successor's first message:
+
+```bash
+pan handoff self --fresh build a new Dwarf Fortress fort
+```
+
+This is the right tool for starting unrelated work from a conversation you're already in — e.g. kicking off a fort-building session on a cheaper model from a research conversation — without carrying any of that context forward.
 
 ### Fallback behavior
 

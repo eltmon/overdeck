@@ -1,0 +1,384 @@
+{
+  "version": "1",
+  "issueId": "PAN-4558",
+  "created": "2026-10-20T02:56:44.706Z",
+  "updated": "2026-10-20T05:53:55.658Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-window-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T02:56:44.706Z",
+      "doneAt": "2026-10-20T03:09:25.251Z"
+    },
+    "wi2-wire-projection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:09:42.437Z",
+      "doneAt": "2026-10-20T03:12:54.452Z"
+    },
+    "wi3-extract-claude-stream": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:12:59.788Z",
+      "doneAt": "2026-10-20T03:16:41.079Z"
+    },
+    "wi4-window-selection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:16:47.496Z",
+      "doneAt": "2026-10-20T03:23:35.383Z"
+    },
+    "wi5-http-window-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:23:43.037Z",
+      "doneAt": "2026-10-20T03:31:19.821Z"
+    },
+    "wi6-http-tool-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:31:36.836Z",
+      "doneAt": "2026-10-20T03:37:14.084Z"
+    },
+    "wi7-agents-route-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:37:20.814Z",
+      "doneAt": "2026-10-20T03:41:57.734Z"
+    },
+    "wi8-claude-ws-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:42:07.228Z",
+      "doneAt": "2026-10-20T03:52:47.435Z"
+    },
+    "wi9-fullparse-ws-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:52:53.926Z",
+      "doneAt": "2026-10-20T03:56:35.410Z"
+    },
+    "wi15-payload-budget-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:56:43.192Z",
+      "doneAt": "2026-10-20T03:58:02.330Z"
+    },
+    "wi10-extract-messages-query": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:58:10.903Z",
+      "doneAt": "2026-10-20T04:00:08.052Z"
+    },
+    "wi11-client-cache-merge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:00:23.784Z",
+      "doneAt": "2026-10-20T04:04:03.123Z"
+    },
+    "wi12-http-query-merge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:04:15.023Z",
+      "doneAt": "2026-10-20T04:09:27.083Z"
+    },
+    "wi13-load-older-history": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:09:34.434Z",
+      "doneAt": "2026-10-20T04:25:38.774Z"
+    },
+    "wi14-tool-body-on-expand": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:25:46.223Z",
+      "doneAt": "2026-10-20T04:29:01.715Z"
+    },
+    "wi16-jump-outside-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:29:10.430Z",
+      "doneAt": "2026-10-20T04:31:41.046Z"
+    },
+    "wi17-export-and-simple-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:31:47.452Z",
+      "doneAt": "2026-10-20T04:43:43.935Z"
+    },
+    "wi19-register-frontend-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:43:59.389Z",
+      "doneAt": "2026-10-20T04:57:42.314Z"
+    },
+    "wi18-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T04:55:51.074Z",
+      "doneAt": "2026-10-20T04:56:06.570Z"
+    },
+    "wi1-window-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:12:45.642Z"
+    },
+    "wi1-window-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:13:59.834Z"
+    },
+    "wi1-window-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:13.364Z"
+    },
+    "wi1-window-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:27.865Z"
+    },
+    "wi2-wire-projection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:41.686Z"
+    },
+    "wi2-wire-projection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:55.323Z"
+    },
+    "wi2-wire-projection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:15:10.379Z"
+    },
+    "wi3-extract-claude-stream.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:15:26.187Z"
+    },
+    "wi3-extract-claude-stream.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:15:41.375Z"
+    },
+    "wi4-window-selection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:15:56.881Z"
+    },
+    "wi4-window-selection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:16:11.074Z"
+    },
+    "wi4-window-selection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:16:25.648Z"
+    },
+    "wi4-window-selection.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:16:39.994Z"
+    },
+    "wi4-window-selection.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:16:55.936Z"
+    },
+    "wi5-http-window-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:17:10.055Z"
+    },
+    "wi5-http-window-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:17:23.497Z"
+    },
+    "wi5-http-window-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:17:36.572Z"
+    },
+    "wi5-http-window-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:17:49.700Z"
+    },
+    "wi6-http-tool-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:02.922Z"
+    },
+    "wi6-http-tool-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:16.031Z"
+    },
+    "wi6-http-tool-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:28.733Z"
+    },
+    "wi7-agents-route-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:41.474Z"
+    },
+    "wi7-agents-route-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:54.380Z"
+    },
+    "wi7-agents-route-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:19:07.458Z"
+    },
+    "wi7-agents-route-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:19:20.871Z"
+    },
+    "wi8-claude-ws-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:19:33.847Z"
+    },
+    "wi8-claude-ws-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:19:46.909Z"
+    },
+    "wi8-claude-ws-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:00.080Z"
+    },
+    "wi8-claude-ws-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:15.331Z"
+    },
+    "wi9-fullparse-ws-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:30.274Z"
+    },
+    "wi9-fullparse-ws-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:20:44.958Z"
+    },
+    "wi9-fullparse-ws-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:01.189Z"
+    },
+    "wi9-fullparse-ws-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:15.945Z"
+    },
+    "wi10-extract-messages-query.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:30.657Z"
+    },
+    "wi10-extract-messages-query.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:45.663Z"
+    },
+    "wi11-client-cache-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:21:59.821Z"
+    },
+    "wi11-client-cache-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:22:14.547Z"
+    },
+    "wi11-client-cache-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:22:28.680Z"
+    },
+    "wi11-client-cache-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:22:41.547Z"
+    },
+    "wi12-http-query-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:22:54.986Z"
+    },
+    "wi12-http-query-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:23:08.315Z"
+    },
+    "wi12-http-query-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:23:21.587Z"
+    },
+    "wi13-load-older-history.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:23:34.679Z"
+    },
+    "wi13-load-older-history.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:23:47.891Z"
+    },
+    "wi13-load-older-history.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:24:01.439Z"
+    },
+    "wi13-load-older-history.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:24:14.759Z"
+    },
+    "wi14-tool-body-on-expand.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:24:28.244Z"
+    },
+    "wi14-tool-body-on-expand.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:24:42.631Z"
+    },
+    "wi14-tool-body-on-expand.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:24:57.336Z"
+    },
+    "wi14-tool-body-on-expand.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:25:14.777Z"
+    },
+    "wi15-payload-budget-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:25:30.297Z"
+    },
+    "wi15-payload-budget-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:25:45.023Z"
+    },
+    "wi15-payload-budget-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:25:59.811Z"
+    },
+    "wi16-jump-outside-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:26:13.275Z"
+    },
+    "wi16-jump-outside-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:26:28.849Z"
+    },
+    "wi16-jump-outside-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:26:44.176Z"
+    },
+    "wi17-export-and-simple-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:27:00.178Z"
+    },
+    "wi17-export-and-simple-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:27:15.590Z"
+    },
+    "wi17-export-and-simple-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:27:30.733Z"
+    },
+    "wi18-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:27:45.784Z"
+    },
+    "wi18-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:28:01.772Z"
+    },
+    "wi18-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:28:16.941Z"
+    },
+    "wi19-register-frontend-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:28:31.866Z"
+    },
+    "wi19-register-frontend-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:28:47.952Z"
+    }
+  },
+  "feedback": []
+}

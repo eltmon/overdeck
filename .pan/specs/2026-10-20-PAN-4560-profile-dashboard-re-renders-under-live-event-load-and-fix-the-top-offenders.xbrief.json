@@ -1,0 +1,1158 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T03:20:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4560: Profile dashboard re-renders under live event load and fix the top offenders",
+    "updated": "2026-10-20T03:13:10.378Z"
+  },
+  "plan": {
+    "id": "pan-4560",
+    "title": "Profile dashboard re-renders under live event load and fix the top offenders",
+    "status": "running",
+    "uid": "e84d516e-b14d-407e-973b-b131680888c0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-20T03:20:00Z",
+    "updated": "2026-10-20T03:13:10.378Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4560",
+        "label": "PAN-4560",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4561",
+        "label": "PAN-4561",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "performance",
+      "dashboard",
+      "frontend",
+      "react",
+      "zustand"
+    ],
+    "metadata": {
+      "sizeJustification": "About 37 files across 6 subsystems. Eight of those files are the new render-count harness and its seven tests, which AC #4 requires per fixed path; six more are existing tests that must keep passing. ACs #1-#3 are measured by one profiling harness in one baseline/after run, so splitting the streaming path into a sibling issue would duplicate the profiling runs and split the operator-written acceptance list. Each item is a separate commit with its own test.",
+      "canonicalFilename": "2026-10-20-PAN-4560-profile-dashboard-re-renders-under-live-event-load-and-fix-the-top-offenders.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Nobody has measured dashboard re-renders under live events. A static census found structural causes on the Command Deck route: runtime events rewrite agentsById to bump an unread field (event-reducers.ts bumpRuntimeSnapshotSequence) at least twice per tool call; selectBackendPanes builds a fresh array, so every issue row re-renders on every store set (via useIssueActions in FeatureItem); useIssueActions, App and CommandDeck subscribe to whole agent and issue slices, so one change re-renders the whole tree; IssueMissionControl subscribes to every agent; a streamed delta re-renders ComposerFooter; a conversation-list poll re-renders every row.",
+      "Proposal": "Add a render-count test harness and a repeatable profiling tool (react-dom/profiling build, bippy probe, Playwright scenarios against the live dashboard on port 3010 with in-page synthetic load). Post a baseline table. Fix the offenders with narrow selectors, identity-keeping selectors and reducers, call-time getState() reads in handlers, a leaf host for App's live-store subscriptions, a memoized ComposerFooter with stable props, and a memoized ConversationListItem. Guard each path with a render-count test, document the rules in docs/DASHBOARD-ARCHITECTURE.md, post the after table and file one follow-up issue for the rest.",
+      "NonGoals": "- No shared clock for relative-time labels and no removal of App's 5 s backend-health poll re-render (follow-up issue)\n- No identity preservation for equal-data agent.enrichment_changed, agent.status_changed or syncSnapshot (follow-up issue)\n- No timeline row reuse in deriveMessagesTimelineRows and no change to the composer's duplicate text state (follow-up issue)\n- No fixes on the Kanban, Pipeline, GodView, Live Agents or Home pages (follow-up issue)\n- No React 19 upgrade and no React Compiler (PAN-4561)\n- No edits to the OKF knowledge bundle\n- No server-side event-emission changes\n- No user-visible behavior or visual changes\n- The profiling tool must never send a mutating request to the dashboard server\n- No allowlist raise in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope the outcome guarantees (AC #2, #3) to the Command Deck route: App shell, CommandDeck, project tree rows, conversation list, Stage and cockpit.",
+        "rationale": "The issue names the Command Deck, the sidebar and the open timeline; other pages have their own page-level aggregators and go to the follow-up issue, which keeps this plan reviewable."
+      },
+      {
+        "summary": "Aggregate chrome (pills, nav Sidebar, ConversationDock) is exempt from 'only the rows that show that issue or agent'.",
+        "rationale": "Those surfaces display cross-issue totals; render-count tests assert on an explicit non-aggregate set, so review has a mechanical target."
+      },
+      {
+        "summary": "Keep App's 5 s backend-health poll re-render; defer the shared clock for relative-time labels and the ticker fixes to the follow-up issue.",
+        "rationale": "Several labels advance only because of that re-render; removing it without a shared-clock sweep (~15 files) would freeze them, violating NFR-1. The ticker scenario is still profiled here as AC #1 requires."
+      },
+      {
+        "summary": "Profile against the live dashboard through vite preview on port 3010, with synthetic in-page events and stream deltas for determinism.",
+        "rationale": "Port 3010 is already a trusted origin (origin-validation.ts getTrustedOrigins), the live snapshot is the realistic load the issue asks for, and in-page synthetic events never reach the server (NFR-5)."
+      },
+      {
+        "summary": "Use bippy@0.7.3 (exact pin) injected by Playwright addInitScript, plus a react-dom/profiling alias with minify:false, instead of wrapping app components in <Profiler>.",
+        "rationale": "It gives per-component names and selfBaseDuration in a production build without touching app components; React DevTools cannot be driven headlessly."
+      },
+      {
+        "summary": "Document the rules in docs/DASHBOARD-ARCHITECTURE.md rather than the OKF frontend/state-management concept.",
+        "rationale": "The issue allows either; the OKF bundle is a separate repository outside this PR's review."
+      },
+      {
+        "summary": "Allow manual memo/useMemo/useCallback only where a render-count test proves the need (ComposerFooter, ConversationListItem, the composer prop hook, useConversationMutations); prefer structural fixes.",
+        "rationale": "PAN-4561 will remove manual memoization under the React Compiler; behavior-level render-count tests are the safety net for that removal."
+      },
+      {
+        "summary": "Keep the issue whole and set sizeJustification (about 37 files) rather than splitting the streaming path into a sibling issue.",
+        "rationale": "ACs #1-#3 are measured by one harness in one baseline/after run, and AC #4 requires a test per fixed path; splitting would duplicate the profiling runs and split the operator's acceptance list."
+      },
+      {
+        "summary": "Remove the runtimeSnapshotSequence schema field together with the reducer bump.",
+        "rationale": "git grep shows no reader; leaving an optional schema field that nothing writes would be an orphan created by this change."
+      }
+    ],
+    "items": [
+      {
+        "id": "render-counter",
+        "title": "Add the render-count test harness (renderCounter.tsx)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4560",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/test-utils/renderCounter.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "stable-pane-selector",
+            "narrow-issue-actions",
+            "command-deck-root-subscriptions",
+            "app-shell-subscriptions",
+            "cockpit-agent-isolation",
+            "streaming-composer-isolation",
+            "conversation-list-item-isolation"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/dashboard/frontend/src/test-utils/renderCounter.tsx exporting createRenderCounter() -> { Probe, count, counts, reset } (Probe wraps children in React <Profiler> and counts onRender calls whose phase !== 'mount'), applyStoreEvents(events) (act(() => useDashboardStore.getState().applyEvents(events))), resetDashboardStore() (setState(initialCapturedAtModuleLoad, true)) and seedDashboardStore(partial). Header comment states that tests assert render counts, never memo usage. Use the exact snippet in the PRD."
+        },
+        "items": [
+          {
+            "id": "render-counter.ac1",
+            "title": "Given a Probe-wrapped child that re-renders twice after mount, when count(id) is read, then it returns 2 and excludes the mount commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-counter.ac2",
+            "title": "Given seedDashboardStore was called in a test, when resetDashboardStore() runs, then useDashboardStore.getState() returns the initial state with every action function (applyEvents, openIssue) still callable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-counter.ac3",
+            "title": "Given an array of DomainEvents, when applyStoreEvents(events) is called, then the store applies them inside act() so React flushes the resulting renders before the call returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "profile-tooling",
+        "title": "Add the profiling build mode, bippy probe and Playwright scenario driver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4560",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/vite.config.ts",
+            "src/dashboard/frontend/package.json",
+            "bun.lock",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/tests/profiling/render-probe.ts",
+            "src/dashboard/frontend/tests/profiling/render-profile.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run build:profile",
+            "npm --prefix src/dashboard/frontend run test -- src/vite-proxy-config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            ".tmp/dashboard-profile/index.html exists after the build",
+            "vite-proxy-config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "profile-baseline",
+            "profile-after"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. vite.config.ts becomes defineConfig(({ mode }) => ...) with a 'profile' mode that aliases /^react-dom$/ to react-dom/profiling and builds to ../../../.tmp/dashboard-profile with minify:false (never the normal dist/dashboard/public outDir). Frontend package.json gains devDependency bippy@0.7.3 (exact) plus scripts build:profile ('vite build --mode profile') and preview:profile ('vite preview --mode profile --port 3010 --strictPort'); run bun install so bun.lock updates. main.tsx exposes window.__overdeckQueryClient only when import.meta.env.MODE === 'profile'. tests/profiling/render-probe.ts uses bippy instrument/traverseRenderedFibers/isCompositeFiber/getDisplayName to record per-component updates, mounts and fiber.selfBaseDuration, exposed as window.__renderProbe { begin, end }. tests/profiling/render-profile.spec.ts bundles the probe to an IIFE with Vite's build() JS API, injects it with addInitScript, and drives the four scenarios (S1 synthetic stream deltas via setQueryData, S2 synthetic event batches via applyEvents with sequence = current state.sequence, S3 composer typing without Enter, S4 65 s idle), writing .tmp/pan-4560-profile/<label>.json and .md. It never clicks a mutating control. Follow the implementation checkpoint in the PRD (react-dom/client alias fallback; stop and pan tell if the preview origin is rejected)."
+        },
+        "items": [
+          {
+            "id": "profile-tooling.ac1",
+            "title": "Given mode 'profile', when npm --prefix src/dashboard/frontend run build:profile runs, then it exits 0, writes .tmp/dashboard-profile/index.html, and leaves dist/dashboard/public untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-tooling.ac2",
+            "title": "Given a normal npm run build, when the built bundle is inspected, then it contains no __overdeckQueryClient assignment and no bippy code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-tooling.ac3",
+            "title": "Given the preview on port 3010 against a live dashboard, when PROFILE_LABEL=smoke npx playwright test tests/profiling/render-profile.spec.ts runs, then it writes .tmp/pan-4560-profile/smoke.md containing four scenario tables with at least one component whose total self ms is above 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-tooling.ac4",
+            "title": "Given the profiling spec source, when a reviewer reads it, then it sends no POST, PUT or DELETE request and clicks no start, stop, archive, merge or send control (synthetic events are applied in-page only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "profile-baseline",
+        "title": "Run the baseline render profile and post the table on PAN-4560",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/profiling/render-profile.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 4560 --comments"
+          ],
+          "expected_outputs": [
+            "a comment headed '## Render profile — baseline' is present"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Before any fix item commits: confirm port 3010 is free, run build:profile, start preview:profile in the background, run PROFILE_LABEL=baseline npx playwright test tests/profiling/render-profile.spec.ts from src/dashboard/frontend, post .tmp/pan-4560-profile/baseline.md with gh issue comment 4560 --body-file under the heading '## Render profile — baseline (<short sha>)', stop the preview. Commit nothing but an empty commit carrying the Item trailer."
+        },
+        "items": [
+          {
+            "id": "profile-baseline.ac1",
+            "title": "Given the baseline run finished, when gh issue view 4560 --comments is read, then a comment headed '## Render profile — baseline' shows four tables (streaming, burst, typing, tickers) with updates, mounts and self ms per component",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-baseline.ac2",
+            "title": "Given the branch history, when git log is read, then the baseline Item commit precedes every fix item commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-baseline.ac3",
+            "title": "Given the preview server was started for the run, when the item completes, then no process listens on port 3010",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-runtime-agent-bump",
+        "title": "Stop runtime events from rewriting agentsById",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/types.ts",
+            "tests/contracts/agent-runtime-reducers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/contracts/agent-runtime-reducers.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "agent-runtime-reducers.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Delete bumpRuntimeSnapshotSequence (event-reducers.ts:270-284) and the 12 'agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),' lines in the runtime cases (activity_changed, thinking_started/stopped, waiting_started/cleared, message_received, channel_reply, model_set, current_issue_set, context_saturation_changed, resolution_changed, state_restored). Delete runtimeSnapshotSequence from the AgentSnapshot schema (types.ts:392). Replace the test 'bumps AgentSnapshot.runtimeSnapshotSequence when agent exists' (agent-runtime-reducers.test.ts:375-390) with 'keeps agentsById identity on runtime events'."
+        },
+        "items": [
+          {
+            "id": "drop-runtime-agent-bump.ac1",
+            "title": "Given an existing agent, when agent.activity_changed, agent.thinking_started and agent.message_received are applied, then next.agentsById is the same object (toBe) as before while agentRuntimeById[agentId] holds the new activity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-runtime-agent-bump.ac2",
+            "title": "Given the repository after the change, when git grep -n runtimeSnapshotSequence runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-runtime-agent-bump.ac3",
+            "title": "Given tests/contracts/agent-runtime-reducers.test.ts, when npx vitest run tests/contracts/agent-runtime-reducers.test.ts runs, then every test passes including the rewritten identity test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stable-pane-selector",
+        "title": "Make selectBackendPanes keep identity per issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/lib/__tests__/selectBackendPanes.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/selectBackendPanes.render-count.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "selectBackendPanes.render-count.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Replace selectBackendPanes (store.ts:332-337) with a version cached per issueId.toUpperCase(): return the cached array when backendPanesById is the same object, or when the recomputed filter has the same element references in order; return EMPTY_PANES when empty. Rewrite useBackendPanes (store.ts:319-327) to subscribe through selectBackendPanes instead of the whole backendPanesById map. Replace the inline '?? []' in selectMemoryObservations (:342) and selectResetMarkersByScope (:372) with module-level empty constants. Call sites (useIssueActions.ts:212, KanbanCards.tsx:566, useDrawerData.ts:306, IssuePeek.tsx:39) stay unedited."
+        },
+        "items": [
+          {
+            "id": "stable-pane-selector.ac1",
+            "title": "Given panes for PAN-1 and PAN-2, when a backend_pane.changed event for a PAN-2 pane is applied, then selectBackendPanes('PAN-1') returns the same array instance (toBe) as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stable-pane-selector.ac2",
+            "title": "Given panes for PAN-1, when a backend_pane.changed event for a PAN-1 pane is applied, then selectBackendPanes('PAN-1') returns a new array containing the updated pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stable-pane-selector.ac3",
+            "title": "Given a component using useBackendPanes('PAN-1') inside a Probe, when a PAN-2 pane event and an agent.activity_changed event are applied, then count() for that Probe stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stable-pane-selector.ac4",
+            "title": "Given no observations for an issue, when selectMemoryObservations(issueId) is called twice, then both calls return the same empty array instance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "narrow-issue-actions",
+        "title": "Make useIssueActions subscribe to one issue and one agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/issueActions.parity.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "useIssueActions.render-count.test.tsx passes",
+            "issueActions.parity.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Replace useIssueActions.ts:209-210 and :218-219 with selectors that return existing entries: issue = useDashboardStore(s => issuesRaw.find(identifier matches issueId case-insensitively)); agent = useDashboardStore(s => activeAgentForIssue(selectAgents(s), issueId)). Remove imports left unused. Test with renderHook counting callback invocations (copy providers from IssueActionContextMenu.test.tsx)."
+        },
+        "items": [
+          {
+            "id": "narrow-issue-actions.ac1",
+            "title": "Given issues PAN-1 and PAN-2 with agents and panes, when a PAN-2 backend_pane.changed event is applied, then useIssueActions('PAN-1') renders 0 additional times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-issue-actions.ac2",
+            "title": "Given the same seed, when agent.status_changed for PAN-2's agent and an issues.delta changing only PAN-2's title are applied, then useIssueActions('PAN-1') renders 0 additional times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-issue-actions.ac3",
+            "title": "Given the same seed, when agent.status_changed for PAN-1's agent is applied, then useIssueActions('PAN-1') renders at least once more and returns the updated agent status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-deck-root-subscriptions",
+        "title": "Stop CommandDeck subscribing to the whole agent and issue lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/lib/useAgentSetInvalidation.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/agentIdsByIssueKey.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/lib/useAgentSetInvalidation.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "CommandDeck.render-count.test.tsx passes",
+            "CommandDeck.test.tsx passes",
+            "useAgentSetInvalidation.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size ratchet included)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. useAgentSetInvalidation subscribes to agentSetSignature(selectAgents(s)) (a string). CommandDeck/index.tsx drops useDashboardStore(selectAgents) (:446): handleRestartSession reads useDashboardStore.getState() at call time; resolveIssue uses a useShallow map from new helper agentIdsByIssueKey (CommandDeck/agentIdsByIssueKey.ts, preferring agent- ids as :1342-1344 does). Remove the issues prop from CommandDeckProps (:153, :197); issueTitles and a createdAtByIssue map come from useShallow selectors; handleOpenPlanDialog reads getState() at call time. AppRoutes.tsx:126 drops issues={issues} on <CommandDeck> (keep the AppRoutesProps field; app-shell-subscriptions removes it). CommandDeck.test.tsx:435 drops issues={[]}. index.tsx must stay at or below 1598 lines. Use fake timers for the 1 s debounce in tests."
+        },
+        "items": [
+          {
+            "id": "command-deck-root-subscriptions.ac1",
+            "title": "Given a mounted CommandDeck inside a Probe with two seeded agents and issues, when agent.activity_changed, a status-only agent.status_changed and an issues.delta changing a non-title field are applied, then count('deck') stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-root-subscriptions.ac2",
+            "title": "Given the same mount, when agent.created for a new agent id is applied and fake timers advance 1 s, then count('deck') becomes at least 1 and the command-deck-projects query is invalidated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-root-subscriptions.ac3",
+            "title": "Given the source after the change, when CommandDeckProps is read, then it has no issues field and index.tsx has at most 1598 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-deck-root-subscriptions.ac4",
+            "title": "Given an issue tab for an issue whose work agent exists, when resolveIssue runs, then it returns the same agentId it returned before the change (agent- prefixed id preferred)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-shell-subscriptions",
+        "title": "Move App's agent, issue and activity subscriptions into AppLiveStoreHost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/AppLiveStoreHost.tsx",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/App/AppLiveStoreHost.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/App/AppLiveStoreHost.render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/App.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AppLiveStoreHost.render-count.test.tsx passes",
+            "App.test.tsx passes",
+            "fr7-conversation-pending-input.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size ratchet included)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New App/AppLiveStoreHost.tsx renders the five pending-input dialogs (ChannelPermissionDialog, TerminalPermissionDialog, AskUserQuestionDialog, PlanApprovalDialog, ConfirmationDialog) using usePendingInputDialogs(), runs useDesktopActivityNotifications(), and runs the 'Rebuild stack for' workspace-invalidation effect moved from App.tsx:250-262; it also exports countRunningAgents. usePendingInputDialogs drops its { agents, issues } args and reads titles through a useShallow Record<issueId,title> selector and the permission agent's issueId through a string selector. App.tsx deletes recentActivity (:230), agents (:633), issues (:640), the usePendingInputDialogs call, the five dialogs and useDesktopActivityNotifications(); runningAgentCount becomes a number selector; resolveDeckKey and handleBacklogIssueAction read getState().issuesRaw at call time; App stops passing issues to AppRoutes, and AppRoutes drops the issues prop. Do not touch the backend-health useQuery (App.tsx:286). App.tsx must end at or below 1017 lines."
+        },
+        "items": [
+          {
+            "id": "app-shell-subscriptions.ac1",
+            "title": "Given AppLiveStoreHost mounted inside a Probe, when agent.activity_changed and an issues.delta changing a non-title field are applied, then count() for that Probe stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-shell-subscriptions.ac2",
+            "title": "Given an agent.enrichment_changed event that sets pendingAskUserQuestion on a seeded agent, when it is applied, then the AskUserQuestion dialog renders in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-shell-subscriptions.ac3",
+            "title": "Given App.tsx after the change, when it is read, then it contains no useDashboardStore(selectAgents), useDashboardStore(selectIssues) or recentActivity subscription, has at most 1017 lines, and still contains the backend-health useQuery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-shell-subscriptions.ac4",
+            "title": "Given the existing App.test.tsx and fr7-conversation-pending-input.test.tsx, when they run, then both pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cockpit-agent-isolation",
+        "title": "Make IssueMissionControl subscribe only to its issue's agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "IssueMissionControl.render-count.test.tsx passes",
+            "IssueMissionControl.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Replace IssueMissionControl.tsx:404-408 (selectAgents plus useMemo filter) with useDashboardStore(useShallow(s => selectAgents(s).filter(a => a.issueId?.toLowerCase() === issueId.toLowerCase()))). Copy provider setup from IssueMissionControl.test.tsx."
+        },
+        "items": [
+          {
+            "id": "cockpit-agent-isolation.ac1",
+            "title": "Given IssueMissionControl for PAN-1 inside a Probe, when agent.status_changed for a PAN-2 agent is applied, then count() stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-agent-isolation.ac2",
+            "title": "Given the same mount, when agent.status_changed for a PAN-1 agent is applied, then count() is at least 1 and the cockpit shows the new status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-agent-isolation.ac3",
+            "title": "Given the existing IssueMissionControl.test.tsx, when it runs, then it passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "streaming-composer-isolation",
+        "title": "Keep the composer from re-rendering on streamed deltas",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/useStableComposerProps.ts",
+            "src/dashboard/frontend/src/components/chat/useComposerDeliveryState.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/composerHeldMessages.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.streaming-render-count.test.tsx passes",
+            "composerHeldMessages.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size ratchet included)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. New hook chat/useStableComposerProps.ts returns { onSend, contextWindowUsage }: onSend is stable on [addOptimistic, conversation.name] and reads the latest serverMessages from a ref (same body as ConversationPanel.tsx:1285-1289); contextWindowUsage is memoized on data?.contextUsage and conversation.contextUsage. ConversationPanel uses the hook and must not exceed 1525 lines. ComposerFooter (ComposerFooter.tsx:957) becomes memo(function ComposerFooter ...) and the file stays at or below 1000 lines. Checkpoint: any other ComposerFooter prop that changes on a delta (onSendFailed etc.) gets the same ref plus stable-callback treatment, in useStableComposerProps or useComposerDeliveryState.ts."
+        },
+        "items": [
+          {
+            "id": "streaming-composer-isolation.ac1",
+            "title": "Given a mounted conversation view with a seeded ['conversation-messages', name] cache, when setQueryData replaces the last message's text, then ComposerFooter renders 0 additional times and the new text renders in the timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "streaming-composer-isolation.ac2",
+            "title": "Given the composer, when the operator sends a message after several deltas, then the optimistic echo is added with the latest serverMessages length and ids (no stale closure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "streaming-composer-isolation.ac3",
+            "title": "Given ConversationPanel.tsx and ComposerFooter.tsx after the change, when line counts are taken, then they are at most 1525 and 1000 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-list-item-isolation",
+        "title": "Re-render only the changed conversation's list item on a poll",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationListItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationList.render-count.test.tsx passes",
+            "ConversationList.test.tsx passes",
+            "ConversationRow.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Move the displayConversations.map body (ConversationList.tsx:420-465: motion.div layout, top-level ConversationRow, group toggle, nested rows) into new ConversationListItem.tsx, exported as memo(Impl, itemPropsEqual) with the equality rule spelled out in the PRD (conv identity, orphanOf, descendants' conv/depth/flattenedFrom/criticOf, collapsed, per-node selected booleans, Object.is for the rest). Pass onSelect={onSelectConversation} directly. ConversationList keeps AnimatePresence with keyed ConversationListItem children, makes toggleGroup stable, and replaces registeredProjects = [] with a module constant. useConversationMutations wraps its returned object in useMemo."
+        },
+        "items": [
+          {
+            "id": "conversation-list-item-isolation.ac1",
+            "title": "Given ConversationList with three seeded conversations A, B, C, when setQueryData(['conversations']) changes only B's isWorking, then rows A and C render 0 additional times and row B renders at least once more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-item-isolation.ac2",
+            "title": "Given a conversation with descendants, when its group toggle is clicked, then the nested rows collapse and expand as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-item-isolation.ac3",
+            "title": "Given the existing ConversationList.test.tsx and ConversationRow.test.tsx, when they run, then both pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-render-discipline",
+        "title": "Document render discipline and add the render-count tests to the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Render discipline (PAN-4560)' docs/DASHBOARD-ARCHITECTURE.md",
+            "npm run lint:docs",
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "the section heading is found",
+            "lint:docs exits 0",
+            "test:frontend-subset passes including the new render-count tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Add '## Render discipline (PAN-4560)' to docs/DASHBOARD-ARCHITECTURE.md, after the 'Frontend data flow' bullets and before '## Diff compare and ignore-whitespace (PAN-4503)', stating the rules listed in the PRD (select the field not the slice; identity-keeping selectors and never inline ?? []; reducers change only their slice and runtime events write agentRuntimeById only; handlers read getState() at call time; streamed deltas reach only ConversationPanel, with ComposerFooter and ConversationListItem memoized; aggregate-chrome exception; the health-poll caveat; the renderCounter harness and test list; the profiling commands and port 3010). No $...$ pairs and no '<' before a digit. Append the seven render-count test paths to the root package.json test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "docs-render-discipline.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grep -n '## Render discipline (PAN-4560)' runs, then it matches once and the section names renderCounter.tsx, selectBackendPanes, useDashboardStore.getState(), build:profile and preview:profile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-render-discipline.ac2",
+            "title": "Given root package.json, when test:frontend-subset is read, then it lists all seven *.render-count.test.tsx paths named in the PRD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-render-discipline.ac3",
+            "title": "Given the docs change, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "profile-after",
+        "title": "Run the after profile, post the table and file the follow-up issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4560",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/profiling/render-profile.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh issue view 4560 --comments",
+            "gh issue list --search 'Dashboard render follow-ups from PAN-4560 profiling' --state open"
+          ],
+          "expected_outputs": [
+            "a comment headed '## Render profile — after' is present",
+            "the follow-up issue is listed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Re-run the WI-3 commands with PROFILE_LABEL=after and post .tmp/pan-4560-profile/after.md on PAN-4560 under '## Render profile — after (<short sha>)', naming per scenario which asserted surfaces (PRD Decision 2) still commit. Fix a residual non-aggregate Command Deck offender here only if the fix is a selector narrowing within one file of at most 30 changed lines and has its own render-count test (add it to test:frontend-subset); otherwise list it. File one issue titled 'Dashboard render follow-ups from PAN-4560 profiling' whose body starts with '**PRD:** .pan/drafts/PAN-4560.md (Census of other offenders)' and lists every census row plus the residual offenders with after-profile numbers. Link it from the PAN-4560 comment. Use an empty commit for the Item trailer when no code changed."
+        },
+        "items": [
+          {
+            "id": "profile-after.ac1",
+            "title": "Given the fixes are merged into the branch, when gh issue view 4560 --comments is read, then a comment headed '## Render profile — after' shows the four scenario tables and states which asserted surfaces still commit for S1 and S2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-after.ac2",
+            "title": "Given the after comment, when it is read, then it links an open issue titled 'Dashboard render follow-ups from PAN-4560 profiling' whose body lists the PRD census rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "profile-after.ac3",
+            "title": "Given the S2 burst table in the after comment, when it is compared with the baseline, then App, CommandDeck and FeatureItem show zero updates per synthetic batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "profile-tooling",
+        "to": "profile-baseline",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "drop-runtime-agent-bump",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "stable-pane-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "narrow-issue-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "command-deck-root-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "app-shell-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "cockpit-agent-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "streaming-composer-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "profile-baseline",
+        "to": "conversation-list-item-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "stable-pane-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "narrow-issue-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "command-deck-root-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "app-shell-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "cockpit-agent-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "streaming-composer-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "render-counter",
+        "to": "conversation-list-item-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "stable-pane-selector",
+        "to": "narrow-issue-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "command-deck-root-subscriptions",
+        "to": "app-shell-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-runtime-agent-bump",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-runtime-agent-bump",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "stable-pane-selector",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "stable-pane-selector",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-issue-actions",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-issue-actions",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "command-deck-root-subscriptions",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "command-deck-root-subscriptions",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "app-shell-subscriptions",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "app-shell-subscriptions",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "cockpit-agent-isolation",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "cockpit-agent-isolation",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "streaming-composer-isolation",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "streaming-composer-isolation",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-list-item-isolation",
+        "to": "docs-render-discipline",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-list-item-isolation",
+        "to": "profile-after",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-render-discipline",
+        "to": "profile-after",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

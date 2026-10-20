@@ -24,6 +24,7 @@ fi
 CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
 EFFECT_DIAG_BASELINE="scripts/effect-diagnostics-baseline.txt"
 EFFECT_FACADES_BASELINE="scripts/effect-facades-baseline.txt"
+HARNESS_BRANCHES_BASELINE="scripts/harness-branches-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
@@ -146,6 +147,50 @@ effect_facades_baseline_increases_for_commit() {
   rm -f "$old_file" "$new_file"
 }
 
+harness_branches_baseline_at() {
+  local rev="$1"
+  { git show "$rev:$HARNESS_BRANCHES_BASELINE" 2>/dev/null || true; } |
+    sed -E '/^[[:space:]]*(#|$)/d' | sort -u
+}
+
+# Rows are "<count> <path>" (PAN-4562). Compare by <path>: a lowered count is
+# free; a raised count or a new row is an increase. Across a merge commit's
+# parents the highest count per path is the old value.
+harness_branches_baseline_increases_for_commit() {
+  local commit="$1"
+  shift
+  local parent has_parent_baseline=false
+  for parent in "$@"; do
+    if git cat-file -e "$parent:$HARNESS_BRANCHES_BASELINE" 2>/dev/null; then
+      has_parent_baseline=true
+      break
+    fi
+  done
+  # The first baseline is an initialization, not a ratchet increase.
+  if [[ "$has_parent_baseline" != true ]]; then
+    return 0
+  fi
+
+  local old_file new_file
+  old_file=$(mktemp)
+  new_file=$(mktemp)
+  for parent in "$@"; do
+    harness_branches_baseline_at "$parent"
+  done > "$old_file"
+  harness_branches_baseline_at "$commit" > "$new_file"
+  awk '
+    FILENAME == ARGV[1] {
+      if (NF >= 2) { key = $2; if (!(key in old) || $1 + 0 > old[key] + 0) old[key] = $1 }
+      next
+    }
+    NF >= 2 {
+      key = $2
+      if (!(key in old) || $1 + 0 > old[key] + 0) print "harness branches baseline increased: " $0
+    }
+  ' "$old_file" "$new_file"
+  rm -f "$old_file" "$new_file"
+}
+
 circular_baseline_increases_for_commit() {
   local commit="$1"
   shift
@@ -238,6 +283,7 @@ audit_commit() {
     circular_baseline_increases_for_commit "$commit" "${parents[@]}"
     effect_diag_baseline_increases_for_commit "$commit" "${parents[@]}"
     effect_facades_baseline_increases_for_commit "$commit" "${parents[@]}"
+    harness_branches_baseline_increases_for_commit "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -265,11 +311,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE" "$HARNESS_BRANCHES_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited ESLint/circular/Effect ratchet increases)"
+echo "✓ ratchet audit passed (no unaudited ESLint/circular/Effect/harness-branch ratchet increases)"

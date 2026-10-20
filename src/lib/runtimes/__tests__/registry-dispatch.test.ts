@@ -146,6 +146,24 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
   it('returns null when no agent state exists', () => {
     expect(getGlobalRegistry().getRuntimeForAgent('agent-unknown')).toBeNull()
   })
+
+  it('falls back to claude-code for the pre-PAN-636 "claude" value (PAN-4562)', () => {
+    writeAgentState('agent-legacy-3', { harness: 'claude' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-legacy-3')?.name).toBe('claude-code')
+  })
+
+  it.each(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'] as const)(
+    'resolves a registered %s harness to its own runtime through normalizeHarnessName (PAN-4562)',
+    (harness) => {
+      const registry = new RuntimeRegistry()
+      for (const name of ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'] as const) {
+        registry.register(stubRuntime(name))
+      }
+      setGlobalRegistry(registry)
+      writeAgentState(`agent-normalize-${harness}`, { harness })
+      expect(getGlobalRegistry().getRuntimeForAgent(`agent-normalize-${harness}`)?.name).toBe(harness)
+    },
+  )
 })
 
 function pickBehaviorFields(behavior: HarnessBehavior): Record<string, unknown> {

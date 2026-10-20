@@ -32,7 +32,6 @@ import { getNewWorkspaceProjectFromSearch } from './routes';
 import { NewProjectPage } from '../pages/NewProjectPage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
-import type { Issue } from '../types';
 import type { ViewMode as ConversationViewMode } from '../components/chat/ConversationPanel';
 import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 
@@ -50,7 +49,6 @@ type SelectProjectHandler = (projectName: string | null, opts?: { updateUrl?: bo
 
 interface AppRoutesProps {
   activeTab: Tab;
-  issues: Issue[];
   selectedConvId: string | null;
   conversationViewMode: ConversationViewMode;
   selectedProjectKey: string | null;
@@ -83,7 +81,6 @@ interface AppRoutesProps {
 
 export function AppRoutes({
   activeTab,
-  issues,
   selectedConvId,
   conversationViewMode,
   selectedProjectKey,
@@ -123,7 +120,6 @@ export function AppRoutes({
       {activeTab === 'command-deck' && (
         <div className="w-full h-full">
           <CommandDeck
-            issues={issues}
             convId={selectedConvId}
             conversationViewMode={conversationViewMode}
             onConvIdChange={onConvIdChange}
