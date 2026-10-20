@@ -158,3 +158,43 @@ describe('codex case 2: interrupt response before the interrupted state', () => 
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
+
+describe('codex case 3: sub-agent turn completes before the parent', () => {
+  it('renders the child completion without ending the owner turn', async () => {
+    const { replay, manager, host, lines } = await start('subagent');
+    const facts = fixtureFacts(replay.fixture);
+    const isSpawn = (frame: ProtocolFrame) => {
+      const item = record(params(frame).item);
+      return frame.dir === 'in' && facts.isOwner(frame) && item.type === 'collabAgentToolCall' && item.tool === 'spawnAgent'
+        && Array.isArray(item.receiverThreadIds) && item.receiverThreadIds.length > 0;
+    };
+    const spawnIndex = facts.index(isSpawn);
+    expect(spawnIndex, 're-check case 3 against the new CLI: no owner spawnAgent item names a receiver').toBeGreaterThanOrEqual(0);
+    const childThreadId = (record(params(facts.frames[spawnIndex]!).item).receiverThreadIds as string[])[0]!;
+    const childFrame = (method: string) => facts.index(frame =>
+      frame.dir === 'in' && frame.message?.method === method && frameThread(frame) === childThreadId);
+    const childCompletedIndex = childFrame('turn/completed');
+    expect(spawnIndex, 're-check case 3 against the new CLI: the child completed before its spawn item named it')
+      .toBeLessThan(childCompletedIndex);
+    expect(childCompletedIndex, 're-check case 3 against the new CLI: the child no longer completes before the owner')
+      .toBeLessThan(facts.ownerCompletedIndex);
+    const label = childThreadId.slice(-8);
+
+    const completedPause = replay.pauseBefore({ method: 'turn/completed', threadId: facts.ownerThreadId });
+    expect(await host.handleOp({ op: 'message', content: prompt(replay) })).toMatchObject({ status: 200 });
+    await completedPause;
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+    expect(manager.threadScope(childThreadId)).toBe('descendant');
+    expect(lines).toContain(`[turn sub:${label}] completed`);
+    // PAN-4568: codex announces the child only when the spawn item completes, and
+    // the child's turn/started can arrive first, labeled thread:; flip when fixed.
+    const startedLabel = childFrame('turn/started') < spawnIndex ? 'thread' : 'sub';
+    expect(lines).toContain(`[turn ${startedLabel}:${label}] started`);
+
+    replay.resume();
+    await replay.done;
+    expect(manager.getState()).toMatchObject({ state: 'idle', activeTurnId: undefined, lastTurnStatus: 'completed' });
+    expect(facts.ownerTurnStatus).toBe('completed');
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
