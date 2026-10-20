@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T05:25:14.777Z",
+  "updated": "2026-10-20T05:25:30.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -322,6 +322,10 @@
     "wi14-tool-body-on-expand.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T05:25:14.777Z"
+    },
+    "wi15-payload-budget-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:25:30.297Z"
     }
   }
 }
