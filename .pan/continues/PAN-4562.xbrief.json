@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:18:49.731Z",
+  "updated": "2026-10-20T04:19:06.901Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "runtime-lifecycle-caps.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T04:18:49.731Z"
+    },
+    "message-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:19:06.900Z"
     }
   }
 }
