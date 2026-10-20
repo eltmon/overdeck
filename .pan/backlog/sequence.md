@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T20:12:13Z · model: claude-opus-5-5 · open: 830_
+_Last sequenced: 2026-10-20T20:14:00Z · model: claude-opus-5-5 · open: 831_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -207,6 +207,7 @@ _Last sequenced: 2026-10-20T20:12:13Z · model: claude-opus-5-5 · open: 830_
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
+| 224 | PAN-4575 | S | high | ok |  | PAN-4563 | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -1165,10 +1166,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T20:12:13Z",
+  "generatedAt": "2026-10-20T20:14:00Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 830,
+  "openCount": 831,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11504,6 +11505,21 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4575",
+      "rank": 224,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4563"
+      ],
+      "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed.",
+      "rationale": "New issue with a source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. It is a small, well-scoped fix to an actively used harness. It ranks in the high tier behind PAN-4563, because PAN-4563 (in pipeline) adds the replay fixture and the pinned host-replay test this fix must flip.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12864,6 +12880,13 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4563",
+      "to": "PAN-4575",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.85
     }
   ]
 }
