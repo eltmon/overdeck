@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T05:14:13.364Z",
+  "updated": "2026-10-20T05:14:27.865Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "wi1-window-contract.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T05:14:13.364Z"
+    },
+    "wi1-window-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:27.865Z"
     }
   }
 }
