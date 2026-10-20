@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getOverdeckHome, isDevMode } from '../paths.js';
+import { renderManagedMemorySections } from '../memory/facts/render.js';
 import { findProjectByPath } from '../projects.js';
 import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.js';
 import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
@@ -14,6 +15,7 @@ export async function materializeMuseContext(agentId: string, workspace: string,
   const sections = [renderGlobalLayer('muse', isDevMode())];
   const project = findProjectByPath(workspace);
   if (project) sections.push(renderProjectLayer(project.path, 'muse'));
+  sections.push(renderManagedMemorySections(project?.path ?? null));
   const workspaceLayer = await readFile(resolveWorkspaceContextFile(workspace), 'utf8').catch(error => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
     throw error;
