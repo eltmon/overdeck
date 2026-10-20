@@ -13,6 +13,12 @@ vi.mock('../../../src/lib/projects.js', () => ({
   resolveInfraRepo: (_project: unknown, root: string) => ({ repoPath: root, recordsPath: '.pan' }),
 }));
 
+const { searchMemoryMock } = vi.hoisted(() => ({ searchMemoryMock: vi.fn() }));
+vi.mock('../../../src/lib/memory/cli.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/memory/cli.js')>();
+  return { ...actual, searchMemory: searchMemoryMock };
+});
+
 import { readMemoryFactsSync } from '../../../src/lib/memory/facts/store.js';
 import {
   memoryFactAddCommand,
@@ -20,10 +26,12 @@ import {
   memoryFactListCommand,
   memoryFactRetireCommand,
   memoryFactShowCommand,
+  printMatchingFacts,
   resolveFactTarget,
 } from '../../../src/cli/commands/memory-facts.js';
+import { memorySearchCommand } from '../../../src/cli/commands/memory.js';
 
-describe('pan memory show/list (PAN-3957 W5a)', () => {
+describe('pan memory curated-fact commands (PAN-3957)', () => {
   let tmpRoot: string;
   let previousHome: string | undefined;
   let previousCwd: string;
@@ -323,6 +331,76 @@ describe('pan memory show/list (PAN-3957 W5a)', () => {
       expect(readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project').facts).toHaveLength(0);
       expect(logSpy.mock.calls.flat().join('\n')).toContain('✓ Removed');
       expect(logSpy.mock.calls.flat().join('\n')).toContain('docs(memory): retire to-remove');
+    });
+  });
+
+  describe('printMatchingFacts / pan memory search facts-first (PAN-3957 W6)', () => {
+    beforeEach(() => {
+      searchMemoryMock.mockReset();
+    });
+
+    it('printMatchingFacts prints at most 5 matches per store under bold headings', () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      for (let i = 0; i < 7; i += 1) {
+        writeFact(dir, `fact-${i}`, `---\ntype: feedback\ndescription: Decide fast ${i}.\n---\nBody.\n`);
+      }
+
+      printMatchingFacts('decide', {});
+
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain('Project memory:');
+      const matchedLines = output.split('\n').filter((line) => line.startsWith('  feedback/fact-'));
+      expect(matchedLines).toHaveLength(5);
+    });
+
+    it('silently skips the project store outside a registered project', () => {
+      process.chdir(tmpRoot);
+      expect(() => printMatchingFacts('decide', {})).not.toThrow();
+      expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Project memory:');
+    });
+
+    it('search prints Project memory lines before observation lines', async () => {
+      writeFact(
+        join(projectRoot, '.overdeck', 'memory'),
+        'be-decisive',
+        '---\ntype: feedback\ndescription: Make routine reversible calls yourself.\n---\nBody.\n',
+      );
+      searchMemoryMock.mockResolvedValue([
+        {
+          observation: {
+            issueId: 'PAN-1', timestamp: '2026-01-01T00:00:00Z', actionStatus: 'did a thing',
+            summary: 's', workspaceId: 'w1', files: [],
+          },
+          score: 1,
+        },
+      ]);
+
+      await memorySearchCommand('decisive', {});
+
+      const lines = logSpy.mock.calls.flat();
+      const projectIdx = lines.findIndex((line) => typeof line === 'string' && line.includes('Project memory:'));
+      const obsIdx = lines.findIndex((line) => typeof line === 'string' && line.includes('PAN-1'));
+      expect(projectIdx).toBeGreaterThanOrEqual(0);
+      expect(obsIdx).toBeGreaterThan(projectIdx);
+    });
+
+    it('--json output is unchanged', async () => {
+      const mockResults = [
+        {
+          observation: {
+            issueId: 'PAN-1', timestamp: '2026-01-01T00:00:00Z', actionStatus: 'x',
+            summary: 's', workspaceId: 'w1', files: [],
+          },
+          score: 1,
+        },
+      ];
+      searchMemoryMock.mockResolvedValue(mockResults);
+
+      await memorySearchCommand('decisive', { json: true });
+
+      const printed = logSpy.mock.calls.map((call) => call[0]).join('');
+      expect(JSON.parse(printed)).toEqual(mockResults);
+      expect(printed).not.toContain('Project memory:');
     });
   });
 });

@@ -15,7 +15,7 @@ import {
   type MemoryDoctorResult,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
-import { registerMemoryFactCommands } from './memory-facts.js';
+import { printMatchingFacts, registerMemoryFactCommands } from './memory-facts.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
@@ -49,6 +49,8 @@ export async function memorySearchCommand(query: string, options: MemorySearchCo
       return;
     }
   }
+
+  if (!options.json) printMatchingFacts(query, { project: options.project });
 
   let results: Awaited<ReturnType<typeof searchMemory>>;
   try {

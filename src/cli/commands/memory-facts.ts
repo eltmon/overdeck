@@ -11,6 +11,7 @@ import {
   isActiveFact,
   matchMemoryFacts,
   MEMORY_FACT_TYPES,
+  type MemoryFact,
   type MemoryFactScope,
   type MemoryFactType,
   projectMemoryDir,
@@ -294,6 +295,39 @@ export async function memoryFactRetireCommand(id: string, options: MemoryFactRet
       `  Commit it: git -C ${target.root} rm --cached --ignore-unmatch ${PROJECT_MEMORY_RELATIVE}/${id}.md ` +
       `&& git -C ${target.root} commit -m "docs(memory): retire ${id}"`,
     );
+  }
+}
+
+const MATCHING_FACTS_LIMIT = 5;
+
+/**
+ * `pan memory search` prints fact matches before observation hits (D13). Resolves
+ * the project store the same way `resolveFactTarget(…, 'read')` does, but never
+ * errors — outside a project (or with an unknown `--project`) it silently skips
+ * the project store.
+ */
+export function printMatchingFacts(query: string, flags: { project?: string }): void {
+  let projectFacts: MemoryFact[] = [];
+  try {
+    const target = resolveFactTarget(flags, 'read');
+    if (target.scope === 'project') {
+      const { facts } = readMemoryFactsSync(target.dir, 'project');
+      projectFacts = matchMemoryFacts(facts.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+    }
+  } catch {
+    // Not inside a registered project, or an unknown --project key: no project matches.
+  }
+
+  const { facts: userFactsAll } = readMemoryFactsSync(userMemoryDir(), 'user');
+  const operatorFacts = matchMemoryFacts(userFactsAll.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+
+  if (projectFacts.length > 0) {
+    console.log(chalk.bold('Project memory:'));
+    for (const fact of projectFacts) console.log(`  ${fact.type}/${fact.id}: ${fact.description}`);
+  }
+  if (operatorFacts.length > 0) {
+    console.log(chalk.bold('Operator memory:'));
+    for (const fact of operatorFacts) console.log(`  ${fact.type}/${fact.id}: ${fact.description}`);
   }
 }
 
