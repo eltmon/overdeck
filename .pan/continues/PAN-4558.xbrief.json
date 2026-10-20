@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T03:37:14.085Z",
+  "updated": "2026-10-20T03:37:20.815Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4558",
       "claimedAt": "2026-10-20T03:31:36.836Z",
       "doneAt": "2026-10-20T03:37:14.084Z"
+    },
+    "wi7-agents-route-window": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T03:37:20.814Z"
     }
   }
 }
