@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T03:32:43.861Z",
+  "updated": "2026-10-20T03:39:03.147Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-20T03:32:32.455Z"
     },
     "profile-baseline": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4560",
-      "claimedAt": "2026-10-20T03:32:43.861Z"
+      "claimedAt": "2026-10-20T03:32:43.861Z",
+      "doneAt": "2026-10-20T03:39:03.147Z"
     }
   }
 }
