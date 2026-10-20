@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T04:08:55.082Z",
+  "updated": "2026-10-20T04:15:05.295Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-10-20T04:08:42.029Z"
     },
     "streaming-composer-isolation": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4560",
-      "claimedAt": "2026-10-20T04:08:55.082Z"
+      "claimedAt": "2026-10-20T04:08:55.082Z",
+      "doneAt": "2026-10-20T04:15:05.295Z"
     }
   }
 }
