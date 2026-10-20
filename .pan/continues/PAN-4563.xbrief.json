@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:46:19.572Z",
+  "updated": "2026-10-20T20:46:31.440Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "acp-replay-harness.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T20:46:19.571Z"
+    },
+    "recorder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:46:31.440Z"
     }
   }
 }
