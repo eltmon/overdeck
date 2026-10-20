@@ -1,4 +1,10 @@
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProtocolCaptureSink, PROTOCOL_CAPTURE_DIR_ENV } from '../../protocol-capture/capture.js';
+import { loadProtocolFixture } from '../../protocol-capture/fixture.js';
+import { defaultScrubContext } from '../../protocol-capture/scrub.js';
 import { CodexAppServerManager, codexModelMinimumVersion, parseCodexCliVersion } from '../app-server-manager.js';
 import { createFakeAppServer, createFakeNativeTransport, type FakeNativeTransport } from './fake-app-server.js';
 
@@ -644,5 +650,61 @@ describe('parseCodexCliVersion (PAN-4363)', () => {
 
   it('returns undefined when no version is present', () => {
     expect(parseCodexCliVersion('garbage')).toBeUndefined();
+  });
+});
+
+describe('CodexAppServerManager protocol capture (PAN-4563)', () => {
+  const dirs: string[] = [];
+  const savedCaptureDir = process.env[PROTOCOL_CAPTURE_DIR_ENV];
+
+  afterEach(async () => {
+    if (savedCaptureDir === undefined) delete process.env[PROTOCOL_CAPTURE_DIR_ENV];
+    else process.env[PROTOCOL_CAPTURE_DIR_ENV] = savedCaptureDir;
+    for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
+  });
+
+  async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'pan-codex-capture-'));
+    dirs.push(dir);
+    return dir;
+  }
+
+  function handshakeServer() {
+    return createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+    });
+  }
+
+  it('writes the CLI version and the three handshake frames to an explicit sink', async () => {
+    const dir = await tempDir();
+    const sink = createProtocolCaptureSink({
+      path: join(dir, 'capture.jsonl'),
+      harness: 'codex-app-server',
+      scrub: defaultScrubContext({ cwd: dir }),
+    });
+    const fake = handshakeServer();
+    const manager = new CodexAppServerManager({ cwd: dir, readVersion: async () => 'codex-cli 0.153.4', spawnProcess: () => fake.child, protocolCapture: sink });
+    await manager.start();
+    manager.stop();
+    await sink.close();
+
+    const fixture = await loadProtocolFixture(sink.path);
+    expect(fixture.header).toMatchObject({ harness: 'codex-app-server', cliVersion: '0.153.4' });
+    expect(fixture.frames.map(frame => [frame.dir, frame.message?.method ?? 'response'])).toEqual([
+      ['out', 'initialize'],
+      ['in', 'response'],
+      ['out', 'initialized'],
+    ]);
+  });
+
+  it('writes no file when neither the option nor the env var is set', async () => {
+    const dir = await tempDir();
+    delete process.env[PROTOCOL_CAPTURE_DIR_ENV];
+    const fake = handshakeServer();
+    const manager = new CodexAppServerManager({ cwd: dir, readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    manager.stop();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(await readdir(dir)).toEqual([]);
   });
 });

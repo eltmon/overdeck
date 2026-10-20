@@ -2,8 +2,11 @@ import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { captureAppServerTransport, protocolCaptureFromEnv, type ProtocolCaptureSink } from '../protocol-capture/capture.js';
+import { defaultScrubContext } from '../protocol-capture/scrub.js';
 import {
   connectUnixWebSocketTransport,
   createStdioTransport,
@@ -59,6 +62,11 @@ export interface CodexAppServerManagerOptions {
   connectNative?: (socketPath: string) => Promise<AppServerTransport>;
   /** Test seam for the orphaned-server check around `app.pid`. */
   processOps?: NativeProcessOps;
+  /**
+   * PAN-4563: record every frame to a protocol fixture. Defaults to the sink
+   * `OVERDECK_PROTOCOL_CAPTURE_DIR` enables; unset means no capture.
+   */
+  protocolCapture?: ProtocolCaptureSink;
 }
 
 /** Process and file operations the native endpoint's orphan check uses. */
@@ -163,15 +171,21 @@ export class CodexAppServerManager extends EventEmitter {
   private readonly foreignThreads = new Set<string>();
 
   private readonly processOps: NativeProcessOps;
+  private readonly capture: ProtocolCaptureSink | undefined;
 
   constructor(private readonly options: CodexAppServerManagerOptions) {
     super();
     this.processOps = options.processOps ?? defaultProcessOps;
+    this.capture = options.protocolCapture ?? protocolCaptureFromEnv(process.env, {
+      harness: 'codex-app-server',
+      scrub: defaultScrubContext({ cwd: options.cwd, codexHome: options.codexHome, overdeckHome: process.env.OVERDECK_HOME, home: homedir() }),
+    });
   }
 
   async start(): Promise<void> {
     if (this.child) return;
     const installed = await this.assertSupportedVersion();
+    this.capture?.setHeader({ cliVersion: installed });
     const nativeSocketPath = this.options.nativeSocketPath;
     let fallbackReason: NativeEndpointUnavailableReason | undefined = nativeSocketPath ? undefined : 'not-requested';
     if (nativeSocketPath && compareVersions(installed, MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION) < 0) {
@@ -351,6 +365,7 @@ export class CodexAppServerManager extends EventEmitter {
       pending.reject(new Error('codex app-server stopped.'));
     }
     this.pending.clear();
+    void this.capture?.close();
   }
 
   private spawnChild(args: string[]): ChildProcessWithoutNullStreams {
@@ -435,7 +450,8 @@ export class CodexAppServerManager extends EventEmitter {
     }
   }
 
-  private useTransport(transport: AppServerTransport, options: { stopOnClose: boolean }): void {
+  private useTransport(rawTransport: AppServerTransport, options: { stopOnClose: boolean }): void {
+    const transport = this.capture ? captureAppServerTransport(rawTransport, this.capture) : rawTransport;
     this.transport = transport;
     transport.onMessage(line => this.handleLine(line));
     // stdio ends with the child, whose exit event reports it. A native socket
