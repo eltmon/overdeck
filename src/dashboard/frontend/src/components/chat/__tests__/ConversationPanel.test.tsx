@@ -1207,4 +1207,44 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
     expect(cache?.messages.map((m) => m.id)).toEqual(['m0', 'm1', 'm2', 'm3', 'm4']);
     expect(cache?.history).toEqual({ cursor: cursor(0), hasOlder: false, transcript: '1:2' });
   });
+
+  it('exports the whole transcript, not the loaded window (PAN-4558)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      const defaultResponse = defaultConversationResponse(method, url);
+      if (defaultResponse) return defaultResponse;
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages?window=all') {
+        return Response.json({ messages: [
+          { id: 'm0', role: 'user', text: 'first message', createdAt: '2026-10-19T00:00:00.000Z' },
+          { id: 'm1', role: 'assistant', text: 'second message', createdAt: '2026-10-19T00:00:01.000Z' },
+          { id: 'm2', role: 'user', text: 'newest message', createdAt: '2026-10-19T00:00:02.000Z' },
+        ], workLog: [], streaming: false });
+      }
+      return undefined;
+    });
+    const blobs: Blob[] = [];
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((blob: Blob) => { blobs.push(blob); return 'blob:export'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      renderStreamingPanel();
+      const listener = streamTransportMock.listeners.get('test-conv');
+      act(() => { listener?.({ kind: 'messages', snapshot: true, workLog: [], streaming: false,
+        messages: [{ id: 'm2', role: 'user', text: 'newest message', createdAt: '2026-10-19T00:00:02.000Z' }],
+        window: { cursor: JSON.stringify(['2026-10-19T00:00:02.000Z', 0, 0, 'm2']), hasOlder: true, transcript: '1:2' } }); });
+
+      fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+      fireEvent.click(screen.getByText('Export transcript'));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+
+      expect(blobs).toHaveLength(1);
+      const markdown = await blobs[0]!.text();
+      expect(markdown).toContain('first message');
+      expect(markdown).toContain('second message');
+      expect(markdown).toContain('newest message');
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    }
+  });
 });

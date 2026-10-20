@@ -44,19 +44,19 @@ afterEach(() => {
 });
 
 describe('useOlderHistory (PAN-4558)', () => {
-  it('pages to the start of the conversation with no duplicated rows', async () => {
-    const fetchMock = stubPagingServer(200, 75);
-    const { client, hook } = setup({ messages: range(150, 200), workLog: [], history: { cursor: cursor(150), hasOlder: true, transcript: '1:2' } });
+  it('pages a five-page history to the start of the conversation with no duplicated rows', async () => {
+    const fetchMock = stubPagingServer(400, 75);
+    const { client, hook } = setup({ messages: range(325, 400), workLog: [], history: { cursor: cursor(325), hasOlder: true, transcript: '1:2' } });
 
-    for (let i = 0; i < 5 && client.getQueryData<HistoryRows>(KEY)!.history!.hasOlder; i++) {
+    for (let i = 0; i < 10 && client.getQueryData<HistoryRows>(KEY)!.history!.hasOlder; i++) {
       await act(() => hook.result.current.loadOlder());
     }
 
     const cache = client.getQueryData<HistoryRows>(KEY)!;
-    expect(cache.messages.map((m) => m.id)).toEqual(range(0, 200).map((m) => m.id));
+    expect(cache.messages.map((m) => m.id)).toEqual(range(0, 400).map((m) => m.id));
     expect(cache.history).toMatchObject({ cursor: cursor(0), hasOlder: false });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]![0]).toBe(`/api/conversations/conv-paging/messages?before=${encodeURIComponent(cursor(150))}&limit=75`);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock.mock.calls[0]![0]).toBe(`/api/conversations/conv-paging/messages?before=${encodeURIComponent(cursor(325))}&limit=75`);
     expect(hook.result.current.loadedOlder).toBe(true);
   });
 

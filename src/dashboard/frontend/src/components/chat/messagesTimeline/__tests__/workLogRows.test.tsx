@@ -15,7 +15,7 @@ const omitted: WorkLogEntry = {
   label: 'Read',
   tone: 'tool',
   toolTitle: 'Read',
-  resultBytes: 10_240,
+  resultBytes: 20_480,
   bodyOmitted: true,
 };
 
@@ -32,7 +32,7 @@ afterEach(() => {
 describe('tool rows with an omitted body (PAN-4558)', () => {
   it('shows the size hint and counts the row as having a result', () => {
     renderWithLoader(<WorkLogGroup entries={[omitted]} />);
-    expect(screen.getByText('10.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('20 KB')).toBeInTheDocument();
   });
 
   it('fetches the full entry once on expand and renders its result', async () => {

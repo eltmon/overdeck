@@ -306,7 +306,7 @@ function ToolUseExpanded({
 }
 
 function formatResultSize(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+  return bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`;
 }
 
 function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSubagent }: {

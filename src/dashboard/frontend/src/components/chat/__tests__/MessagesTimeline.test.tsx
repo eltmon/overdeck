@@ -807,7 +807,7 @@ describe('MessagesTimeline — older history (PAN-4558)', () => {
     render(<MessagesTimeline messages={page(10, 14)} workLog={[]} streaming={false}
       history={{ hasOlder: true, loadingOlder: false }} onLoadOlder={onLoadOlder} />);
     const el = scrollContainer();
-    el.scrollTop = 120;
+    el.scrollTop = 100;
     fireEvent.scroll(el);
     expect(onLoadOlder).toHaveBeenCalledTimes(1);
   });

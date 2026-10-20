@@ -174,8 +174,10 @@ describe('GET /api/conversations/:name/messages query parsing (PAN-4558)', () =>
   }
 
   it('rejects a malformed cursor with 400', async () => {
-    const response = await get(`/api/conversations/whatever/messages?before=${encodeURIComponent('[1,2]')}`);
-    expect(response.status).toBe(400);
-    expect(json(response)).toEqual({ error: 'Invalid cursor' });
+    for (const before of ['not-a-cursor', '[1,2]']) {
+      const response = await get(`/api/conversations/whatever/messages?before=${encodeURIComponent(before)}`);
+      expect(response.status).toBe(400);
+      expect(json(response)).toEqual({ error: 'Invalid cursor' });
+    }
   });
 });
