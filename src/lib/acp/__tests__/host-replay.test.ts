@@ -128,7 +128,7 @@ describe("kimi acp replay harness", () => {
     ]);
     const { host, replay } = await start(fixture);
     await host.start();
-    expect(host.status().state).toBe("ready");
+    expect(host.status()).toMatchObject({ state: "ready", sessionId: "session-replay" });
     await replay.done;
     await host.stop();
     active = undefined;
