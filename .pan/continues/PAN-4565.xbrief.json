@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4565",
   "created": "2026-10-20T02:51:57.744Z",
-  "updated": "2026-10-20T03:04:50.061Z",
+  "updated": "2026-10-20T03:04:58.633Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4565",
       "claimedAt": "2026-10-20T02:58:45.306Z",
       "doneAt": "2026-10-20T03:04:50.061Z"
+    },
+    "fresh-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:04:58.632Z"
     }
   }
 }
