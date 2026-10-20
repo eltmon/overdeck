@@ -1437,6 +1437,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           bookmarksEnabled
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
+          onLoadOlderUntil={olderHistory.loadOlderUntil}
         />
         </ToolBodyLoaderContext.Provider>
       )}

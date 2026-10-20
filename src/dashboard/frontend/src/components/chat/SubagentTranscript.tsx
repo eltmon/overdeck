@@ -98,6 +98,7 @@ export function SubagentTranscript({
             onTargetMessageHandled={onTargetMessageHandled}
             history={olderHistory}
             onLoadOlder={olderHistory.loadOlder}
+            onLoadOlderUntil={olderHistory.loadOlderUntil}
           />
           </ToolBodyLoaderContext.Provider>
         )}

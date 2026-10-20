@@ -90,6 +90,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   bookmarksEnabled = false,
   history,
   onLoadOlder,
+  onLoadOlderUntil,
 }: MessagesTimelineProps) {
   const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -380,7 +381,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       ? rows.findIndex((row) => row.kind === 'message' && row.message.id === targetMessageId)
       : -1;
     if (byId >= 0) return { row: rows[byId]!, index: byId };
-    if (targetMessageIndex === undefined) return null;
+    // PAN-4558: message indexes count from the first loaded row, so they only
+    // mean the transcript index once nothing older remains to load.
+    if (targetMessageIndex === undefined || history?.hasOlder) return null;
     let messageIndex = 0;
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
       const row = rows[rowIndex]!;
@@ -389,7 +392,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       messageIndex += 1;
     }
     return null;
-  }, [rows, targetMessageId, targetMessageIndex]);
+  }, [rows, targetMessageId, targetMessageIndex, history?.hasOlder]);
   const targetMessageKey = targetMessageId || targetMessageIndex !== undefined
     ? `${targetMessageNonce ?? 'no-nonce'}:${targetMessageId ?? ''}:${targetMessageIndex ?? ''}`
     : null;
@@ -424,6 +427,16 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     scrollToRow(match.index, match.row.id);
   }, [scrollToRow, searchMatches]);
 
+  // PAN-4558: a target outside the loaded window pages older history in until
+  // it appears; the effect below then scrolls to it.
+  const loadingTargetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (targetMessageRow || !targetMessageKey || !targetMessageId || !history?.hasOlder || !onLoadOlderUntil) return;
+    if (loadingTargetKeyRef.current === targetMessageKey) return;
+    loadingTargetKeyRef.current = targetMessageKey;
+    void onLoadOlderUntil(targetMessageId);
+  }, [targetMessageRow, targetMessageKey, targetMessageId, history?.hasOlder, onLoadOlderUntil]);
+
   useEffect(() => {
     if (!targetMessageRow || !targetMessageKey) return;
     if (handledTargetKeyRef.current === targetMessageKey) return;
@@ -432,20 +445,35 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     onTargetMessageHandled?.();
   }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
+  const loadingJumpNonceRef = useRef<number | null>(null);
   useEffect(() => {
     if (!jumpRequest) return;
-    if (handledJumpNonceRef.current === jumpRequest.nonce) return;
-    handledJumpNonceRef.current = jumpRequest.nonce;
-    const index = rows.findIndex((row) => row.kind === 'message' && row.message.id === jumpRequest.messageId);
+    const { nonce, messageId } = jumpRequest;
+    if (handledJumpNonceRef.current === nonce) return;
+    const index = rows.findIndex((row) => row.kind === 'message' && row.message.id === messageId);
     if (index >= 0) {
+      handledJumpNonceRef.current = nonce;
       const row = rows[index]!;
       scrollToRow(index, row.id);
       setFlashRowId(row.id);
-      bookmarksCtx?.resolveJump(jumpRequest.nonce, true);
-    } else {
-      bookmarksCtx?.resolveJump(jumpRequest.nonce, false);
+      bookmarksCtx?.resolveJump(nonce, true);
+      return;
     }
-  }, [jumpRequest, rows, scrollToRow, bookmarksCtx]);
+    // PAN-4558: a bookmark outside the loaded window pages older history in;
+    // this effect re-runs on the new rows and scrolls once the row is loaded.
+    if (history?.hasOlder && onLoadOlderUntil) {
+      if (loadingJumpNonceRef.current === nonce) return;
+      loadingJumpNonceRef.current = nonce;
+      void onLoadOlderUntil(messageId).then((found) => {
+        if (found || handledJumpNonceRef.current === nonce) return;
+        handledJumpNonceRef.current = nonce;
+        bookmarksCtx?.resolveJump(nonce, false);
+      });
+      return;
+    }
+    handledJumpNonceRef.current = nonce;
+    bookmarksCtx?.resolveJump(nonce, false);
+  }, [jumpRequest, rows, scrollToRow, bookmarksCtx, history?.hasOlder, onLoadOlderUntil]);
 
   useEffect(() => {
     if (!flashRowId) return;

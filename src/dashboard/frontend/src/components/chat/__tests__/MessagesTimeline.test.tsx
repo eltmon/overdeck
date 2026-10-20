@@ -849,6 +849,60 @@ describe('MessagesTimeline — older history (PAN-4558)', () => {
     expect(screen.getByText('Start of conversation')).toBeInTheDocument();
   });
 
+  it('loads older pages for a palette target outside the window, then scrolls to it', async () => {
+    const onLoadOlderUntil = vi.fn(async () => true);
+    const onTargetMessageHandled = vi.fn();
+    const props = { workLog: [], streaming: false, targetMessageId: 'm2', targetMessageIndex: 2, targetMessageNonce: 1, onTargetMessageHandled, onLoadOlderUntil };
+    const { rerender } = render(<MessagesTimeline messages={page(10, 14)} {...props} history={{ hasOlder: true, loadingOlder: false }} />);
+    await waitFor(() => expect(onLoadOlderUntil).toHaveBeenCalledWith('m2'));
+    expect(onTargetMessageHandled).not.toHaveBeenCalled();
+
+    rerender(<MessagesTimeline messages={page(0, 14)} {...props} history={{ hasOlder: false, loadingOlder: false }} />);
+    await waitFor(() => expect(onTargetMessageHandled).toHaveBeenCalledTimes(1));
+    expect(onLoadOlderUntil).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the message-index fallback only once nothing older remains', async () => {
+    const onTargetMessageHandled = vi.fn();
+    const props = { messages: page(10, 14), workLog: [], streaming: false, targetMessageId: 'gone', targetMessageIndex: 0, targetMessageNonce: 1, onTargetMessageHandled, onLoadOlderUntil: vi.fn(async () => false) };
+    const { rerender } = render(<MessagesTimeline {...props} history={{ hasOlder: true, loadingOlder: false }} />);
+    await act(async () => {});
+    expect(onTargetMessageHandled).not.toHaveBeenCalled();
+    rerender(<MessagesTimeline {...props} history={{ hasOlder: false, loadingOlder: false }} />);
+    await waitFor(() => expect(onTargetMessageHandled).toHaveBeenCalledTimes(1));
+  });
+
+  it('loads older pages for a bookmark jump before reporting the bookmark missing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ bookmarks: [] })));
+    let finish!: (found: boolean) => void;
+    const onLoadOlderUntil = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
+    function Harness() {
+      const ctx = useConversationBookmarks();
+      return (
+        <>
+          <button onClick={() => ctx?.jumpTo('m2')}>jump</button>
+          <span data-testid="missing">{ctx?.missingMessageId ?? ''}</span>
+        </>
+      );
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ConversationBookmarksProvider conversationName="conv-older">
+          <Harness />
+          <MessagesTimeline messages={page(10, 14)} workLog={[]} streaming={false} bookmarksEnabled
+            history={{ hasOlder: true, loadingOlder: false }} onLoadOlderUntil={onLoadOlderUntil} />
+        </ConversationBookmarksProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByText('jump'));
+    await waitFor(() => expect(onLoadOlderUntil).toHaveBeenCalledWith('m2'));
+    expect(screen.getByTestId('missing').textContent).toBe('');
+    await act(async () => { finish(false); });
+    await waitFor(() => expect(screen.getByTestId('missing').textContent).toBe('m2'));
+    vi.unstubAllGlobals();
+  });
+
   it('hides compact boundaries older than the loaded rows while older history remains', () => {
     const boundaries = [{ id: 'old-compact', timestamp: new Date(1_700_000_000_000).toISOString(), trigger: 'auto' }];
     const messages = page(10, 14);
