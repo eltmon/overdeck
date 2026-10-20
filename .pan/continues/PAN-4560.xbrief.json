@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:14:42.552Z",
+  "updated": "2026-10-20T05:14:55.977Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "profile-tooling.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T05:14:42.551Z"
+    },
+    "profile-baseline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:14:55.976Z"
     }
   }
 }
