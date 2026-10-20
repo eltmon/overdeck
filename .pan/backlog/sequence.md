@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T20:06:47Z · model: claude-opus-5-5 · open: 833_
+_Last sequenced: 2026-10-20T20:07:27Z · model: claude-opus-5-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -20,8 +20,7 @@ _Last sequenced: 2026-10-20T20:06:47Z · model: claude-opus-5-5 · open: 833_
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 15 | PAN-4558 | M | high | ok |  |  | Conversation open sends the whole multi-MB transcript on HTTP and WS; bound the first window, page older rows. Carries #3778 server cap. |
 | 16 | PAN-4563 | M | medium | ok |  |  | Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline. |
-| 17 | PAN-4560 | M | medium | ok |  |  | No measurement of dashboard re-renders under live event load; profile four scenarios, fix top offenders, add render-count tests. |
-| 19 | PAN-4572 | M | medium | ok |  | PAN-4560 | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -206,7 +205,7 @@ _Last sequenced: 2026-10-20T20:06:47Z · model: claude-opus-5-5 · open: 833_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-4561 | L | medium | ok |  | PAN-4560 | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. Profile (#4560) first. |
+| 220 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  | PAN-4558 | Client mitigation is on main; server snapshot cap moved to #4558. Resume-from-offset on resubscribe is still open here. |
@@ -901,13 +900,9 @@ New and already in the pipeline. It takes over the server-side snapshot cap that
 
 New and already in the pipeline. Replay fixtures catch provider ordering changes (turn completion, interrupt, subagent nesting) that hand-written mocks miss. Valuable harness hardening but test infrastructure rather than a live defect, so medium.
 
-### PAN-4560 (rank 17)
-
-New and already in the pipeline. Measurement-first performance work that also produces the before numbers PAN-4561 (React 19 + compiler) needs, so it should land first.
-
 ### PAN-4572 (rank 19)
 
-New follow-up filed from the in-pipeline PAN-4560 profiling, with measured counts and exact file references against that branch. It cannot start until PAN-4560 merges, so it sits directly behind it in the top tier; it also gives PAN-4561 (React compiler) a cleaner baseline.
+PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
 ### PAN-4217 (rank 23)
 
@@ -1161,6 +1156,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 
 npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
 
+### PAN-2957 (rank 92)
+
+npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1168,10 +1167,10 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T20:06:47Z",
+  "generatedAt": "2026-10-20T20:07:27Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 833,
+  "openCount": 832,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1373,19 +1372,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "dependsOn": [],
       "why": "Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline.",
       "rationale": "New and already in the pipeline. Replay fixtures catch provider ordering changes (turn completion, interrupt, subagent nesting) that hand-written mocks miss. Valuable harness hardening but test infrastructure rather than a live defect, so medium.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4560",
-      "rank": 17,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "No measurement of dashboard re-renders under live event load; profile four scenarios, fix top offenders, add render-count tests.",
-      "rationale": "New and already in the pipeline. Measurement-first performance work that also produces the before numbers PAN-4561 (React 19 + compiler) needs, so it should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3745,11 +3731,9 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "importance": "medium",
       "score": 52,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4560"
-      ],
-      "why": "React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. Profile (#4560) first.",
-      "rationale": "New. Broad frontend upgrade with real risk across third-party React deps; the body asks for the PAN-4560 profiling to land first so its numbers show the before and after. Medium importance, placed in the mid tier behind the dashboard stability fixes.",
+      "dependsOn": [],
+      "why": "React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed.",
+      "rationale": "PAN-4560 profiling merged, so the before numbers this upgrade wanted now exist; rank held at 220 because the broad React upgrade still carries third-party risk and PAN-4572 should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11545,11 +11529,9 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "importance": "medium",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4560"
-      ],
+      "dependsOn": [],
       "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
-      "rationale": "New follow-up filed from the in-pipeline PAN-4560 profiling, with measured counts and exact file references against that branch. It cannot start until PAN-4560 merges, so it sits directly behind it in the top tier; it also gives PAN-4561 (React compiler) a cleaner baseline.",
+      "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12907,13 +12889,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "confidence": 1
     },
     {
-      "from": "PAN-4560",
-      "to": "PAN-4561",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-4562",
       "to": "PAN-4563",
       "type": "informs",
@@ -12926,13 +12901,6 @@ npm run build regenerates the committed record-cost-event.js bundle, dirtying ev
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-4560",
-      "to": "PAN-4572",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4572",
