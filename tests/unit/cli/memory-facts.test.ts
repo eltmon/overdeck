@@ -13,8 +13,12 @@ vi.mock('../../../src/lib/projects.js', () => ({
   resolveInfraRepo: (_project: unknown, root: string) => ({ repoPath: root, recordsPath: '.pan' }),
 }));
 
+import { readMemoryFactsSync } from '../../../src/lib/memory/facts/store.js';
 import {
+  memoryFactAddCommand,
+  memoryFactEditCommand,
   memoryFactListCommand,
+  memoryFactRetireCommand,
   memoryFactShowCommand,
   resolveFactTarget,
 } from '../../../src/cli/commands/memory-facts.js';
@@ -211,6 +215,114 @@ describe('pan memory show/list (PAN-3957 W5a)', () => {
       expect(parsed.dir).toBe(dir);
       expect(parsed.facts).toHaveLength(1);
       expect(parsed.problems).toHaveLength(0);
+    });
+  });
+
+  describe('memoryFactAddCommand', () => {
+    function baseAddOptions(overrides: Record<string, unknown> = {}) {
+      return { type: 'feedback' as const, description: 'A description.', ...overrides };
+    }
+
+    it('writes the file and prints the commit hint', async () => {
+      await memoryFactAddCommand('new-fact', baseAddOptions());
+
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain('✓ Wrote');
+      expect(output).toContain('Commit it: git -C');
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.map((f) => f.id)).toEqual(['new-fact']);
+    });
+
+    it('refuses outside a registered project', async () => {
+      process.chdir(tmpRoot);
+      await expect(memoryFactAddCommand('new-fact', baseAddOptions())).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+    });
+
+    it('--type user without --user is refused', async () => {
+      await expect(memoryFactAddCommand('user-fact', baseAddOptions({ type: 'user' }))).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('add --user');
+    });
+
+    it('refuses when check-ignore reports ignored', async () => {
+      await expect(
+        memoryFactAddCommand('new-fact', baseAddOptions({ checkIgnored: async () => true })),
+      ).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('git-ignored');
+    });
+
+    it('from a workspace writes into the workspace checkout, not the primary', async () => {
+      const workspace = join(projectRoot, 'workspaces', 'feature-x');
+      mkdirSync(workspace, { recursive: true });
+      process.chdir(workspace);
+
+      await memoryFactAddCommand('workspace-fact', baseAddOptions());
+
+      expect(readMemoryFactsSync(join(workspace, '.overdeck', 'memory'), 'project').facts).toHaveLength(1);
+      expect(readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project').facts).toHaveLength(0);
+    });
+
+    it('refuses a /home/<user>/ path without --user and prints the machine-specific message', async () => {
+      await expect(
+        memoryFactAddCommand('path-fact', baseAddOptions({ body: 'See /home/alice/notes.' })),
+      ).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('machine-specific path');
+    });
+
+    it('--user accepts the same text', async () => {
+      await memoryFactAddCommand('path-fact', baseAddOptions({ user: true, body: 'See /home/alice/notes.' }));
+      expect(readMemoryFactsSync(join(process.env.OVERDECK_HOME as string, 'context', 'memory'), 'user').facts).toHaveLength(1);
+    });
+  });
+
+  describe('memoryFactEditCommand', () => {
+    beforeEach(() => {
+      writeFact(
+        join(projectRoot, '.overdeck', 'memory'),
+        'be-decisive',
+        '---\ntype: feedback\ndescription: Original description.\ntags: [a]\n---\nOriginal body.\n',
+      );
+    });
+
+    it('changes only the given fields and bumps updated', async () => {
+      await memoryFactEditCommand('be-decisive', { description: 'New description.' });
+
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts[0].description).toBe('New description.');
+      expect(facts[0].tags).toEqual(['a']);
+      expect(facts[0].updated).toBe(new Date().toISOString().slice(0, 10));
+    });
+
+    it('with no flags is refused', async () => {
+      await expect(memoryFactEditCommand('be-decisive', {})).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('nothing to change');
+    });
+
+    it('--clear-review removes the review marker', async () => {
+      writeFact(
+        join(projectRoot, '.overdeck', 'memory'),
+        'marked-fact',
+        '---\ntype: feedback\ndescription: Marked.\nreview: [unindexed]\n---\nBody.\n',
+      );
+      await memoryFactEditCommand('marked-fact', { clearReview: true });
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'marked-fact')?.review).toEqual([]);
+    });
+  });
+
+  describe('memoryFactRetireCommand', () => {
+    it('removes the file', async () => {
+      writeFact(join(projectRoot, '.overdeck', 'memory'), 'to-remove', '---\ntype: feedback\ndescription: x.\n---\nBody.\n');
+
+      await memoryFactRetireCommand('to-remove', {});
+
+      expect(readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project').facts).toHaveLength(0);
+      expect(logSpy.mock.calls.flat().join('\n')).toContain('✓ Removed');
+      expect(logSpy.mock.calls.flat().join('\n')).toContain('docs(memory): retire to-remove');
     });
   });
 });
