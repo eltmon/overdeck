@@ -18,18 +18,17 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ConversationResumeControls } from './ConversationResumeControls';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
-import { fetchWithTimeout } from '../../lib/apiFetch';
 import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { resumeConversation } from './conversationResumeApi';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { TurnDiffSummary } from './chat-types';
 import {
   useComposerStore,
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { EffortSource, ReviewerRoundMetadata } from '@overdeck/contracts';
+import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
@@ -44,6 +43,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
+import { fetchMessages, type MessagesResponse } from './messagesQuery';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
@@ -1128,48 +1128,7 @@ export function ConversationPanel({
 
 // ─── ConversationView ─────────────────────────────────────────────────────────
 
-interface MessagesResponse {
-  messages: ChatMessage[];
-  workLog: WorkLogEntry[];
-  streaming: boolean;
-  discovering?: boolean;
-  totalCost?: number;
-  proposedPlan?: ProposedPlan;
-  compactBoundaries?: CompactBoundary[];
-  compacting?: boolean;
-  contextUsage?: ContextUsage | null;
-  subagents?: SubagentSummary[];
-  /** PAN-4255 (agent reads): transcript-observed effort and the launch/pinned resolution. */
-  observedEffort?: string | null;
-  effortResolution?: { effort: string; source: EffortSource } | null;
-  /** Server-side resolution failure to surface in the panel (e.g. the live
-   * session could not be resolved from the launcher). Rendered as a banner. */
-  error?: string;
-  checked?: string[];
-}
-
-export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
-  // PAN-1705: timeout + React Query's abort signal so a request in flight
-  // during a server restart rejects (and retries) instead of pinning the
-  // panel on "Loading…" forever, and switching conversations cancels the
-  // previous conversation's fetch.
-  const path = agentId
-    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
-    : `/api/conversations/${encodeURIComponent(name)}/messages`;
-  const res = await fetchWithTimeout(path, { signal });
-  if (res.status === 404 && agentId) {
-    const missing = await res.json() as { error?: string; checked?: string[] };
-    return {
-      messages: [],
-      workLog: [],
-      streaming: false,
-      error: missing.error ?? `No transcript found for ${agentId}.`,
-      checked: missing.checked ?? [],
-    };
-  }
-  if (!res.ok) throw new Error('Failed to fetch messages');
-  return res.json();
-}
+export { fetchMessages };
 
 interface ConversationViewProps {
   conversation: Conversation;

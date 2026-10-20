@@ -1,6 +1,6 @@
 /** Agent-backed panels have a dedicated transcript route and surface misses. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchMessages } from '../ConversationPanel';
+import { fetchMessages } from '../messagesQuery';
 
 function stubFetch(status: number, body: unknown = {}) {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(body, { status })));
