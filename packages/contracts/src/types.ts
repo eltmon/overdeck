@@ -387,9 +387,6 @@ export const AgentSnapshot = Schema.Struct({
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   turnEndAssessment: Schema.optional(TurnEndAssessment),
-  // PAN-800 — bumped on every runtime event so subscribers can cheaply detect
-  // a change without diffing the full AgentRuntimeSnapshot.
-  runtimeSnapshotSequence: Schema.optional(SequenceNumber),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
 

@@ -1,0 +1,346 @@
+{
+  "version": "1",
+  "issueId": "PAN-4562",
+  "created": "2026-10-20T03:04:35.302Z",
+  "updated": "2026-10-20T05:22:03.700Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-20T05:19Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-10-20T05:19:36.291Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-20T05:22Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-10-20T05:22:03.700Z"
+    }
+  ],
+  "items": {
+    "capabilities-foundation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:04:35.302Z",
+      "doneAt": "2026-10-20T03:09:14.548Z"
+    },
+    "ratchet-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:09:24.447Z",
+      "doneAt": "2026-10-20T03:12:15.530Z"
+    },
+    "runtime-readiness-kinds": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:15:01.678Z",
+      "doneAt": "2026-10-20T03:18:26.170Z"
+    },
+    "runtime-lifecycle-caps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:18:27.935Z",
+      "doneAt": "2026-10-20T03:20:30.348Z"
+    },
+    "message-caps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:20:32.336Z",
+      "doneAt": "2026-10-20T03:23:49.690Z"
+    },
+    "reads-session-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:23:56.937Z",
+      "doneAt": "2026-10-20T03:26:18.947Z"
+    },
+    "session-history-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:26:21.263Z",
+      "doneAt": "2026-10-20T03:28:15.610Z"
+    },
+    "launcher-caps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:28:17.611Z",
+      "doneAt": "2026-10-20T03:31:23.900Z"
+    },
+    "binary-caps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:31:25.443Z",
+      "doneAt": "2026-10-20T03:35:47.376Z"
+    },
+    "scanner-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:35:49.100Z",
+      "doneAt": "2026-10-20T03:39:00.518Z"
+    },
+    "activity-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:39:04.698Z",
+      "doneAt": "2026-10-20T03:51:23.756Z"
+    },
+    "row-label": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:51:25.550Z",
+      "doneAt": "2026-10-20T03:53:13.247Z"
+    },
+    "registry-normalize": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:53:14.590Z",
+      "doneAt": "2026-10-20T03:54:59.806Z"
+    },
+    "fake-runtime-contract": {
+      "status": "completed",
+      "doneAt": "2026-10-20T03:56:40.127Z"
+    },
+    "ratchet-lower": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:56:41.339Z",
+      "doneAt": "2026-10-20T03:57:16.319Z"
+    },
+    "docs-capabilities": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4562",
+      "claimedAt": "2026-10-20T03:57:17.872Z",
+      "doneAt": "2026-10-20T03:58:21.493Z"
+    },
+    "capabilities-foundation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:14:34.791Z"
+    },
+    "capabilities-foundation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:14:53.435Z"
+    },
+    "capabilities-foundation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:15:12.697Z"
+    },
+    "capabilities-foundation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:15:33.111Z"
+    },
+    "ratchet-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:15:52.238Z"
+    },
+    "ratchet-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:16:09.620Z"
+    },
+    "ratchet-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:16:26.769Z"
+    },
+    "ratchet-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:16:45.115Z"
+    },
+    "ratchet-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:17:05.456Z"
+    },
+    "runtime-readiness-kinds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:17:24.793Z"
+    },
+    "runtime-readiness-kinds.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:17:44.472Z"
+    },
+    "runtime-readiness-kinds.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:18:01.155Z"
+    },
+    "runtime-lifecycle-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:18:17.596Z"
+    },
+    "runtime-lifecycle-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:18:33.555Z"
+    },
+    "runtime-lifecycle-caps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:18:49.731Z"
+    },
+    "message-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:19:06.900Z"
+    },
+    "message-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:19:23.670Z"
+    },
+    "message-caps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:19:39.788Z"
+    },
+    "reads-session-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:19:55.990Z"
+    },
+    "reads-session-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:20:13.654Z"
+    },
+    "reads-session-table.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:20:31.919Z"
+    },
+    "session-history-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:20:52.640Z"
+    },
+    "session-history-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:21:09.840Z"
+    },
+    "session-history-table.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:21:26.651Z"
+    },
+    "launcher-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:21:43.402Z"
+    },
+    "launcher-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:22:02.799Z"
+    },
+    "launcher-caps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:22:20.250Z"
+    },
+    "launcher-caps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:22:35.839Z"
+    },
+    "binary-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:22:54.245Z"
+    },
+    "binary-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:23:12.972Z"
+    },
+    "binary-caps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:23:30.604Z"
+    },
+    "binary-caps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:23:48.620Z"
+    },
+    "scanner-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:24:07.256Z"
+    },
+    "scanner-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:24:25.788Z"
+    },
+    "scanner-table.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:24:42.980Z"
+    },
+    "activity-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:25:04.022Z"
+    },
+    "activity-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:25:23.902Z"
+    },
+    "activity-table.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:25:42.891Z"
+    },
+    "activity-table.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:03.150Z"
+    },
+    "row-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:20.660Z"
+    },
+    "row-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:36.635Z"
+    },
+    "row-label.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:53.788Z"
+    },
+    "registry-normalize.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:13.708Z"
+    },
+    "registry-normalize.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:31.580Z"
+    },
+    "fake-runtime-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:48.233Z"
+    },
+    "fake-runtime-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:06.513Z"
+    },
+    "fake-runtime-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:25.347Z"
+    },
+    "fake-runtime-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:28:43.022Z"
+    },
+    "ratchet-lower.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:01.010Z"
+    },
+    "ratchet-lower.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:18.923Z"
+    },
+    "docs-capabilities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:37.130Z"
+    },
+    "docs-capabilities.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:55.014Z"
+    },
+    "docs-capabilities.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:13.749Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-20T05:19:36Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4562 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (172656ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4562/.overdeck/verification/2026-10-20T05-14-18-022Z-0a601d9a.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4562/.overdeck/verification/2026-10-20T05-14-18-022Z-0a601d9a.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4562 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4562 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-20T05:22:03Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4562\n\nPull request: https://github.com/eltmon/overdeck/pull/4570 (head `0a601d9a`)\n\nSource: check_suite\n\n## Failing checks (1)\n\n### CI [INHERITED FROM MAIN — also failing on main]\n\nRun: `gh run view 39373816252 --repo eltmon/overdeck`  \n```\nlint-group (core)\tLint (core)\t﻿2026-10-20T05:18:59.5448241Z ##[group]Run node scripts/run-lint-group.mjs core\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5448678Z ^[[36;1mnode scripts/run-lint-group.mjs core^[[0m\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5518098Z shell: /usr/bin/bash -e {0}\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5518542Z env:\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5518762Z   SKIP_DOCS_INDEX: 1\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5519000Z ##[endgroup]\nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5896531Z \nlint-group (core)\tLint (core)\t2026-10-20T05:18:59.5897234Z $ eslint src/ --ext .js,.ts,.tsx --no-inline-config\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.6709490Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.6710008Z $ npm run lint:effect\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.7645922Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.7646580Z > @overdeck/core@0.68.0 lint:effect\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.7647025Z > node scripts/check-effect-versions.mjs\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.7647237Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.7984079Z ✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.8074290Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.8074683Z $ npm run lint:permissions\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.9005328Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.9006040Z > @overdeck/core@0.68.0 lint:permissions\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.9006749Z > bash scripts/lint-permissions.sh\nlint-group (core)\tLint (core)\t2026-10-20T05:19:29.9006944Z \nlint-group (core)\tLint (core)\t2026-10-20T05:19:30.1641369Z ✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\nlint-group (core)\tLint (core)\t2026-10-20T05:19:30.1709778Z \nlint-group (core)\tLint (core)\t20\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

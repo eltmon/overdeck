@@ -372,7 +372,7 @@ describe('PAN-800 runtime reducer', () => {
     expect(s.resolvedChannelPermissionDecisionsById['perm-stop']).toBeUndefined()
   })
 
-  it('bumps AgentSnapshot.runtimeSnapshotSequence when agent exists', () => {
+  it('keeps agentsById identity on runtime events', () => {
     const withAgent = {
       ...INITIAL_READ_MODEL_STATE,
       agentsById: {
@@ -383,10 +383,21 @@ describe('PAN-800 runtime reducer', () => {
         },
       },
     }
-    const next = applyEvent(withAgent, at(42, {
+    let next = applyEvent(withAgent, at(42, {
       type: 'agent.activity_changed',
       payload: { agentId: AGENT, activity: 'working', currentTool: 'Write' },
     } as any))
-    expect(next.agentsById[AGENT].runtimeSnapshotSequence).toBe(42)
+    next = applyEvent(next, at(43, {
+      type: 'agent.thinking_started',
+      payload: { agentId: AGENT, lastToolAt: '2026-04-21T10:00:00.000Z' },
+    } as any))
+    next = applyEvent(next, at(44, {
+      type: 'agent.message_received',
+      payload: { agentId: AGENT, direction: 'to_agent', source: 'user' },
+    } as any))
+    expect(next.agentsById).toBe(withAgent.agentsById)
+    expect(next.agentRuntimeById[AGENT]).toBeDefined()
+    expect(next.agentRuntimeById[AGENT]).not.toBe(withAgent.agentRuntimeById[AGENT])
+    expect(next.agentRuntimeById[AGENT].updatedAtSequence).toBe(44)
   })
 })

@@ -33,6 +33,7 @@ vi.mock('../../cloister/cpu-pressure.js', () => ({ assessCpuPressure: assessCpuP
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation, getConversationByName } = await import('../conversations.js');
 const { startConversationRuntime } = await import('../conversation-runtime.js');
+type RuntimeName = Parameters<typeof startConversationRuntime>[0]['harness'];
 
 afterAll(() => {
   closeOverdeckDatabase();
@@ -141,5 +142,49 @@ describe('startConversationRuntime (PAN-4223 WI-2)', () => {
 
     expect(deps.stop).not.toHaveBeenCalled();
     expect(getConversationByName('rt-start-fail-cc')?.spawnError).toBe('never ready');
+  });
+});
+
+describe('startConversationRuntime reads declared capabilities for every runtime (PAN-4562)', () => {
+  const start = (harness: RuntimeName, name: string, deps: ReturnType<typeof fakes>) => {
+    const conv = createConversation({ name, tmuxSession: `conv-${name}`, cwd: TEST_HOME, harness, workspaceId: null });
+    return startConversationRuntime({
+      conv, tmuxSession: `conv-${name}`, cwd: TEST_HOME, claudeSessionId: `sess-${name}`,
+      harness, launchContext: { bareContext: false, skipClaudeMd: false }, message: 'go',
+    }, deps as never).then(() => conv);
+  };
+
+  // harness, stopRuntimeOnStartFailure, initialPromptMustLand
+  it.each([
+    ['claude-code', false, false],
+    ['ohmypi', false, false],
+    ['codex', false, false],
+    ['acp', true, true],
+    ['kimi-code', true, true],
+    ['opencode', true, true],
+    ['muse', true, false],
+    ['prime-agent', true, true],
+  ] as const)('%s: stop on a spawn failure %s, undelivered prompt is an error %s', async (harness, stopsOnFailure, promptMustLand) => {
+    const failed = fakes();
+    failed.spawn.mockRejectedValueOnce(new Error('spawn failed'));
+    const failedConv = await start(harness, `caps-spawn-${harness}`, failed);
+    expect(failed.stop.mock.calls).toEqual(stopsOnFailure ? [[failedConv, `caps-spawn-${harness}`]] : []);
+
+    const undelivered = fakes();
+    undelivered.deliver.mockResolvedValue({ ok: false, failure: 'pane gone' } as never);
+    await start(harness, `caps-deliver-${harness}`, undelivered);
+    const spawnError = getConversationByName(`caps-deliver-${harness}`)?.spawnError ?? null;
+    if (promptMustLand) expect(spawnError).toContain('initial prompt did not land: pane gone');
+    else expect(spawnError).toBeNull();
+  });
+
+  it('kimi-code delivers its context in the first message even when the prompt is empty', async () => {
+    const deps = fakes();
+    const conv = createConversation({ name: 'caps-kimi-empty', tmuxSession: 'conv-caps-kimi-empty', cwd: TEST_HOME, harness: 'kimi-code', workspaceId: null });
+    await startConversationRuntime({
+      conv, tmuxSession: 'conv-caps-kimi-empty', cwd: TEST_HOME, claudeSessionId: 'sess-kimi-empty',
+      harness: 'kimi-code', launchContext: { bareContext: false, skipClaudeMd: false }, message: '',
+    }, deps as never);
+    expect(deps.deliver).toHaveBeenCalledWith('conv-caps-kimi-empty', '', 'conversation-message', expect.any(String), { kimiContext: { workspace: TEST_HOME } });
   });
 });

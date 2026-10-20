@@ -6,7 +6,6 @@
  * Pure reducer functions are shared with the server read model via @overdeck/contracts.
  */
 
-import { useMemo } from 'react'
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
@@ -317,29 +316,52 @@ export function useDerivedIssueState(issueId: string | null | undefined): Derive
 
 /** React hook form of `selectBackendPanes` — the issue's rows in the issue tree. */
 export function useBackendPanes(issueId: string | null | undefined): BackendPane[] {
-  const byId = useDashboardStore((s) => s.backendPanesById)
-  return useMemo(
-    () => (issueId
-      ? Object.values(byId).filter((pane) => pane.issue?.toUpperCase() === issueId.toUpperCase())
-      : EMPTY_PANES),
-    [byId, issueId],
-  )
+  return useDashboardStore(issueId ? selectBackendPanes(issueId) : selectNoPanes)
 }
 
 const EMPTY_PANES: BackendPane[] = []
+const EMPTY_OBSERVATIONS: MemoryObservation[] = []
+const EMPTY_RESET_MARKERS: ResetMarker[] = []
+
+const selectNoPanes = (): BackendPane[] => EMPTY_PANES
+
+/**
+ * Last result per upper-cased issue id. PAN-4560: a pane event for another
+ * issue replaces `backendPanesById`, so the selector keeps returning the same
+ * array while this issue's panes are the same objects in the same order.
+ * Otherwise every subscriber re-renders on every store set.
+ */
+const backendPanesCache = new Map<string, { byId: DashboardState['backendPanesById']; result: BackendPane[] }>()
+
+function sameElements<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
 
 /** Every backend pane whose `issue` metadata token names this issue. */
 export const selectBackendPanes =
   (issueId: string) =>
-  (s: DashboardState): BackendPane[] =>
-    Object.values(s.backendPanesById).filter(
-      (pane) => pane.issue?.toUpperCase() === issueId.toUpperCase(),
-    )
+  (s: DashboardState): BackendPane[] => {
+    const key = issueId.toUpperCase()
+    const cached = backendPanesCache.get(key)
+    if (cached && cached.byId === s.backendPanesById) return cached.result
+    const filtered = Object.values(s.backendPanesById).filter((pane) => pane.issue?.toUpperCase() === key)
+    if (cached && sameElements(cached.result, filtered)) {
+      cached.byId = s.backendPanesById
+      return cached.result
+    }
+    const result = filtered.length === 0 ? EMPTY_PANES : filtered
+    backendPanesCache.set(key, { byId: s.backendPanesById, result })
+    return result
+  }
 
 export const selectMemoryObservations =
   (issueId: string) =>
   (s: DashboardState): MemoryObservation[] =>
-    s.observationsByIssueId[issueId] ?? []
+    s.observationsByIssueId[issueId] ?? EMPTY_OBSERVATIONS
 
 export const selectMemoryStatus =
   (issueId: string) =>
@@ -369,7 +391,7 @@ export const selectLatestMemoryFailure = (s: DashboardState): MemoryHealthSnapsh
 export const selectResetMarkersByScope =
   (scope: string, scopeId: string) =>
   (s: DashboardState): ResetMarker[] =>
-    s.resetMarkersByScopeId[`${scope}:${scopeId}`] ?? []
+    s.resetMarkersByScopeId[`${scope}:${scopeId}`] ?? EMPTY_RESET_MARKERS
 
 export const selectChannelPermissionRequests = memoizeArraySelector<
   DashboardState,

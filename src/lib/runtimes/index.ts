@@ -45,6 +45,7 @@ import type {
   RuntimeName,
   RuntimeRegistry as RuntimeRegistryInterface,
 } from './types.js';
+import { normalizeHarnessName } from '@overdeck/contracts';
 import { getAgentState } from '../agents.js';
 import { createClaudeCodeRuntime } from './claude-code.js';
 import { createOhmypiRuntimeSync } from './ohmypi.js';
@@ -94,25 +95,8 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (!state) {
       return null;
     }
-    // Read as plain string so legacy 'pi' rows (pre-PAN-1989) are handled below.
-    const harness = (state as { harness?: string }).harness;
-    if (harness === 'ohmypi' || harness === 'pi') {
-      // 'pi' is a legacy harness value (PAN-1989); normalize to ohmypi adapter.
-      return this.get('ohmypi') ?? null;
-    }
-    if (harness === 'codex') {
-      return this.get('codex') ?? null;
-    }
-    if (harness === 'opencode') return this.get('opencode') ?? null;
-    if (harness === 'acp') {
-      return this.get('acp') ?? null;
-    }
-    if (harness === 'muse') return this.get('muse') ?? null;
-    if (harness === 'prime-agent') return this.get('prime-agent') ?? null;
-    if (harness === 'kimi-code') {
-      return this.get('kimi-code') ?? null;
-    }
-    return this.get('claude-code') ?? null;
+    // Legacy 'pi' rows (pre-PAN-1989) normalize to ohmypi; a missing or unknown harness is claude-code.
+    return this.get(normalizeHarnessName((state as { harness?: unknown }).harness) ?? 'claude-code') ?? null;
   }
 }
 

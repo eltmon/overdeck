@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
@@ -36,16 +37,9 @@ function shortModel(model: string): string {
 }
 
 function shortHarness(harness: NonNullable<Conversation['harness']>): string {
-  if (harness === 'claude-code') return 'Claude Code';
-  if (harness === 'ohmypi') return 'oh-my-pi';
-  if (harness === 'pi') return 'oh-my-pi';
-  if (harness === 'codex') return 'Codex';
-  if (harness === 'opencode') return 'OpenCode';
-  if (harness === 'acp') return 'ACP';
-  if (harness === 'kimi-code') return 'Kimi Code';
-  if (harness === 'prime-agent') return 'Prime Agent';
+  const runtime = normalizeHarnessName(harness);
   // Unknown future harness — show the raw id rather than a wrong label.
-  return harness;
+  return runtime ? getRuntimeBehavior(runtime).displayName : harness;
 }
 
 function formatStalledTime(timestamp: string): string {

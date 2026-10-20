@@ -1,5 +1,16 @@
-import type { Harness } from "./types"
+import { KNOWN_HARNESSES, type Harness } from "./types"
 import type { EffortLevel } from "./effort"
+import {
+  ACP_CAPABILITIES,
+  CLAUDE_CODE_CAPABILITIES,
+  CODEX_CAPABILITIES,
+  KIMI_CODE_CAPABILITIES,
+  MUSE_CAPABILITIES,
+  OHMYPI_CAPABILITIES,
+  OPENCODE_CAPABILITIES,
+  PRIME_AGENT_CAPABILITIES,
+  type HarnessCapabilities,
+} from "./harness-capabilities"
 
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
@@ -68,10 +79,13 @@ export interface HarnessBehavior {
   readonly steerKind: HarnessSteerKind
   /** Effort levels this harness accepts, when narrower than the full {@link EFFORT_LEVELS} set. Undefined = no known restriction. */
   readonly effortLevels?: readonly EffortLevel[]
+  /** Declared behavior decisions consumers read instead of comparing harness names (PAN-4562). */
+  readonly capabilities: HarnessCapabilities
 }
 
 export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
   displayName: "Claude Code",
+  capabilities: CLAUDE_CODE_CAPABILITIES,
   // Verified from the installed Claude Code 2.1.209 binary on 2026-07-24.
   nativeCommands: [
     { name: "/model", description: "Switch the AI model for this conversation", insert: "/model " },
@@ -102,6 +116,7 @@ export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
 
 export const OHMYPI_BEHAVIOR: HarnessBehavior = {
   displayName: "Pi",
+  capabilities: OHMYPI_CAPABILITIES,
   // omp 16.3.11 does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
   nativeCommands: [],
   executableName: "omp",
@@ -128,6 +143,7 @@ export const OHMYPI_BEHAVIOR: HarnessBehavior = {
 
 export const CODEX_BEHAVIOR: HarnessBehavior = {
   displayName: "Codex",
+  capabilities: CODEX_CAPABILITIES,
   // Codex CLI 0.144.4 does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
   nativeCommands: [],
   executableName: "codex",
@@ -153,6 +169,7 @@ export const CODEX_BEHAVIOR: HarnessBehavior = {
 
 export const ACP_BEHAVIOR: HarnessBehavior = {
   displayName: "ACP",
+  capabilities: ACP_CAPABILITIES,
   // Kimi Code CLI 0.28.1 via ACP does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
   nativeCommands: [],
   executableName: "acp-host",
@@ -178,6 +195,7 @@ export const ACP_BEHAVIOR: HarnessBehavior = {
 
 export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
   displayName: "Kimi Code",
+  capabilities: KIMI_CODE_CAPABILITIES,
   nativeCommands: [], // no machine-readable inventory verified yet
   executableName: "kimi",
   processNames: ["kimi"],
@@ -203,6 +221,7 @@ export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
 export const OPENCODE_BEHAVIOR: HarnessBehavior = {
   ...ACP_BEHAVIOR,
   displayName: "OpenCode",
+  capabilities: OPENCODE_CAPABILITIES,
   contextLayerKind: "opencode",
   executableName: "opencode",
   processNames: ["acp-host", "opencode"],
@@ -210,6 +229,7 @@ export const OPENCODE_BEHAVIOR: HarnessBehavior = {
 
 export const MUSE_BEHAVIOR: HarnessBehavior = {
   displayName: "Muse Code",
+  capabilities: MUSE_CAPABILITIES,
   nativeCommands: [],
   executableName: "muse",
   processNames: ["muse", "muse-bin"],
@@ -235,6 +255,7 @@ export const MUSE_BEHAVIOR: HarnessBehavior = {
 
 export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
   displayName: "Prime Agent",
+  capabilities: PRIME_AGENT_CAPABILITIES,
   nativeCommands: [], // 0.8.0 exposes get_commands only for extension/skill commands; none are Overdeck-relevant
   executableName: "prime-agent",
   processNames: ["prime-agent"],
@@ -268,15 +289,21 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "prime-agent": PRIME_AGENT_BEHAVIOR,
 }
 
+const LEGACY_PI_HARNESS = "pi"
+
+/** True for the legacy stored harness alias `pi` (PAN-1989), which now means ohmypi. */
+export function isLegacyPiHarnessName(raw: unknown): boolean {
+  return raw === LEGACY_PI_HARNESS
+}
+
+/** Map a stored or requested harness string to a RuntimeName; legacy `pi` → `ohmypi`; anything else → null. */
+export function normalizeHarnessName(raw: unknown): RuntimeName | null {
+  if (isLegacyPiHarnessName(raw)) return "ohmypi"
+  return typeof raw === "string" && KNOWN_HARNESSES.has(raw) ? (raw as RuntimeName) : null
+}
+
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
-  if (harness === "ohmypi" || harness === "pi") return OHMYPI_BEHAVIOR
-  if (harness === "codex") return CODEX_BEHAVIOR
-  if (harness === "opencode") return OPENCODE_BEHAVIOR
-  if (harness === "acp") return ACP_BEHAVIOR
-  if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
-  if (harness === "muse") return MUSE_BEHAVIOR
-  if (harness === "prime-agent") return PRIME_AGENT_BEHAVIOR
-  return CLAUDE_CODE_BEHAVIOR
+  return BEHAVIORS[normalizeHarnessName(harness) ?? "claude-code"]
 }
 
 export function getRuntimeBehavior(runtime: RuntimeName): HarnessBehavior {

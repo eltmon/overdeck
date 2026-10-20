@@ -73,7 +73,7 @@ import {
   resolvePiSessionPath,
 } from '../agents/transcript-resolver.js';
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
-import { resolveEffectivePullRequest, type TimelineKey } from '@overdeck/contracts';
+import { resolveEffectivePullRequest, type HarnessTranscriptKind, type TimelineKey } from '@overdeck/contracts';
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
@@ -121,43 +121,35 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
   return findClaudeSessionFileById(name);
 }
 
+interface HarnessSessionFileLookup {
+  readonly resolve: (conv: Conversation) => Promise<string | null>;
+  /** return = the harness owns the answer (even null); fallback = a miss falls through to the Claude path (stale harness recovery). */
+  readonly onMiss: 'return' | 'fallback';
+}
+/** Where each transcript kind's session file lives; null = the Claude path below (PAN-4562). */
+const HARNESS_SESSION_FILE: Record<HarnessTranscriptKind, HarnessSessionFileLookup | null> = {
+  'claude-jsonl': null,
+  'muse-jsonl': { resolve: (c) => resolveMuseSessionPath(c.tmuxSession), onMiss: 'return' },
+  'prime-agent-jsonl': { resolve: (c) => readPrimeAgentSessionFile(c.tmuxSession), onMiss: 'return' },
+  // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908); the resolver checks both and skips sidecars.
+  'ohmypi-jsonl': { resolve: (c) => resolvePiSessionPath(c.tmuxSession), onMiss: 'fallback' },
+  // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
+  'codex-rollout-jsonl': { resolve: (c) => resolveCodexRolloutPath(c.tmuxSession), onMiss: 'fallback' },
+  // OpenCode/ACP conversations persist the normalized ACP transcript in the agent directory.
+  'acp-jsonl': { resolve: (c) => resolveAcpTranscriptPath(c.tmuxSession), onMiss: 'fallback' },
+  // Native Kimi writes wire.jsonl under ~/.kimi-code/sessions/; conversations have no AgentState row, so pass conv.cwd (PAN-1837).
+  'kimi-wire-jsonl': { resolve: (c) => resolveKimiWirePath(c.tmuxSession, { workspaceOverride: c.cwd }), onMiss: 'fallback' },
+};
+
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.origin === 'vault') {
     const vaultId = vaultIdFromBrowseName(conv.name);
     return vaultId && isBrowsableVaultId(vaultId) ? vaultBrowseFilePath(vaultId, conv.harness ?? 'claude-code') : null;
   }
-  if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
-  if (conv.harness === 'prime-agent') return readPrimeAgentSessionFile(conv.tmuxSession);
-  // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
-  // conversations use sessions/. The shared resolver checks both and skips sidecars.
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
-    const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    // Fall through if the harness is stale from an earlier ohmypi run.
-    if (piPath) return piPath;
-  }
-  // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
-    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
-    if (codexPath) return codexPath;
-    // Fall through if codex path not found — same stale-harness recovery.
-  }
-  // OpenCode conversations persist the normalized ACP transcript in the
-  // agent directory. Conversation-list activity enrichment reads this path
-  // to surface active tools and stalled turns.
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'acp-jsonl') {
-    const acpPath = await resolveAcpTranscriptPath(conv.tmuxSession);
-    if (acpPath) return acpPath;
-    // Fall through if the harness is stale from an earlier ACP run.
-  }
-  // Native kimi-code conversations write wire.jsonl under Kimi's own
-  // ~/.kimi-code/sessions/<workDirKey>/<sessionId>/agents/main/ tree.
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
-    // Conversations have no AgentState row, so resolveKimiWirePath's default
-    // workspace lookup (getAgentStateSync) returns nothing — pass conv.cwd
-    // directly (PAN-1837 review fix).
-    const kimiPath = await resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
-    if (kimiPath) return kimiPath;
-    // Fall through if wire.jsonl not found — same stale-harness recovery.
+  const lookup = HARNESS_SESSION_FILE[getHarnessBehavior(conv.harness).transcriptKind];
+  if (lookup) {
+    const path = await lookup.resolve(conv);
+    if (path || lookup.onMiss === 'return') return path;
   }
   // claude-code: prefer the launcher's pinned live session id, then the recorded
   // canonical id. Do not guess from JSONL mtime; compaction can make old files

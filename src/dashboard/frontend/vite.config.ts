@@ -55,7 +55,23 @@ function panDevFullReloadOnSignal(): Plugin {
   };
 }
 
-export default defineConfig({
+// PAN-4560: `vite build --mode profile` aliases react-dom to its profiling
+// build, so React records per-fiber render timings in production mode. The
+// output goes to the gitignored .tmp/dashboard-profile; it must never
+// overwrite the normal dist/dashboard/public.
+const profileOverrides = {
+  resolve: {
+    alias: [{ find: /^react-dom$/, replacement: 'react-dom/profiling' }],
+  },
+  build: {
+    outDir: '../../../.tmp/dashboard-profile',
+    emptyOutDir: true,
+    minify: false,
+    sourcemap: false,
+  },
+} as const;
+
+export default defineConfig(({ mode }) => ({
   plugins: [react(), panDevFullReloadOnSignal()],
   server: {
     port: 3010,
@@ -81,4 +97,5 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: 'hidden',
   },
-});
+  ...(mode === 'profile' ? profileOverrides : {}),
+}));
