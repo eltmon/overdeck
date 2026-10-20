@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T04:29:10.430Z",
+  "updated": "2026-10-20T04:31:41.046Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,9 +100,10 @@
       "doneAt": "2026-10-20T04:29:01.715Z"
     },
     "wi16-jump-outside-window": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4558",
-      "claimedAt": "2026-10-20T04:29:10.430Z"
+      "claimedAt": "2026-10-20T04:29:10.430Z",
+      "doneAt": "2026-10-20T04:31:41.046Z"
     }
   }
 }
