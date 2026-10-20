@@ -198,3 +198,31 @@ describe('codex case 3: sub-agent turn completes before the parent', () => {
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
+
+describe('codex case 4a: approval request mid-turn', () => {
+  it('surfaces the approval as pending, forwards the answer, and finishes the turn', async () => {
+    const { replay, manager, host } = await start('approval');
+    const facts = fixtureFacts(replay.fixture);
+    const approvalFrame = facts.frames.find(frame =>
+      frame.dir === 'in' && frameKind(frame) === 'request' && /requestApproval/.test(String(frame.message?.method)));
+    expect(approvalFrame, 're-check case 4a against the new CLI: no requestApproval server request recorded').toBeDefined();
+    const approval = approvalFrame!.message!;
+    const answer = facts.frames.find(frame => frame.dir === 'out' && frameKind(frame) === 'response' && frame.message?.id === approval.id);
+    const recordedDecision = record(answer?.message?.result).decision;
+
+    const awaitingAnswer = replay.awaitingClient({ dir: 'out', where: frame => frameKind(frame) === 'response' && frame.message?.id === approval.id });
+    expect(await host.handleOp({ op: 'message', content: prompt(replay) })).toMatchObject({ status: 200 });
+    await awaitingAnswer;
+    expect(host.status()).toMatchObject({
+      state: 'awaiting-approval',
+      pendingRequests: [{ id: approval.id, method: approval.method, params: approval.params }],
+    });
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: facts.ownerTurnId });
+
+    expect(await host.handleOp({ op: 'approval', requestId: approval.id, decision: recordedDecision })).toEqual({ status: 200, body: { ok: true } });
+    await replay.done;
+    expect(host.status().pendingRequests).toEqual([]);
+    expect(manager.getState()).toMatchObject({ state: 'idle', activeTurnId: undefined, lastTurnStatus: 'completed' });
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});

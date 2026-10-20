@@ -50,6 +50,8 @@ interface Scenario {
 }
 
 const COUNT_PROMPT = 'Count from 1 to 400, one number per line, with no other text.';
+/** Outside the workspace and outside /tmp, so the workspace-write sandbox asks before writing it. */
+const APPROVAL_PROBE = join(homedir(), `.overdeck-approval-probe-${process.pid}.txt`);
 
 export const SCENARIOS: readonly Scenario[] = [
   { harness: 'codex', name: 'turn-idle', prompt: 'Reply with exactly OK.', actions: 'none' },
@@ -68,8 +70,10 @@ export const SCENARIOS: readonly Scenario[] = [
   {
     harness: 'codex',
     name: 'approval',
-    prompt: "Run this exact shell command and nothing else: curl -sS -o /dev/null -w '%{http_code}' https://example.com",
-    actions: 'accept each */requestApproval request',
+    // A blocked-network curl fails in the sandbox without asking (codex 0.159.0),
+    // and /tmp is writable there; a write under $HOME asks for approval.
+    prompt: `Run this exact shell command and nothing else: printf hi > ${APPROVAL_PROBE}`,
+    actions: 'accept each */requestApproval request (deletes the probe file afterwards)',
   },
   {
     harness: 'codex',
@@ -379,6 +383,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 1;
   } finally {
     for (const dir of tempDirs) await rm(dir, { recursive: true, force: true });
+    if (scenario.name === 'approval') await rm(APPROVAL_PROBE, { force: true });
   }
 }
 
