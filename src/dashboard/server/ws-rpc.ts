@@ -125,12 +125,13 @@ export function streamHarnessFullParseSnapshots(
   unresolvedMeansEmpty = false,
   workspace: string | null = null,
   agentId?: string,
+  resume?: ConversationResume,
 ): FullParseSnapshotStream | null {
   const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
   const streamResolved = (
     resolve: () => Promise<string | null>,
     parse: (file: string) => Promise<ParseResult>,
-  ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty);
+  ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty, false, resume);
 
   // A missing kind gets the caller's discovering stream (the kimi-code hang); `workspace` is the conversation cwd, which the kimi resolver needs because conversations have no AgentState row to derive it from.
   switch (behavior.transcriptKind) {
@@ -144,7 +145,7 @@ export function streamHarnessFullParseSnapshots(
         return parent && agentId !== undefined ? resolveCodexSubagentTranscript(parent, agentId) : parent;
       },
       sharedTranscriptParser('codex'),
-      model, unresolvedMeansEmpty, agentId === undefined,
+      model, unresolvedMeansEmpty, agentId === undefined, resume,
     );
     case 'acp-jsonl': return streamResolved(
       () => resolveAcpTranscriptPath(sessionName),
@@ -290,6 +291,7 @@ export function streamSyntheticAgentTranscript(
         candidate.model ?? null,
         false,
         candidate.kind === 'codex' && selectedSubagentId === undefined,
+        resume,
       );
     }),
   );
@@ -817,7 +819,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null, input.agentId);
+            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null, input.agentId, input.resume);
             if (stream) return stream;
 
             if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
