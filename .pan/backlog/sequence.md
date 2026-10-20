@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T04:41:45.291741Z · model: claude-opus-5-5 · open: 834_
+_Last sequenced: 2026-10-20T04:45:49.913988Z · model: claude-opus-5-5 · open: 835_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -23,6 +23,7 @@ _Last sequenced: 2026-10-20T04:41:45.291741Z · model: claude-opus-5-5 · open: 
 | 16 | PAN-4563 | M | medium | ok |  |  | Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline. |
 | 17 | PAN-4560 | M | medium | ok |  |  | No measurement of dashboard re-renders under live event load; profile four scenarios, fix top offenders, add render-count tests. |
 | 18 | PAN-4565 | S | medium | ok |  |  | pan handoff has no clean-start mode; add --fresh: no summary, no author session, no parent link. In pipeline. |
+| 19 | PAN-4572 | M | medium | ok |  | PAN-4560 | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -914,6 +915,10 @@ New and already in the pipeline. Measurement-first performance work that also pr
 
 New and already in the pipeline. Small, self-contained CLI and dialog option with clear ACs; saves the authoring cost when source context is irrelevant.
 
+### PAN-4572 (rank 19)
+
+New follow-up filed from the in-pipeline PAN-4560 profiling, with measured counts and exact file references against that branch. It cannot start until PAN-4560 merges, so it sits directly behind it in the top tier; it also gives PAN-4561 (React compiler) a cleaner baseline.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1158,10 +1163,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 
 Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
 
-### PAN-2422 (rank 90)
-
-Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1169,10 +1170,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T04:41:45.291741Z",
+  "generatedAt": "2026-10-20T04:45:49.913988Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 834,
+  "openCount": 835,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -11566,6 +11567,21 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-4572",
+      "rank": 19,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4560"
+      ],
+      "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
+      "rationale": "New follow-up filed from the in-pipeline PAN-4560 profiling, with measured counts and exact file references against that branch. It cannot start until PAN-4560 merges, so it sits directly behind it in the top tier; it also gives PAN-4561 (React compiler) a cleaner baseline.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12954,6 +12970,20 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-4560",
+      "to": "PAN-4572",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4572",
+      "to": "PAN-4561",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
