@@ -19,7 +19,7 @@ import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { pauseOutcomeNotice, toastPauseOutcome, unpauseOutcomeNotice } from '../../lib/pauseOutcome';
 import { isWriteBlockedPhase, OFFLINE_ACTION_REASON, useConnectionPhase } from '../../lib/connectionState';
-import { selectAgents, selectBackendPanes, selectDerivedIssueState, selectIssues, useDashboardStore } from '../../lib/store';
+import { selectAgents, selectBackendPanes, selectDerivedIssueState, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
 
@@ -206,8 +206,11 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const alert = useAlert();
-  const issues = useDashboardStore(selectIssues) as Issue[];
-  const agents = useDashboardStore(selectAgents) as Agent[];
+  // PAN-4560: select this issue's row and active agent, not the whole slices,
+  // so a change to another issue or agent does not re-render every row.
+  const issue = useDashboardStore((s) =>
+    (s.issuesRaw as Issue[]).find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()));
+  const agent = useDashboardStore((s) => activeAgentForIssue(selectAgents(s) as Agent[], issueId));
   const derived = useDashboardStore(selectDerivedIssueState(issueId));
   const panes = useDashboardStore(selectBackendPanes(issueId));
   const openIssue = useDashboardStore((state) => state.openIssue);
@@ -215,8 +218,6 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const [pendingKey, setPendingKey] = useState<IssueActionKey | null>(null);
   const openRecovery = useResumeRecovery((s) => s.openRecovery);
 
-  const issue = useMemo(() => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()), [issueId, issues]);
-  const agent = useMemo(() => activeAgentForIssue(agents, issueId), [agents, issueId]);
 
   // The WS-fed agents store carries no lifecycle, so agent?.lifecycle is
   // usually undefined here — which silently disabled resumeSession/resetSession
