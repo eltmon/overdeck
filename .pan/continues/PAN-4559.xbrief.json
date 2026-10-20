@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:30:38.316Z",
+  "updated": "2026-10-20T04:30:54.966Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "docs-replay-cap.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T04:30:38.316Z"
+    },
+    "docs-replay-cap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:30:54.965Z"
     }
   }
 }
