@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T23:23:00.573Z",
+  "updated": "2026-10-20T23:30:36.731Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-10-20T23:22:56.484Z"
     },
     "w12-dirty-gate-carveout": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-20T23:23:00.573Z"
+      "claimedAt": "2026-10-20T23:23:00.573Z",
+      "doneAt": "2026-10-20T23:30:36.731Z"
     }
   }
 }
