@@ -43,7 +43,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
-import { fetchMessages, type MessagesResponse } from './messagesQuery';
+import { buildMessagesQueryFn, fetchMessages, type MessagesResponse } from './messagesQuery';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
@@ -197,10 +197,6 @@ export function ConversationPanel({
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   const httpFallbackDue = useMessagesHttpFallback(streamMessagesEnabled, receivedFirstPayload, conversation.name);
-  // Ref mirrors the latest streaming state so the HTTP queryFn can discard
-  // responses that were already in flight when streaming became active.
-  const streamActiveRef = useRef(streamMessagesEnabled);
-  streamActiveRef.current = streamMessagesEnabled;
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -256,21 +252,10 @@ export function ConversationPanel({
   // Live transcripts are pushed through WS/RPC. HTTP is a fallback for the
   // initial snapshot (only after MESSAGES_HTTP_FALLBACK_MS without a stream
   // payload) and is the sole read path for stopped history.
-  const messagesQueryFn = useCallback(async ({ signal }: { signal?: AbortSignal }) => {
-    const fetched = await fetchMessages(conversation.name, signal, agentId);
-    // If the WS subscription became active while this HTTP request was in
-    // flight, prefer the streamed cache ONLY when it is at least as complete
-    // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
-    // partial), this HTTP response is the authoritative full history — use it
-    // rather than returning empty/truncated state. (PAN-1642 regression: the
-    // old `cached ?? empty` rendered "How can I help you?" / only-last-parts
-    // whenever the snapshot lost the race, worsening under load.)
-    if (streamActiveRef.current) {
-      const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
-      if (cached && cached.messages.length >= fetched.messages.length) return cached;
-    }
-    return fetched;
-  }, [conversation.name, agentId, queryClient, messagesQueryKey]);
+  const messagesQueryFn = useMemo(
+    () => buildMessagesQueryFn(queryClient, messagesQueryKey, conversation.name, agentId),
+    [conversation.name, agentId, queryClient, messagesQueryKey],
+  );
   const refreshMessagesOverHttp = useCallback(() => {
     // staleTime: 0 forces the refetch past the app's default 30s staleTime, since
     // fetchQuery otherwise returns fresh cached data without calling queryFn.

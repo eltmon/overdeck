@@ -71,8 +71,8 @@ function replaceWith(incoming: IncomingWindow): HistoryRows {
 
 /**
  * FR-9: merge a windowed response into the cache. Rows older than the
- * response's cursor that the cache already holds are kept; from the cursor on
- * the response is authoritative. A reset, an empty cache, a different
+ * response's cursor that the cache already holds are kept; from the cursor to
+ * the response's newest row the response is authoritative. A reset, an empty cache, a different
  * transcript, a legacy full body, a window that reaches the first row, or a
  * gap between the cache's newest row and the response's cursor replaces the
  * cache. An empty window that is not a reset keeps the cache.
@@ -94,7 +94,13 @@ export function mergeWindowIntoCache(previous: HistoryRows | undefined, incoming
   const incomingIds = new Set<string>();
   for (const message of incoming.messages) incomingIds.add(message.id);
   for (const entry of incoming.workLog) incomingIds.add(entry.id);
-  const isKept = (id: string, key: TimelineKey) => !incomingIds.has(id) && (!cursor || compareTimelineKeys(key, cursor) < 0);
+  // Rows newer than the response arrived after it was read (a stream delta
+  // racing an HTTP read); deltas never resend them, so they are kept too.
+  const incomingNewest = newestKey(incoming);
+  const isKept = (id: string, key: TimelineKey) => !incomingIds.has(id) && (
+    !cursor
+    || compareTimelineKeys(key, cursor) < 0
+    || (incomingNewest !== null && compareTimelineKeys(key, incomingNewest) > 0));
   const keptMessages = previous.messages.filter((message) => isKept(message.id, timelineKeyOfMessage(message)));
   const keptWorkLog = previous.workLog.filter((entry) => isKept(entry.id, timelineKeyOfWork(entry)));
   if (keptMessages.length === 0 && keptWorkLog.length === 0) return replaceWith(incoming);

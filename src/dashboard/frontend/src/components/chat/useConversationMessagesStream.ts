@@ -7,6 +7,7 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ConversationWindow, ProposedPlan, SubagentSummary, WorkLogEntry } from './chat-types';
 import { mergeWindowIntoCache, resumePayloadFromCache } from './conversationHistory';
+import { mergeFetchedMessages } from './messagesQuery';
 
 export const conversationMessagesQueryKey = (name: string) => ['conversation-messages', name] as const;
 export const subagentTranscriptQueryKey = (name: string, agentId: string) => ['conversation-messages', name, 'subagent', agentId] as const;
@@ -245,7 +246,8 @@ export function useSubagentTranscript(
         { signal },
       );
       if (!response.ok) throw new Error('Failed to fetch subagent messages');
-      return response.json() as Promise<ConversationMessagesCache>;
+      const fetched = await response.json() as ConversationMessagesCache & { window?: ConversationWindow };
+      return mergeFetchedMessages(queryClient.getQueryData<ConversationMessagesCache>(queryKey), fetched);
     },
     enabled: agentId !== null && !streaming,
   });

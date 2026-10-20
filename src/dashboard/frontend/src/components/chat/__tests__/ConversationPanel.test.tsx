@@ -140,7 +140,7 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv|agent-test-stream-[ab])\/diffs$/.test(url)) {
     return Response.json({ summaries: [] });
   }
-  if (method === 'GET' && /^\/api\/agents\/agent-test-stream-[ab]\/conversation$/.test(url)) {
+  if (method === 'GET' && /^\/api\/agents\/agent-test-stream-[ab]\/conversation\?window=initial$/.test(url)) {
     return Response.json({ messages: [], workLog: [], streaming: false });
   }
   // PAN-3113 — the panel polls the shared pending-input feed for pane choice
@@ -1169,5 +1169,42 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     expect(messagesCallCount()).toBe(1);
+  });
+
+  it('keeps paged-in older rows when an HTTP read lands after a prepend (PAN-4558)', async () => {
+    const at = (i: number) => new Date(Date.UTC(2026, 9, 19) + i * 1000).toISOString();
+    const message = (i: number) => ({ id: `m${i}`, role: 'user' as const, text: `m${i}`, createdAt: at(i), sequence: i });
+    const cursor = (i: number) => JSON.stringify([at(i), i, 0, `m${i}`]);
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      const defaultResponse = defaultConversationResponse(method, url);
+      if (defaultResponse) return defaultResponse;
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages') {
+        return Response.json({ messages: [message(2), message(3), message(4)], workLog: [], streaming: false,
+          window: { cursor: cursor(2), hasOlder: true, transcript: '1:2' } });
+      }
+      if (method === 'POST' && url === '/api/conversations/test-conv/resume') {
+        return Response.json({ ...mockConversation, status: 'active', sessionAlive: true });
+      }
+      return undefined;
+    });
+    const { client } = renderStreamingPanel();
+    const listener = streamTransportMock.listeners.get('test-conv');
+    act(() => { listener?.({ kind: 'messages', snapshot: true, messages: [message(2), message(3)], workLog: [], streaming: false,
+      window: { cursor: cursor(2), hasOlder: true, transcript: '1:2' } }); });
+    // An older page was prepended (useOlderHistory does this on scroll-to-top).
+    act(() => {
+      client.setQueryData(['conversation-messages', 'test-conv'], (previous: { messages: unknown[]; history: object }) => ({
+        ...previous, messages: [message(0), message(1), ...previous.messages],
+        history: { cursor: cursor(0), hasOlder: false, transcript: '1:2' },
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(messagesCallCount()).toBe(1);
+    const cache = client.getQueryData<{ messages: Array<{ id: string }>; history: unknown }>(['conversation-messages', 'test-conv']);
+    expect(cache?.messages.map((m) => m.id)).toEqual(['m0', 'm1', 'm2', 'm3', 'm4']);
+    expect(cache?.history).toEqual({ cursor: cursor(0), hasOlder: false, transcript: '1:2' });
   });
 });

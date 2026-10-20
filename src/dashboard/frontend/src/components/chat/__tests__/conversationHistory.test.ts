@@ -60,6 +60,12 @@ describe('mergeWindowIntoCache (PAN-4558)', () => {
     expect(ids(merged)).toEqual(idsBetween(0, 10));
   });
 
+  it('keeps cached rows newer than the response (a stream delta that raced the read)', () => {
+    const previous: HistoryRows = { ...rows(100, 305), history: window(100) };
+    const incoming = { ...rows(225, 300), window: window(225) };
+    expect(ids(mergeWindowIntoCache(previous, incoming))).toEqual(idsBetween(100, 305));
+  });
+
   it('replaces the cache when the window starts after the newest cached row (a gap)', () => {
     const previous: HistoryRows = { ...rows(0, 50), history: window(0, false) };
     const incoming = { ...rows(200, 275), window: window(200) };

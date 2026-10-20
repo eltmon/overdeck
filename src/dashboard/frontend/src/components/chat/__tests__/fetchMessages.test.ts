@@ -12,7 +12,7 @@ describe('fetchMessages · agent transcript route', () => {
   it('uses the agent route and preserves a transcript miss for rendering', async () => {
     stubFetch(404, { error: 'No transcript found for agent-queued-1.', checked: ['/tmp/older.jsonl'] });
     const data = await fetchMessages('agent-queued-1', undefined, 'agent-queued-1');
-    expect(fetch).toHaveBeenCalledWith('/api/agents/agent-queued-1/conversation', expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith('/api/agents/agent-queued-1/conversation?window=initial', expect.any(Object));
     expect(data).toEqual({
       messages: [],
       workLog: [],
