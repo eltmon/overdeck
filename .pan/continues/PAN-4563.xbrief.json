@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:47:40.890Z",
+  "updated": "2026-10-20T20:47:51.932Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -270,6 +270,10 @@
     "codex-case-interrupt.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T20:47:40.890Z"
+    },
+    "codex-case-interrupt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:47:51.932Z"
     }
   }
 }
