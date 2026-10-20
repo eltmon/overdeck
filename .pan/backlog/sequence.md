@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T03:41:24.667588Z · model: claude-opus-5-5 · open: 834_
+_Last sequenced: 2026-10-20T04:19:12.121982Z · model: claude-opus-5-5 · open: 834_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1169,7 +1169,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T03:41:24.667588Z",
+  "generatedAt": "2026-10-20T04:19:12.121982Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 834,
