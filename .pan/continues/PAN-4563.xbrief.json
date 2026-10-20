@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:40:44.889Z",
+  "updated": "2026-10-20T20:40:57.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "format-scrub.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T20:40:44.889Z"
+    },
+    "format-scrub.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:40:57.123Z"
     }
   }
 }
