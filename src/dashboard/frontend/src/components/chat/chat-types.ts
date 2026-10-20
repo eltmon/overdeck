@@ -67,6 +67,17 @@ export interface WorkLogEntry {
   /** Raw tool_use input dict — drives per-tool expanded rendering (PAN-1459). */
   toolInput?: Record<string, unknown>;
   sequence?: number;
+  /** PAN-4558: UTF-8 byte length of a `result` the wire projection removed. */
+  resultBytes?: number;
+  /** PAN-4558: the wire projection removed or cut a tool body; fetch the full entry on expand. */
+  bodyOmitted?: boolean;
+}
+
+/** PAN-4558: where a windowed response or page sits in the whole transcript. */
+export interface ConversationWindow {
+  cursor: string | null;
+  hasOlder: boolean;
+  transcript?: string;
 }
 
 /** A human-origin message read from a subagent's own sidechain transcript (PAN-4247). */
@@ -128,7 +139,7 @@ export interface ContextUsage {
 }
 
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; reset?: boolean; metadataSnapshot?: boolean; totalCost?: number; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; reset?: boolean; metadataSnapshot?: boolean; totalCost?: number; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null; window?: ConversationWindow }
   | { kind: 'discovering' }
   | { kind: 'subagents'; subagents: SubagentSummary[] };
 
