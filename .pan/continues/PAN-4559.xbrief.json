@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:26:34.072Z",
+  "updated": "2026-10-20T04:26:49.051Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "store-bounded-read.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T04:26:34.072Z"
+    },
+    "store-bounded-read.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:26:49.051Z"
     }
   }
 }
