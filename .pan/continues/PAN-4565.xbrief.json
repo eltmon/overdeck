@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4565",
   "created": "2026-10-20T02:51:57.744Z",
-  "updated": "2026-10-20T03:15:54.624Z",
+  "updated": "2026-10-20T03:16:03.638Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4565",
       "claimedAt": "2026-10-20T03:04:58.632Z",
       "doneAt": "2026-10-20T03:15:54.624Z"
+    },
+    "fresh-lane-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:16:03.637Z"
     }
   }
 }
