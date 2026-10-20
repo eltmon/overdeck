@@ -1,0 +1,204 @@
+{
+  "version": "1",
+  "issueId": "PAN-4565",
+  "created": "2026-10-20T02:51:57.744Z",
+  "updated": "2026-10-20T04:26:17.558Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-10-20T04:19Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-10-20T04:19:55.422Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-10-20T04:26Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-10-20T04:26:17.558Z"
+    }
+  ],
+  "items": {
+    "extract-fork-source-session": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T02:51:57.744Z",
+      "doneAt": "2026-10-20T02:58:26.384Z"
+    },
+    "fresh-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T02:58:45.306Z",
+      "doneAt": "2026-10-20T03:04:50.061Z"
+    },
+    "fresh-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:04:58.632Z",
+      "doneAt": "2026-10-20T03:15:54.624Z"
+    },
+    "fresh-lane-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:16:03.637Z",
+      "doneAt": "2026-10-20T03:19:54.939Z"
+    },
+    "fresh-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:20:04.629Z",
+      "doneAt": "2026-10-20T03:28:37.855Z"
+    },
+    "composer-fresh-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:28:46.123Z",
+      "doneAt": "2026-10-20T03:32:25.642Z"
+    },
+    "fresh-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:32:32.878Z",
+      "doneAt": "2026-10-20T03:49:39.530Z"
+    },
+    "fresh-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:49:46.055Z",
+      "doneAt": "2026-10-20T03:52:11.413Z"
+    },
+    "extract-fork-source-session.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:04:06.233Z"
+    },
+    "extract-fork-source-session.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:05:10.900Z"
+    },
+    "extract-fork-source-session.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:05:40.116Z"
+    },
+    "fresh-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:06:06.642Z"
+    },
+    "fresh-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:06:25.305Z"
+    },
+    "fresh-pipeline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:06:43.380Z"
+    },
+    "fresh-pipeline.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:07:02.058Z"
+    },
+    "fresh-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:07:18.790Z"
+    },
+    "fresh-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:07:37.801Z"
+    },
+    "fresh-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:07:55.951Z"
+    },
+    "fresh-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:08:13.349Z"
+    },
+    "fresh-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:08:28.969Z"
+    },
+    "fresh-lane-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:08:45.454Z"
+    },
+    "fresh-lane-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:09:01.249Z"
+    },
+    "fresh-lane-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:09:16.283Z"
+    },
+    "fresh-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:09:31.974Z"
+    },
+    "fresh-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:09:48.186Z"
+    },
+    "fresh-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:10:03.448Z"
+    },
+    "fresh-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:10:20.137Z"
+    },
+    "composer-fresh-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:10:37.236Z"
+    },
+    "composer-fresh-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:10:57.597Z"
+    },
+    "composer-fresh-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:11:14.693Z"
+    },
+    "fresh-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:11:30.663Z"
+    },
+    "fresh-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:11:48.281Z"
+    },
+    "fresh-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:12:03.890Z"
+    },
+    "fresh-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:12:19.359Z"
+    },
+    "fresh-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:12:35.441Z"
+    },
+    "fresh-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:12:54.425Z"
+    },
+    "fresh-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:13:12.117Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-10-20T04:19:55Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4565\n\nPull request: https://github.com/eltmon/overdeck/pull/4569 (head `55848236`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\nGitHub reported a failing CI status, but no failing workflow runs were found for this commit. Check the PR checks page directly.\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-10-20T04:26:17Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4565 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (0ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4565/.overdeck/verification/2026-10-20T04-14-05-025Z-d90a6ad0.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-4565/.overdeck/verification/2026-10-20T04-14-05-025Z-d90a6ad0.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-4565 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-4565 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    }
+  ]
+}

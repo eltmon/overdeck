@@ -36,6 +36,9 @@ By default a clean **external** session reads the transcript from disk and write
 
 **Best for:** Deliberate handoffs where the dead ends, important files, and suggested next steps matter.
 
+### Fresh start
+Starts a clean conversation that takes only this conversation's project, working directory, model and effort. No summary or handoff document is written, the new conversation is not linked as a successor, and the Focus text is sent as its first message.
+
 ### Exact copy
 Copies the raw conversation history into a new session. No summary is generated — the new agent picks up exactly where the previous one left off.
 
@@ -137,7 +140,7 @@ interface ForkModalProps {
     handoffAuthorModel?: string,
     handoffAuthorHarness?: Harness,
     projectKey?: string,
-    handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean },
+    handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean; fresh?: boolean },
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -184,6 +187,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const [handoffSkills, setHandoffSkills] = useState(parsedComposerArgs.skills);
   const [handoffPacks, setHandoffPacks] = useState(parsedComposerArgs.packs);
   const [handoffHold, setHandoffHold] = useState(parsedComposerArgs.hold);
+  // PAN-4565: a fresh start borrows only the source's defaults — no summary,
+  // no handoff document, no parent link.
+  const [freshStart, setFreshStart] = useState(parsedComposerArgs.fresh);
   const [handoffAuthor, setHandoffAuthor] = useState<HandoffAuthor>('external');
   // Source-authored handoff requires the harness to support delivering a
   // prompt to the live agent and watching for a sentinel file. Today only
@@ -213,9 +219,12 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
 
   useEffect(() => {
     if (!nameDirtyRef.current) {
-      setForkTitle(`${INTENT_LABEL[intent]}: ${convTitle}`);
+      // PAN-4565: a fresh start has no document/summary to name after, so it
+      // defaults to blank — titled from the first message once sent, or left
+      // as the server's "New conversation" fallback.
+      setForkTitle(intent === 'handoff' && freshStart ? '' : `${INTENT_LABEL[intent]}: ${convTitle}`);
     }
-  }, [intent, convTitle]);
+  }, [intent, convTitle, freshStart]);
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -229,9 +238,12 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const modelChanged = launchModel !== (conversation.model || defaultModel);
   const showModelSwitchWarning = isPlainFork && modelChanged;
   // Only source-authored handoff requires a live source — external authoring
-  // reads the transcript from disk and works on ended conversations.
-  const handoffUnavailable = isHandoffFork && handoffAuthor === 'source' && !conversation.sessionAlive;
-  const confirmDisabled = isPending || handoffUnavailable;
+  // reads the transcript from disk and works on ended conversations. A fresh
+  // start needs no live source at all (PAN-4565): it never reads the source
+  // transcript.
+  const handoffUnavailable = isHandoffFork && !freshStart && handoffAuthor === 'source' && !conversation.sessionAlive;
+  const freshHoldNeedsFocus = isHandoffFork && freshStart && handoffHold && !handoffFocus.trim();
+  const confirmDisabled = isPending || handoffUnavailable || freshHoldNeedsFocus;
   const handoffFocusValue = handoffFocus.trim() || undefined;
 
   const title = conversation.title ?? conversation.name;
@@ -321,6 +333,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 value={forkTitle}
                 onChange={(e) => { nameDirtyRef.current = true; setForkTitle(e.target.value); }}
                 className={styles.forkTitleInput}
+                placeholder={isHandoffFork && freshStart ? 'Named from the first message' : undefined}
                 autoFocus
               />
             </div>
@@ -374,7 +387,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
             {isHandoffFork && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
                 <label htmlFor="handoff-focus-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
-                  Focus (optional)
+                  {freshStart ? 'First message (optional)' : 'Focus (optional)'}
                 </label>
                 <textarea
                   id="handoff-focus-input"
@@ -385,9 +398,11 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                   placeholder="What should the next conversation focus on?"
                 />
                 <span className={pickerStyles.fieldHint}>
-                  {handoffAuthor === 'external'
-                    ? 'Steers what the authoring session emphasizes in the handoff document.'
-                    : 'Sent to the source agent as guidance for the handoff document.'}
+                  {freshStart
+                    ? "Sent verbatim as the new conversation's first message. Nothing from this conversation is carried over."
+                    : handoffAuthor === 'external'
+                      ? 'Steers what the authoring session emphasizes in the handoff document.'
+                      : 'Sent to the source agent as guidance for the handoff document.'}
                 </span>
               </div>
             )}
@@ -414,14 +429,24 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               </div>
             )}
             {isHandoffFork && (
-              <label className={styles.forkCheckboxRow}>
-                <input
-                  type="checkbox"
-                  checked={handoffHold}
-                  onChange={(e) => setHandoffHold(e.target.checked)}
-                />
-                <span>Hold — start it myself</span>
-              </label>
+              <>
+                <label className={styles.forkCheckboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={handoffHold}
+                    onChange={(e) => setHandoffHold(e.target.checked)}
+                  />
+                  <span>Hold — start it myself</span>
+                </label>
+                <label className={styles.forkCheckboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={freshStart}
+                    onChange={(e) => setFreshStart(e.target.checked)}
+                  />
+                  <span>Fresh start — no summary, no parent link</span>
+                </label>
+              </>
             )}
 
             {/* Inline warnings — safety, not advanced. */}
@@ -489,7 +514,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                   </>
                 )}
 
-                {isHandoffFork && (
+                {isHandoffFork && !freshStart && (
                   <>
                     <fieldset className={styles.forkModeGroup}>
                       <legend>Authored by</legend>
@@ -565,13 +590,20 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
           <button
             className={styles.forkConfirmBtn}
             disabled={confirmDisabled}
-            title={handoffUnavailable ? 'Source-authored handoff requires a running source conversation' : undefined}
+            title={
+              handoffUnavailable
+                ? 'Source-authored handoff requires a running source conversation'
+                : freshHoldNeedsFocus
+                  ? 'Hold needs a first message'
+                  : undefined
+            }
             onClick={() => {
               capture('conversation_forked', {
                 fork_intent: intent,
                 fork_mode: apiForkMode,
                 fast_summary: localSummaryOnly,
                 launch_harness: (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code',
+                fresh_start: isHandoffFork && freshStart,
               });
               onConfirm(
                 conversation,
@@ -584,15 +616,16 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 isPlainFork ? 'claude-code' : undefined,
                 undefined,
                 handoffFocusValue,
-                isHandoffFork ? handoffAuthor : undefined,
-                isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
+                isHandoffFork && !freshStart ? handoffAuthor : undefined,
+                isHandoffFork && !freshStart && handoffAuthor === 'external' ? summaryModel : undefined,
                 undefined,
                 projectKey || undefined,
-                isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0 || handoffHold)
+                isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0 || handoffHold || freshStart)
                   ? {
                       ...(handoffSkills.length > 0 ? { skills: handoffSkills } : {}),
                       ...(handoffPacks.length > 0 ? { packs: handoffPacks } : {}),
                       ...(handoffHold ? { hold: true } : {}),
+                      ...(freshStart ? { fresh: true } : {}),
                     }
                   : undefined,
               );

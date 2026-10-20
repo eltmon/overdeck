@@ -145,6 +145,21 @@ describe('fork successors carry the parent link (PAN-4223 WI-14)', () => {
     expect(first).toMatchObject({ parentConversationId: root?.id, parentConversationName: 'parent-conv' });
     expect(second).toMatchObject({ parentConversationId: first.id, parentConversationName: first.name });
   });
+
+  it('a fresh handoff stamps no parent link (PAN-4565)', async () => {
+    const { __setForkPipelineRuntimeOverridesForTest, __resetForkPipelineRuntimeOverridesForTest } = await import('../conversation-forks.js');
+    __setForkPipelineRuntimeOverridesForTest({ sessionExists: async () => true, isHarnessProcessAlive: async () => true });
+    try {
+      const response = await handleConversationSummaryFork('parent-conv', { forkMode: 'handoff', fresh: true });
+      const body = await readBody(response);
+      expect(response.status).toBe(200);
+      const conversation = body['conversation'] as ForkedConversation;
+      expect(conversation.parentConversationId).toBeNull();
+      expect(conversation.parentConversationName).toBeNull();
+    } finally {
+      __resetForkPipelineRuntimeOverridesForTest();
+    }
+  });
 });
 
 describe('fork effort precedence (PAN-4254)', () => {

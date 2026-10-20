@@ -8,18 +8,21 @@ describe('parseHandoffComposerArgs (PAN-4499 WI-9)', () => {
       skills: ['grilling'],
       packs: [],
       hold: true,
+      fresh: false,
     });
     expect(parseHandoffComposerArgs('--skill grilling --pack mattpocock continue the work')).toEqual({
       focus: 'continue the work',
       skills: ['grilling'],
       packs: ['mattpocock'],
       hold: false,
+      fresh: false,
     });
     expect(parseHandoffComposerArgs('--skill a --skill b fix it')).toEqual({
       focus: 'fix it',
       skills: ['a', 'b'],
       packs: [],
       hold: false,
+      fresh: false,
     });
   });
 
@@ -29,6 +32,7 @@ describe('parseHandoffComposerArgs (PAN-4499 WI-9)', () => {
       skills: ['grilling'],
       packs: ['mattpocock'],
       hold: false,
+      fresh: false,
     });
   });
 
@@ -38,8 +42,48 @@ describe('parseHandoffComposerArgs (PAN-4499 WI-9)', () => {
       skills: [],
       packs: [],
       hold: false,
+      fresh: false,
     });
-    expect(parseHandoffComposerArgs(undefined)).toEqual({ focus: undefined, skills: [], packs: [], hold: false });
-    expect(parseHandoffComposerArgs('   ')).toEqual({ focus: undefined, skills: [], packs: [], hold: false });
+    expect(parseHandoffComposerArgs(undefined)).toEqual({ focus: undefined, skills: [], packs: [], hold: false, fresh: false });
+    expect(parseHandoffComposerArgs('   ')).toEqual({ focus: undefined, skills: [], packs: [], hold: false, fresh: false });
+  });
+});
+
+describe('parseHandoffComposerArgs --fresh (PAN-4565)', () => {
+  it('extracts --fresh and keeps the focus', () => {
+    expect(parseHandoffComposerArgs('--fresh build a fort')).toEqual({
+      focus: 'build a fort',
+      skills: [],
+      packs: [],
+      hold: false,
+      fresh: true,
+    });
+  });
+
+  it('combines with --hold wherever the flags appear', () => {
+    expect(parseHandoffComposerArgs('build a fort --fresh --hold')).toEqual({
+      focus: 'build a fort',
+      skills: [],
+      packs: [],
+      hold: true,
+      fresh: true,
+    });
+  });
+
+  it('leaves --freshly in the focus and fresh false with no token', () => {
+    expect(parseHandoffComposerArgs('--freshly do the thing')).toEqual({
+      focus: '--freshly do the thing',
+      skills: [],
+      packs: [],
+      hold: false,
+      fresh: false,
+    });
+    expect(parseHandoffComposerArgs('just continue the work')).toEqual({
+      focus: 'just continue the work',
+      skills: [],
+      packs: [],
+      hold: false,
+      fresh: false,
+    });
   });
 });

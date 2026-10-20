@@ -826,7 +826,9 @@ successor keeps its own row and does not pull its ended predecessor into the liv
 live lane still pulls in its ended launcher. In the Live view a lane with its parent on the page is
 a child line of the parent row (a needs-you lane also keeps its own row), and a successor always
 keeps its own row with its `continues ←` link. History nests both by `parentId`, capped at two
-levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent.
+levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent. A
+`pan handoff --fresh` successor (PAN-4565) has no parent link at all — its row has no `parentId`
+and no `continuesFrom` — so it renders as a root entry with no `continues ←`.
 
 **Command Deck conversation groups (PAN-4223).** `conversation-tree.ts` nests every conversation
 whose parent link names a row in the rendered list, lanes and successors alike, in pre-order at
