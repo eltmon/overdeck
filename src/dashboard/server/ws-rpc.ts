@@ -37,7 +37,7 @@ import { sessionFilePath } from '../../lib/runtimes/storage/claude-code.js';
 import type { TranscriptCandidate } from '../../lib/session-history.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
+import type { AgentStatus, ConversationEvent, ConversationResume, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
@@ -276,13 +276,14 @@ export function watchForAgentTranscriptCandidate(
 export function streamSyntheticAgentTranscript(
   agentId: string,
   selectedSubagentId?: string,
+  resume?: ConversationResume,
 ): FullParseSnapshotStream {
   const resolved = watchForAgentTranscriptCandidate(agentId).pipe(
     Stream.take(1),
     Stream.flatMap((candidate) => {
       const sessionFile = selectedSubagentId ? subagentTranscriptPath(candidate.path, selectedSubagentId) : candidate.path;
       if (!sessionFile) return conversationDiscoveringStream();
-      if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, agentId, candidate.model ?? null, selectedSubagentId);
+      if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, agentId, candidate.model ?? null, selectedSubagentId, resume);
       return streamResolvedFullParseSnapshots(
         async () => sessionFile,
         sharedTranscriptParser(candidate.kind),
@@ -809,7 +810,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // have no conversations-table row. Resolve their durable agent
             // transcript and stream snapshots over the same RPC transport.
             if (!conv && isAgentSessionName(input.conversationName)) {
-              return streamSyntheticAgentTranscript(input.conversationName, input.agentId);
+              return streamSyntheticAgentTranscript(input.conversationName, input.agentId, input.resume);
             }
 
             if (!conv) {
@@ -846,7 +847,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            return streamClaudeTranscript(sessionFile, input.conversationName, model, input.agentId);
+            return streamClaudeTranscript(sessionFile, input.conversationName, model, input.agentId, input.resume);
           }),
         ),
 
