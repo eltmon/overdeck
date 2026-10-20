@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T23:46:45.682Z",
+  "updated": "2026-10-20T23:53:43.306Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-10-20T23:46:41.478Z"
     },
     "w7-bundled-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3957",
-      "claimedAt": "2026-10-20T23:46:45.682Z"
+      "claimedAt": "2026-10-20T23:46:45.682Z",
+      "doneAt": "2026-10-20T23:53:43.305Z"
     }
   }
 }
