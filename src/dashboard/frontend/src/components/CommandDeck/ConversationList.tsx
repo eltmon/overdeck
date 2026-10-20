@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { ForkModal } from './ForkModal';
-import { ConversationRow } from './ConversationRow';
-import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
+import { ConversationListItem } from './ConversationListItem';
+import { buildConversationTree, isConversationActive, type ConversationTreeNode } from './conversation-tree';
 import { useConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
 import type { ContextUsage } from '../chat/chat-types';
@@ -229,6 +229,9 @@ interface ConversationListProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/** Stable fallback so the memoized list items keep equal props before projects load. */
+const EMPTY_PROJECTS: Awaited<ReturnType<typeof fetchRegisteredProjects>> = [];
+
 /** PAN-4223 D18: localStorage key holding the top-level names the viewer collapsed. */
 export const GROUPS_COLLAPSED_STORAGE_KEY = 'commandDeck.groups.collapsed';
 
@@ -247,18 +250,6 @@ function writeCollapsedGroups(names: ReadonlySet<string>): void {
   } catch {
     // Storage unavailable (private window, blocked site data): collapse still works for this view.
   }
-}
-
-/** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
-function groupSummaryText(node: ConversationTreeNode<Conversation>): string {
-  const summary = groupSummary(node);
-  const parts: string[] = [];
-  if (summary.successors > 0) parts.push(`${summary.successors} ${summary.successors === 1 ? 'successor' : 'successors'}`);
-  if (summary.lanes > 0) parts.push(`${summary.lanes} ${summary.lanes === 1 ? 'lane' : 'lanes'}`);
-  if (summary.working > 0) parts.push(`${summary.working} working`);
-  if (summary.needsYou > 0) parts.push(`${summary.needsYou} needs you`);
-  if (summary.reported > 0) parts.push(`${summary.reported} reported`);
-  return parts.join(' · ');
 }
 
 export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds }: ConversationListProps) {
@@ -281,7 +272,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
 
   // Registered projects for each row's Move submenu (PAN-1577) — one shared
   // query for the whole list, same key the Sidebar/CommandDeck use.
-  const { data: registeredProjects = [] } = useQuery({
+  const { data: registeredProjects = EMPTY_PROJECTS } = useQuery({
     queryKey: ['registered-projects'],
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
@@ -417,55 +408,18 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       ) : (
         <div className={styles.conversationList}>
           <AnimatePresence initial={false}>
-            {displayConversations.map((node) => {
-              const collapsed = node.descendants.length > 0 && isGroupCollapsed(node);
-              return (
-                <motion.div
-                  key={node.conv.id}
-                  layout
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                >
-                  <ConversationRow
-                    conv={node.conv}
-                    isSelected={selectedConversation === node.conv.name}
-                    onSelect={(name) => onSelectConversation(name)}
-                    mutations={mutations}
-                    registeredProjects={registeredProjects}
-                    orphanOf={node.orphanOf}
-                  />
-                  {node.descendants.length > 0 && (
-                    <button
-                      type="button"
-                      className={styles.convGroupToggle}
-                      aria-expanded={!collapsed}
-                      onClick={() => toggleGroup(node)}
-                    >
-                      {`${collapsed ? '▸' : '▾'} ${groupSummaryText(node)}`}
-                    </button>
-                  )}
-                  {!collapsed && node.descendants.map((child) => (
-                    <div
-                      key={child.conv.id}
-                      className={child.depth === 2 ? styles.convTreeDepth2 : styles.convTreeDepth1}
-                    >
-                      <ConversationRow
-                        conv={child.conv}
-                        variant="nested"
-                        isSelected={selectedConversation === child.conv.name}
-                        onSelect={(name) => onSelectConversation(name)}
-                        mutations={mutations}
-                        registeredProjects={registeredProjects}
-                        flattenedFrom={child.flattenedFrom}
-                        criticOf={child.criticOf}
-                      />
-                    </div>
-                  ))}
-                </motion.div>
-              );
-            })}
+            {displayConversations.map((node) => (
+              <ConversationListItem
+                key={node.conv.id}
+                node={node}
+                collapsed={node.descendants.length > 0 && isGroupCollapsed(node)}
+                selectedConversation={selectedConversation}
+                onSelectConversation={onSelectConversation}
+                onToggleGroup={toggleGroup}
+                mutations={mutations}
+                registeredProjects={registeredProjects}
+              />
+            ))}
           </AnimatePresence>
         </div>
       )}
