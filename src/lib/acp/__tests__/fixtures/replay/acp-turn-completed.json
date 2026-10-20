@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "protocol": "acp",
+  "recordedAt": "2026-10-20T10:00:00.000Z",
+  "frames": [
+    {
+      "direction": "outgoing",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
+          },
+          "clientInfo": {
+            "name": "overdeck-test",
+            "version": "0.0.0"
+          }
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "1",
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": false
+          },
+          "agentInfo": {
+            "name": "test-acp-agent",
+            "version": "1.0.0"
+          }
+        }
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "2",
+        "method": "authenticate",
+        "params": {
+          "methodId": "test"
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "2",
+        "result": {}
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "3",
+        "method": "session/new",
+        "params": {
+          "cwd": "/workspace",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "3",
+        "result": {
+          "sessionId": "acp-session-001"
+        }
+      }
+    },
+    {
+      "direction": "outgoing",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "4",
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "acp-session-001",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Hello ACP agent"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "acp-session-001",
+          "update": {
+            "sessionUpdate": "plan",
+            "entries": [
+              {
+                "content": "Analyzing repository",
+                "priority": "high",
+                "status": "completed"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "acp-session-001",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "Hello from recorded ACP"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "incoming",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "4",
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ]
+}

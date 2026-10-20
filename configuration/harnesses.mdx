@@ -1084,6 +1084,70 @@ The Pi and Muse CLIs parse `max` (`omp` 17.4.1, `pi` 0.85.0, `muse` 1.4.2), but 
 
 **GPT through Claude Code (CLIProxy):** Claude Code sends the level as `output_config.effort` with adaptive thinking; CLIProxy `v7.3.16` maps it to the Codex request's `reasoning.effort` and clamps it to the model, so `--effort` is honored end to end. Overdeck always passes `--effort` on a Claude Code launch, so CLIProxy's own fallbacks (`xhigh` for adaptive thinking without a level, `medium` with no thinking block) never apply. One caveat: `gpt-5.5` is a deprecated alias of `gpt-5.6-sol` in the model catalog, so its effective effort levels and clamping come from the `gpt-5.6-sol` row, not from any levels set on `gpt-5.5` itself.
 
+## Harness protocol testing and replay fixtures
+
+Overdeck includes recorded-protocol testing for structured harness transports (`codex app-server` and `acp`). Unlike hand-written mock peers, replay-backed tests replay real raw JSON-RPC frame sequences (with secrets and user paths scrubbed) directly into Overdeck's adapters, state managers, and normalizers.
+
+### Recording a new fixture (dev mode)
+
+To capture live JSON-RPC traffic from a real session into a new fixture file:
+
+1. Launch Overdeck or run the harness command with one of the capture environment variables:
+   - `OVERDECK_RECORD_FIXTURE=<filepath>` (global capture for any harness)
+   - `OVERDECK_RECORD_CODEX_FIXTURE=<filepath>` (specifically captures `codex app-server` JSON-RPC frames)
+   - `OVERDECK_RECORD_ACP_FIXTURE=<filepath>` (specifically captures ACP session runtime frames)
+
+   ```bash
+   OVERDECK_RECORD_CODEX_FIXTURE=src/lib/codex/__fixtures__/replay/my-ordering-case.json overdeck
+   ```
+
+2. Perform the desired action or interaction in the dashboard or CLI.
+3. The capture mode automatically scrubs host home directories, socket tokens, Bearer authorization headers, and API keys before saving the JSON fixture.
+
+### Adding a replay test
+
+#### Codex app-server
+
+Use `createCodexReplayTransport` from `src/lib/codex/replay-transport.ts`:
+
+```typescript
+import { CodexAppServerManager } from '../app-server-manager.js';
+import { createCodexReplayTransport } from '../replay-transport.js';
+import myFixture from '../__fixtures__/replay/my-ordering-case.json';
+
+const transport = createCodexReplayTransport(myFixture);
+const manager = new CodexAppServerManager({
+  cwd: '/workspace',
+  readVersion: async () => '0.153.4',
+  transport,
+});
+
+await manager.start();
+await manager.startThread({ model: 'gpt-5-preview' });
+await manager.startTurn('Do task');
+// Assert state transitions, pending requests, or subagent scoping
+```
+
+#### ACP
+
+Use `createAcpReplaySpawner` from `src/lib/acp/replay-spawner.ts`:
+
+```typescript
+import { AcpSessionRuntime, layer } from '../session-runtime.js';
+import { createAcpReplaySpawner } from '../replay-spawner.js';
+import myFixture from './fixtures/replay/my-acp-case.json';
+
+Effect.gen(function* () {
+  const runtime = yield* AcpSessionRuntime;
+  yield* runtime.start();
+  const response = yield* runtime.prompt({ prompt: [{ type: 'text', text: 'Hello' }] });
+  // Assert response.stopReason and emitted events
+}).pipe(
+  Effect.provide(layer(runtimeOptions)),
+  Effect.provide(createAcpReplaySpawner(myFixture)),
+);
+```
+
 
 ## OpenRouter favorites
 

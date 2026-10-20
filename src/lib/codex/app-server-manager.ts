@@ -12,6 +12,7 @@ import {
   type AppServerTransport,
 } from './app-server-transport.js';
 import { compareVersions } from './model-floors.js';
+import { wrapCodexTransportForCapture } from '../harness-replay/capture.js';
 
 // Re-exported so existing callers of these pure pieces need no import
 // change; the definitions live in the `ws`-free leaf module model-floors.ts
@@ -59,6 +60,8 @@ export interface CodexAppServerManagerOptions {
   connectNative?: (socketPath: string) => Promise<AppServerTransport>;
   /** Test seam for the orphaned-server check around `app.pid`. */
   processOps?: NativeProcessOps;
+  /** Test seam / replay transport: supply an existing transport instead of spawning. */
+  transport?: AppServerTransport;
 }
 
 /** Process and file operations the native endpoint's orphan check uses. */
@@ -180,17 +183,27 @@ export class CodexAppServerManager extends EventEmitter {
       fallbackReason = 'socket-path-too-long';
     }
 
-    if (nativeSocketPath && !fallbackReason) {
-      if (await this.startNative(nativeSocketPath)) {
-        this.transportInfo = { kind: 'unix', endpoint: nativeEndpointUrl(nativeSocketPath), cliVersion: installed };
-      } else {
-        fallbackReason = 'connect-failed';
+    if (this.options.transport) {
+      this.useTransport(this.options.transport, { stopOnClose: false });
+      this.transportInfo = { kind: 'stdio', cliVersion: installed };
+    } else {
+      if (nativeSocketPath && !fallbackReason) {
+        if (await this.startNative(nativeSocketPath)) {
+          this.transportInfo = { kind: 'unix', endpoint: nativeEndpointUrl(nativeSocketPath), cliVersion: installed };
+        } else {
+          fallbackReason = 'connect-failed';
+        }
+      }
+      if (!this.transport) {
+        const child = this.spawnChild(['app-server']);
+        this.useTransport(createStdioTransport(child.stdout, child.stdin), { stopOnClose: false });
+        this.transportInfo = { kind: 'stdio', cliVersion: installed, ...(fallbackReason ? { unavailableReason: fallbackReason } : {}) };
       }
     }
-    if (!this.transport) {
-      const child = this.spawnChild(['app-server']);
-      this.useTransport(createStdioTransport(child.stdout, child.stdin), { stopOnClose: false });
-      this.transportInfo = { kind: 'stdio', cliVersion: installed, ...(fallbackReason ? { unavailableReason: fallbackReason } : {}) };
+
+    const capturePath = process.env.OVERDECK_RECORD_CODEX_FIXTURE || process.env.OVERDECK_RECORD_FIXTURE;
+    if (capturePath && this.transport) {
+      this.transport = wrapCodexTransportForCapture(this.transport, capturePath, { workspacePath: this.options.cwd });
     }
 
     await this.request('initialize', {

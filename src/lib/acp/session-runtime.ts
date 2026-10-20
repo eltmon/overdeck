@@ -19,6 +19,7 @@ import * as EffectAcpClient from "effect-acp/client";
 import * as EffectAcpErrors from "effect-acp/errors";
 import type * as EffectAcpProtocol from "effect-acp/protocol";
 import type * as EffectAcpSchema from "effect-acp/schema";
+import { createCaptureSession } from "../harness-replay/capture.js";
 
 import {
   closeActiveAssistantSegment,
@@ -344,15 +345,47 @@ export const make = (
         ),
       );
 
+    const capturePath =
+      process.env.OVERDECK_RECORD_ACP_FIXTURE || process.env.OVERDECK_RECORD_FIXTURE;
+    let protocolLogging = options.protocolLogging;
+    if (capturePath && !protocolLogging?.logger) {
+      const captureSession = createCaptureSession(capturePath, "acp", {
+        workspacePath: options.cwd,
+      });
+      protocolLogging = {
+        logIncoming: true,
+        logOutgoing: true,
+        logger: (event) =>
+          Effect.sync(() => {
+            if (event.stage === "raw") {
+              const text =
+                typeof event.payload === "string"
+                  ? event.payload
+                  : new TextDecoder().decode(event.payload as Uint8Array);
+              for (const line of text.split("\n")) {
+                const trimmed = line.trim();
+                if (trimmed) {
+                  try {
+                    captureSession.record(event.direction, JSON.parse(trimmed));
+                  } catch {
+                    captureSession.record(event.direction, trimmed);
+                  }
+                }
+              }
+            }
+          }),
+      };
+    }
+
     const acpContext = yield* Layer.build(
       EffectAcpClient.layerChildProcess(child, {
-        ...(options.protocolLogging?.logIncoming !== undefined
-          ? { logIncoming: options.protocolLogging.logIncoming }
+        ...(protocolLogging?.logIncoming !== undefined
+          ? { logIncoming: protocolLogging.logIncoming }
           : {}),
-        ...(options.protocolLogging?.logOutgoing !== undefined
-          ? { logOutgoing: options.protocolLogging.logOutgoing }
+        ...(protocolLogging?.logOutgoing !== undefined
+          ? { logOutgoing: protocolLogging.logOutgoing }
           : {}),
-        ...(options.protocolLogging?.logger ? { logger: options.protocolLogging.logger } : {}),
+        ...(protocolLogging?.logger ? { logger: protocolLogging.logger } : {}),
       }),
     ).pipe(Effect.provideService(Scope.Scope, runtimeScope));
 
