@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:14:52.439Z",
+  "updated": "2026-10-20T03:16:58.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-10-20T03:14:46.038Z"
     },
     "codex-replay-harness": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4563",
-      "claimedAt": "2026-10-20T03:14:52.439Z"
+      "claimedAt": "2026-10-20T03:14:52.439Z",
+      "doneAt": "2026-10-20T03:16:58.233Z"
     }
   }
 }
