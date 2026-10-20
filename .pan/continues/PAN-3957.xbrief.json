@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-20T23:53:43.306Z",
+  "updated": "2026-10-20T23:53:47.461Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-3957",
       "claimedAt": "2026-10-20T23:46:45.682Z",
       "doneAt": "2026-10-20T23:53:43.305Z"
+    },
+    "w8a-user-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3957",
+      "claimedAt": "2026-10-20T23:53:47.461Z"
     }
   }
 }
