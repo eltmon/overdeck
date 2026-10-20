@@ -25,6 +25,7 @@ import {
   SyncGitCommandTimeoutError,
 } from './sync-main-git.js';
 import { syncMainAcrossWorkspaceRepos, type SyncMainRepoResult, type SyncMainResult } from './sync-main-workspace.js';
+import { isProjectMemoryPath, PROJECT_MEMORY_PATH } from '../state-plane.js';
 export type { SyncMainRepoResult, SyncMainResult } from './sync-main-workspace.js';
 
 const execAsync = promisify(exec);
@@ -68,6 +69,7 @@ export function isSyncMainMainPreferredPath(relativePath: string): boolean {
 
 export function isAutoCommitExcludedPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, '/');
+  if (isProjectMemoryPath(normalized)) return false; // PAN-3957 D17: curated facts are work product
   for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
     if (pattern.endsWith('/')) {
       if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) {
@@ -129,7 +131,8 @@ export async function autoCommitWorkspaceChangesBeforeSync(
 
     await run('git add -A');
     const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) => p.endsWith('/') ? p.slice(0, -1) : p).join(' ');
-    await run(`git reset HEAD -- ${resetPaths}`);
+    // PAN-3957 D17: un-stage machine-local .overdeck/ files but keep curated facts staged.
+    await run(`git reset HEAD -- ${resetPaths} ':(exclude)${PROJECT_MEMORY_PATH}'`);
 
     const { stdout: diffStat } = await run('git diff --cached --stat');
     if (!diffStat.trim()) return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
