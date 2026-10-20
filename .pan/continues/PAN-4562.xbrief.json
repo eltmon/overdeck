@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:23:30.605Z",
+  "updated": "2026-10-20T04:23:48.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "binary-caps.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T04:23:30.604Z"
+    },
+    "binary-caps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:23:48.620Z"
     }
   }
 }
