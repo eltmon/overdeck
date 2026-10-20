@@ -4,17 +4,17 @@
     "created": "2026-10-20T02:47:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4559: Domain event replay reads every missed event on the main thread: cap catch-up and fall back to a snapshot",
-    "updated": "2026-10-20T02:51:43.902Z"
+    "updated": "2026-10-20T02:52:24.898Z"
   },
   "plan": {
     "id": "pan-4559",
     "title": "Domain event replay reads every missed event on the main thread: cap catch-up and fall back to a snapshot",
-    "status": "proposed",
+    "status": "running",
     "uid": "958f9983-e53b-4765-9059-729148480f1c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T02:47:04Z",
-    "updated": "2026-10-20T02:51:43.902Z",
+    "updated": "2026-10-20T02:52:24.898Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4559",
@@ -519,5 +519,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
