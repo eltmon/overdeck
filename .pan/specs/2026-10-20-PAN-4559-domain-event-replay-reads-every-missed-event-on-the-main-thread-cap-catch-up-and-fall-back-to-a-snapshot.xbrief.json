@@ -1,0 +1,523 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T02:47:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4559: Domain event replay reads every missed event on the main thread: cap catch-up and fall back to a snapshot",
+    "updated": "2026-10-20T02:51:43.902Z"
+  },
+  "plan": {
+    "id": "pan-4559",
+    "title": "Domain event replay reads every missed event on the main thread: cap catch-up and fall back to a snapshot",
+    "status": "proposed",
+    "uid": "958f9983-e53b-4765-9059-729148480f1c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-20T02:47:04Z",
+    "updated": "2026-10-20T02:51:43.902Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4559",
+        "label": "PAN-4559",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4566",
+        "label": "PAN-4566 (follow-up: failed replay wedges the tab)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4559.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "event-store",
+      "ws-rpc",
+      "performance",
+      "recovery"
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small items across four subsystems (event store, Effect service, RPC contract, frontend EventRouter) plus one doc; 11 files total, well under the projected-surface limits.",
+      "canonicalFilename": "2026-10-20-PAN-4559-domain-event-replay-reads-every-missed-event-on-the-main-thread-cap-catch-up-and-fall-back-to-a-snapshot.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The dashboard's gap recovery calls pan.replayEvents, whose server handler runs eventStore.readFrom(fromSequence): an unbounded SELECT over the events table (about 141,000 rows, 19 MB) executed synchronously on the main thread, with every row JSON-parsed and encoded. A tab that returns after a long sleep blocks the server's event loop for every client, and then applies each event one by one when a snapshot would be cheaper.",
+      "Proposal": "Add EventStore.readFromBounded(fromSequence, limits?) with a LIMIT ? statement that reads at most REPLAY_MAX_EVENTS (500) + 1 rows and checks a REPLAY_MAX_PAYLOAD_BYTES (1 MiB) payload budget; past either cap it returns tooFarBehind with no events. Expose it on EventStoreService. Change the ReplayEventsRpc success schema to the union Array(DomainEvent) | { tooFarBehind: true } so old tabs keep decoding arrays. The ws-rpc handler returns { tooFarBehind: true } for a too-far gap without growing ws-rpc.ts. The client's replay() returns an outcome; a live gap that is too far behind re-bootstraps through getSnapshot on the same transport (no resetTransport), and a too-far replay right after a fresh snapshot fails that bootstrap attempt so the existing backoff paces the retry. docs/DASHBOARD-ARCHITECTURE.md describes the cap and the fallback.",
+      "NonGoals": "- Routing a failed (non-cap) replay to the snapshot fallback; that is PAN-4566.\n- Changing readFrom, its SQL, or the SSE replay routes (src/dashboard/server/routes/events.ts, src/dashboard/server/routes/internal-events.ts).\n- Detecting events lost to the 7-day compaction (fromSequence older than the oldest retained row).\n- Paginated replay that returns a partial page and continues; past the cap the client always takes a snapshot.\n- Touching src/lib/overdeck/observability.ts (the unwired remodel RPC group) or the e2e transport mocks in tests/e2e/*.spec.ts.\n- Moving the replay read off the main thread (worker or async driver).\n- Raising the scripts/file-size-allowlist.txt row for src/dashboard/server/ws-rpc.ts.\n- Changing recoveryCoordinator.ts.\n- Updating the external OKF knowledge bundle (../overdeck-knowledge)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Signal too-far-behind as a union success member { tooFarBehind: true } alongside the unchanged Array(DomainEvent), not as a typed PanRpcError.",
+        "rationale": "The issue offers both. The union keeps every open tab (old JS) and the three e2e transport mocks working for small gaps, and avoids depending on how Effect 4 beta surfaces typed RPC errors through wsTransport.request()."
+      },
+      {
+        "summary": "Cap at 500 stored rows and 1 MiB of stored payload bytes (Buffer.byteLength over raw payload text), whichever is exceeded first; count checked first via LIMIT maxEvents + 1.",
+        "rationale": "These are the issue's example numbers; LIMIT bounds the read, and the byte budget runs before any JSON.parse so oversized payloads are never parsed or sent."
+      },
+      {
+        "summary": "Past the cap the server returns no events (no partial page); the client always falls back to getSnapshot.",
+        "rationale": "The issue's proposal says the client runs its normal bootstrap instead of replaying; pagination would keep the per-event apply cost the issue wants to avoid."
+      },
+      {
+        "summary": "Add a new readFromBounded method and leave readFrom unchanged.",
+        "rationale": "The SSE routes and other callers already cap their own windows by span; changing readFrom would alter their behavior outside this issue."
+      },
+      {
+        "summary": "A too-far replay right after a fresh snapshot fails that bootstrap attempt (existing catch + backoff reconnect) instead of looping snapshot fetches.",
+        "rationale": "It can only happen under an extreme event rate; the existing backoff bounds retries and replay() cannot call bootstrap() from inside bootstrap() without awaiting itself."
+      },
+      {
+        "summary": "Keep the existing failed-replay behavior and file PAN-4566 for the wedge it causes.",
+        "rationale": "Surgical scope: the issue covers the cap and its fallback; the failure path is a separate pre-existing bug traced during planning."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-bounded-read",
+        "title": "Add the LIMITed readFromBounded replay read to the event store",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/event-store.ts",
+            "tests/unit/event-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/event-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/event-store.test.ts passes including the readFromBounded (PAN-4559) describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/dashboard/server/event-store.ts export REPLAY_MAX_EVENTS = 500, REPLAY_MAX_PAYLOAD_BYTES = 1024 * 1024, ReplayLimits and ReplayWindow; add readFromBounded(fromSequence, limits?) to the EventStore interface; prepare readFromBoundedStmt with readFromStmt's SQL plus 'LIMIT ?'; implement readFromBounded so it reads maxEvents + 1 rows, returns { events: [], tooFarBehind: true } when rows.length > maxEvents or when the running Buffer.byteLength(row.payload, 'utf8') sum exceeds maxPayloadBytes, and otherwise returns rows.map(rowToStored) with tooFarBehind false; add it to the returned store object and add one usage line to the module header. Leave readFrom and readFromStmt unchanged. Add the six tests listed in WI-1, including the recording DbAdapter test. Build every store in these tests with createEventStore(db, { resolveWorkspaceId: () => undefined }) so appends never touch the real ~/.overdeck/overdeck.db."
+        },
+        "items": [
+          {
+            "id": "store-bounded-read.ac1",
+            "title": "Given 20 stored events, when readFromBounded(0, { maxEvents: 5 }) runs through a recording DbAdapter, then it returns { events: [], tooFarBehind: true } and the recorded bounded SQL contains 'LIMIT ?' with exactly 6 rows read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-bounded-read.ac2",
+            "title": "Given exactly maxEvents stored events after fromSequence, readFromBounded returns all of them in ascending sequence order with tooFarBehind false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-bounded-read.ac3",
+            "title": "Given 3 events with 400-character payload blobs, readFromBounded with maxPayloadBytes 1000 returns tooFarBehind true and with maxPayloadBytes 10000 returns the 3 events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-bounded-read.ac4",
+            "title": "readFromBounded excludes issues.snapshot rows and defaults to REPLAY_MAX_EVENTS when no limits are passed (REPLAY_MAX_EVENTS + 1 events returns tooFarBehind true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-bounded-read",
+        "title": "Expose readFromBounded on EventStoreService",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/domain-services.ts",
+            "tests/unit/dashboard/domain-services.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/domain-services.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/domain-services.test.ts passes including the readFromBounded service test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add readonly readFromBounded: (fromSequence: number) => Effect.Effect<ReplayWindow> to EventStoreServiceShape in src/dashboard/server/services/domain-services.ts (import ReplayWindow as a type from '../event-store.js'), and add readFromBounded: (fromSequence) => Effect.sync(() => store.readFromBounded(fromSequence)) to EventStoreServiceLive's returned object. In tests/unit/dashboard/domain-services.test.ts add the same member to makeTestService() and one test that appends 2 events through the service and reads them back with readFromBounded(0)."
+        },
+        "items": [
+          {
+            "id": "service-bounded-read.ac1",
+            "title": "EventStoreServiceShape contains a readFromBounded member and EventStoreServiceLive returns an implementation that delegates to store.readFromBounded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-bounded-read.ac2",
+            "title": "Given 2 events appended through the test service, readFromBounded(0) returns those 2 events with tooFarBehind false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-replay-result",
+        "title": "Make the ReplayEventsRpc success schema the ReplayEventsResult union",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4559",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "handler-bounded-replay",
+            "client-gap-fallback",
+            "client-bootstrap-guard"
+          ],
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "packages/contracts/src/__tests__/replay-events-result.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/replay-events-result.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "replay-events-result.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In packages/contracts/src/rpc.ts, before ReplayEventsRpc, export ReplayTooFarBehind = Schema.Struct({ tooFarBehind: Schema.Literal(true) }) and ReplayEventsResult = Schema.Union([Schema.Array(DomainEvent), ReplayTooFarBehind]) with their types, array member first, and set ReplayEventsRpc's success to ReplayEventsResult. Keep payload and error unchanged. Add packages/contracts/src/__tests__/replay-events-result.test.ts with the four decode/encode cases in WI-3. Implementation checkpoint: if this Effect 4 beta needs a different Schema.Union or decode call form, copy the form used elsewhere in packages/contracts/src without changing the members or their order."
+        },
+        "items": [
+          {
+            "id": "contract-replay-result.ac1",
+            "title": "Decoding [] with ReplayEventsResult returns [] and decoding { tooFarBehind: true } returns { tooFarBehind: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-replay-result.ac2",
+            "title": "Decoding { tooFarBehind: false } with ReplayEventsResult fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-replay-result.ac3",
+            "title": "ReplayEventsRpc in packages/contracts/src/rpc.ts declares ReplayEventsResult as its success schema and preserves PanRpcError as its error schema",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handler-bounded-replay",
+        "title": "Return the tooFarBehind signal from the replayEvents handler without growing ws-rpc.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "wc -l src/dashboard/server/ws-rpc.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "wc prints 1220 or fewer lines for ws-rpc.ts",
+            "lint-file-size.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In the [WS_METHODS.replayEvents] handler in src/dashboard/server/ws-rpc.ts replace eventStore.readFrom(input.fromSequence) with eventStore.readFromBounded(input.fromSequence) and replace the Effect.map line with the single line Effect.map((bounded) => (bounded.tooFarBehind ? { tooFarBehind: true as const } : bounded.events.map(storedToDomainEvent).filter(passesDomainEventSchema))). Keep the Effect.mapError block with code REPLAY_FAILED unchanged. Add no lines and no comments: the file must stay at or below 1220 lines, and the allowlist row must not change."
+        },
+        "items": [
+          {
+            "id": "handler-bounded-replay.ac1",
+            "title": "The replayEvents handler calls eventStore.readFromBounded and returns { tooFarBehind: true } when the store reports tooFarBehind, otherwise the filtered DomainEvent array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handler-bounded-replay.ac2",
+            "title": "wc -l src/dashboard/server/ws-rpc.ts prints 1220 or fewer and bash scripts/lint-file-size.sh exits 0 with scripts/file-size-allowlist.txt unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handler-bounded-replay.ac3",
+            "title": "npm run typecheck passes, which validates the handler's return type against ReplayEventsResult",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-gap-fallback",
+        "title": "Re-bootstrap through getSnapshot when a live gap replay is too far behind",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/EventRouter.tsx",
+            "src/dashboard/frontend/src/components/EventRouter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/EventRouter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EventRouter.test.tsx passes including the new too-far-behind fallback test and the three existing replay tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In src/dashboard/frontend/src/components/EventRouter.tsx import the ReplayEventsResult type, change replay() to return 'caught-up' | 'too-far-behind' | 'failed' (on 'tooFarBehind' in result: console.warn, coordinator.failRecovery(), return 'too-far-behind'; the array path and catch path keep today's behavior), add recoverFromGap() that calls replay(latestSequence) and calls bootstrapWithReconnectRetry() on 'too-far-behind', and use recoverFromGap() at the two live-gap call sites in drainDeferredEvents and handleEvent. replay() must never call bootstrap() itself. Leave the bootstrap() call site for client-bootstrap-guard. Add the requestedMethods() helper and the fallback test from WI-5 using fake timers."
+        },
+        "items": [
+          {
+            "id": "client-gap-fallback.ac1",
+            "title": "Given a bootstrapped tab at sequence 0, when live event 600 arrives and replayEvents returns { tooFarBehind: true }, then the requested methods are getSnapshot, replayEvents, getSnapshot, replayEvents in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-gap-fallback.ac2",
+            "title": "Given the too-far-behind fallback, when the second snapshot syncs, then resetTransport is never called and the store's snapshotTimestamp equals the second snapshot's timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-gap-fallback.ac3",
+            "title": "The three existing replay tests that return event arrays pass unchanged, so a small gap still applies replayed events and drains deferred live events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-bootstrap-guard",
+        "title": "Fail the bootstrap attempt when the replay right after a snapshot is too far behind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/EventRouter.tsx",
+            "src/dashboard/frontend/src/components/EventRouter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/EventRouter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EventRouter.test.tsx passes including the bootstrap too-far-behind backoff test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In bootstrap() in src/dashboard/frontend/src/components/EventRouter.tsx replace 'if (needsReplay) { await replay(snapshot.sequence) }' with a check that throws new Error('replay after snapshot is too far behind') when needsReplay is true and replay(snapshot.sequence) resolves 'too-far-behind', so the existing catch runs failRecovery, markStreamDown and returns false, and bootstrapWithReconnectRetry schedules the backoff reconnect. The 'failed' outcome keeps today's behavior. Add the backoff test from WI-6 using fake timers."
+        },
+        "items": [
+          {
+            "id": "client-bootstrap-guard.ac1",
+            "title": "Given a live event deferred during the first getSnapshot, when the post-snapshot replay returns { tooFarBehind: true }, then request is called exactly 2 times and streamLive is false before any backoff elapses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-bootstrap-guard.ac2",
+            "title": "After 2.5 seconds of fake time the tab sends a third request whose method is pan.getSnapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-replay-cap",
+        "title": "Document the replay cap and snapshot fallback in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4559",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Gap replay (PAN-4559)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the Gap replay (PAN-4559) bullet line in the Degraded mode section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. In docs/DASHBOARD-ARCHITECTURE.md extend the EventRouter.tsx bullet under Frontend data flow to point at gap replay, and add a 'Gap replay (PAN-4559).' bullet after the Bootstrap bullet in the Degraded mode (PAN-4279) section that names readFromBounded, the LIMIT, REPLAY_MAX_EVENTS (500), REPLAY_MAX_PAYLOAD_BYTES (1 MiB), the { tooFarBehind: true } ReplayEventsResult member, the getSnapshot fallback on the same transport with no resetTransport, the failed-bootstrap backoff when the post-snapshot replay is too far behind, and that other replay failures are tracked in PAN-4566."
+        },
+        "items": [
+          {
+            "id": "docs-replay-cap.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Gap replay (PAN-4559).' bullet that names readFromBounded, REPLAY_MAX_EVENTS, REPLAY_MAX_PAYLOAD_BYTES and tooFarBehind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-replay-cap.ac2",
+            "title": "The bullet states that the client falls back to getSnapshot on the same transport without resetTransport, and that a too-far replay right after a snapshot routes to the reconnect backoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-bounded-read",
+        "to": "service-bounded-read",
+        "type": "blocks"
+      },
+      {
+        "from": "service-bounded-read",
+        "to": "handler-bounded-replay",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-replay-result",
+        "to": "handler-bounded-replay",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-replay-result",
+        "to": "client-gap-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "client-gap-fallback",
+        "to": "client-bootstrap-guard",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
