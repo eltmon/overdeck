@@ -46,6 +46,7 @@ import {
   getConversationMessageLocator,
   getConversationMessagesRead,
   getConversationRead,
+  getConversationToolBodyRead,
   getConversationsPendingInputFeed,
   patchConversationTitle,
   handleConversationMove,
@@ -482,6 +483,23 @@ const getConversationMessagesRoute = HttpRouter.add(
       const agentId = searchParams.get('agentId') ?? undefined;
       return conversationReadJson(await getConversationMessagesRead(name, conversationReadDependencies, agentId, options));
     });
+  }),
+);
+const getConversationToolBodyRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/tool-body/:toolUseId',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const toolUseId = params['toolUseId'] ?? '';
+    const agentId = new URL(request.url, 'http://localhost').searchParams.get('agentId') ?? undefined;
+    return yield* Effect.promise(async () =>
+      conversationReadJson(await getConversationToolBodyRead(name, toolUseId, conversationReadDependencies, agentId)));
   }),
 );
 const getConversationMessageLocatorRoute = HttpRouter.add(
@@ -994,6 +1012,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,
   getConversationMessagesRoute,
+  getConversationToolBodyRoute,
   getConversationMessageLocatorRoute,
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,

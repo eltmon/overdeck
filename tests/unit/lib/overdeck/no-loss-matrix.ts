@@ -194,6 +194,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/subagents/:agentId/input', kind: 'http', disposition: 'READ', door: 'conversationSubagentInput: validate parent membership and read live direct-input capability' },
   { surface: 'POST /api/conversations/:name/subagents/:agentId/input', kind: 'http', disposition: 'WRITE', door: 'conversationSubagentInput: direct validated child delivery through the persistent Codex host' },
   { surface: 'GET /api/conversations/:name/messages',                    kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.parse' },
+  { surface: 'GET /api/conversations/:name/tool-body/:toolUseId',       kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.parse' },
   { surface: 'GET /api/conversations/:name/message-locator',             kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.resolveFile' },
   { surface: 'POST /api/conversations/:name/upload-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stageAttachment' },
   { surface: 'POST /api/conversations/:name/delete-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.removeAttachment' },
