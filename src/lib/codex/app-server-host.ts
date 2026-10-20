@@ -215,6 +215,7 @@ export class CodexAppServerHost {
       managerState: managerState.state,
       threadId: managerState.threadId,
       activeTurnId: managerState.activeTurnId,
+      lastTurnStatus: managerState.lastTurnStatus,
       pendingRequests: [...this.pendingRequests.values()],
       generation: this.generation,
       nativeEndpoint: this.nativeEndpointStatus(),

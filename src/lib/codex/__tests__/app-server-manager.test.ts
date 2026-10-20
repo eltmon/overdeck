@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -706,5 +707,52 @@ describe('CodexAppServerManager protocol capture (PAN-4563)', () => {
     manager.stop();
     await new Promise(resolve => setImmediate(resolve));
     expect(await readdir(dir)).toEqual([]);
+  });
+});
+
+describe('CodexAppServerManager lastTurnStatus (PAN-4563)', () => {
+  async function ownedManager() {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === 'thread/start') server.send({ id: message.id, result: { thread: { id: 'owner-thread' } } });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    await manager.startThread({ model: 'gpt-5.6-luna' });
+    const deliver = async (message: Record<string, unknown>) => {
+      const seen = once(manager, 'notification');
+      fake.send(message);
+      await seen;
+    };
+    return { manager, deliver };
+  }
+
+  it('records an interrupted owner turn and clears it when the next turn starts', async () => {
+    const { manager, deliver } = await ownedManager();
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't1' } } });
+    await deliver({ method: 'turn/completed', params: { threadId: 'owner-thread', turn: { id: 't1', status: 'interrupted' } } });
+    expect(manager.getState()).toMatchObject({ state: 'idle', lastTurnStatus: 'interrupted' });
+
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't2' } } });
+    expect(manager.getState().lastTurnStatus).toBeUndefined();
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: 't2' });
+    manager.stop();
+  });
+
+  it('ignores a sub-agent turn completion', async () => {
+    const { manager, deliver } = await ownedManager();
+    await deliver({
+      method: 'item/completed',
+      params: {
+        threadId: 'owner-thread',
+        item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner-thread', receiverThreadIds: ['sub-thread'] },
+      },
+    });
+    await deliver({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't1' } } });
+    await deliver({ method: 'turn/completed', params: { threadId: 'sub-thread', turn: { id: 'sub-turn', status: 'completed' } } });
+    expect(manager.threadScope('sub-thread')).toBe('descendant');
+    expect(manager.getState().lastTurnStatus).toBeUndefined();
+    expect(manager.getState()).toMatchObject({ state: 'running', activeTurnId: 't1' });
+    manager.stop();
   });
 });

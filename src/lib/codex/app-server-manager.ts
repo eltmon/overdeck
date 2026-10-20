@@ -146,6 +146,8 @@ export interface CodexAppServerState {
   state: 'starting' | 'ready' | 'idle' | 'running' | 'error' | 'closed';
   threadId?: string;
   activeTurnId?: string;
+  /** PAN-4563: the owner's last turn outcome, from `turn/completed` `turn.status`. */
+  lastTurnStatus?: 'completed' | 'interrupted' | 'failed';
 }
 
 interface PendingRequest {
@@ -611,11 +613,13 @@ export class CodexAppServerManager extends EventEmitter {
     if (message.method === 'turn/started') {
       const turn = asRecord(params.turn);
       const activeTurnId = typeof turn.id === 'string' ? turn.id : typeof params.turnId === 'string' ? params.turnId : undefined;
-      this.sessionState = { ...this.sessionState, state: 'running', ...(activeTurnId ? { activeTurnId } : {}) };
+      this.sessionState = { ...this.sessionState, state: 'running', lastTurnStatus: undefined, ...(activeTurnId ? { activeTurnId } : {}) };
       return;
     }
     if (message.method === 'turn/completed') {
-      this.sessionState = { ...this.sessionState, state: 'idle', activeTurnId: undefined };
+      const status = asRecord(params.turn).status;
+      const lastTurnStatus = status === 'completed' || status === 'interrupted' || status === 'failed' ? status : undefined;
+      this.sessionState = { ...this.sessionState, state: 'idle', activeTurnId: undefined, lastTurnStatus };
       return;
     }
     if (message.method === 'error' && params.willRetry !== true) {
