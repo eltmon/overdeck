@@ -80,7 +80,6 @@ const PRIME_AGENT_LITERAL_FILES = [
   'src/lib/agents/recovery.ts',
   'src/lib/agents/termination.ts',
   'src/lib/context-layers/launch-sources.ts',
-  'src/lib/runtimes/index.ts',
   'src/lib/runtimes/runtime-pane-launch.ts',
   'src/lib/overdeck/cost.ts',
   'src/lib/cloister/pi-cost-reconciler.ts',
