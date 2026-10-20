@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:04:28.450Z",
+  "updated": "2026-10-20T03:06:42.810Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-10-20T03:03:03.388Z"
     },
     "codex-capture-hook": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4563",
-      "claimedAt": "2026-10-20T03:04:28.450Z"
+      "claimedAt": "2026-10-20T03:04:28.450Z",
+      "doneAt": "2026-10-20T03:06:42.809Z"
     }
   }
 }
