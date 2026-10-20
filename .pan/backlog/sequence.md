@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T21:35:36Z · model: claude-opus-5-5 · open: 831_
+_Last sequenced: 2026-10-20T21:43:31Z · model: claude-opus-5-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -638,102 +638,103 @@ _Last sequenced: 2026-10-20T21:35:36Z · model: claude-opus-5-5 · open: 831_
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 667 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
-| 668 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 669 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 670 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 671 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 672 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 673 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 674 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 675 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 676 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 677 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 678 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 679 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 680 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 681 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 682 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 683 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 684 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 685 | PAN-2356 | M | low | needs-refinement |  | PAN-4297 | Overdeck Anywhere P3: relay service |
-| 686 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 687 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 688 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 689 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 690 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 691 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 692 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 693 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 694 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 695 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 696 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 697 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 698 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 699 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 700 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 701 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 702 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 703 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 704 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 705 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 706 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
-| 707 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 708 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 709 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 710 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 711 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 712 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 713 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 714 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 715 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 716 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 717 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 718 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 719 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 720 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 721 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 722 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 723 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 724 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 725 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 726 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 727 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 728 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 729 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 730 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 731 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 732 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 734 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 736 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 737 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 740 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 741 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 742 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 743 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 744 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 745 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 746 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 747 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 748 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 749 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 750 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 751 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 752 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 753 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 754 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 755 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 756 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 757 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 758 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 759 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 760 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 761 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 762 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 763 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 668 | PAN-4577 | M | medium | ok |  | PAN-3957 | PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; blocked until #3957 merges. |
+| 669 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 670 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 671 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 675 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 676 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 677 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 678 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 679 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 680 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 681 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 682 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297 | Overdeck Anywhere P3: relay service |
+| 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 690 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 691 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 692 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 693 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 694 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 695 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 696 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 697 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 698 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 699 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 700 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 701 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 702 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 703 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 704 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 705 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 706 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 707 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
+| 708 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 709 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 710 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 711 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 712 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 713 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 714 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 715 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 716 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 717 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 718 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 719 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 720 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 721 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 722 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 723 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 724 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 725 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 726 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 727 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 728 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 729 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 730 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 731 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 732 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 733 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 734 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 735 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 736 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 737 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 738 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 739 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 740 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 741 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 742 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 743 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 744 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 745 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 746 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 747 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 748 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 749 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 750 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 751 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 752 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 753 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 754 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 755 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 756 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 757 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 758 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 759 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 760 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 761 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 762 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 763 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 764 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
 | 765 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
 | 766 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
 | 767 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
@@ -1166,10 +1167,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T21:35:36Z",
+  "generatedAt": "2026-10-20T21:43:31Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 831,
+  "openCount": 832,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1345,6 +1346,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline.",
       "rationale": "New and already in the pipeline. Replay fixtures catch provider ordering changes (turn completion, interrupt, subagent nesting) that hand-written mocks miss. Valuable harness hardening but test infrastructure rather than a live defect, so medium.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4572",
+      "rank": 19,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
+      "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3746,6 +3760,21 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "dependsOn": [],
       "why": "Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked.",
       "rationale": "Rank held at 223. PAN-4558 closed as completed on 2026-10-20, so the server-side snapshot cap this issue depended on has landed and the dependency edge is removed. The remaining resume-from-offset work is now unblocked, but its impact is unchanged, so the rank and score stay where they were.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4575",
+      "rank": 224,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4563"
+      ],
+      "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed.",
+      "rationale": "New issue with a source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. It is a small, well-scoped fix to an actively used harness. It ranks in the high tier behind PAN-4563, because PAN-4563 (in pipeline) adds the replay fixture and the pinned host-replay test this fix must flip.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9062,8 +9091,23 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
-      "issue": "PAN-2282",
+      "issue": "PAN-4577",
       "rank": 668,
+      "size": "M",
+      "importance": "medium",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3957"
+      ],
+      "why": "PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; blocked until #3957 merges.",
+      "rationale": "New issue with a PRD (PAN-3957 W9-W11) and an explicit block on PAN-3957, which is in pipeline; it ranks directly after its parent so it is next once phase 1 merges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2282",
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9075,7 +9119,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2091",
-      "rank": 669,
+      "rank": 670,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9087,7 +9131,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2085",
-      "rank": 670,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9099,7 +9143,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2084",
-      "rank": 671,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9111,7 +9155,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2083",
-      "rank": 672,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9126,7 +9170,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2082",
-      "rank": 673,
+      "rank": 674,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9138,7 +9182,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2074",
-      "rank": 674,
+      "rank": 675,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9150,7 +9194,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2046",
-      "rank": 675,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9163,7 +9207,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2006",
-      "rank": 676,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9175,7 +9219,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3919",
-      "rank": 677,
+      "rank": 678,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9188,7 +9232,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2005",
-      "rank": 678,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9200,7 +9244,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2002",
-      "rank": 679,
+      "rank": 680,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9212,7 +9256,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1999",
-      "rank": 680,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9224,7 +9268,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1986",
-      "rank": 681,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9236,7 +9280,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1983",
-      "rank": 682,
+      "rank": 683,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9248,7 +9292,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2672",
-      "rank": 683,
+      "rank": 684,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9261,7 +9305,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1958",
-      "rank": 684,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9273,7 +9317,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2356",
-      "rank": 685,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9288,7 +9332,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1907",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9300,7 +9344,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1895",
-      "rank": 687,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9312,7 +9356,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1878",
-      "rank": 688,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9324,7 +9368,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1782",
-      "rank": 689,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9336,7 +9380,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1773",
-      "rank": 690,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9348,7 +9392,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1646",
-      "rank": 691,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9360,7 +9404,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1643",
-      "rank": 692,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9372,7 +9416,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1592",
-      "rank": 693,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9384,7 +9428,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1581",
-      "rank": 694,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9396,7 +9440,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1552",
-      "rank": 695,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9408,7 +9452,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1533",
-      "rank": 696,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9420,7 +9464,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1483",
-      "rank": 697,
+      "rank": 698,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9432,7 +9476,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1482",
-      "rank": 698,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9444,7 +9488,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1481",
-      "rank": 699,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9456,7 +9500,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1356",
-      "rank": 700,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9468,7 +9512,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1242",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9480,7 +9524,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1222",
-      "rank": 702,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9492,7 +9536,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1208",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9504,7 +9548,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4352",
-      "rank": 704,
+      "rank": 705,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9516,7 +9560,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1153",
-      "rank": 705,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9528,7 +9572,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4298",
-      "rank": 706,
+      "rank": 707,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -9545,7 +9589,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1152",
-      "rank": 707,
+      "rank": 708,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9557,7 +9601,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1135",
-      "rank": 708,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9569,7 +9613,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1133",
-      "rank": 709,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9582,7 +9626,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1123",
-      "rank": 710,
+      "rank": 711,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9594,7 +9638,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1121",
-      "rank": 711,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9606,7 +9650,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4248",
-      "rank": 712,
+      "rank": 713,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -9619,7 +9663,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1117",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9631,7 +9675,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1116",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9643,7 +9687,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1065",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9655,7 +9699,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1064",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9667,7 +9711,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1063",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9680,7 +9724,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3971",
-      "rank": 718,
+      "rank": 719,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -9692,7 +9736,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3768",
-      "rank": 719,
+      "rank": 720,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9704,7 +9748,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3034",
-      "rank": 720,
+      "rank": 721,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9716,7 +9760,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2983",
-      "rank": 721,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9729,7 +9773,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3824",
-      "rank": 722,
+      "rank": 723,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9742,7 +9786,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3823",
-      "rank": 723,
+      "rank": 724,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9755,7 +9799,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-1049",
-      "rank": 724,
+      "rank": 725,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9767,7 +9811,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-984",
-      "rank": 725,
+      "rank": 726,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -9779,7 +9823,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-962",
-      "rank": 726,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9792,7 +9836,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-961",
-      "rank": 727,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9804,7 +9848,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-943",
-      "rank": 728,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9816,7 +9860,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-908",
-      "rank": 729,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9828,7 +9872,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-898",
-      "rank": 730,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -9840,7 +9884,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-853",
-      "rank": 731,
+      "rank": 732,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -9852,7 +9896,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-833",
-      "rank": 732,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -9864,7 +9908,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-832",
-      "rank": 733,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -9877,7 +9921,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4347",
-      "rank": 734,
+      "rank": 735,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -9889,7 +9933,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-797",
-      "rank": 735,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -9901,7 +9945,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4275",
-      "rank": 736,
+      "rank": 737,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -9914,7 +9958,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-2836",
-      "rank": 737,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9927,7 +9971,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-790",
-      "rank": 738,
+      "rank": 739,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -9939,7 +9983,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-786",
-      "rank": 739,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -9951,7 +9995,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-777",
-      "rank": 740,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -9963,7 +10007,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-775",
-      "rank": 741,
+      "rank": 742,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -9975,7 +10019,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-3456",
-      "rank": 742,
+      "rank": 743,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -9987,7 +10031,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-774",
-      "rank": 743,
+      "rank": 744,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -9999,7 +10043,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-773",
-      "rank": 744,
+      "rank": 745,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10011,7 +10055,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-772",
-      "rank": 745,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10024,7 +10068,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-771",
-      "rank": 746,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10036,7 +10080,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-769",
-      "rank": 747,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10051,7 +10095,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-765",
-      "rank": 748,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10063,7 +10107,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-764",
-      "rank": 749,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10075,7 +10119,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-4425",
-      "rank": 750,
+      "rank": 751,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10087,7 +10131,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-752",
-      "rank": 751,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10099,7 +10143,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-751",
-      "rank": 752,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10111,7 +10155,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-750",
-      "rank": 753,
+      "rank": 754,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10123,7 +10167,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-749",
-      "rank": 754,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10135,7 +10179,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-747",
-      "rank": 755,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10147,7 +10191,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-743",
-      "rank": 756,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10159,7 +10203,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-738",
-      "rank": 757,
+      "rank": 758,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10171,7 +10215,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-735",
-      "rank": 758,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10183,7 +10227,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-730",
-      "rank": 759,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10195,7 +10239,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-702",
-      "rank": 760,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10207,7 +10251,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-701",
-      "rank": 761,
+      "rank": 762,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10219,7 +10263,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-663",
-      "rank": 762,
+      "rank": 763,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10231,7 +10275,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
     },
     {
       "issue": "PAN-660",
-      "rank": 763,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11492,34 +11536,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "rationale": "New since the prior run. Clear file-by-file spec, but the change is only correct on or after 2026-12-01, so it ranks at the tail to keep the Flywheel from picking it early.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-4572",
-      "rank": 19,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs.",
-      "rationale": "PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4575",
-      "rank": 224,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4563"
-      ],
-      "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed.",
-      "rationale": "New issue with a source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. It is a small, well-scoped fix to an actively used harness. It ranks in the high tier behind PAN-4563, because PAN-4563 (in pipeline) adds the replay fixture and the pinned host-replay test this fix must flip.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12887,6 +12903,13 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-3957",
+      "to": "PAN-4577",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
