@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T21:53:11Z · model: claude-opus-5-5 · open: 831_
+_Last sequenced: 2026-10-20T21:54:12Z · model: claude-opus-5-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -637,6 +637,7 @@ _Last sequenced: 2026-10-20T21:53:11Z · model: claude-opus-5-5 · open: 831_
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 667 | PAN-3957 | L | low | ok |  |  | In pipeline: repo-owned project memory replacing per-harness auto-memory; phase 2 is PAN-4577. Pinned at prior rank. |
 | 668 | PAN-4577 | M | medium | ok |  | PAN-3957 | PAN-3957 phase 2: import Claude auto-memory into repo facts and gate native memory; blocked until #3957 merges. |
 | 669 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 670 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
@@ -1166,10 +1167,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T21:53:11Z",
+  "generatedAt": "2026-10-20T21:54:12Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 831,
+  "openCount": 832,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -9074,6 +9075,19 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       ],
       "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
       "rationale": "PAN-1641 (the Ollama path) closed as completed, so only the hosted-path dependency on PAN-465 remains; rank unchanged because the hardware limit still applies.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3957",
+      "rank": 667,
+      "size": "L",
+      "importance": "low",
+      "score": 25,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: repo-owned project memory replacing per-harness auto-memory; phase 2 is PAN-4577. Pinned at prior rank.",
+      "rationale": "Restored after it dropped from the prior run; it is in pipeline, so it is pinned at its earlier rank 667 directly ahead of its phase-2 follow-up PAN-4577.",
       "gate": "auto",
       "planning": "auto"
     },
