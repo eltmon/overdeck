@@ -1,0 +1,1052 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T22:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3957: Overdeck-owned agent memory: project memory stored in the repo, replacing per-harness memory (Claude auto-memory)",
+    "updated": "2026-10-20T21:51:20.554Z"
+  },
+  "plan": {
+    "id": "pan-3957",
+    "title": "Overdeck-owned agent memory: project memory stored in the repo, replacing per-harness memory (Claude auto-memory)",
+    "status": "proposed",
+    "uid": "014f8708-4185-42dc-b3dc-69733a2e8354",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-20T22:30:00Z",
+    "updated": "2026-10-20T21:51:20.554Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3957",
+        "label": "PAN-3957",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3957/.pan/drafts/pan-3957.md",
+        "label": "PRD draft (.pan/drafts/pan-3957.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4577",
+        "label": "PAN-4577 (phase 2 child)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory",
+      "context-layers",
+      "cli",
+      "launch-context",
+      "pipeline-gates",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "Phase 1 is one vertical feature that crosses its natural seams once each: the store library, the index renderer, the three launch compositions (managed, Muse, dashboard preview, which docs promise match), the pan memory CLI door (which must regenerate the composer manifest and skill in lockstep), three pipeline predicates that would otherwise silently drop facts, the bundled rule, and docs. About 31 files, half of them the tests and docs that each slice must carry; the subsystem count is inflated by tests/, sync-sources/, configuration/ and root doc files. The separable remainder (import + native-memory switch) is already split into PAN-4577. Splitting further would ship either an injected index with no write door or a write door whose facts the pipeline loses.",
+      "canonicalFilename": "2026-10-20-PAN-3957-overdeck-owned-agent-memory-project-memory-stored-in-the-repo-replacing-per-harness-memory-claude-auto-memory.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Agent memory lives in each harness's own store. Claude Code auto-memory (~/.claude/projects/<slug>/memory/) is per machine, per user, per harness and invisible to the project; Codex, Pi, OMP and Kimi agents never see it, a second machine never sees it, and the project cannot review it. The operator works across several machines, so durable facts must travel with the repo through git.",
+      "Proposal": "Add curated, one-fact-per-file memory in <planHome>/.overdeck/memory/<id>.md (operator facts per machine in ~/.overdeck/context/memory/), rendered at launch into a budgeted '## Project memory' / '## Operator memory' index in every managed harness's composition (managed launch, Muse, and the Context page preview). pan memory gains show/list/add/edit/retire and facts-first search as the single door; writes never commit, git and the PR are the curation. Home-directory paths are refused in the project store (D16), and .overdeck/memory/ is carved out of three pipeline predicates so facts survive pan done, sync-main and close-out (D17). A universal rule directs managed agents to pan memory add. Phase 2 (Claude import, native-memory switch) is PAN-4577.",
+      "NonGoals": "- Replacing or changing observation memory, its FTS index, prompt-time injection budgets or the SessionStart briefing\n- pan memory import claude and memory.harness_native_memory (shipped by PAN-4577)\n- Injecting fact bodies or per-prompt fact retrieval; a dashboard fact editor; capture hooks (phase 3)\n- Committing, pushing or opening PRs on the author's behalf\n- Reaching sessions already running; facts reach new sessions only\n- Syncing the operator store between machines, or auto-pulling the primary checkout\n- Storing any MEMORY.md or index file (the index is rendered at launch only)\n- Reading, writing, moving or deleting anything under ~/.claude/\n- Changing pan context diff\n- Changing pipeline treatment of .pan/ or of any .overdeck/ path other than .overdeck/memory/\n- Raising any row in scripts/file-size-allowlist.txt\n- Running pan sync from the workspace build"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Q1: project facts live in <planHome>/.overdeck/memory/<id>.md, committed on the code branch.",
+        "rationale": "PRD-recommended option. Re-checked 2026-10-20: PAN-3998 is merged, .pan/ needs the same pipeline carve-outs, overdeck-state is archived (operator comment), and git check-ignore shows the path trackable in every registered project except dfai, where D11's guard refuses with the fix."
+      },
+      {
+        "summary": "Q2: git is the curation; pan memory writes uncommitted files and never commits.",
+        "rationale": "PRD-recommended option; the PR diff is the review and no second store or inbox state is needed."
+      },
+      {
+        "summary": "Q3: facts stay separate from the OKF bundle but use OKF-compatible frontmatter keys.",
+        "rationale": "PRD-recommended option; OKF is opt-in, long-form and PR-gated in a second repo."
+      },
+      {
+        "summary": "Q4/Q5 (native auto-memory switch and Claude import) are adopted as specified but delivered by child issue PAN-4577, filed 2026-10-20 and blocked on PAN-3957.",
+        "rationale": "The PRD's own phasing names P2 as a child; the combined plan exceeds the 25-file finalize lint; phase 1 already realizes the title (every harness gets the repo-owned index and the rule redirects writes), phase 2 is the cutover. This is a split, not a scope reduction."
+      },
+      {
+        "summary": "Q6: operator-level facts live per machine in ~/.overdeck/context/memory/; syncing them across machines is a non-goal.",
+        "rationale": "PRD-recommended option and the issue's 'user-level memory stays outside the repo'; the operator's multi-machine requirement applies to the project store, which travels through git."
+      },
+      {
+        "summary": "Q7: no wait on PAN-3920.",
+        "rationale": "PRD-recommended option; there is no code dependency, only launch-composition merge surface."
+      },
+      {
+        "summary": "D16: project-store facts refuse home-directory absolute paths (/home/<u>/, /Users/<u>/, C:\\Users\\); /tmp/, localhost:<port> and 127.0.0.1 are allowed.",
+        "rationale": "The operator's 2026-10-20 comment requires machine-specific facts to stay out of the repo store; home paths can never be true on another machine, while dev ports and scratch conventions are often real project facts. Local keys are already refused by the D10 secret guard."
+      },
+      {
+        "summary": "D17: carve .overdeck/memory/ out of the dirty-workspace gate, the pre-sync auto-commit reset, and close-out's merged detection.",
+        "rationale": "Verified on origin/main: all three predicates treat .overdeck/ as disposable, so an uncommitted or fact-only change would be lost silently, defeating 'reach the other machines after a normal pull'."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-fact-store",
+        "title": "Add the curated fact store library (src/lib/memory/facts/store.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/store.ts",
+            "tests/unit/lib/memory/facts/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes every W1 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-12",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "w2-index-renderer",
+            "w5a-cli-read-verbs",
+            "w5b-cli-write-verbs",
+            "w6-search-facts-first",
+            "w3a-inject-launch",
+            "w3b-inject-muse",
+            "w4-context-preview"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W1 exactly: types, MEMORY_FACT_ID, MACHINE_PATH_PATTERN (D16), projectMemoryDir (resolvePlanHome-based, D1), userMemoryDir, parseMemoryFact with every listed problem reason verbatim (including the D16 machine-specific problem for scope project only), readMemoryFactsSync, serializeMemoryFact, writeMemoryFact (round-trip validation, D10 secret refusal via redactSensitiveText, MemoryFactExistsError, temp file + rename), removeMemoryFact, isActiveFact and matchMemoryFacts (W6 body). Carry the module header comment from W1. Tests in a mkdtempSync dir with OVERDECK_HOME set; mock projects.js findProjectByPath + resolveInfraRepo."
+        },
+        "items": [
+          {
+            "id": "w1-fact-store.ac1",
+            "title": "Given a project-scope fact file whose body contains '/home/alice/notes', when parseMemoryFact runs, then it returns the problem 'machine-specific path \"/home/alice/\"; use ~ or a project-relative path, or keep the fact on this machine with --user', and the same file parsed with scope 'user' returns a MemoryFact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-store.ac2",
+            "title": "Given fact text containing an sk-ant- key or GITHUB_TOKEN=<value>, when writeMemoryFact is called, then it rejects with MemoryFactSensitiveError and writes no file; text containing OVERDECK_RTK_ENABLED=0 is accepted and persists <id>.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-store.ac3",
+            "title": "Given a directory holding README.md, a dotfile, a subdirectory and a non-.md file plus one valid fact, when readMemoryFactsSync runs, then it returns exactly the one fact and no problems; a missing directory returns { facts: [], problems: [] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-fact-store.ac4",
+            "title": "Given any valid fact, when serializeMemoryFact output is parsed back with parseMemoryFact, then every field round-trips unchanged and frontmatter keys appear in the order type, title, description, tags, updated, source, review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-index-renderer",
+        "title": "Render the Project/Operator memory index sections (src/lib/memory/facts/render.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/facts/render.ts",
+            "tests/unit/lib/memory/facts/render.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/facts/render.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "render.test.ts passes every W2 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W2: renderMemoryIndexSection (filter active facts, D6 ordering, D7 exact header text, budget with overflow line) and renderManagedMemorySections(projectRoot, opts?: { userDir?: string }) that never throws (D9: console.warn '[memory] facts unavailable: <reason>' and return ''). Problems are skipped silently here."
+        },
+        "items": [
+          {
+            "id": "w2-index-renderer.ac1",
+            "title": "Given a project store with one active fact be-decisive, when renderManagedMemorySections runs, then it renders the exact D7 header ('## Project memory', the Source line with the store path and '(1 active facts, curated and committed with this repository)') followed by '- feedback/be-decisive: <description>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-index-renderer.ac2",
+            "title": "Given 300 active facts with 150-character descriptions, when the project section renders, then its length is at most 12000 characters and it ends with a line containing 'more facts: run `pan memory list`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-index-renderer.ac3",
+            "title": "Given a fact with review: [unindexed] and a store with zero active facts, when sections render, then the review-marked fact is absent and the empty store produces '' (no heading)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-index-renderer.ac4",
+            "title": "Given a reader that throws, when renderManagedMemorySections runs, then it returns '' and console.warn is called once with a message starting '[memory] facts unavailable:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3a-inject-launch",
+        "title": "Inject memory sections into renderManagedLaunchContext",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/context-layers/materialize.ts",
+            "tests/lib/context-layers/materialize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/context-layers/materialize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "materialize.test.ts passes including the new memory cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD W3 materialize.ts before/after: push renderManagedMemorySections(project?.path ?? null) right after the project layer. Extend the test's projects.js mock with resolveInfraRepo and add the five W3 cases."
+        },
+        "items": [
+          {
+            "id": "w3a-inject-launch.ac1",
+            "title": "Given a project store fact and a workspace context file, when renderManagedLaunchContext renders, then indexOf('## Project context') < indexOf('## Project memory') < indexOf('## Workspace context')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-inject-launch.ac2",
+            "title": "Given the same stores, when rendered for claude-code and for codex, then both outputs contain the identical '## Project memory' section text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-inject-launch.ac3",
+            "title": "Given a fact under $OVERDECK_HOME/context/memory, when rendered, then the output contains '## Operator memory'; given both stores empty, the output contains neither '## Project memory' nor '## Operator memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-inject-launch.ac4",
+            "title": "Given a review-marked project fact, when rendered, then its id does not appear in the output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3b-inject-muse",
+        "title": "Inject memory sections into materializeMuseContext",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/muse-context.ts",
+            "tests/unit/lib/runtimes/muse-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/runtimes/muse-context.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "muse-context.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W3's muse-context.ts change: sections.push(renderManagedMemorySections(project?.path ?? null)) on the line after the project layer push. Create tests/unit/lib/runtimes/muse-context.test.ts (no real-function test exists today) using agent id agent-pan-3957 and OVERDECK_HOME in a mkdtemp dir."
+        },
+        "items": [
+          {
+            "id": "w3b-inject-muse.ac1",
+            "title": "Given a project store fact and agent id agent-pan-3957, when materializeMuseContext runs, then $OVERDECK_HOME/agents/agent-pan-3957/muse-context.md contains '## Project memory' and the fact line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3b-inject-muse.ac2",
+            "title": "Given both stores empty, when materializeMuseContext runs, then the written file contains no '## Project memory' or '## Operator memory' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-context-preview",
+        "title": "Show memory sections in the dashboard Context page preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/context.ts",
+            "tests/dashboard/context-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/dashboard/context-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "context-routes.test.ts passes including the two memory cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W4: previewForHarness gains a memory parameter; previewProjectRoot resolves the project path from the injected projects list (never getProjectSync); previewContextLayers renders memory once with userDir join(overdeckHome,'context','memory') and passes it to every harness. No host lookups inside the preview."
+        },
+        "items": [
+          {
+            "id": "w4-context-preview.ac1",
+            "title": "Given a project-scoped preview request and <projectRoot>/.overdeck/memory/be-decisive.md, when previewContextLayers runs, then every harness preview contains '## Project memory' and 'feedback/be-decisive'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-context-preview.ac2",
+            "title": "Given a global-scoped preview and <panHome>/context/memory/terse-answers.md passed via overdeckHome, when previewContextLayers runs, then previews contain '## Operator memory' and do not contain '## Project memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-context-preview.ac3",
+            "title": "Given an injected projects entry whose config.path has no .overdeck/memory directory and a panHome with no context/memory, when previewContextLayers runs, then no preview contains '## Project memory' or '## Operator memory' (the preview reads no host path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5a-cli-read-verbs",
+        "title": "Add pan memory show and list with the fact target resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "src/cli/commands/memory.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run generate:slash-commands && bash scripts/lint-slash-commands.sh",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes the show/list/resolver cases",
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "lint-skills passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/memory-facts.ts with registerMemoryFactCommands(memory), resolveFactTarget (PRD W5 step 1, D4: reads default to the primary checkout's store, --here reads the cwd checkout, --project/--user/--here mutually exclusive, refuse outside a registered project), and the show and list verbs (W5 step 4: list filters --type/--query/--review, prints a Problems block and exits 1 when any problem exists, --json prints { scope, dir, facts, problems }). Register it in memory.ts right before `return memory;` (line 413). Add the show/list lines to SKILL.md, regenerate and commit the composer manifest."
+        },
+        "items": [
+          {
+            "id": "w5a-cli-read-verbs.ac1",
+            "title": "Given a fact present only in the primary checkout's store, when `pan memory show <id>` runs from a cwd under workspaces/feature-x/, then it prints 'Source: <primary store path>' and the file; with --here it reads the workspace store instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5a-cli-read-verbs.ac2",
+            "title": "Given a malformed .md file in the store, when `pan memory list` runs, then it prints a 'Problems:' block with '<file>: <reason>' and exits 1; `--review` lists only review-marked facts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5a-cli-read-verbs.ac3",
+            "title": "Given a cwd outside any registered project and no --project/--user, when `pan memory list` runs, then it exits 1 with 'not inside a registered project; pass --project <key> or --user'; --project with --user together exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5a-cli-read-verbs.ac4",
+            "title": "Given the built CLI, when `node dist/cli/index.js memory show --help` runs, then it lists --here, and lint-slash-commands reports the manifest matches the CLI registry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5b-cli-write-verbs",
+        "title": "Add pan memory add, edit and retire with the git ignore guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run generate:slash-commands && bash scripts/lint-slash-commands.sh",
+            "bash scripts/lint-skills.sh",
+            "grep -rn execSync src/cli/commands/memory-facts.ts src/lib/memory/facts/ || echo no-execSync"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts passes every W5 write case",
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "the execSync grep prints no-execSync"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-12",
+            "NFR-1",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add add/edit/retire per PRD W5 steps 2, 3, 5 and 7: writes target the cwd checkout's store (D4), never commit, print the exact commit hints; D11 ignore check through promisify(execFile) with an injectable checkIgnored; --type user requires --user; edit refuses with no change flag; retire unlinks (D12). Store-library refusals (D10 secret, D16 machine-specific) print verbatim and exit 1. Add the three command lines to SKILL.md and regenerate the composer manifest."
+        },
+        "items": [
+          {
+            "id": "w5b-cli-write-verbs.ac1",
+            "title": "Given a cwd in workspaces/feature-x/, when `pan memory add be-decisive --type feedback --description \"...\"` runs, then it creates workspaces/feature-x/.overdeck/memory/be-decisive.md (not the primary checkout's), prints '✓ Wrote <path>' and the 'Commit it: git -C <root> add .overdeck/memory/be-decisive.md' hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5b-cli-write-verbs.ac2",
+            "title": "Given a description containing '/home/alice/', when add runs without --user, then it exits 1 with the D16 machine-specific message and writes nothing; with --user and --type feedback it writes ~/.overdeck/context/memory/<id>.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5b-cli-write-verbs.ac3",
+            "title": "Given checkIgnored resolves true, when add runs for project scope, then it exits 1 with 'add \"!.overdeck/memory/\" to <planHome>/.gitignore' and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5b-cli-write-verbs.ac4",
+            "title": "Given an existing fact, when `pan memory edit <id> --description <new>` runs, then only description and updated change; edit with no field flag exits 1; `pan memory retire <id>` removes the file and prints the git rm hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-search-facts-first",
+        "title": "Print matching facts before observations in pan memory search",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/cli/commands/memory-facts.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "sync-sources/skills/pan-memory/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-facts.test.ts tests/unit/lib/memory/target-search.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-facts.test.ts search cases and target-search.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W6: in memorySearchCommand, after the --target block (memory.ts:50) and before `let results`, call printMatchingFacts(query, { project: options.project }) when not --json. printMatchingFacts (in memory-facts.ts) never errors, prints at most 5 project and 5 operator matches under 'Project memory:' / 'Operator memory:'. The --json branch is untouched. Add one SKILL.md note line."
+        },
+        "items": [
+          {
+            "id": "w6-search-facts-first.ac1",
+            "title": "Given a matching project fact and one mocked observation hit, when `pan memory search <q>` runs, then stdout prints 'Project memory:' and the fact line before the first observation line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-search-facts-first.ac2",
+            "title": "Given the same inputs with --json, when search runs, then JSON.parse(stdout) equals exactly the mocked observation array (no fact output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-search-facts-first.ac3",
+            "title": "Given a cwd outside any registered project, when search runs, then it prints observation results without an error and without a 'Project memory:' block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-dirty-gate-carveout",
+        "title": "Treat .overdeck/memory/ as work product in the dirty-workspace gates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/__tests__/state-plane.test.ts",
+            "src/lib/work/__tests__/done-preflight.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/state-plane.test.ts src/lib/work/__tests__/done-preflight.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "state-plane.test.ts and done-preflight.test.ts pass",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ],
+          "foundationFor": [
+            "w13-autocommit-carveout",
+            "w14-closeout-carveout"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W12 and D17: add PROJECT_MEMORY_PATH and isProjectMemoryPath to state-plane.ts (stays a leaf) and make isOverdeckWorkspaceRuntimePath return false for it. No caller changes."
+        },
+        "items": [
+          {
+            "id": "w12-dirty-gate-carveout.ac1",
+            "title": "Given the path '.overdeck/memory/x.md' or the bare '.overdeck/memory', when isOverdeckWorkspaceRuntimePath runs, then it returns false, and for '.overdeck/continue.json' it still returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-dirty-gate-carveout.ac2",
+            "title": "Given porcelain '?? .overdeck/memory/x.md\\n?? .overdeck/continue.json', when filterUncommittedPorcelainLines runs, then it returns only the .overdeck/memory/x.md line, so pan done's preflight rejects the uncommitted fact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w13-autocommit-carveout",
+        "title": "Commit curated facts in the sync-main pre-sync auto-commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/auto-commit-excluded-paths.test.ts",
+            "src/lib/cloister/__tests__/merge-agent-auto-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/auto-commit-excluded-paths.test.ts src/lib/cloister/__tests__/merge-agent-auto-commit.test.ts tests/cloister/sync-main-pan-1819-regression.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three cloister auto-commit test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W13: isAutoCommitExcludedPath returns false for isProjectMemoryPath; the reset becomes `git reset HEAD -- ${resetPaths} ':(exclude)${PROJECT_MEMORY_PATH}'`. Keep '.overdeck/' in AUTO_COMMIT_EXCLUDED_PATHS and every existing test expectation."
+        },
+        "items": [
+          {
+            "id": "w13-autocommit-carveout.ac1",
+            "title": "Given a temp repo with .overdeck/memory/x.md, .overdeck/config.yaml and code.ts uncommitted, when autoCommitWorkspaceChangesBeforeSync runs, then `git show --name-only HEAD` lists .overdeck/memory/x.md and code.ts and not .overdeck/config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w13-autocommit-carveout.ac2",
+            "title": "Given '.overdeck/memory/x.md', when isAutoCommitExcludedPath runs, then it returns false, while '.overdeck/config.yaml' and '.overdeck/projects.yaml' still return true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w13-autocommit-carveout.ac3",
+            "title": "Given a temp repo without a .overdeck/memory directory, when autoCommitWorkspaceChangesBeforeSync runs, then it succeeds and commits the remaining non-excluded changes as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w14-closeout-carveout",
+        "title": "Count a branch that adds curated facts as unmerged in close-out",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/close-out.ts",
+            "tests/unit/lib/close-out-memory-facts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/close-out-memory-facts.test.ts tests/unit/lib/close-out-negative-cache.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "close-out-memory-facts.test.ts and close-out-negative-cache.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W14: isPipelineArtifactPath replaces the prefix check at close-out.ts:106; branchAddsMemoryFacts (git diff --name-only --diff-filter=AM main <ref> -- .overdeck/memory) gates both code-diff 'merged' shortcuts (lines 150 and 198). New test file uses a real temp git repo and stubs runGh."
+        },
+        "items": [
+          {
+            "id": "w14-closeout-carveout.ac1",
+            "title": "Given a branch whose only change versus main is .overdeck/memory/x.md, when isBranchMerged runs, then it returns status 'unmerged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w14-closeout-carveout.ac2",
+            "title": "Given a branch whose only change is .overdeck/continue.json, when isBranchMerged runs, then it returns status 'merged' as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w14-closeout-carveout.ac3",
+            "title": "Given a branch with a fact that was squash-merged so main holds the identical fact, when isBranchMerged runs, then it returns status 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-bundled-rule",
+        "title": "Add the project-memory universal rule and nomenclature routing row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/rules/project-memory.md",
+            "sync-sources/rules/context-nomenclature.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts tests/lib/context-layers/rules.test.ts"
+          ],
+          "expected_outputs": [
+            "agent-text-cli-verbs.test.ts and rules.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create sync-sources/rules/project-memory.md with the exact PRD W7 content (scope: universal) and add the memory row to the context-nomenclature.md table after the machine rule row. Do not run pan sync from the workspace."
+        },
+        "items": [
+          {
+            "id": "w7-bundled-rule.ac1",
+            "title": "Given the repo, when sync-sources/rules/project-memory.md is read, then its frontmatter is 'scope: universal' and its body names `pan memory add` and forbids writing ~/.claude/projects/*/memory/ in managed sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-bundled-rule.ac2",
+            "title": "Given context-nomenclature.md, when its placement table is read, then it contains a 'memory' row routing to `pan memory add` and <planHome>/.overdeck/memory/<id>.md, and agent-text-cli-verbs.test.ts accepts every pan verb the two files name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8a-user-docs",
+        "title": "Write the user-facing Project Memory page and link it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx",
+            "docs.json",
+            "configuration/context-layers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '\"configuration/memory\"' docs.json",
+            "grep -c 'git pull' configuration/memory.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "docs.json lists configuration/memory",
+            "memory.mdx mentions git pull at least once"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Write configuration/memory.mdx with the PRD W8 section list in order (What a fact is, Where facts live, How agents see them, Adding and curating facts, Search, Facts vs observation memory vs OKF, Previewing, Several machines). Add 'configuration/memory' after 'configuration/context-layers' in docs.json (line 121). Add the short Project memory subsection to configuration/context-layers.mdx. MDX rule: &#36; for dollars, &lt; before digits."
+        },
+        "items": [
+          {
+            "id": "w8a-user-docs.ac1",
+            "title": "Given configuration/memory.mdx, when read, then it contains the strings '.overdeck/memory/', '~/.overdeck/context/memory/', 'pan memory add', 'never injected', and 'git pull', and shows the D7 section text verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8a-user-docs.ac2",
+            "title": "Given docs.json, when its navigation is read, then 'configuration/memory' appears directly after 'configuration/context-layers'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8a-user-docs.ac3",
+            "title": "Given configuration/context-layers.mdx, when read, then it contains a Project memory subsection linking /configuration/memory that states memory renders after the project layer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8b-dev-docs",
+        "title": "Update developer docs and CLAUDE.md for curated facts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T22:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONTEXT-LAYERS.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'harness-native input' docs/CONTEXT-LAYERS.md",
+            "grep -c '.overdeck/memory' CLAUDE.md docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "expected_outputs": [
+            "CONTEXT-LAYERS.md count is 1",
+            "each of CLAUDE.md and WORKSPACES-AND-PROJECTS.md counts at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD W8's developer-doc edits: two inventory rows and the replaced sentence (lines 361-362) in docs/CONTEXT-LAYERS.md; the observation-vs-facts paragraph (with the D17 work-product note) at the top of 'Memory homes' (line 347) in docs/WORKSPACES-AND-PROJECTS.md; the one-line Key Invariants bullet in CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "w8b-dev-docs.ac1",
+            "title": "Given docs/CONTEXT-LAYERS.md, when read, then the Instruction source inventory table has 'Project memory' and 'Operator memory' rows and the old 'it is not a context-layer source' sentence is replaced by the 'harness-native input' sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8b-dev-docs.ac2",
+            "title": "Given docs/WORKSPACES-AND-PROJECTS.md, when 'Memory homes' is read, then its first paragraph distinguishes observation memory from curated facts and states .overdeck/memory/ is treated as work product",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8b-dev-docs.ac3",
+            "title": "Given CLAUDE.md, when 'Key Invariants' is read, then it contains the curated-facts bullet naming <planHome>/.overdeck/memory/<id>.md and `pan memory add`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-fact-store",
+        "to": "w2-index-renderer",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-index-renderer",
+        "to": "w3a-inject-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-index-renderer",
+        "to": "w3b-inject-muse",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-index-renderer",
+        "to": "w4-context-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-fact-store",
+        "to": "w5a-cli-read-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "w5a-cli-read-verbs",
+        "to": "w5b-cli-write-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "w5b-cli-write-verbs",
+        "to": "w6-search-facts-first",
+        "type": "blocks"
+      },
+      {
+        "from": "w5b-cli-write-verbs",
+        "to": "w7-bundled-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-dirty-gate-carveout",
+        "to": "w13-autocommit-carveout",
+        "type": "blocks"
+      },
+      {
+        "from": "w12-dirty-gate-carveout",
+        "to": "w14-closeout-carveout",
+        "type": "blocks"
+      },
+      {
+        "from": "w5a-cli-read-verbs",
+        "to": "w6-search-facts-first",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
