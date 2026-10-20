@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4558",
+  "created": "2026-10-20T02:56:44.706Z",
+  "updated": "2026-10-20T02:56:44.706Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-window-contract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4558",
+      "claimedAt": "2026-10-20T02:56:44.706Z"
+    }
+  }
+}
