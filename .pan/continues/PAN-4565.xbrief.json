@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4565",
+  "created": "2026-10-20T02:51:57.744Z",
+  "updated": "2026-10-20T02:51:57.744Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-fork-source-session": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T02:51:57.744Z"
+    }
+  }
+}
