@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4558",
   "created": "2026-10-20T02:56:44.706Z",
-  "updated": "2026-10-20T05:27:30.733Z",
+  "updated": "2026-10-20T05:27:45.785Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -358,6 +358,10 @@
     "wi17-export-and-simple-feed.ac3": {
       "status": "completed",
       "doneAt": "2026-10-20T05:27:30.733Z"
+    },
+    "wi18-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:27:45.784Z"
     }
   }
 }
