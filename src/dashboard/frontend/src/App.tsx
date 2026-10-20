@@ -1,15 +1,10 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
 import { fetchWithTimeout } from './lib/apiFetch';
 import { dashboardMutationJsonHeaders } from './lib/wsTransport';
-import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
-import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
-import { TerminalPermissionDialog } from './components/TerminalPermissionDialog';
-import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
-import { PlanApprovalDialog } from './components/PlanApprovalDialog';
 import { EventRouter } from './components/EventRouter';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
@@ -30,8 +25,8 @@ import { XBriefFullscreen } from './components/xbrief';
 
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
-import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgents, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { Issue } from './types';
+import { useDashboardStore, selectDashboardLifecycle } from './lib/store';
 import { useConnectionState } from './lib/connectionState';
 import { usePanesStore } from './lib/panesStore';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
@@ -70,9 +65,7 @@ import {
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
 import { useUiMode } from './lib/simple/uiMode';
-import { isRunningAgentStatus } from './components/AgentPillPopoverRow';
-import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
-import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
+import { AppLiveStoreHost, countRunningAgents } from './App/AppLiveStoreHost';
 
 export {
   buildConversationUrl,
@@ -227,7 +220,6 @@ export default function App() {
 
 
   const queryClient = useQueryClient();
-  const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
 
   const handleNewProject = useCallback(() => useAddProjectDialog.getState().show(), []);
 
@@ -247,20 +239,6 @@ export default function App() {
     usePanesStore.getState().ensureHome(project.key);
     requestLauncherFocusAfterCreate(target.tab, project.key);
   }, [queryClient, setConversationRoute]);
-  const seenWorkspaceActivityIds = useRef(new Set<string>());
-
-  useEffect(() => {
-    for (const entry of recentActivity.slice(0, 10)) {
-      const id = typeof entry['id'] === 'string' ? entry['id'] : null;
-      const issueId = typeof entry['issueId'] === 'string' ? entry['issueId'] : null;
-      const message = typeof entry['message'] === 'string' ? entry['message'] : '';
-      if (!id || !issueId || seenWorkspaceActivityIds.current.has(id)) continue;
-      if (!/^Rebuild stack for\b/.test(message)) continue;
-      seenWorkspaceActivityIds.current.add(id);
-      void queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-    }
-  }, [queryClient, recentActivity]);
-
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -628,38 +606,9 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [syncDrawerFromUrl, applyIssueRoute]);
 
-  // Agents from Zustand store (event-sourced — no polling)
-  // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
-  // Live agent count for the app-bar status pill (PAN-1591).
-  const runningAgentCount = useMemo(
-    () => agents.filter((agent) => isRunningAgentStatus(agent.status)).length,
-    [agents],
-  );
-  // Issues from Zustand store (event-sourced via snapshot — no polling)
-  const issues = useDashboardStore(selectIssues) as unknown as Issue[];
-  const {
-    currentChannelPermissionRequest,
-    currentChannelPermissionIssueId,
-    isChannelPermissionSubmitting,
-    handleAllowChannelPermission,
-    handleDenyChannelPermission,
-    terminalPermissionDialog,
-    currentAskUserQuestionSubject,
-    isAskUserQuestionSubmitting,
-    handleSubmitAskUserQuestion,
-    handleDismissAskUserQuestion,
-    currentPlanApprovalSubject,
-    isPlanActionSubmitting,
-    handleApprovePlan,
-    handleRequestPlanChanges,
-    handleDismissPlanApproval,
-    currentConfirmation,
-    handleConfirm,
-    handleDeny,
-    handleCloseConfirmation,
-  } = usePendingInputDialogs({ agents, issues });
-  useDesktopActivityNotifications();
+  // PAN-4560: App subscribes to no agent, issue or activity slice — those
+  // consumers live in AppLiveStoreHost. The running count is a number.
+  const runningAgentCount = useDashboardStore((s) => countRunningAgents(s.agentsById));
 
   // PAN-1234: global 'g' chord state for lens navigation (g p, g b, g a, g c).
   const chordRef = useRef<{ prefix: string | null; timer: ReturnType<typeof setTimeout> | null }>({ prefix: null, timer: null });
@@ -792,21 +741,21 @@ export default function App() {
     staleTime: 60_000,
   });
   const resolveDeckKey = useCallback((issueId: string): string | null => {
-    const issue = issues.find((i) => i.identifier === issueId);
+    const issue = (useDashboardStore.getState().issuesRaw as Issue[]).find((i) => i.identifier === issueId);
     const repo = issue?.sourceRepo || issue?.project?.name || '';
     const repoName = repo.includes('/') ? repo.split('/').pop()! : repo;
     const rp = registeredProjects.find(
       (p) => p.key === repoName || p.name === repoName || p.key === repo || p.name === repo,
     );
     return rp ? (rp.name ?? rp.key) : (selectedProjectKey ?? null);
-  }, [issues, registeredProjects, selectedProjectKey]);
+  }, [registeredProjects, selectedProjectKey]);
 
   // PAN-2005: three ways to open an issue from the backlog detail drawer.
   //   browser → the tracker (GitHub) issue page in a new tab
   //   modal   → the right-side issue overlay (IssueDrawer; already URL-synced via ?issue=)
   //   panel   → the full cockpit tab in the project's deck (deep-linked /command-deck/<proj>/<issue>)
   const handleBacklogIssueAction = useCallback((issueId: string, mode: 'browser' | 'modal' | 'panel') => {
-    const issue = issues.find((i) => i.identifier === issueId);
+    const issue = (useDashboardStore.getState().issuesRaw as Issue[]).find((i) => i.identifier === issueId);
     if (mode === 'browser') {
       // Prefer the tracker's canonical URL; fall back to deriving from the
       // project's owner/repo (project.name is "owner/repo" for GitHub projects).
@@ -833,7 +782,7 @@ export default function App() {
     setActiveTab('command-deck');
     setCockpitRouteState({ project: projectKey, issue: issueId });
     onCockpitChange(projectKey, issueId);
-  }, [issues, openIssue, resolveDeckKey, setActiveTab, onCockpitChange]);
+  }, [openIssue, resolveDeckKey, setActiveTab, onCockpitChange]);
 
   const handleOpenWorkspaceHome = useCallback((issueId: string) => {
     setActiveTab('kanban');
@@ -891,7 +840,6 @@ export default function App() {
         >
           <AppRoutes
             activeTab={activeTab}
-            issues={issues}
             selectedConvId={selectedConvId}
             conversationViewMode={conversationViewMode}
             selectedProjectKey={selectedProjectKey}
@@ -943,45 +891,7 @@ export default function App() {
         onClose={() => setIsUpdateDialogOpen(false)}
       />
 
-      <ChannelPermissionDialog
-        request={currentChannelPermissionRequest}
-        issueId={currentChannelPermissionIssueId}
-        isOpen={!!currentChannelPermissionRequest}
-        isSubmitting={isChannelPermissionSubmitting}
-        onAllow={handleAllowChannelPermission}
-        onDeny={handleDenyChannelPermission}
-      />
-      <TerminalPermissionDialog {...terminalPermissionDialog} />
-
-      {/* PAN-1520 — AskUserQuestion interactive dialog (covers both work
-          agents and conversation sessions — same modal, same code path). */}
-      <AskUserQuestionDialog
-        subject={currentAskUserQuestionSubject}
-        isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
-        isSubmitting={isAskUserQuestionSubmitting}
-        onSubmit={handleSubmitAskUserQuestion}
-        onDismiss={handleDismissAskUserQuestion}
-      />
-
-      {/* PAN-1520 (FR-3) — plan-approval popup modal. Priority: permission
-          modal > AUQ dialog > plan dialog (extends the existing exclusion). */}
-      <PlanApprovalDialog
-        subject={currentPlanApprovalSubject}
-        isOpen={!!currentPlanApprovalSubject && !currentChannelPermissionRequest && !currentAskUserQuestionSubject}
-        isSubmitting={isPlanActionSubmitting}
-        onApprove={handleApprovePlan}
-        onRequestChanges={handleRequestPlanChanges}
-        onDismiss={handleDismissPlanApproval}
-      />
-
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
-        request={currentConfirmation}
-        isOpen={!!currentConfirmation}
-        onConfirm={handleConfirm}
-        onDeny={handleDeny}
-        onClose={handleCloseConfirmation}
-      />
+      <AppLiveStoreHost />
 
       {/* Search Modal */}
       <SearchModal

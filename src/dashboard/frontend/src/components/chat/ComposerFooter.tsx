@@ -10,7 +10,7 @@
  *   └───────────────────────────────────────┘
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { memo, useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
@@ -954,7 +954,9 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
   );
 }
 
-export function ComposerFooter(props: ComposerFooterProps) {
+// PAN-4560: memoized so a streamed delta, which re-renders the conversation
+// panel, does not re-render the composer toolbar while its props are stable.
+export const ComposerFooter = memo(function ComposerFooter(props: ComposerFooterProps) {
   if (props.conversation.origin === 'vault') return <VaultReadOnlyNotice conversation={props.conversation} />;
   const continuity = props.conversation.vaultContinuity;
   if (continuity) {
@@ -966,7 +968,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
     );
   }
   return <ComposerFooterWithHandoff {...props} />;
-}
+});
 
 /** PAN-4455 D-15/D-16: the hand-off notice, only when PAN-4447's continuity notice does not apply. */
 function ComposerFooterWithHandoff(props: ComposerFooterProps) {

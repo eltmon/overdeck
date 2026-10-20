@@ -17,7 +17,7 @@ import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ConversationResumeControls } from './ConversationResumeControls';
-import { toContextWindowSnapshot } from '../../lib/contextWindow';
+import { useStableComposerProps } from './useStableComposerProps';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
@@ -1264,13 +1264,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     serverMessageIds: serverMessages.map((message) => message.id),
     onSendFailed: onSendFailedProp,
   });
-  // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
-  // t3code's placement). The snapshot adapter normalizes the server's
-  // `ContextUsage` shape into t3code's `ContextWindowSnapshot` so future
-  // upstream changes port cleanly.
-  const contextWindowUsage = toContextWindowSnapshot(
-    data?.contextUsage ?? conversation.contextUsage ?? null,
-  );
+  const { onSend: handleMessageSent, contextWindowUsage } = useStableComposerProps({ conversation, data, serverMessages, addOptimistic });
 
   const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
@@ -1281,12 +1275,6 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     () => (agentId ? null : inputTargetNotice(conversation.inputTarget)),
     [agentId, conversation.inputTarget],
   );
-
-  const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
-    addOptimistic(conversation.name, text, serverMessages.length, {
-      clientMessageId, echoBaselineIds: serverMessages.map((message) => message.id),
-    });
-  }, [addOptimistic, conversation.name, serverMessages]);
 
   const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
     acknowledgeOptimistic(conversation.name, text, clientMessageId);

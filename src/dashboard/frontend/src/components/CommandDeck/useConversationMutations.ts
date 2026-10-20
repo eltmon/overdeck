@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
@@ -282,8 +282,11 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
+  // Depends on the stable `.mutate`, not the mutation result object, which
+  // TanStack rebuilds every render (PAN-4560).
+  const summaryForkMutate = summaryForkMutation.mutate;
   const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', projectKey?: string, handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean; fresh?: boolean }) => {
-    summaryForkMutation.mutate({
+    summaryForkMutate({
       conv,
       model: launchModel,
       summaryModel,
@@ -303,33 +306,44 @@ export function useConversationMutations(
     setForkTarget(null);
     setForkTargetMode(undefined);
     setForkTargetFocus(undefined);
-  }, [summaryForkMutation]);
+  }, [summaryForkMutate]);
 
-  // retitleVersion is referenced so isRetitlePending re-evaluates after pending changes.
-  void retitleVersion;
-
-  return {
-    archive: (name) => archiveMutation.mutate(name),
-    stop: (name) => { if (!stopMutation.isPending) stopMutation.mutate(name); },
-    rename: (opts) => renameMutation.mutate(opts),
+  // PAN-4560: one object per meaningful change, so the memoized conversation
+  // list items do not all re-render on every list render. TanStack keeps each
+  // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
+  // re-evaluates after pending changes.
+  const archiveMutate = archiveMutation.mutate;
+  const stopMutate = stopMutation.mutate;
+  const stopIsPending = stopMutation.isPending;
+  const renameMutate = renameMutation.mutate;
+  const retitleMutate = retitleMutation.mutate;
+  const favoriteMutate = favoriteMutation.mutate;
+  const moveMutate = moveMutation.mutate;
+  const linkPullRequestMutate = linkPullRequestMutation.mutate;
+  const unlinkPullRequestMutate = unlinkPullRequestMutation.mutate;
+  const isForkPending = summaryForkMutation.isPending;
+  return useMemo<ConversationMutations>(() => ({
+    archive: (name) => archiveMutate(name),
+    stop: (name) => { if (!stopIsPending) stopMutate(name); },
+    rename: (opts) => renameMutate(opts),
     retitle: (name) => {
       if (pendingRetitleNamesRef.current.has(name)) return;
-      retitleMutation.mutate(name);
+      retitleMutate(name);
     },
     isRetitlePending: (name) => pendingRetitleNamesRef.current.has(name),
     toggleFavorite: (opts) => {
       if (pendingFavoriteNamesRef.current.has(opts.name)) return;
-      favoriteMutation.mutate(opts);
+      favoriteMutate(opts);
     },
-    move: (opts) => moveMutation.mutate(opts),
-    linkPullRequest: (opts) => linkPullRequestMutation.mutate(opts),
-    unlinkPullRequest: (opts) => unlinkPullRequestMutation.mutate(opts),
+    move: (opts) => moveMutate(opts),
+    linkPullRequest: (opts) => linkPullRequestMutate(opts),
+    unlinkPullRequest: (opts) => unlinkPullRequestMutate(opts),
     openForkModal,
     submitFork,
     forkTarget,
     forkTargetMode,
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
-    isForkPending: summaryForkMutation.isPending,
-  };
+    isForkPending,
+  }), [archiveMutate, stopMutate, stopIsPending, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
 }

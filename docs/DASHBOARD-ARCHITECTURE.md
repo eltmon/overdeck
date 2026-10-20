@@ -548,6 +548,42 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Render discipline (PAN-4560)
+
+The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` call re-renders its component whenever the selector's result is not `Object.is`-equal to the last one, after any store `set()`. Domain events arrive in 16 ms batches and a Claude Code agent produces at least two runtime events per tool call, so a selector that returns a new value on every call re-renders its component many times a second. The Command Deck route follows these rules.
+
+- **Select the field, not the slice.** A row, the `App` shell and `CommandDeck` never subscribe to `selectAgents` or `selectIssues`. They select one entry (`useIssueActions` selects its issue row and its active agent), a primitive (`App` selects `countRunningAgents(agentsById)`, a number; `useAgentSetInvalidation` selects the agent-id signature, a string), or a derived map kept stable by `useShallow` (`CommandDeck/agentIdsByIssueKey.ts`, the issue-title map in `usePendingInputDialogs`).
+- **A selector that builds an array or object keeps identity.** Use `memoizeArraySelector`, `deriveMemo`, a per-key cache like the one in `selectBackendPanes` (the last result per issue, returned while that issue's panes are the same objects in the same order), or `useShallow`. Never write `?? []` inline in a selector; use a module-level empty constant.
+- **Reducers change only the slice and entry an event is about.** Runtime events (`agent.activity_changed`, `agent.thinking_*`, `agent.message_received` and the rest) write `agentRuntimeById` only and leave `agentsById` untouched.
+- **Click handlers read the store at call time.** A component that needs a slice only to look something up when the operator clicks reads `useDashboardStore.getState()` inside the handler instead of subscribing.
+- **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions.
+- **Live-store consumers of the shell live in `AppLiveStoreHost`.** The pending-input dialogs, desktop activity notifications and the "Rebuild stack for" workspace invalidation follow agent, issue and activity changes. They render in `App/AppLiveStoreHost.tsx`, a sibling of the routed tree, so those changes do not re-render `App` and everything below it.
+- **Aggregate chrome is the exception.** `RunningAgentsPill`, `StoppedAgentsBanner`, `SystemHealthPill`, `DecisionsIndicator`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
+- **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
+
+**Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through the root `test:frontend-subset` script:
+
+- `src/lib/__tests__/selectBackendPanes.render-count.test.tsx`
+- `src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx`
+- `src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx`
+- `src/App/AppLiveStoreHost.render-count.test.tsx`
+- `src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx`
+- `src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx`
+- `src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx`
+- `src/test-utils/renderCounter.test.tsx` (the harness itself)
+
+A test fails when a subtree re-renders more than it should. To count renders of a memoized component, count inside it (for example through a hook it calls on every render, as the composer test does with `useHandoffNotice`), because a `Profiler` wrapped around a memoized child also fires when the wrapper re-renders.
+
+**Profiling.** A profiling build measures which components commit, how often, and their self render time, against the live dashboard:
+
+```bash
+npm --prefix src/dashboard/frontend run build:profile     # writes .tmp/dashboard-profile, aliases react-dom to react-dom/profiling
+npm --prefix src/dashboard/frontend run preview:profile   # serves it on :3010 (port must be free), proxied to the dashboard on :3011
+cd src/dashboard/frontend && PROFILE_LABEL=baseline npx playwright test tests/profiling/render-profile.spec.ts
+```
+
+The spec installs a bippy-based probe (`tests/profiling/render-probe.ts`) before React loads and runs four scenarios: a streaming conversation (40 synthetic deltas through the profile-only `window.__overdeckQueryClient`), a domain-event burst with no conversation open (20 batches applied through `window.useDashboardStore`, each carrying the store's current sequence so replay is unaffected), composer typing, and 65 s of idle tickers. S2 and S4 open the project home `/command-deck/<PROFILE_PROJECT>` (default `overdeck`), because a bare `/command-deck` auto-selects the first conversation. It is read-only: it never clicks a control that changes server state. Results go to `.tmp/pan-4560-profile/<label>.json` and `<label>.md`; each scenario table starts with the watched surfaces, then the top 15 components by updates.
+
 ## Diff compare and ignore-whitespace (PAN-4503)
 
 The diff panel can compare any two refs of a local repository, with no remote

@@ -53,6 +53,12 @@ const queryClient = new QueryClient({
   },
 });
 
+// PAN-4560: the render profiler applies synthetic stream deltas through the
+// query cache. Vite replaces MODE at build time, so normal builds drop this.
+if (import.meta.env.MODE === 'profile') {
+  (window as unknown as { __overdeckQueryClient?: QueryClient }).__overdeckQueryClient = queryClient;
+}
+
 // PAN-3527: the deck's project and conversation lists retry with backoff and
 // refetch when the RPC websocket reconnects, instead of latching empty.
 installQueryRecovery(queryClient);
