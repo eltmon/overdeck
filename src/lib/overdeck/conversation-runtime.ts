@@ -35,7 +35,7 @@ import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDi
 import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import { cpuClassForConversation } from '../terminal-backends/cpu-class.js';
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
-import type { AgentRole } from '@overdeck/contracts';
+import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
@@ -63,7 +63,6 @@ import { waitForClaudeReady } from './claude-readiness.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { reapPrimeAgentDaemon } from '../prime-agent/daemon.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
-import { hostTransportFor } from '../runtimes/host-transport.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
@@ -262,7 +261,7 @@ export function shouldReportUnresolvedLiveSession(
   conv: Pick<Conversation, 'status' | 'harness'> | null | undefined,
 ): boolean {
   if (!conv || conv.status !== 'active') return false;
-  return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
+  return getHarnessBehavior(conv.harness).sessionIdSource === 'launcher-session-id';
 }
 export function conversationSessionAliveFromState(
   conv: Pick<Conversation, 'status' | 'forkStatus'>,
@@ -298,7 +297,7 @@ export function shouldUseSupervisorForConversation(
   harness: RuntimeName,
   options: { codexTransport?: 'app-server' | 'tui' } = {},
 ): boolean {
-  if (harness === 'codex' && options.codexTransport === 'app-server') return false;
+  if (options.codexTransport === 'app-server') return false;
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 /**
@@ -317,38 +316,40 @@ export function conversationUsesSupervisor(
   return backend === 'tmux' || detectionPolicyFor(harness) !== 'required';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
-  if (harness === 'muse') {
-    if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
-    return;
-  }
-  const hostTransport = hostTransportFor(harness);
-  if (hostTransport) {
-    // The conversation liveness door, not the agent oracle.
-    await waitForHostReady(tmuxSession, hostTransport, hostTransport === 'acp' ? 30 : 60, { sessionExists: tmuxSessionExists });
-    return;
-  }
-  const transcriptKind = getHarnessBehavior(harness).transcriptKind;
-  if (transcriptKind === 'ohmypi-jsonl') {
-    const ready = await waitForPiTuiReady(tmuxSession);
-    if (!ready) {
-      throw new Error(
-        `Pi (ohmypi) did not become interactive in ${tmuxSession} within the startup window — MCP server connections are likely still in progress. Retry once MCP servers finish connecting, or check ~/.claude/mcp.json for a slow/hanging server.`,
-      );
+  const kind = getHarnessBehavior(harness).readinessKind;
+  switch (kind) {
+    case 'muse-tui-prompt':
+      if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
+      return;
+    // Host-backed harnesses use the conversation liveness door, not the agent oracle.
+    case 'acp-host-ready':
+      await waitForHostReady(tmuxSession, 'acp', 30, { sessionExists: tmuxSessionExists });
+      return;
+    case 'prime-agent-host-ready':
+      await waitForHostReady(tmuxSession, 'prime-agent', 60, { sessionExists: tmuxSessionExists });
+      return;
+    case 'ohmypi-ready-file':
+      if (!await waitForPiTuiReady(tmuxSession)) throw new Error(`Pi (ohmypi) did not become interactive in ${tmuxSession} within the startup window — MCP server connections are likely still in progress. Retry once MCP servers finish connecting, or check ~/.claude/mcp.json for a slow/hanging server.`);
+      return;
+    case 'kimi-session-signal':
+      // PAN-1837: the native kimi binary never prints Claude Code's ready markers, so wait on its own prompt.
+      if (!await waitForPromptReady(tmuxSession, harness, 30)) throw new Error(`Kimi Code did not become interactive in ${tmuxSession} within the startup window.`);
+      return;
+    case 'codex-tui-prompt':
+    case 'codex-app-server-ready':
+      return;
+    case 'claude-session-signal':
+      if (mode === 'respawn') await waitForReadySignal(tmuxSession, 30);
+      else {
+        await waitForClaudeReady(tmuxSession);
+        console.log(`[conversations] Claude ready in ${tmuxSession}`);
+      }
+      return;
+    default: {
+      const unreachable: never = kind;
+      throw new Error(`unknown readiness kind ${String(unreachable)}`);
     }
   }
-  else if (transcriptKind === 'kimi-wire-jsonl') {
-    // PAN-1837 review fix: this readiness dispatcher had no Kimi branch, so it
-    // fell through to waitForClaudeReady() and waited for Claude Code's own
-    // ready markers, which the native kimi binary never produces.
-    const ready = await waitForPromptReady(tmuxSession, 'kimi-code', 30);
-    if (!ready) {
-      throw new Error(`Kimi Code did not become interactive in ${tmuxSession} within the startup window.`);
-    }
-  }
-  else if (transcriptKind !== 'codex-rollout-jsonl' && mode === 'spawn') {
-    await waitForClaudeReady(tmuxSession);
-    console.log(`[conversations] Claude ready in ${tmuxSession}`);
-  } else if (transcriptKind !== 'codex-rollout-jsonl') await waitForReadySignal(tmuxSession, 30);
 }
 export async function handleConversationSwitchModel(
   name: string,
@@ -364,8 +365,8 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse' || requestedHarness === 'prime-agent') {
-    const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
+  const requestedRuntime = normalizeHarnessName(requestedHarness);
+  if (requestedRuntime) {
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
       const decision = canUseHarness(
@@ -598,8 +599,8 @@ export async function spawnConversationSession(
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
   let primeLaunch: Awaited<ReturnType<typeof getPrimeAgentLauncherFields>> | undefined;
-  const museSavedSession = harness === 'muse' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
-  const museFields = harness === 'muse' ? {
+  const museSavedSession = behavior.launchCommandKind === 'muse-tui' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
+  const museFields = behavior.launchCommandKind === 'muse-tui' ? {
     harness: 'muse' as const,
     museModel: model,
     museEffort: launchEffort,
@@ -641,7 +642,7 @@ export async function spawnConversationSession(
     // Map permissions through the canonical helper; Claude rejects the literal `auto` flag.
     runtimeCommand = ensureClaudePermissionFlag(runtimeCommand);
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
-    if (behavior.transcriptKind === 'ohmypi-jsonl') {
+    if (behavior.launchCommandKind === 'ohmypi-rpc') {
       if (getProviderForModel(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
