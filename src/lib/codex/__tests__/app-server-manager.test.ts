@@ -756,3 +756,17 @@ describe('CodexAppServerManager lastTurnStatus (PAN-4563)', () => {
     manager.stop();
   });
 });
+
+describe('CodexAppServerManager answerUserInput (PAN-4563)', () => {
+  it('wraps each answer list in the ToolRequestUserInputAnswer shape', async () => {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+    await manager.start();
+    manager.answerUserInput(7, { color: ['red'] });
+    await vi.waitFor(() => expect(fake.messages).toHaveLength(3));
+    expect(fake.messages[2]).toEqual({ id: 7, result: { answers: { color: { answers: ['red'] } } } });
+    manager.stop();
+  });
+});

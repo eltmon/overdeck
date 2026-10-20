@@ -330,7 +330,9 @@ export class CodexAppServerManager extends EventEmitter {
   }
 
   answerUserInput(id: number | string, answers: Record<string, string[]>): void {
-    this.write({ id, result: { answers } });
+    // ToolRequestUserInputResponse: each answer is { answers: string[] }.
+    const wrapped = Object.fromEntries(Object.entries(answers).map(([questionId, values]) => [questionId, { answers: values }]));
+    this.write({ id, result: { answers: wrapped } });
   }
 
   request<T = unknown>(method: string, params: unknown, timeoutMs = this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS): Promise<T> {
