@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T04:04:24.339Z",
+  "updated": "2026-10-20T04:08:42.029Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-10-20T04:04:15.810Z"
     },
     "cockpit-agent-isolation": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4560",
-      "claimedAt": "2026-10-20T04:04:24.339Z"
+      "claimedAt": "2026-10-20T04:04:24.339Z",
+      "doneAt": "2026-10-20T04:08:42.029Z"
     }
   }
 }
