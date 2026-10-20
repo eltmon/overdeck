@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CLAUDE_CODE_CAPABILITIES } from '@overdeck/contracts';
 
 const mocks = vi.hoisted(() => ({
   compact: vi.fn(),
@@ -112,6 +113,7 @@ beforeEach(() => {
   mocks.getHarnessBehavior.mockReturnValue({
     injectsPromptTimeMemory: false,
     transcriptKind: 'claude-jsonl',
+    capabilities: CLAUDE_CODE_CAPABILITIES,
   });
 });
 

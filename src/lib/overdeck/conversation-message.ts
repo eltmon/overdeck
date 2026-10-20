@@ -364,7 +364,7 @@ export async function handleConversationImageDelete(
 }
 
 export function transformMessageForHarness(message: string, harness: RuntimeName, attachmentPaths: string[]): string {
-  if (getHarnessBehavior(harness).transcriptKind === 'claude-jsonl') return message;
+  if (getHarnessBehavior(harness).capabilities.attachmentDelivery === 'native') return message;
   if (attachmentPaths.length === 0) return message;
 
   let userText = message;
@@ -461,7 +461,7 @@ export async function handleConversationMessage(
   }
 
   const interceptManualCompact = deps.shouldInterceptManualCompact ?? shouldInterceptManualCompact;
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && interceptManualCompact(message)) {
+  if (getHarnessBehavior(conv.harness).capabilities.nativeManualCompact && interceptManualCompact(message)) {
     const compactSessionFile = await deps.resolveSessionFile(conv);
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
@@ -551,7 +551,7 @@ export async function handleConversationMessage(
       deliverAs: pickDeliverAs(body['deliverAs']),
     });
   } else {
-    if (harness === 'claude-code') {
+    if (behavior.capabilities.paneInputGuard) {
       // PAN-4278: never paste into a permission prompt. Checked BEFORE
       // ensure-main, whose Down/Enter would move the menu cursor and answer it.
       // Only a prompt on the pane holds the message — a stale hook entry alone
@@ -581,7 +581,7 @@ export async function handleConversationMessage(
     }
 
     let watchFromByteOffset: number | null = null;
-    if (behavior.transcriptKind === 'claude-jsonl' && conv.claudeSessionId) {
+    if (behavior.capabilities.transcriptDeliveryReceipt && conv.claudeSessionId) {
       const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
       watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
     }
@@ -591,7 +591,7 @@ export async function handleConversationMessage(
     try {
       const method = resolveConversationDeliveryMethod(conv);
       // PAN-4185: a bare Kimi conversation gets the operator's text without the context envelope.
-      if (harness === 'kimi-code' && !conv.bareContext) {
+      if (behavior.capabilities.contextChannel === 'initial-message-envelope' && !conv.bareContext) {
         // The composer enables the moment the tmux session exists, but the
         // spawn path may still be diffing Kimi's session bucket to capture the
         // session id (up to 60s). Wait for the pointer file — bounded under the
@@ -673,7 +673,7 @@ export async function handleConversationMessage(
   return jsonResponse({
     ok: true,
     ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}),
-    ...(harness === 'claude-code' ? { inputTarget: 'main' } : {}),
+    ...(behavior.capabilities.paneInputGuard ? { inputTarget: 'main' } : {}),
     ...(switchedFromSubagent ? { switchedFromSubagent } : {}),
     ...(steerDegraded ? { steerDegraded } : {}),
   });
