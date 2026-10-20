@@ -43,7 +43,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
-import { buildMessagesQueryFn, fetchMessages, type MessagesResponse } from './messagesQuery';
+import { buildMessagesQueryFn, fetchFullTranscript, type MessagesResponse } from './messagesQuery';
 import { useOlderHistory } from './useOlderHistory';
 import { ToolBodyLoaderContext, toolBodyLoaderFor } from './messagesTimeline/toolBodyLoader';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
@@ -579,8 +579,15 @@ export function ConversationPanel({
     }
   }, [conversation.name, queryClient, onArchived]);
 
-  const handleExportTranscript = useCallback(() => {
-    const messages = messagesData?.messages ?? [];
+  const handleExportTranscript = useCallback(async () => {
+    // PAN-4558: the panel holds a window; export reads the whole transcript.
+    let messages: MessagesResponse['messages'];
+    try {
+      messages = (await fetchFullTranscript(conversation.name, agentId)).messages;
+    } catch {
+      toast.error('Failed to export transcript');
+      return;
+    }
     if (messages.length === 0) {
       toast.error('No messages to export yet');
       return;
@@ -599,7 +606,7 @@ export function ConversationPanel({
     a.remove();
     URL.revokeObjectURL(url);
     toast.success('Transcript exported');
-  }, [messagesData, conversation.title, conversation.name]);
+  }, [agentId, conversation.title, conversation.name]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
     if (mode === 'terminal') markTerminalClick(conversation.name);
@@ -900,7 +907,7 @@ export function ConversationPanel({
                         </MenuItemButton>
                       )}
                       <MenuItemButton
-                        onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
+                        onClick={() => { void handleExportTranscript(); setMenuOpen(false); }}
                       >
                         <Download size={14} />
                         Export transcript
@@ -1114,8 +1121,6 @@ export function ConversationPanel({
 }
 
 // ─── ConversationView ─────────────────────────────────────────────────────────
-
-export { fetchMessages };
 
 interface ConversationViewProps {
   conversation: Conversation;

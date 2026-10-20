@@ -55,6 +55,19 @@ export async function fetchMessages(name: string, signal?: AbortSignal, agentId?
 }
 
 /**
+ * PAN-4558 FR-16: the whole transcript, unwindowed and unprojected, for export.
+ * Agent panels read the agents route without params, which stays full.
+ */
+export async function fetchFullTranscript(name: string, agentId?: string): Promise<MessagesResponse> {
+  const path = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+    : `/api/conversations/${encodeURIComponent(name)}/messages?window=all`;
+  const res = await fetchWithTimeout(path);
+  if (!res.ok) throw new Error('Failed to fetch transcript');
+  return res.json();
+}
+
+/**
  * PAN-4558: fold an HTTP read into the cache with the same cursor-aware merge
  * as WS snapshots, so a poll or fallback read never drops paged-in older rows
  * or rows a stream delta delivered while the read was in flight.

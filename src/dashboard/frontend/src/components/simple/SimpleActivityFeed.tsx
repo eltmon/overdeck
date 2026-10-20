@@ -22,7 +22,7 @@ import {
   conversationMessagesQueryKey,
   useConversationMessagesStream,
 } from '../chat/useConversationMessagesStream';
-import { fetchMessages } from '../chat/ConversationPanel';
+import { fetchMessages, mergeFetchedMessages } from '../chat/messagesQuery';
 import { ChatMarkdown } from '../chat/ChatMarkdown';
 import { buildSimpleFeedEntries, type SimpleFeedEntry } from '../../lib/simple/feedEntries';
 import { getPendingToolEntry, getPhaseLabel, getWorkingPhase } from '../../lib/workingPhase';
@@ -55,11 +55,8 @@ export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state,
     queryKey,
     queryFn: async ({ signal }) => {
       const fetched = await fetchMessages(conversation.name, signal, agent.id);
-      if (streamEnabled) {
-        const cached = queryClient.getQueryData<typeof fetched>(queryKey);
-        if (cached && cached.messages.length >= fetched.messages.length) return cached;
-      }
-      return fetched;
+      // PAN-4558: merge by cursor so a poll never drops rows the stream or a page delivered.
+      return mergeFetchedMessages(queryClient.getQueryData<typeof fetched>(queryKey), fetched);
     },
     enabled: !streamEnabled,
     refetchInterval: streamEnabled ? false : live ? 2000 : false,
@@ -69,8 +66,8 @@ export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state,
   const workLog = useMemo(() => messagesData?.workLog ?? [], [messagesData]);
 
   const entries = useMemo(
-    () => buildSimpleFeedEntries({ messages, workLog, issueTitle: issue.title }),
-    [messages, workLog, issue.title],
+    () => buildSimpleFeedEntries({ messages, workLog, issueTitle: issue.title, hasOlder: messagesData?.history?.hasOlder }),
+    [messages, workLog, issue.title, messagesData?.history?.hasOlder],
   );
 
   // Auto-follow: stick to the newest entry only while the viewer is at the bottom.
