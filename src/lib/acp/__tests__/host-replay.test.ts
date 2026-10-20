@@ -13,7 +13,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { frameKind, PROTOCOL_CAPTURE_FORMAT, type ProtocolFixture, type ProtocolFrame } from "../../protocol-capture/fixture.js";
 import { ACP_TRANSCRIPT_FILE } from "../../runtimes/storage/acp.js";
@@ -159,6 +159,55 @@ describe("kimi acp case: turn completion", () => {
     await host.stop();
     active = undefined;
     await replay.done;
+    expect(replay.unmatchedClientLines()).toEqual([]);
+  });
+});
+
+describe("kimi acp case: interrupt", () => {
+  it("ends the turn cancelled once, with no failure record", async () => {
+    const { host, replay, lines } = await start("kimi-interrupt");
+    const facts = promptFacts(replay.fixture);
+    const promptSeq = facts.frames[facts.promptIndex]!.seq;
+    // The first client frame after the prompt is what the interrupt produces
+    // (effect-rpc's interrupt for the prompt request, then session/cancel).
+    const firstAfterPrompt = facts.frames.find((frame) => frame.dir === "out" && frame.seq > promptSeq);
+    expect(firstAfterPrompt, "re-check the ACP interrupt case: no client frame after the prompt").toBeDefined();
+    const cancelIndex = facts.frames.findIndex((frame) => frame.dir === "out" && frame.message?.method === "session/cancel");
+    expect(cancelIndex, "re-check the ACP interrupt case: no session/cancel recorded").toBeGreaterThan(facts.promptIndex);
+
+    await host.start();
+    const awaitingInterrupt = replay.awaitingClient({ dir: "out", where: (frame) => frame.seq === firstAfterPrompt!.seq });
+    expect(await host.handleOp({ op: "message", content: String(replay.fixture.header.hostOptions?.prompt) }))
+      .toMatchObject({ status: 202 });
+    await awaitingInterrupt;
+    // The recorder interrupted on the first [assistant] pane line; do the same.
+    await vi.waitFor(() => expect(lines.some((line) => line.startsWith("[assistant]"))).toBe(true));
+    expect(await host.handleOp({ op: "interrupt" })).toMatchObject({ status: 200 });
+    await host.waitForIdle();
+    await replay.done;
+    // done means every frame was delivered, not that the host has written it yet.
+    const assistantText = (entries: TranscriptRecord[]) => entries.filter((entry) => entry.role === "assistant").map((entry) => entry.content).join("");
+    const visible = (text: string) => text.replace(/\s+/g, "");
+    const recordedText = visible(facts.chunkText(facts.promptIndex, facts.frames.length));
+    // Every visible chunk lands. The cancel closes the assistant segment, and
+    // session-events.ts drops a whitespace-only chunk that would open a new one,
+    // so whitespace is compared loosely.
+    await vi.waitFor(async () => expect(visible(assistantText(await readTranscript()))).toBe(recordedText));
+
+    const records = await readTranscript();
+    const completed = records.filter((entry) => entry.event === "turn_completed");
+    expect(completed).toEqual([expect.objectContaining({ stopReason: "cancelled" })]);
+    expect(records.some((entry) => entry.event === "prompt_failed")).toBe(false);
+    // PAN-4575: effect-acp sends session/cancel with "id":"", Kimi rejects it as an
+    // unknown request and keeps streaming; the late chunks land after turn_completed.
+    // Flip to "no assistant record after turn_completed" when fixed.
+    const completedAt = records.findIndex((entry) => entry.event === "turn_completed");
+    // Which chunks land after the boundary depends on delivery timing; pin that some do.
+    expect(visible(assistantText(records.slice(completedAt + 1))).length).toBeGreaterThan(0);
+    expect(lines.filter((line) => line.startsWith("[error]"))).toEqual([]);
+
+    await host.stop();
+    active = undefined;
     expect(replay.unmatchedClientLines()).toEqual([]);
   });
 });
