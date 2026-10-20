@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T03:31:11.074Z",
+  "updated": "2026-10-20T03:31:18.810Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4559",
       "claimedAt": "2026-10-20T03:17:47.824Z",
       "doneAt": "2026-10-20T03:31:11.073Z"
+    },
+    "handler-bounded-replay": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4559",
+      "claimedAt": "2026-10-20T03:31:18.810Z"
     }
   }
 }
