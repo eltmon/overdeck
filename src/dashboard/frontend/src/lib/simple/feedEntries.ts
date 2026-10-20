@@ -101,9 +101,11 @@ export function buildSimpleFeedEntries(input: {
   messages: readonly ChatMessage[];
   workLog: readonly WorkLogEntry[];
   issueTitle: string;
+  /** PAN-4558: older history is not loaded, so the first loaded user message is not the kickoff. */
+  hasOlder?: boolean;
 }): SimpleFeedEntry[] {
   const entries: SimpleFeedEntry[] = [];
-  let kickoffSeen = false;
+  let kickoffSeen = input.hasOlder === true;
 
   for (const m of input.messages) {
     if (m.role === 'user' && !kickoffSeen) {

@@ -286,10 +286,35 @@ door that does not exist; a real record read door would be a separate change.
   session file (a freshly spawned conversation subscribing before its transcript exists)
   still dispatches an uncached parse rather than throwing; `watchConversation` then polls
   until the file appears. Codex consumes appended records; other full-parser harnesses
-  still parse changed files in the worker. Clients receive complete initial history, then
-  changed message/tool rows and metadata. Explicit resets replace history after
-  truncation/replacement, and metadata snapshots clear removed plans or compact
-  boundaries. Full tool results remain accessible.
+  still parse changed files in the worker. The first event is a windowed snapshot
+  (PAN-4558): the newest contiguous slice of at most 75 timeline rows and 960 KiB of
+  encoded entries (`CONVERSATION_WINDOW_MAX_ROWS` / `CONVERSATION_WINDOW_MAX_BYTES` in
+  `packages/contracts/src/conversation-window.ts`), plus up to 10 pinned open tool calls,
+  so the whole event stays under 1 MiB (`CONVERSATION_PAYLOAD_BUDGET_BYTES`, enforced by
+  `conversation-payload-budget.test.ts`). Its `window: { cursor, hasOlder, transcript }`
+  field names the oldest loaded row (an encoded timeline key) and the transcript file
+  (`"<dev>:<ino>"`); older rows page in over HTTP (below). After the snapshot come changed
+  message/tool rows and metadata. Every later snapshot (a file reset or a full-parse
+  reorder) is windowed too, and explicit resets replace history after
+  truncation/replacement; metadata snapshots clear removed plans or compact boundaries.
+  Selection lives in `services/conversation/window.ts` and keeps full rows server-side.
+  - Wire projection (`services/conversation/wire-projection.ts`): on every windowed or
+    paged body and every WS event, a tool `result` over 4 KiB is replaced by
+    `resultBytes` and a `detail`/`toolInput` string over 4 KiB is cut to a 512-character
+    preview; either change sets `bodyOmitted: true`. Expanding such a row fetches the
+    full entry from a tool-body route (below).
+  - Resume on resubscribe (PAN-4558, #3778): the subscribe payload may carry
+    `resume: { afterSequence, openIds, transcript }`, read from the client's cache at
+    every (re)subscribe. When the transcript id matches, every row has a numeric
+    `sequence`, and the delta fits the byte budget, the first event is
+    `{ snapshot: false, metadataSnapshot: true }` with only rows newer than
+    `afterSequence` plus the current copy of each still-open row the client named.
+    Otherwise it is a windowed snapshot with `reset: true` (an empty fallback carries
+    no reset, so an empty re-read never wipes the view).
+  - Client cache: `conversationHistory.ts` merges a windowed snapshot or HTTP body into
+    the cache by cursor. Paged-in older rows and rows newer than the response are kept;
+    a reset, a gap, a different transcript, or a window that reaches the first row
+    replaces the cache.
   - The client shows the loading skeleton until the first WS payload arrives, and falls
     back to HTTP `GET .../messages` only after `MESSAGES_HTTP_FALLBACK_MS` (1500 ms) pass
     without one (`useMessagesHttpFallback`, PAN-4312). Resume, switch-model, and fork
@@ -395,6 +420,25 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+  - Windowing and paging (PAN-4558): with no paging params the messages read returns the
+    newest window and a `window` field. `?before=<cursor>&limit=<n>` returns the rows
+    strictly older than the cursor (`limit` defaults to 75 and clamps to [1, 200]; a
+    malformed cursor is HTTP 400 `{ "error": "Invalid cursor" }`) and combines with
+    `agentId`. `?window=all` returns the full, unprojected body with no `window`
+    (transcript export). `GET /api/conversations/:name/tool-body/:toolUseId`
+    (`?agentId=` for a subagent) returns `{ entry }`, the full work entry, or 404
+    `{ "error": "Tool entry not found" }`.
+  - `GET /api/agents/:id/conversation` stays full without params (TerminalPanel,
+    DirectoryTranscript and SessionTranscript read it whole). `?window=initial` and
+    `?before=<cursor>&limit=<n>` window and page it like the conversations route, and
+    `GET /api/agents/:id/conversation/tool-body/:toolUseId` serves tool bodies; all of
+    them combine with `subagentId`. Agent panels in `ConversationPanel` use
+    `window=initial`.
+  - Windowed and paged bodies carry wire-projected tool rows (`resultBytes`,
+    `bodyOmitted`). The timeline loads the next older page within 400 px of the top
+    ("Loading earlier messages…", then "Start of conversation"), and palette or
+    bookmark jumps load older pages until the target message is loaded. Ctrl+F
+    searches loaded rows only and does not search omitted tool bodies.
 - Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
   says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
   `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on

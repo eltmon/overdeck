@@ -18,18 +18,17 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ConversationResumeControls } from './ConversationResumeControls';
 import { useStableComposerProps } from './useStableComposerProps';
-import { fetchWithTimeout } from '../../lib/apiFetch';
 import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { resumeConversation } from './conversationResumeApi';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { TurnDiffSummary } from './chat-types';
 import {
   useComposerStore,
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { EffortSource, ReviewerRoundMetadata } from '@overdeck/contracts';
+import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
@@ -44,6 +43,9 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
+import { buildMessagesQueryFn, fetchFullTranscript, type MessagesResponse } from './messagesQuery';
+import { useOlderHistory } from './useOlderHistory';
+import { ToolBodyLoaderContext, toolBodyLoaderFor } from './messagesTimeline/toolBodyLoader';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
@@ -197,10 +199,6 @@ export function ConversationPanel({
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   const httpFallbackDue = useMessagesHttpFallback(streamMessagesEnabled, receivedFirstPayload, conversation.name);
-  // Ref mirrors the latest streaming state so the HTTP queryFn can discard
-  // responses that were already in flight when streaming became active.
-  const streamActiveRef = useRef(streamMessagesEnabled);
-  streamActiveRef.current = streamMessagesEnabled;
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -256,21 +254,10 @@ export function ConversationPanel({
   // Live transcripts are pushed through WS/RPC. HTTP is a fallback for the
   // initial snapshot (only after MESSAGES_HTTP_FALLBACK_MS without a stream
   // payload) and is the sole read path for stopped history.
-  const messagesQueryFn = useCallback(async ({ signal }: { signal?: AbortSignal }) => {
-    const fetched = await fetchMessages(conversation.name, signal, agentId);
-    // If the WS subscription became active while this HTTP request was in
-    // flight, prefer the streamed cache ONLY when it is at least as complete
-    // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
-    // partial), this HTTP response is the authoritative full history — use it
-    // rather than returning empty/truncated state. (PAN-1642 regression: the
-    // old `cached ?? empty` rendered "How can I help you?" / only-last-parts
-    // whenever the snapshot lost the race, worsening under load.)
-    if (streamActiveRef.current) {
-      const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
-      if (cached && cached.messages.length >= fetched.messages.length) return cached;
-    }
-    return fetched;
-  }, [conversation.name, agentId, queryClient, messagesQueryKey]);
+  const messagesQueryFn = useMemo(
+    () => buildMessagesQueryFn(queryClient, messagesQueryKey, conversation.name, agentId),
+    [conversation.name, agentId, queryClient, messagesQueryKey],
+  );
   const refreshMessagesOverHttp = useCallback(() => {
     // staleTime: 0 forces the refetch past the app's default 30s staleTime, since
     // fetchQuery otherwise returns fresh cached data without calling queryFn.
@@ -592,8 +579,15 @@ export function ConversationPanel({
     }
   }, [conversation.name, queryClient, onArchived]);
 
-  const handleExportTranscript = useCallback(() => {
-    const messages = messagesData?.messages ?? [];
+  const handleExportTranscript = useCallback(async () => {
+    // PAN-4558: the panel holds a window; export reads the whole transcript.
+    let messages: MessagesResponse['messages'];
+    try {
+      messages = (await fetchFullTranscript(conversation.name, agentId)).messages;
+    } catch {
+      toast.error('Failed to export transcript');
+      return;
+    }
     if (messages.length === 0) {
       toast.error('No messages to export yet');
       return;
@@ -612,7 +606,7 @@ export function ConversationPanel({
     a.remove();
     URL.revokeObjectURL(url);
     toast.success('Transcript exported');
-  }, [messagesData, conversation.title, conversation.name]);
+  }, [agentId, conversation.title, conversation.name]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
     if (mode === 'terminal') markTerminalClick(conversation.name);
@@ -913,7 +907,7 @@ export function ConversationPanel({
                         </MenuItemButton>
                       )}
                       <MenuItemButton
-                        onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
+                        onClick={() => { void handleExportTranscript(); setMenuOpen(false); }}
                       >
                         <Download size={14} />
                         Export transcript
@@ -1128,49 +1122,6 @@ export function ConversationPanel({
 
 // ─── ConversationView ─────────────────────────────────────────────────────────
 
-interface MessagesResponse {
-  messages: ChatMessage[];
-  workLog: WorkLogEntry[];
-  streaming: boolean;
-  discovering?: boolean;
-  totalCost?: number;
-  proposedPlan?: ProposedPlan;
-  compactBoundaries?: CompactBoundary[];
-  compacting?: boolean;
-  contextUsage?: ContextUsage | null;
-  subagents?: SubagentSummary[];
-  /** PAN-4255 (agent reads): transcript-observed effort and the launch/pinned resolution. */
-  observedEffort?: string | null;
-  effortResolution?: { effort: string; source: EffortSource } | null;
-  /** Server-side resolution failure to surface in the panel (e.g. the live
-   * session could not be resolved from the launcher). Rendered as a banner. */
-  error?: string;
-  checked?: string[];
-}
-
-export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
-  // PAN-1705: timeout + React Query's abort signal so a request in flight
-  // during a server restart rejects (and retries) instead of pinning the
-  // panel on "Loading…" forever, and switching conversations cancels the
-  // previous conversation's fetch.
-  const path = agentId
-    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
-    : `/api/conversations/${encodeURIComponent(name)}/messages`;
-  const res = await fetchWithTimeout(path, { signal });
-  if (res.status === 404 && agentId) {
-    const missing = await res.json() as { error?: string; checked?: string[] };
-    return {
-      messages: [],
-      workLog: [],
-      streaming: false,
-      error: missing.error ?? `No transcript found for ${agentId}.`,
-      checked: missing.checked ?? [],
-    };
-  }
-  if (!res.ok) throw new Error('Failed to fetch messages');
-  return res.json();
-}
-
 interface ConversationViewProps {
   conversation: Conversation;
   onResume?: () => void;
@@ -1227,6 +1178,17 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
   const queryClient = useQueryClient();
+  // PAN-4558: the transcript opens on its newest window; older rows page in on scroll.
+  const olderHistory = useOlderHistory({
+    queryKey: conversationMessagesQueryKey(conversation.name),
+    pagePath: agentId
+      ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+      : `/api/conversations/${encodeURIComponent(conversation.name)}/messages`,
+    history: messagesData?.history,
+  });
+  const toolBodyLoader = useMemo(() => toolBodyLoaderFor(agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation/tool-body`
+    : `/api/conversations/${encodeURIComponent(conversation.name)}/tool-body`), [agentId, conversation.name]);
 
   // When forkStatus transitions from non-null to null (fork completed),
   // immediately re-fetch messages so the user doesn't see a stale empty state.
@@ -1434,6 +1396,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           </p>
         </div>
       ) : (
+        <ToolBodyLoaderContext.Provider value={toolBodyLoader}>
         <MessagesTimeline
           messages={messages}
           workLog={workLog}
@@ -1465,7 +1428,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          history={olderHistory}
+          onLoadOlder={olderHistory.loadOlder}
+          onLoadOlderUntil={olderHistory.loadOlderUntil}
         />
+        </ToolBodyLoaderContext.Provider>
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a
           banner linking to the sibling that continues the work. The composer/resume bar

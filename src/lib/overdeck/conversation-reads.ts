@@ -64,6 +64,7 @@ import { parseAcpConversationMessages } from '../../dashboard/server/services/ac
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
+import { selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../dashboard/server/services/conversation/window.js';
 import {
   readLauncherPinnedSessionId,
   resolveAcpTranscriptPath,
@@ -72,7 +73,7 @@ import {
   resolvePiSessionPath,
 } from '../agents/transcript-resolver.js';
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
-import { resolveEffectivePullRequest, type HarnessTranscriptKind } from '@overdeck/contracts';
+import { resolveEffectivePullRequest, type HarnessTranscriptKind, type TimelineKey } from '@overdeck/contracts';
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
@@ -543,21 +544,55 @@ export async function getConversationRead(
   }
 }
 
+/**
+ * PAN-4558: `window` (default) bounds a cold open to the newest rows, `page`
+ * returns the rows older than `before`, and `all` is the full unprojected body
+ * (transcript export).
+ */
+export type ConversationMessagesReadOptions =
+  | { mode: 'window' }
+  | { mode: 'all' }
+  | { mode: 'page'; before: TimelineKey; limit: number };
+
+type ConversationTranscriptTarget =
+  | { kind: 'found'; conv: Conversation | null; parentSessionFile: string; sessionFile: string }
+  | { kind: 'unresolved'; conv: Conversation }
+  | { kind: 'failed'; result: ConversationReadResult };
+
+/** Resolves a conversation's transcript, or one subagent's, the same way for every transcript read. */
+async function resolveConversationTranscript(
+  name: string,
+  deps: Pick<ConversationReadDependencies, 'resolveSessionFile'>,
+  agentId: string | undefined,
+): Promise<ConversationTranscriptTarget> {
+  const conv = getConversationByName(name);
+  const parentSessionFile = conv
+    ? await deps.resolveSessionFile(conv)
+    : await resolveUnregisteredClaudeSessionFile(name);
+  if (!parentSessionFile) {
+    return conv
+      ? { kind: 'unresolved', conv }
+      : { kind: 'failed', result: result({ error: 'Conversation not found', lookedUp: name }, 404) };
+  }
+  if (agentId === undefined) return { kind: 'found', conv, parentSessionFile, sessionFile: parentSessionFile };
+  const sessionFile = isCodexSessionFile(parentSessionFile)
+    ? await resolveCodexSubagentTranscript(parentSessionFile, agentId)
+    : subagentTranscriptPath(parentSessionFile, agentId);
+  if (!sessionFile) return { kind: 'failed', result: result({ error: 'Invalid subagent id' }, 400) };
+  return { kind: 'found', conv, parentSessionFile, sessionFile };
+}
+
 export async function getConversationMessagesRead(
   name: string,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'shouldReportUnresolvedLiveSession'>,
   agentId?: string,
+  options: ConversationMessagesReadOptions = { mode: 'window' },
 ): Promise<ConversationReadResult> {
   try {
-    const conv = getConversationByName(name);
-    const browseCopy = conv?.origin === 'vault';
-    let sessionFile: string | null = conv
-      ? await deps.resolveSessionFile(conv)
-      : await resolveUnregisteredClaudeSessionFile(name);
-    if (!conv && !sessionFile) return result({ error: 'Conversation not found', lookedUp: name }, 404);
-
-    if (!sessionFile) {
-      if (deps.shouldReportUnresolvedLiveSession(conv)) {
+    const target = await resolveConversationTranscript(name, deps, agentId);
+    if (target.kind === 'failed') return target.result;
+    if (target.kind === 'unresolved') {
+      if (deps.shouldReportUnresolvedLiveSession(target.conv)) {
         return result({
           messages: [],
           workLog: [],
@@ -570,17 +605,15 @@ export async function getConversationMessagesRead(
       }
       return result({ messages: [], workLog: [], streaming: false });
     }
-
-    const parentSessionFile = sessionFile;
-    if (agentId !== undefined) {
-      sessionFile = isCodexSessionFile(parentSessionFile)
-        ? await resolveCodexSubagentTranscript(parentSessionFile, agentId)
-        : subagentTranscriptPath(parentSessionFile, agentId);
-      if (!sessionFile) return result({ error: 'Invalid subagent id' }, 400);
-    }
+    const { conv, parentSessionFile, sessionFile } = target;
+    const browseCopy = conv?.origin === 'vault';
 
     try {
       const parsed = await getCachedMessages(sessionFile, false);
+      if (options.mode === 'page') {
+        const transcript = transcriptIdOf(await stat(sessionFile));
+        return result(selectPageBefore(parsed, options.before, options.limit, transcript));
+      }
       if (agentId === undefined && conv && !browseCopy && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
@@ -592,9 +625,12 @@ export async function getConversationMessagesRead(
           : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
+      const rows = options.mode === 'all'
+        ? { messages: parsed.messages, workLog: parsed.workLog }
+        : selectInitialWindow(parsed, transcriptIdOf(await stat(sessionFile)));
+
       return result({
-        messages: parsed.messages,
-        workLog: parsed.workLog,
+        ...rows,
         streaming: parsed.streaming,
         totalCost: browseCopy ? 0 : parsed.totalCost,
         totalTokens: browseCopy ? 0 : parsed.totalTokens,
@@ -612,6 +648,38 @@ export async function getConversationMessagesRead(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] load messages failed:', msg);
+    return result({ error: 'Internal server error' }, 500);
+  }
+}
+
+/**
+ * PAN-4558: the full, unprojected work entry behind a tool row whose body the
+ * wire projection omitted. Reads the same parse cache as the messages route.
+ */
+export async function getConversationToolBodyRead(
+  name: string,
+  toolUseId: string,
+  deps: Pick<ConversationReadDependencies, 'resolveSessionFile'>,
+  agentId?: string,
+): Promise<ConversationReadResult> {
+  const notFound = result({ error: 'Tool entry not found' }, 404);
+  try {
+    const target = await resolveConversationTranscript(name, deps, agentId);
+    if (target.kind === 'failed') return target.result;
+    if (target.kind === 'unresolved') return notFound;
+    let parsed: ConversationMessagesParseResult;
+    try {
+      parsed = await getCachedMessages(target.sessionFile, false);
+    } catch (parseErr: unknown) {
+      if ((parseErr as { code?: string })?.code === 'ENOENT') return notFound;
+      throw parseErr;
+    }
+    const entry = parsed.workLog.find((candidate) => candidate.id === toolUseId)
+      ?? parsed.pendingToolUse.get(toolUseId);
+    return entry ? result({ entry }) : notFound;
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] load tool body failed:', msg);
     return result({ error: 'Internal server error' }, 500);
   }
 }

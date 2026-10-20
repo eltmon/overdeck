@@ -1,0 +1,1556 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T02:48:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4558: Conversation open sends the whole transcript: bound the initial window and page older history",
+    "updated": "2026-10-20T02:56:12.196Z"
+  },
+  "plan": {
+    "id": "pan-4558",
+    "title": "Conversation open sends the whole transcript: bound the initial window and page older history",
+    "status": "running",
+    "uid": "6124fbde-3fba-4f8a-9322-8d8c9e9d54a5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-20T02:48:23Z",
+    "updated": "2026-10-20T02:56:12.196Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4558",
+        "label": "PAN-4558",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3778",
+        "label": "PAN-3778",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4558.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "performance",
+      "websocket",
+      "pagination"
+    ],
+    "metadata": {
+      "sizeJustification": "The window, paging and resume share one cursor contract (WI-1) and one client cache-merge model (WI-11); shipping any one without the others leaves either an unbounded path or a timeline that cannot reach older history, and the 1 MiB budget is not reachable without tool-body elision. The surface spans contracts, server read paths, the frontend timeline, tests and docs (four OKF files live in a separate repo), so it exceeds the 25-file projection while staying one feature. Items are sliced finely and DAG-ordered so slots stay small.",
+      "canonicalFilename": "2026-10-20-PAN-4558-conversation-open-sends-the-whole-transcript-bound-the-initial-window-and-page-older-history.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Opening a conversation sends its whole parsed transcript to the browser over HTTP (GET /api/conversations/:name/messages) and the WS subscribe (first snapshot event), and every WS resubscribe resends it. Long transcripts are several MB; #3778 showed full snapshots on resubscribe starving the domain event stream into a reconnect loop.",
+      "Proposal": "Bound every cold open (HTTP and WS, all harnesses, conversations and agent sessions) to the newest 75 timeline rows or ~960 KiB of entries with a cursor and hasOlder flag; add ?before=<cursor>&limit= paged reads loaded when the timeline scrolls near the top and prepended without moving the view; elide tool bodies over 4 KB to a size hint and load them on expand via tool-body routes; let a WS resubscribe send resume {afterSequence, openIds, transcript} so the server sends only new or newly settled rows; enforce the budget with a >5 MB synthetic-transcript test. Full design: .pan/drafts/PAN-4558.md.",
+      "NonGoals": "- Eliding message text: a single newest entry larger than the budget is still sent whole.\n- Searching unloaded rows or omitted tool bodies with Ctrl+F.\n- Paging in TerminalPanel, DirectoryTranscript or SessionTranscript; they keep the full agents-route response.\n- Changing transcripts on disk, parser output, the message-locator route, or #3778 direction 3 (watchdog fairness).\n- Adding any new persistent cache or on-disk state.\n- Raising scripts/file-size-allowlist.txt caps."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Window unit is timeline rows over the merged messages+workLog order (75 rows) with a 983,040-byte entry budget leaving 64 KiB for metadata under a 1 MiB payload budget.",
+        "rationale": "The issue asks for about 75 timeline rows or about 1 MiB; windowing the two arrays separately would interleave wrongly at the old edge, and a metadata allowance makes the 1 MiB assertion hold mechanically."
+      },
+      {
+        "summary": "Cursor is the timeline key [createdAt, sequence, kind, id] of the oldest contiguous entry, encoded as JSON.",
+        "rationale": "Byte offsets do not map to entries because parsers sort and merge tool blocks; the key matches the frontend's sort and is a total order."
+      },
+      {
+        "summary": "WS resume (issue AC3, #3778 direction 1) uses afterSequence + openIds + transcript id, with a windowed reset snapshot as the fallback.",
+        "rationale": "Every parser except prime-agent assigns per-line sequences from file start; open entries are the only rows that change in place, and the transcript id detects a replaced file."
+      },
+      {
+        "summary": "Tool bodies over 4 KB are elided on every windowed, paged and WS payload and loaded through new tool-body routes; window=all and the agents route without params stay full and unelided.",
+        "rationale": "Export and three agent-route hosts keep working unchanged while every open path stays within budget."
+      },
+      {
+        "summary": "Include the agents conversation route (window=initial, before, tool-body) even though the issue names only the conversations route.",
+        "rationale": "Agent panels receive windowed WS snapshots and elided bodies, so they need the same paging and body routes to reach older history and expand tool rows."
+      },
+      {
+        "summary": "Docs item edits the OKF bundle at /home/eltmon/Projects/overdeck-knowledge and commits there directly.",
+        "rationale": "The issue requires the OKF conversation-ui and data-flow concepts; PAN-4312 updated them the same way (commit 0641353)."
+      },
+      {
+        "summary": "Keep one plan with sizeJustification instead of splitting into sibling issues.",
+        "rationale": "All six issue ACs live on this issue and share one cursor contract and client merge model; splitting would ship paths that are bounded but cannot page, or resume without windows."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-window-contract",
+        "title": "Add the shared conversation window contract to packages/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4558",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/conversation-window.ts",
+            "packages/contracts/src/conversation-window.test.ts",
+            "packages/contracts/src/rpc.ts",
+            "packages/contracts/src/rpc.test.ts",
+            "packages/contracts/src/index.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/conversation-window.test.ts packages/contracts/src/rpc.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-window.test.ts and rpc.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7",
+            "FR-8",
+            "FR-12"
+          ],
+          "foundationFor": [
+            "wi2-wire-projection",
+            "wi4-window-selection",
+            "wi11-client-cache-merge"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/conversation-window.ts with the Decision-3 constants (CONVERSATION_WINDOW_MAX_ROWS=75, CONVERSATION_WINDOW_MAX_BYTES=983040, CONVERSATION_PAYLOAD_BUDGET_BYTES=1048576, CONVERSATION_PAGE_DEFAULT_LIMIT=75, CONVERSATION_PAGE_MAX_LIMIT=200, TOOL_BODY_INLINE_MAX_BYTES=4096, TOOL_BODY_PREVIEW_CHARS=512, RESUME_OPEN_IDS_MAX=200, WINDOW_PINNED_OPEN_TOOLS_MAX=10), TimelineKey = [createdAt, sequence??0, kindRank 0|1, id], timelineKeyOfMessage/timelineKeyOfWork, compareTimelineKeys (createdAt string compare, then sequence, then kindRank, then id), encodeTimelineCursor (JSON.stringify), decodeTimelineCursor (validates 4-tuple, null otherwise), hasToolResult (!!result || resultBytes>0). In rpc.ts add WorkLogEntry.resultBytes/bodyOmitted, ConversationWindow {cursor: NullOr(String), hasOlder, transcript?}, ConversationResume {afterSequence, openIds, transcript}, window? on the messages ConversationEvent member and on ConversationResponse, resume? on SubscribeConversationMessagesRpc payload. Export from index.ts; mirror fields in frontend chat-types.ts."
+        },
+        "items": [
+          {
+            "id": "wi1-window-contract.ac1",
+            "title": "Given cursors for two entries with equal createdAt, compareTimelineKeys orders them by sequence, then message before work entry, then id, and the conversation-window.test.ts cases for this pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-window-contract.ac2",
+            "title": "decodeTimelineCursor returns null for 'x', '[1,2]' and a tuple whose third element is not 0 or 1, and returns the original key for any encodeTimelineCursor output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-window-contract.ac3",
+            "title": "hasToolResult returns true for an entry with resultBytes 5000 and no result, and false for an entry with neither.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-window-contract.ac4",
+            "title": "The SubscribeConversationMessagesRpc payload schema accepts {conversationName, resume: {afterSequence, openIds, transcript}} and the messages event schema accepts a window field, verified by rpc.test.ts decode cases.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-wire-projection",
+        "title": "Add the tool-body wire projection module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/wire-projection.ts",
+            "src/dashboard/server/services/conversation/__tests__/wire-projection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/wire-projection.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "wire-projection.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Export projectWorkLogEntry(entry) and projectWorkLog(entries) implementing FR-7: a result over 4096 UTF-8 bytes is removed and replaced by resultBytes; a detail or any string inside toolInput (recursive through plain objects/arrays) over 4096 bytes is cut to its first 512 characters plus '…'; any change sets bodyOmitted: true; tone, label, toolTitle and the 'Error: ' detail prefix are kept; return the same object reference when nothing changes."
+        },
+        "items": [
+          {
+            "id": "wi2-wire-projection.ac1",
+            "title": "Given a work entry with a 10,240-byte result, projectWorkLogEntry returns an entry with no result, resultBytes 10240 and bodyOmitted true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-wire-projection.ac2",
+            "title": "Given a work entry with a 1 KB result, projectWorkLogEntry returns the same object reference unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-wire-projection.ac3",
+            "title": "Given a 6 KB 'Error: ...' detail and an 8 KB toolInput.content, the projected entry keeps tone 'error', a detail of 513 characters starting with 'Error: ', a truncated content, and an unchanged toolInput.file_path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-extract-claude-stream",
+        "title": "Move streamClaudeTranscript out of ws-rpc.ts into its own service module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/claude-transcript-stream.ts",
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc.test.ts src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both ws-rpc test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Pure move, no behavior change: move `const claudeInitialSnapshot = sharedTranscriptParser('claude-initial');` and `function streamClaudeTranscript(...)` from src/dashboard/server/ws-rpc.ts (~lines 170-235) into the new src/dashboard/server/services/claude-transcript-stream.ts, export streamClaudeTranscript, and import it in ws-rpc.ts. This frees room under ws-rpc.ts's file-size cap (1221) for WI-8/WI-9."
+        },
+        "items": [
+          {
+            "id": "wi3-extract-claude-stream.ac1",
+            "title": "After the move, ws-rpc.ts imports streamClaudeTranscript from ./services/claude-transcript-stream.js and `wc -l src/dashboard/server/ws-rpc.ts` returns a count below 1170.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-extract-claude-stream.ac2",
+            "title": "The existing ws-rpc.test.ts and ws-rpc-resolved-stream.test.ts passes with no test changes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-window-selection",
+        "title": "Add the server window, page and resume selection module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/window.ts",
+            "src/dashboard/server/services/conversation/__tests__/window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/window.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "window.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-8",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "wi5-http-window-page",
+            "wi7-agents-route-window",
+            "wi8-claude-ws-window",
+            "wi9-fullparse-ws-window",
+            "wi15-payload-budget-test"
+          ],
+          "parallelSafeReason": "Touches only two new files; parallel-safe once wi1 and wi2 land."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Implement selectInitialWindow(input, transcript?, budget?), selectPageBefore(input, before, limit, transcript?), selectResumeDelta(input, resume, transcript) and transcriptIdOf(stats) exactly as the PRD algorithm states: merge messages (kindRank 0) and workLog (kindRank 1) by compareTimelineKeys; walk from the newest; count timeline rows (each message is a row, a run of consecutive work entries is one row); measure Buffer.byteLength(JSON.stringify(projected entry)) with projectWorkLogEntry; stop before exceeding maxRows/limit or CONVERSATION_WINDOW_MAX_BYTES except the first entry; cursor = oldest taken entry's encoded key; hasOlder = an older untaken entry exists; initial window adds up to 10 newest pinned open tools (workLog entries with tone 'tool' and !hasToolResult) without moving the cursor; split back into ascending arrays. selectResumeDelta returns entries with sequence > afterSequence plus the server's current copy of every openIds entry, or null on transcript mismatch, missing numeric sequence, afterSequence above the max sequence, or delta over the byte budget."
+        },
+        "items": [
+          {
+            "id": "wi4-window-selection.ac1",
+            "title": "Given 300 alternating message and tool entries, selectInitialWindow returns entries covering exactly 75 timeline rows, window.hasOlder true, and window.cursor equal to the encoded key of the oldest returned entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-window-selection.ac2",
+            "title": "Given entries of 200 KB each, selectInitialWindow stops before the encoded entries exceed 983,040 bytes; given one 2 MB message, it returns exactly that message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-window-selection.ac3",
+            "title": "Given repeated selectPageBefore calls from the initial window's cursor until hasOlder is false, the concatenated results contain every input id exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-window-selection.ac4",
+            "title": "Given a pinned open tool older than the window, selectInitialWindow returns it while window.cursor still points at the oldest contiguous entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-window-selection.ac5",
+            "title": "selectResumeDelta returns only entries newer than afterSequence plus the current copy of each openIds entry for a matching transcript, and returns null for a different transcript id or for entries without a numeric sequence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-http-window-page",
+        "title": "Window and page GET /api/conversations/:name/messages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/__tests__/conversation-messages-window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-messages-window.test.ts src/lib/overdeck/__tests__/conversation-messages-read-context-usage.test.ts tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add options {mode: 'window'|'all'|'page', before?, limit?} to getConversationMessagesRead (default 'window'). 'all' returns today's body unchanged. 'window' returns today's metadata plus selectInitialWindow output (transcript from transcriptIdOf(await stat(sessionFile))) and a window field. 'page' returns only {messages, workLog, window} from selectPageBefore and skips updateConversationCost. Empty/missing-transcript branches keep their bodies. The route parses window/before/limit from the URL: bad cursor -> 400 {error:'Invalid cursor'}; limit NaN -> 75, clamped to [1,200]; window=all -> mode 'all'; agentId combines with every mode."
+        },
+        "items": [
+          {
+            "id": "wi5-http-window-page.ac1",
+            "title": "Given a 400-entry transcript, GET /api/conversations/:name/messages returns at most 75 timeline rows and window.hasOlder true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-http-window-page.ac2",
+            "title": "GET ...?window=all returns every entry with no window field and no projected bodies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-http-window-page.ac3",
+            "title": "Following window.cursor with ?before= until hasOlder is false returns every transcript entry exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-http-window-page.ac4",
+            "title": "GET ...?before=not-a-cursor rejects the request with status 400 and body {\"error\":\"Invalid cursor\"}.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-http-tool-body",
+        "title": "Add GET /api/conversations/:name/tool-body/:toolUseId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/overdeck/__tests__/conversation-tool-body.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-tool-body.test.ts tests/unit/lib/overdeck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-tool-body.test.ts and the no-loss matrix tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add getConversationToolBodyRead(name, toolUseId, deps, agentId?) resolving the session file exactly like getConversationMessagesRead, reading getCachedMessages(sessionFile, false), and returning {entry} (unprojected) for the workLog entry or pendingToolUse value with that id, else 404 {error:'Tool entry not found'}. Register GET /api/conversations/:name/tool-body/:toolUseId with validateOrigin like its neighbours, and add its no-loss-matrix row (kind http, disposition READ, door TranscriptsResolver.parse)."
+        },
+        "items": [
+          {
+            "id": "wi6-http-tool-body.ac1",
+            "title": "Given a transcript whose tool result is 10 KB, GET /api/conversations/:name/tool-body/:toolUseId returns {entry} whose result is the full 10 KB string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-tool-body.ac2",
+            "title": "An unknown toolUseId returns 404 with {\"error\":\"Tool entry not found\"}.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-http-tool-body.ac3",
+            "title": "With ?agentId=<subagent>, the route returns the entry from the subagent transcript.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-agents-route-window",
+        "title": "Add window, page and tool-body reads to the agents conversation route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/agent-conversation-window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/agent-conversation-window.test.ts tests/unit/lib/overdeck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-conversation-window.test.ts and no-loss matrix tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. GET /api/agents/:id/conversation with no new params stays unchanged (full). ?window=initial returns the existing ConversationResponse with messages/workLog from selectInitialWindow (transcript = transcriptIdOf(await stat(<resolved transcript path>))) plus window. ?before=<cursor>&limit=<n> returns {messages, workLog, window} (400 {error:'Invalid cursor'} on a bad cursor). Both combine with subagentId. Add GET /api/agents/:id/conversation/tool-body/:toolUseId (?subagentId=) that builds the same parse as buildAgentConversationResult and returns {entry} or 404 {error:'Tool entry not found'}; add its no-loss-matrix row."
+        },
+        "items": [
+          {
+            "id": "wi7-agents-route-window.ac1",
+            "title": "GET /api/agents/:id/conversation with no query params returns every transcript entry and no window field, as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-agents-route-window.ac2",
+            "title": "GET ...?window=initial on a 400-entry transcript returns at most 75 timeline rows plus a window field with hasOlder true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-agents-route-window.ac3",
+            "title": "Following ?before= pages to hasOlder false returns every entry exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-agents-route-window.ac4",
+            "title": "GET /api/agents/:id/conversation/tool-body/:toolUseId returns the full entry for a known id and 404 for an unknown id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-claude-ws-window",
+        "title": "Window, project and resume the Claude WS transcript stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/claude-transcript-stream.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/services/__tests__/claude-transcript-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/claude-transcript-stream.test.ts src/dashboard/server/__tests__/ws-rpc.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "claude-transcript-stream.test.ts and ws-rpc.test.ts pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-8"
+          ],
+          "parallelSafeReason": "Owns claude-transcript-stream.ts; the ws-rpc.ts overlap with wi9 is serialized by an explicit edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. streamClaudeTranscript gains resume?: ConversationResume; ws-rpc.ts passes input.resume at its call sites (subscribe handler and streamSyntheticAgentTranscript). After the initial parse, compute transcript = transcriptIdOf(stat(sessionFile)) (ENOENT -> undefined); rows = {messages: initial.messages, workLog: [...initial.workLog, ...initial.pendingToolUse.values()]}. If resume and selectResumeDelta(...) is non-null, offer {kind:'messages', snapshot:false, metadataSnapshot:true, ...delta, streaming, proposedPlan, compactBoundaries, contextUsage}; else offer a windowed snapshot with window (reset:true when a resume was supplied). Watch callback: gate.snapshot -> windowed snapshot (reset:true when fileWasReset); otherwise workLog: projectWorkLog(result.workLog). Use fake timers in tests."
+        },
+        "items": [
+          {
+            "id": "wi8-claude-ws-window.ac1",
+            "title": "Given a 400-entry Claude transcript, the first event of streamClaudeTranscript is a snapshot with at most 75 timeline rows and a window field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-claude-ws-window.ac2",
+            "title": "When a line is appended after subscribe, the stream emits a snapshot:false event whose large tool result is replaced by resultBytes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-claude-ws-window.ac3",
+            "title": "Subscribing with resume {afterSequence, openIds, transcript} matching the file emits a snapshot:false event containing only entries newer than afterSequence plus the current copy of each open entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-claude-ws-window.ac4",
+            "title": "Subscribing with a resume whose transcript id differs emits a windowed snapshot with reset true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-fullparse-ws-window",
+        "title": "Window, project and resume the full-parse WS transcript stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/transcript-delta.ts",
+            "src/dashboard/server/services/full-parse-stream.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/services/__tests__/transcript-delta.test.ts",
+            "src/dashboard/server/services/__tests__/full-parse-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/transcript-delta.test.ts src/dashboard/server/services/__tests__/full-parse-stream.test.ts src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "FR-8"
+          ],
+          "parallelSafeReason": "Owns transcript-delta.ts and full-parse-stream.ts; ws-rpc.ts overlap with wi8 is serialized by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-9. createTranscriptDelta(model, resume?) returns (result, reset, transcript?) => event. Keep `previous` over the full ParseResult rows (Decision 5). First emission: resume event when selectResumeDelta succeeds, else a windowed snapshot. reset or reorder: windowed snapshot with reset:true. Deltas: workLog projected with projectWorkLog. streamResolvedFullParseSnapshots threads resume and passes transcriptIdOf(before) to delta(). streamHarnessFullParseSnapshots and streamSyntheticAgentTranscript thread input.resume from the subscribe handler; ws-rpc.ts stays at or under its cap."
+        },
+        "items": [
+          {
+            "id": "wi9-fullparse-ws-window.ac1",
+            "title": "Given a 400-row full parse, the first createTranscriptDelta event is a snapshot with at most 75 timeline rows and a window field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-fullparse-ws-window.ac2",
+            "title": "A reorder between two parses emits a windowed snapshot with reset true instead of the whole transcript.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-fullparse-ws-window.ac3",
+            "title": "Given a matching resume, the first event emits only the newly appended row with snapshot false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-fullparse-ws-window.ac4",
+            "title": "With rows lacking a numeric sequence (prime-agent), a resume falls back to a windowed snapshot with reset true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-extract-messages-query",
+        "title": "Move MessagesResponse and fetchMessages out of ConversationPanel.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesQuery.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/fetchMessages.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/fetchMessages.test.ts src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "both test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Pure move, no behavior change: move `interface MessagesResponse` (~:1131-1149) and `export async function fetchMessages` (~:1151-1170) from ConversationPanel.tsx into the new components/chat/messagesQuery.ts; re-export fetchMessages from ConversationPanel.tsx so existing importers compile; update the fetchMessages test import. Frees lines under ConversationPanel.tsx's cap (1531)."
+        },
+        "items": [
+          {
+            "id": "wi10-extract-messages-query.ac1",
+            "title": "ConversationPanel.tsx imports MessagesResponse and fetchMessages from ./messagesQuery and `wc -l` returns at least 30 fewer lines than before the move.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-extract-messages-query.ac2",
+            "title": "fetchMessages.test.ts and ConversationPanel.test.tsx passes with only import-path changes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-client-cache-merge",
+        "title": "Add the cursor-aware client cache merge and the resume payload",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/conversationHistory.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/conversationHistory.test.ts",
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/conversationHistory.test.ts src/components/chat/__tests__/useConversationMessagesStream.test.ts src/components/chat/useConversationMessagesStream.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "the three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ],
+          "foundationFor": [
+            "wi12-http-query-merge",
+            "wi13-load-older-history",
+            "wi17-export-and-simple-feed"
+          ],
+          "parallelSafeReason": "Owns conversationHistory.ts; useConversationMessagesStream.ts overlap with wi12 is serialized by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-11. conversationHistory.ts exports mergeWindowIntoCache(previous, incoming) (FR-9: keep previous entries older than the incoming cursor whose ids are not in incoming; replace on reset, empty previous, a gap (incoming cursor newer than previous newest key) or a legacy body without window; history stays the previous history when older entries were kept), prependOlderPage(previous, page, requestedCursor) (ignore when previous.history.cursor !== requestedCursor; prepend page entries whose ids are not present; history cursor/hasOlder from the page), and resumePayloadFromCache(cache) (undefined without entries or history.transcript; else max numeric sequence, newest 200 open ids (tool entries without hasToolResult, assistant messages without completedAt), transcript). ConversationMessagesCache gains history. applyConversationMessagesEvent routes events with window through mergeWindowIntoCache. Both subscribe factories compute resume from queryClient.getQueryData(queryKey) inside the factory."
+        },
+        "items": [
+          {
+            "id": "wi11-client-cache-merge.ac1",
+            "title": "Given a cache holding paged-in older entries, applying a windowed snapshot whose cursor overlaps the cache keeps the older entries and history.hasOlder from the cache.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-client-cache-merge.ac2",
+            "title": "Given a windowed snapshot whose cursor is newer than the cache's newest entry, or one with reset true, the cache is replaced by the snapshot entries and its window.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-client-cache-merge.ac3",
+            "title": "Given a page requested with a stale cursor, prependOlderPage returns the previous cache unchanged, and given a page containing an id already present, it contains that id once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-client-cache-merge.ac4",
+            "title": "When the subscribe factory runs a second time, it sends a payload with resume.afterSequence equal to the highest cached sequence and resume.openIds containing an unresolved tool entry id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-http-query-merge",
+        "title": "Make the HTTP messages queries use the cursor-aware merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesQuery.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/fetchMessages.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "both test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. fetchMessages requests /api/agents/:id/conversation?window=initial for agent panels. Move the messagesQueryFn body into messagesQuery.ts as buildMessagesQueryFn and replace the `cached.messages.length >= fetched.messages.length` test with mergeWindowIntoCache(cached, fetched) whenever a cache exists; useSubagentTranscript's queryFn does the same. ConversationPanel.tsx stays at or under 1531 lines."
+        },
+        "items": [
+          {
+            "id": "wi12-http-query-merge.ac1",
+            "title": "Given an older page already prepended, a 2-second poll or refreshMessagesOverHttp preserves the prepended older entries in the cache (ConversationPanel.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-http-query-merge.ac2",
+            "title": "When an agent panel opens, fetchMessages sends its HTTP read to /api/agents/<id>/conversation?window=initial.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-http-query-merge.ac3",
+            "title": "`npm run lint:file-size` passes with no violation for ConversationPanel.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-load-older-history",
+        "title": "Load older history pages when the timeline scrolls near the top",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useOlderHistory.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useOlderHistory.test.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/useOlderHistory.test.ts src/components/chat/__tests__/MessagesTimeline.test.tsx src/components/chat/SubagentTranscript.test.tsx",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "the three test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-14"
+          ],
+          "parallelSafeReason": "Shared ConversationPanel.tsx/SubagentTranscript.tsx/MessagesTimeline.tsx edits are serialized by edges to wi12, wi14 and wi16."
+        },
+        "narrative": {
+          "Action": "PRD WI-13. useOlderHistory({queryKey, pagePath}) -> {hasOlder, loadingOlder, error, loadOlder, loadOlderUntil}; loadOlder fetches `${pagePath}${sep}before=<encoded cursor>&limit=75` and applies prependOlderPage; one request in flight; loadOlderUntil loops until the message id is loaded or hasOlder is false, max 100 pages. MessagesTimelineProps gains history, onLoadOlder, onLoadOlderUntil. handleScroll calls onLoadOlder when scrollTop < 400 and hasOlder and not loading. Anchor scroll after prepend in a useLayoutEffect using the scrollHeight delta; never change pinned-to-bottom state. Render 'Loading earlier messages…' and 'Start of conversation' rows (muted text token, pan-style-guide). FR-14: hide compact boundaries older than the oldest loaded entry while hasOlder. Wire ConversationPanel (conversations route or agents route with agentId) and SubagentTranscript (?agentId=)."
+        },
+        "items": [
+          {
+            "id": "wi13-load-older-history.ac1",
+            "title": "useOlderHistory pages a mocked 5-page history to the start and the cache then holds every entry id exactly once with hasOlder false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-load-older-history.ac2",
+            "title": "When the timeline container scrolls to scrollTop 100 with hasOlder true, the onLoadOlder spy records exactly one call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-load-older-history.ac3",
+            "title": "Given a prepend that adds 600 px of content, the container's scrollTop updates by +600 so the previously visible first row preserves its on-screen position.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-load-older-history.ac4",
+            "title": "The timeline renders 'Loading earlier messages…' while a page loads and 'Start of conversation' once hasOlder is false after paging.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-tool-body-on-expand",
+        "title": "Load omitted tool bodies on expand and treat resultBytes as a result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/toolBodyLoader.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx",
+            "src/dashboard/frontend/src/lib/workingPhase.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/workingPhase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx src/lib/__tests__/workingPhase.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "both test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. toolBodyLoader.tsx: ToolBodyLoaderContext ((entryId) => Promise<WorkLogEntry>) and useToolBody(entry, expanded) (React Query key ['tool-body', loaderKey, entry.id], enabled only when expanded && entry.bodyOmitted). SimpleWorkEntryRow uses hasToolResult(entry); when expanded with bodyOmitted, renders the loaded full entry, 'Loading full output…' while loading and 'Could not load the full output.' on error; shows the resultBytes size hint (KB) on the collapsed row. workingPhase.ts getWorkingPhase and getPendingToolEntry use !hasToolResult(entry). ConversationPanel provides the loader for /api/conversations/:name/tool-body/:id (agents route tool-body with agentId); SubagentTranscript provides it with ?agentId=."
+        },
+        "items": [
+          {
+            "id": "wi14-tool-body-on-expand.ac1",
+            "title": "Expanding a work row with bodyOmitted true fetches the tool-body route once and renders the full result text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-tool-body-on-expand.ac2",
+            "title": "A collapsed row with resultBytes 20480 shows a '20 KB' size hint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-tool-body-on-expand.ac3",
+            "title": "Given an entry with resultBytes and no result, getWorkingPhase and getPendingToolEntry returns it as finished, not pending.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-tool-body-on-expand.ac4",
+            "title": "If the tool-body fetch fails, the expanded row renders 'Could not load the full output.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-payload-budget-test",
+        "title": "Add the conversation payload budget test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/__tests__/conversation-payload-budget.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-payload-budget.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-payload-budget.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Write a synthetic Claude JSONL over 5 MB to a temp dir (at least 1,000 user/assistant message pairs with text of 1.5 KB or more each, so message text alone exceeds 1 MiB after elision, interleaved with 500 Bash tool_use/tool_result pairs with 3-20 KB output). Assert Buffer.byteLength(JSON.stringify(body)) <= CONVERSATION_PAYLOAD_BUDGET_BYTES for getConversationMessagesRead default mode, for the first streamClaudeTranscript event, and for the first createTranscriptDelta(null) event; also assert the fixture is larger than 5,000,000 bytes, and add a negative control: selectInitialWindow with an unlimited budget on the same parse encodes to more than 1,048,576 bytes. Use fake timers for any wait."
+        },
+        "items": [
+          {
+            "id": "wi15-payload-budget-test.ac1",
+            "title": "The test creates a fixture file and asserts its size is larger than 5,000,000 bytes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-payload-budget-test.ac2",
+            "title": "The test asserts the initial HTTP body, the first Claude WS event and the first full-parse WS event are each at most 1,048,576 bytes when JSON-encoded, and all three assertions pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-payload-budget-test.ac3",
+            "title": "A negative-control case calls selectInitialWindow on the same parse with budget {maxRows: 1000000, maxBytes: Number.POSITIVE_INFINITY} and asserts the JSON-encoded result contains more than 1,048,576 bytes, proving the budget check would fail if the window grew.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-jump-outside-window",
+        "title": "Load older pages when a jump target is outside the loaded window",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/ConversationBookmarks.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/MessagesTimeline.test.tsx src/components/chat/bookmarks/__tests__/ConversationBookmarks.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. In targetMessageRow skip the targetMessageIndex fallback while history.hasOlder. When targetMessageId is not in rows and onLoadOlderUntil exists, call it once per nonce; the scroll effect re-runs when rows change. Bookmark jumps call onLoadOlderUntil before resolveJump(nonce, false) marks the message missing."
+        },
+        "items": [
+          {
+            "id": "wi16-jump-outside-window.ac1",
+            "title": "Given a targetMessageId that is not loaded and hasOlder true, the timeline calls onLoadOlderUntil with that id once and scrolls to the message after it loads.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-jump-outside-window.ac2",
+            "title": "Given hasOlder true and only a targetMessageIndex, the timeline returns no target row and does not scroll to a counted row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-jump-outside-window.ac3",
+            "title": "When a bookmark jump targets an unloaded message, the provider calls onLoadOlderUntil before it marks the message missing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-export-and-simple-feed",
+        "title": "Export the full transcript and fix the simple-feed kickoff under a window",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesQuery.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx",
+            "src/dashboard/frontend/src/lib/simple/feedEntries.ts",
+            "src/dashboard/frontend/src/components/simple/SimpleActivityFeed.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/simple-feed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/simple-feed.test.ts src/components/simple/SimpleActivityFeed.test.tsx",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors",
+            "both test files pass",
+            "lint:file-size reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17. Add fetchFullTranscript(name, agentId?) to messagesQuery.ts (/api/conversations/:name/messages?window=all, or the agents route without params). handleExportTranscript awaits it instead of reading messagesData. ConversationActionMenu export fetches ?window=all. buildSimpleFeedEntries gains hasOlder?; the first user message is the kickoff only when !hasOlder. SimpleActivityFeed passes messagesData?.history?.hasOlder and replaces its length guard with mergeWindowIntoCache."
+        },
+        "items": [
+          {
+            "id": "wi17-export-and-simple-feed.ac1",
+            "title": "When the Command Deck export runs, it sends its request to /api/conversations/<name>/messages?window=all.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-export-and-simple-feed.ac2",
+            "title": "Given a cache that holds only a window, the conversation header export produces a markdown file that contains every message of the transcript (mocked fetch).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-export-and-simple-feed.ac3",
+            "title": "buildSimpleFeedEntries with hasOlder true renders the first user message as a normal user entry, not the kickoff system entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-docs",
+        "title": "Document bounded conversation windows, paging, resume and tool bodies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "/home/eltmon/Projects/overdeck-knowledge/frontend/conversation-ui.md",
+            "/home/eltmon/Projects/overdeck-knowledge/frontend/data-flow.md",
+            "/home/eltmon/Projects/overdeck-knowledge/log.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'before=' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -c 'Clients receive complete initial history' docs/DASHBOARD-ARCHITECTURE.md || true",
+            "git -C /home/eltmon/Projects/overdeck-knowledge log -1 --stat",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep finds the before= paging documentation",
+            "the old phrase count is 0",
+            "the latest overdeck-knowledge commit names PAN-4558 and lists the three files",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. docs/DASHBOARD-ARCHITECTURE.md: in the subscribeConversationMessages bullet (~:278-300) replace 'Clients receive complete initial history' with the window contract (75 rows / 960 KiB entries / 1 MiB payload), the window field, resume (afterSequence, openIds, transcript) and its windowed-reset fallback; in the GET /api/conversations/:name/messages bullet (~:391) document before/limit, window=all, /tool-body/:toolUseId, the agents route window=initial/before/tool-body, resultBytes/bodyOmitted, and that Ctrl+F searches loaded rows only. OKF bundle at /home/eltmon/Projects/overdeck-knowledge (absolute path; .okf.yml's ../overdeck-knowledge is relative to the project root, not the workspace; use /okf author): frontend/conversation-ui.md (scroll-to-top paging, tool body on expand, jump loads older pages), frontend/data-flow.md (windowed snapshot, resume on resubscribe), log.md entry '* Author (PAN-4558): ...'; git pull --rebase, commit 'docs: document bounded conversation windows and history paging (PAN-4558)', push to its main."
+        },
+        "items": [
+          {
+            "id": "wi18-docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md states that a cold open returns at most 75 timeline rows within a 1 MiB payload and names the before=, window=all and tool-body routes (grep for 'before=' and 'resultBytes' matches).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md no longer contains the phrase 'Clients receive complete initial history'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac3",
+            "title": "The overdeck-knowledge repo's newest commit subject contains PAN-4558 and touches frontend/conversation-ui.md, frontend/data-flow.md and log.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-register-frontend-tests",
+        "title": "Register the new frontend tests in the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:48:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4558",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "test:frontend-subset passes including the four new files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Append these paths (relative to src/dashboard/frontend) to the `test:frontend-subset` script in the root package.json so CI runs them: src/components/chat/__tests__/conversationHistory.test.ts, src/components/chat/__tests__/useOlderHistory.test.ts, src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx, src/lib/__tests__/simple-feed.test.ts. Only append; do not reorder or remove existing entries."
+        },
+        "items": [
+          {
+            "id": "wi19-register-frontend-tests.ac1",
+            "title": "The root package.json test:frontend-subset script contains conversationHistory.test.ts, useOlderHistory.test.ts, workLogRows.test.tsx and simple-feed.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-register-frontend-tests.ac2",
+            "title": "Running `npm run test:frontend-subset` passes with the four added files included.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-window-contract",
+        "to": "wi2-wire-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-window-contract",
+        "to": "wi4-window-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-wire-projection",
+        "to": "wi4-window-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-window-selection",
+        "to": "wi5-http-window-page",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-window-selection",
+        "to": "wi7-agents-route-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-window-selection",
+        "to": "wi8-claude-ws-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-window-selection",
+        "to": "wi9-fullparse-ws-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-http-window-page",
+        "to": "wi6-http-tool-body",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-http-tool-body",
+        "to": "wi7-agents-route-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-extract-claude-stream",
+        "to": "wi8-claude-ws-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-claude-ws-window",
+        "to": "wi9-fullparse-ws-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-http-window-page",
+        "to": "wi15-payload-budget-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-claude-ws-window",
+        "to": "wi15-payload-budget-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-fullparse-ws-window",
+        "to": "wi15-payload-budget-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-window-contract",
+        "to": "wi11-client-cache-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-extract-messages-query",
+        "to": "wi12-http-query-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-client-cache-merge",
+        "to": "wi12-http-query-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-http-query-merge",
+        "to": "wi13-load-older-history",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-load-older-history",
+        "to": "wi14-tool-body-on-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-load-older-history",
+        "to": "wi16-jump-outside-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-tool-body-on-expand",
+        "to": "wi17-export-and-simple-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-load-older-history",
+        "to": "wi19-register-frontend-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-tool-body-on-expand",
+        "to": "wi19-register-frontend-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-export-and-simple-feed",
+        "to": "wi19-register-frontend-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-agents-route-window",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-payload-budget-test",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-jump-outside-window",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-export-and-simple-feed",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-extract-claude-stream",
+        "to": "wi9-fullparse-ws-window",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-extract-messages-query",
+        "to": "wi13-load-older-history",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-extract-messages-query",
+        "to": "wi14-tool-body-on-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-extract-messages-query",
+        "to": "wi17-export-and-simple-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-http-query-merge",
+        "to": "wi14-tool-body-on-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-http-query-merge",
+        "to": "wi17-export-and-simple-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-load-older-history",
+        "to": "wi17-export-and-simple-feed",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

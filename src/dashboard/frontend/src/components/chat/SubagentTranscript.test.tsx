@@ -8,6 +8,10 @@ const hookMocks = vi.hoisted(() => ({ useSubagentTranscript: vi.fn(), timelinePr
 
 vi.mock('./useConversationMessagesStream', () => ({
   useSubagentTranscript: hookMocks.useSubagentTranscript,
+  subagentTranscriptQueryKey: (name: string, agentId: string) => ['conversation-messages', name, 'subagent', agentId],
+}));
+vi.mock('./useOlderHistory', () => ({
+  useOlderHistory: () => ({ hasOlder: false, loadingOlder: false, loadedOlder: false, error: null, loadOlder: vi.fn(), loadOlderUntil: vi.fn() }),
 }));
 vi.mock('./SubagentComposer', () => ({ SubagentComposer: () => null }));
 vi.mock('./MessagesTimeline', () => ({

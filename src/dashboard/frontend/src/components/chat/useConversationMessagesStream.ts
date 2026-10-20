@@ -5,7 +5,9 @@ import { getHarnessBehavior, isAgentSessionName, WS_METHODS } from '@overdeck/co
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
-import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ProposedPlan, SubagentSummary, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ConversationWindow, ProposedPlan, SubagentSummary, WorkLogEntry } from './chat-types';
+import { mergeWindowIntoCache, resumePayloadFromCache } from './conversationHistory';
+import { mergeFetchedMessages } from './messagesQuery';
 
 export const conversationMessagesQueryKey = (name: string) => ['conversation-messages', name] as const;
 export const subagentTranscriptQueryKey = (name: string, agentId: string) => ['conversation-messages', name, 'subagent', agentId] as const;
@@ -60,6 +62,8 @@ export interface ConversationMessagesCache {
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
   contextUsage?: ContextUsage | null;
+  /** PAN-4558: cursor and transcript id of the loaded window; older rows page in from `history.cursor`. */
+  history?: ConversationWindow;
 }
 
 export function applyConversationMessagesEvent(
@@ -102,23 +106,34 @@ export function applyConversationMessagesEvent(
   const snapshotShrinks =
     isSnapshot && !event.reset && event.messages.length < (previous?.messages.length ?? 0);
   const replaceFromSnapshot = isSnapshot && !snapshotShrinks;
+  // PAN-4558: a windowed snapshot replaces only the rows from its cursor on,
+  // keeping older rows the user paged in.
+  const rows = event.window
+    ? mergeWindowIntoCache(previous, event)
+    : replaceFromSnapshot
+      ? { messages: event.messages, workLog: event.workLog, history: undefined }
+      : {
+          messages: mergeById(previous?.messages ?? [], event.messages),
+          workLog: mergeById(previous?.workLog ?? [], event.workLog),
+          history: previous?.history,
+        };
   return {
     ...previous,
-    messages: replaceFromSnapshot
-      ? event.messages
-      : mergeById(previous?.messages ?? [], event.messages),
-    workLog: replaceFromSnapshot
-      ? event.workLog
-      : mergeById(previous?.workLog ?? [], event.workLog),
+    ...rows,
     streaming: event.streaming,
     totalCost: event.totalCost ?? previous?.totalCost,
     proposedPlan: event.metadataSnapshot ? event.proposedPlan : event.proposedPlan ?? previous?.proposedPlan,
-    compactBoundaries: event.metadataSnapshot || replaceFromSnapshot
+    compactBoundaries: event.metadataSnapshot || replaceFromSnapshot || event.window
       ? event.compactBoundaries
       : mergeById(previous?.compactBoundaries ?? [], event.compactBoundaries ?? []),
     contextUsage: 'contextUsage' in event ? event.contextUsage : previous?.contextUsage,
     discovering: false,
   };
+}
+
+function resumeField(cache: ConversationMessagesCache | undefined) {
+  const resume = resumePayloadFromCache(cache);
+  return resume ? { resume } : {};
 }
 
 export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): boolean {
@@ -168,7 +183,11 @@ export function useConversationMessagesStream(
     const queryKey = conversationMessagesQueryKey(conversation.name);
     const unsubscribe = getTransport().subscribe(
       (client) =>
-        (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,
+        (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({
+          conversationName: conversation.name,
+          // Read at every (re)subscribe so the server sends only rows this cache lacks.
+          ...resumeField(queryClient.getQueryData<ConversationMessagesCache>(queryKey)),
+        }) as Stream.Stream<ConversationEvent, Error>,
       (event) => {
         setFirstPayloadIdentity(streamIdentity);
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) =>
@@ -204,6 +223,7 @@ export function useSubagentTranscript(
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({
           conversationName: conversation.name,
           agentId,
+          ...resumeField(queryClient.getQueryData<ConversationMessagesCache>(queryKey)),
         }) as Stream.Stream<ConversationEvent, Error>,
       (event) => {
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) =>
@@ -226,7 +246,8 @@ export function useSubagentTranscript(
         { signal },
       );
       if (!response.ok) throw new Error('Failed to fetch subagent messages');
-      return response.json() as Promise<ConversationMessagesCache>;
+      const fetched = await response.json() as ConversationMessagesCache & { window?: ConversationWindow };
+      return mergeFetchedMessages(queryClient.getQueryData<ConversationMessagesCache>(queryKey), fetched);
     },
     enabled: agentId !== null && !streaming,
   });
