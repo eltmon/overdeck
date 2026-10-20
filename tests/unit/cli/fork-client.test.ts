@@ -117,4 +117,19 @@ describe('forkConversationViaServer', () => {
     const body = JSON.parse(init.body);
     expect(body).toMatchObject({ forkMode: 'handoff', issueId: 'PAN-9005', focus: 'drive' });
   });
+
+  it('forwards fresh in the request body when provided (PAN-4565)', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ conversation: { id: 5, name: 'fresh-fork', tmuxSession: 'conv-5', forkStatus: null } }))
+      .mockResolvedValue(jsonResponse({ id: 5, name: 'fresh-fork', tmuxSession: 'conv-5', forkStatus: null }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const resultPromise = forkConversationViaServer('source', { forkMode: 'handoff', fresh: true }, { timeoutMs: 1_000, pollMs: 500 });
+    await vi.advanceTimersByTimeAsync(500);
+    await resultPromise;
+
+    const init = fetchMock.mock.calls[0][1] as { body: string };
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({ forkMode: 'handoff', fresh: true });
+  });
 });

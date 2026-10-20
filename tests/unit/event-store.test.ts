@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
-import { createEventStore, type DbAdapter } from '../../src/dashboard/server/event-store.js';
+import { createEventStore, REPLAY_MAX_EVENTS, type DbAdapter } from '../../src/dashboard/server/event-store.js';
 
 let db: SqliteDatabase;
 
@@ -189,5 +189,98 @@ describe('startup purge of orphaned review-status events (PAN-3917)', () => {
     const remaining = store.readFrom(0);
     expect(remaining).toHaveLength(1);
     expect(remaining[0]!.type).toBe('agent.started');
+  });
+});
+
+describe('readFromBounded (PAN-4559)', () => {
+  function appendN(store: ReturnType<typeof createEventStore>, n: number, payload: unknown = {}): void {
+    for (let i = 0; i < n; i++) {
+      store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload } as any);
+    }
+  }
+
+  it('returns every event after fromSequence when the gap is within the cap', () => {
+    const store = createEventStore(db as unknown as DbAdapter, { resolveWorkspaceId: () => undefined });
+    appendN(store, 3);
+
+    const result = store.readFromBounded(0, { maxEvents: 5 });
+
+    expect(result.tooFarBehind).toBe(false);
+    expect(result.events).toHaveLength(3);
+    const seqs = result.events.map(e => e.sequence);
+    expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+  });
+
+  it('returns exactly maxEvents events without tooFarBehind', () => {
+    const store = createEventStore(db as unknown as DbAdapter, { resolveWorkspaceId: () => undefined });
+    appendN(store, 5);
+
+    const result = store.readFromBounded(0, { maxEvents: 5 });
+
+    expect(result.tooFarBehind).toBe(false);
+    expect(result.events).toHaveLength(5);
+  });
+
+  it('reports tooFarBehind and reads at most maxEvents + 1 rows when the gap exceeds the cap', () => {
+    const recorded: { sql: string; rowCount: number }[] = [];
+    const recordingDb: DbAdapter = {
+      prepare: <R = Record<string, unknown>>(sql: string) => {
+        const stmt = (db as unknown as DbAdapter).prepare<R>(sql);
+        return {
+          run: (params?: unknown[]) => (params === undefined ? stmt.run() : stmt.run(params)),
+          get: (params?: unknown[]) => (params === undefined ? stmt.get() : stmt.get(params)),
+          all: (params?: unknown[]) => {
+            const rows = params === undefined ? stmt.all() : stmt.all(params);
+            recorded.push({ sql, rowCount: rows.length });
+            return rows;
+          },
+        };
+      },
+      exec: (sql: string) => (db as unknown as DbAdapter).exec(sql),
+    };
+    const store = createEventStore(recordingDb, { resolveWorkspaceId: () => undefined });
+    appendN(store, 20);
+
+    const result = store.readFromBounded(0, { maxEvents: 5 });
+
+    expect(result).toEqual({ events: [], tooFarBehind: true });
+    const boundedCall = recorded.find(r => r.sql.includes('LIMIT ?'));
+    expect(boundedCall).toBeDefined();
+    expect(boundedCall!.rowCount).toBe(6);
+  });
+
+  it('uses REPLAY_MAX_EVENTS by default', () => {
+    const store = createEventStore(db as unknown as DbAdapter, { resolveWorkspaceId: () => undefined });
+    appendN(store, REPLAY_MAX_EVENTS + 1);
+
+    expect(store.readFromBounded(0).tooFarBehind).toBe(true);
+
+    const result = store.readFromBounded(1);
+    expect(result.tooFarBehind).toBe(false);
+    expect(result.events).toHaveLength(REPLAY_MAX_EVENTS);
+  });
+
+  it('reports tooFarBehind when payload bytes exceed maxPayloadBytes', () => {
+    const store = createEventStore(db as unknown as DbAdapter, { resolveWorkspaceId: () => undefined });
+    appendN(store, 3, { blob: 'x'.repeat(400) });
+
+    expect(store.readFromBounded(0, { maxEvents: 10, maxPayloadBytes: 1000 }).tooFarBehind).toBe(true);
+
+    const result = store.readFromBounded(0, { maxEvents: 10, maxPayloadBytes: 10_000 });
+    expect(result.tooFarBehind).toBe(false);
+    expect(result.events).toHaveLength(3);
+  });
+
+  it('excludes issues.snapshot rows', () => {
+    const store = createEventStore(db as unknown as DbAdapter, { resolveWorkspaceId: () => undefined });
+    db.prepare(`INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`)
+      .run('issues.snapshot', Date.now(), '{}');
+    store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: {} } as any);
+
+    const result = store.readFromBounded(0, { maxEvents: 10 });
+
+    expect(result.tooFarBehind).toBe(false);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.type).toBe('agent.started');
   });
 });

@@ -12,6 +12,7 @@
  *   const seq = store.append({ type: 'agent.started', ... });
  *   const past = store.readFrom(0);
  *   const unsub = store.subscribe(event => console.log(event));
+ *   const bounded = store.readFromBounded(seq); // capped gap replay (PAN-4559)
  */
 
 import { EventEmitter } from 'node:events';
@@ -71,6 +72,21 @@ export interface StoredEvent {
   payload: unknown;
 }
 
+/** PAN-4559: the most stored rows / payload bytes one replayEvents call may return. */
+export const REPLAY_MAX_EVENTS = 500;
+export const REPLAY_MAX_PAYLOAD_BYTES = 1024 * 1024;
+
+export interface ReplayLimits {
+  maxEvents?: number;
+  maxPayloadBytes?: number;
+}
+
+/** A bounded replay read: the events, or tooFarBehind (and no events) when the gap exceeds a cap. */
+export interface ReplayWindow {
+  events: StoredEvent[];
+  tooFarBehind: boolean;
+}
+
 export type EventSubscriber = (event: StoredEvent) => void;
 export type Unsubscribe = () => void;
 
@@ -92,6 +108,12 @@ export interface EventStore {
   emitOnly(event: Omit<DomainEvent, 'sequence'>): void;
   /** Return all events with sequence > fromSequence (exclusive lower bound). */
   readFrom(fromSequence: number): StoredEvent[];
+  /**
+   * PAN-4559: events with sequence > fromSequence, bounded by `limits`
+   * (defaults REPLAY_MAX_EVENTS / REPLAY_MAX_PAYLOAD_BYTES). Reads at most
+   * maxEvents + 1 rows; returns tooFarBehind with no events past either cap.
+   */
+  readFromBounded(fromSequence: number, limits?: ReplayLimits): ReplayWindow;
   /** Return events of a given type, most recent first, capped at limit. */
   queryByType(type: string, limit?: number): StoredEvent[];
   /**
@@ -232,6 +254,11 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     // issues.snapshot is a high-frequency derived event (~1.5 MB each) that is not
     // useful for replay — clients get current issues via getSnapshot instead.
     `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? AND type != 'issues.snapshot' ORDER BY sequence ASC`,
+  );
+  const readFromBoundedStmt = db.prepare<EventRow>(
+    // PAN-4559: readFromStmt's filter plus LIMIT, so a far-behind client never
+    // makes the server read the whole retained range on the main thread.
+    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? AND type != 'issues.snapshot' ORDER BY sequence ASC LIMIT ?`,
   );
   const compactStmt = db.prepare<void>(
     `DELETE FROM events WHERE timestamp < ?`,
@@ -418,6 +445,20 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     return rows.map(rowToStored);
   }
 
+  function readFromBounded(fromSequence: number, limits: ReplayLimits = {}): ReplayWindow {
+    const maxEvents = limits.maxEvents ?? REPLAY_MAX_EVENTS;
+    const maxPayloadBytes = limits.maxPayloadBytes ?? REPLAY_MAX_PAYLOAD_BYTES;
+    // One extra row tells "exactly at the cap" apart from "past it".
+    const rows = readFromBoundedStmt.all([fromSequence, maxEvents + 1]);
+    if (rows.length > maxEvents) return { events: [], tooFarBehind: true };
+    let payloadBytes = 0;
+    for (const row of rows) {
+      payloadBytes += Buffer.byteLength(row.payload, 'utf8');
+      if (payloadBytes > maxPayloadBytes) return { events: [], tooFarBehind: true };
+    }
+    return { events: rows.map(rowToStored), tooFarBehind: false };
+  }
+
   function subscribe(fn: EventSubscriber): Unsubscribe {
     emitter.on('event', fn);
     return () => emitter.off('event', fn);
@@ -546,6 +587,7 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     appendAsync,
     emitOnly,
     readFrom,
+    readFromBounded,
     queryByType,
     queryLatestPerIssue,
     appendOnce,

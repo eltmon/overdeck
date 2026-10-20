@@ -1,0 +1,709 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T02:47:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4565: pan handoff --fresh: start a clean conversation with no summary and no parent link",
+    "updated": "2026-10-20T02:51:43.633Z"
+  },
+  "plan": {
+    "id": "pan-4565",
+    "title": "pan handoff --fresh: start a clean conversation with no summary and no parent link",
+    "status": "running",
+    "uid": "6023e130-630c-423c-a108-9341bcfefd05",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-20T02:47:22Z",
+    "updated": "2026-10-20T02:51:43.633Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4565",
+        "label": "PAN-4565",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "handoff",
+      "cli",
+      "dashboard",
+      "forks"
+    ],
+    "narratives": {
+      "Problem": "pan handoff always stamps parent_conversation_id on the successor (handleConversationSummaryFork passes parentName: conv.name unconditionally) and always seeds it from the source transcript via an authored handoff document or a summary. There is no CLI way to start a clean conversation that takes only the source's defaults, e.g. starting a Dwarf Fortress fort on a cheaper model from a Project Zomboid research conversation.",
+      "Proposal": "Add a boolean 'fresh' to the handoff fork request (like PAN-4499's hold). The route skips the transcript and git gates, creates the successor without a parent link, titles it from the focus, does not inherit the source issue, and refuses lane sources; runForkPipeline gets a fresh branch before any transcript read that launches the session and delivers the focus verbatim (or holds it, or delivers nothing). Recovery forwards fresh. CLI: pan handoff --fresh. Dashboard: a 'Fresh start' checkbox in the Continue dialog and a --fresh composer token. Full detail: .pan/drafts/pan-4565.md.",
+      "NonGoals": "- No pan fork --fresh and no standalone pan conv new verb\n- No change to summary, plain or regular handoff behavior, output or titles\n- No change to --skill/--pack inheritance of the source skill map or to conversationLaunchContext inheritance\n- No AI title generation for fresh successors\n- No new forkMode value and no new forkStatus value\n- No schema migration: fresh lives only inside the existing fork_request JSON\n- No callerKind-based exception to the lane guard\n- No allowlist cap raise for conversation-forks.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Model --fresh as a boolean 'fresh' on the handoff request (like PAN-4499's hold), not a fourth forkMode",
+        "rationale": "Keeps the three forkMode unions, parsePersistedForkRequest and the frontend ApiForkMode unchanged; hold is the established precedent for a handoff modifier."
+      },
+      {
+        "summary": "Dashboard control is a 'Fresh start' checkbox under the Agent handoff intent, beside Hold",
+        "rationale": "The issue asks for a toggle in the handoff dialog; a checkbox matches the existing Hold control and sends the same request as the CLI."
+      },
+      {
+        "summary": "Fresh skips the source session-file gates (route, pipeline, CLI) and the git-worktree gate",
+        "rationale": "The source is only a defaults donor and its transcript is never read; the git gate exists for document authoring, and a plain new conversation has no such gate."
+      },
+      {
+        "summary": "Fresh with no focus and no hold launches the successor and delivers nothing; fresh+hold with no focus is a 400",
+        "rationale": "A conversation with no first message is a valid new conversation; holding an empty kickoff would make the kickoff door send an empty message."
+      },
+      {
+        "summary": "Refuse fresh when the source's effective launcher is a gauntlet lane, for every caller",
+        "rationale": "A fresh successor is a root and could launch root-only lanes, escaping PAN-4223 D21; callerKind cannot gate it because every conv-* session, lanes included, is classified operator."
+      },
+      {
+        "summary": "A fresh successor does not inherit the source's issueId (uses --issue, else the cwd's branch issue)",
+        "rationale": "The issue lists only project, cwd, model and effort as inherited defaults; an issue link is a soft lineage the operator asked to drop."
+      },
+      {
+        "summary": "Fresh title: --title, else the focus cut to 70 chars without a 'Handoff:' prefix, else 'New conversation'",
+        "rationale": "The source title is exactly the context being discarded (the Zomboid example); the successor is a root, not a handoff."
+      },
+      {
+        "summary": "Extract source-session helpers out of conversation-forks.ts before adding fresh logic",
+        "rationale": "The file is 973 lines against a 1000-line ceiling with no allowlist row, and agents may not raise caps."
+      },
+      {
+        "summary": "CLI exits 1 on --fresh with --author source or --author-model",
+        "rationale": "Those flags configure an authoring session that a fresh start never runs; an explicit conflict is clearer than silently ignoring it. --author's commander default 'external' cannot be detected, so only explicit source/model are refused."
+      },
+      {
+        "summary": "Add ForkModal.test.tsx and handoffComposerArgs.test.ts to test:frontend-subset",
+        "rationale": "CI runs only listed frontend tests; without this the dialog AC test never runs in CI."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One CLI flag whose wire contract must land on the server route and pipeline, the CLI, the dashboard dialog and the docs in one PR: shipped separately, the CLI flag or the dialog checkbox would silently perform a full handoff (summary + parent link) against a server that ignores fresh.",
+      "canonicalFilename": "2026-10-20-PAN-4565-pan-handoff-fresh-start-a-clean-conversation-with-no-summary-and-no-parent-link.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "extract-fork-source-session",
+        "title": "Extract fork source-session resolution into fork-source-session.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/fork-source-session.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-hold.test.ts src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts src/lib/overdeck/__tests__/conversation-forks-skill-flags.test.ts src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular",
+            "wc -l src/lib/overdeck/conversation-forks.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all seven existing fork test files pass unchanged",
+            "file-size guard passes",
+            "no new circular dependency reported",
+            "conversation-forks.ts is 905 lines or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Move SESSION_FILE_MISS_TTL_MS, sessionFileByIdCache, findClaudeSessionFileById(), resolveForkSourceSessionFile() and resolvePlainForkTargetSessionFile() (conversation-forks.ts lines 90-173; grep 'const SESSION_FILE_MISS_TTL_MS = 2000;') unchanged into a new leaf module src/lib/overdeck/fork-source-session.ts that exports the two resolve* functions. conversation-forks.ts imports them from './fork-source-session.js' and drops imports that become unused. The new module never imports conversation-forks.ts. Pure move: no behavior change."
+        },
+        "items": [
+          {
+            "id": "extract-fork-source-session.ac1",
+            "title": "Given the extraction, when grep 'function resolveForkSourceSessionFile' runs over src/lib/overdeck, then it matches only fork-source-session.ts, which exports resolveForkSourceSessionFile and resolvePlainForkTargetSessionFile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-fork-source-session.ac2",
+            "title": "When vitest runs the seven existing fork test files (conversation-forks-*.test.ts, conversations-fork-recovery.test.ts, conversations-fork-pipeline.test.ts), then it exits 0 and no test file is modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-fork-source-session.ac3",
+            "title": "When wc -l runs on src/lib/overdeck/conversation-forks.ts, then it returns 905 lines or fewer, and npm run lint:circular reports no new cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-pipeline",
+        "title": "Fresh-start branch in runForkPipeline and fork recovery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts src/lib/overdeck/__tests__/conversation-forks-hold.test.ts src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-forks-fresh.test.ts 'fresh pipeline (PAN-4565)' tests pass; hold and recovery tests still pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-7",
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add 'fresh?: boolean' to ForkRequest (conversations.ts) and '...(params.fresh ? { fresh: true } : {})' to buildForkRequest. Add a trailing 'fresh = false' parameter to runForkPipeline and insert the fresh branch right after 'if (!conv) throw' and BEFORE resolveForkSourceSessionFile(parentConv): updateForkStatus 'spawning'; self.ensureForkSessionReady(conv, sessionId, false); with focus and no hold -> return self.deliverForkSeed(conv, handoffFocus, 'fresh-start'); with focus and hold -> holdKickoff(convName, handoffFocus); then markConversationActive + updateForkStatus(null). No focus -> deliver nothing. recoverStuckForks passes 'request.fresh === true' as the new last argument. Tests go in new src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts (describe 'fresh pipeline (PAN-4565)'), modeled on conversation-forks-hold.test.ts, with the four summary-fork.js generators mocked to throw if called."
+        },
+        "items": [
+          {
+            "id": "fresh-pipeline.ac1",
+            "title": "Given runForkPipeline is called with fresh=true and focus 'build a fort', when it completes, then injectForkSummary receives exactly 'build a fort' and authorHandoffExternal, requestHandoffFromAgent, generateSummaryForFork and generateFallbackSummary are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-pipeline.ac2",
+            "title": "Given the source conversation has no session file on disk, when a fresh pipeline runs, then it completes with forkStatus null instead of throwing 'Parent has no session file'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-pipeline.ac3",
+            "title": "Given fresh=true with hold=true and a focus, when the pipeline completes, then readHeldKickoff returns the focus and injectForkSummary is not called; given fresh=true with no focus, then nothing is delivered or held and the row is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-pipeline.ac4",
+            "title": "Given a persisted ForkRequest with fresh: true and a runtime that is not active, when recoverStuckForks runs, then the replay never calls any of the four summary-fork generators",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-route",
+        "title": "Accept fresh on the summary-fork route: root successor, focus title, no issue inheritance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4565",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/fork-fresh.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts src/lib/overdeck/__tests__/conversation-forks-hold.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "fresh route tests and the new parent-link fresh test pass; existing parent-link it.each passes unchanged",
+            "file-size guard passes with conversation-forks.ts at or under 1000 lines",
+            "no new circular dependency"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "fresh-lane-guard",
+            "fresh-cli",
+            "fresh-dialog"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New leaf src/lib/overdeck/fork-fresh.ts exports freshStartTitle(focus) (collapse whitespace, >70 chars -> first 69 trimEnd + '…', empty -> 'New conversation'; no 'Handoff: ' prefix). In handleConversationSummaryFork: 'const fresh = body[\"fresh\"] === true' computed before the source session-file gate; keep the getTranscriptAdapter(...) sourceAdapter assignment unconditional (later plain-fork and source-authored checks use it) and skip only the resolveSessionFile/existsSync 400 when fresh; 400 'fresh is only valid with forkMode \"handoff\"' for summary/plain; 400 'fresh with hold needs focus text: there is nothing to hold' when fresh && hold && !handoffFocus; skip the source-authored-harness 400 and the isInsideGitWorkTree gate when fresh; 'inheritedIssueId = fresh ? undefined : conv.issueId' used for issueId, the branch-detection condition and the effort resolver; defaultTitle = fresh ? freshStartTitle(handoffFocus) : existing; titleSeed 'Fresh start'; forkStatus 'spawning'; replace 'parentName: conv.name' with '...(fresh ? {} : { parentName: conv.name })'; add fresh to buildForkRequest and pass fresh as the last runForkPipeline argument. Tests: describe 'fresh route (PAN-4565)' in conversation-forks-fresh.test.ts plus one new separate it() in conversation-forks-parent-link.test.ts (never edit the existing it.each)."
+        },
+        "items": [
+          {
+            "id": "fresh-route.ac1",
+            "title": "Given a fresh request with focus 'start a fort', when the route returns 200, then the response and stored row have parentConversationId null and parentConversationName null, the stored forkRequest has fresh: true, and the title is 'start a fort' with no 'Handoff:' prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-route.ac2",
+            "title": "Given a fresh request with no model and no cwd, then the successor defaults to the source's model, cwd and effort; given model 'claude-haiku-4-5' and a cwd, then the successor uses those values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-route.ac3",
+            "title": "Given a source with issueId PAN-9001 and no issueId in the body, when a fresh successor is created in a non-git cwd, then its issueId is null; given a source with no session file and handoff_author_model unset, then the request still returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-route.ac4",
+            "title": "Given fresh with forkMode 'summary' or 'plain', or fresh+hold with no focus, when the route runs, then it returns 400 with the PRD error text and listConversations().length is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-route.ac5",
+            "title": "Given a fresh request, when the successor is created, then the source row's handoffTargetConvId, handoffDocPath and title are unchanged, and wc -l conversation-forks.ts stays at or under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-lane-guard",
+        "title": "Refuse fresh starts from a gauntlet lane or its successor chain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/fork-fresh.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-fresh.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lane-guard tests in conversation-forks-fresh.test.ts pass",
+            "no new circular dependency"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In fork-fresh.ts export freshStartLaneRefusal(sourceName): returns the FR-9 message ('a fresh start cannot be made from a gauntlet lane or its successors: it would drop the lane standing that passes through the parent link (PAN-4223 D21). Use pan handoff without --fresh, or pan lane start --reuse.') when resolveEffectiveLauncher(sourceName)?.laneKey is non-null, else null. Import resolveEffectiveLauncher from './conversations.js'. In handleConversationSummaryFork right after the FR-8 check: when fresh and the refusal is non-null, return 400 with it. Applies to every caller: callerKind is 'operator' for every conv-* session including lanes, so it cannot be the gate."
+        },
+        "items": [
+          {
+            "id": "fresh-lane-guard.ac1",
+            "title": "Given a builder lane conversation, when a fresh request names it as source, then the route returns 400 with the FR-9 message and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-lane-guard.ac2",
+            "title": "Given a regular handoff successor of a builder lane, when a fresh request names that successor, then the route returns 400 with the FR-9 message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-lane-guard.ac3",
+            "title": "Given a root conversation with no lane ancestry, when a fresh request names it, then the route returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-cli",
+        "title": "pan handoff --fresh flag with skill doc and regenerated composer manifest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "tests/unit/cli/fork-client.test.ts",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts",
+            "npm run build:cli",
+            "node dist/cli/index.js handoff --help",
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "handoff.test.ts and fork-client.test.ts pass including the '--fresh (PAN-4565)' tests",
+            "handoff --help output lists --fresh",
+            "skill CLI lint passed",
+            "composer-command manifest matches the CLI registry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-15",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. index.ts: add .option('--fresh', 'Start a clean conversation: no handoff document, no summary, no parent link; the focus is its first message. Project, cwd, model and effort still default from the source') after --hold. fork-client.ts: 'fresh?: boolean' on ForkViaServerOptions and 'if (opts.fresh) body[\"fresh\"] = true'. handoff.ts: 'fresh?: boolean' on HandoffOptions; skip the session-file check (lines 85-89) when fresh; exit 1 with '--fresh authors no handoff document; drop --author/--author-model' when fresh && (author === 'source' || authorModel !== undefined); exit 1 with 'fresh with hold needs focus text: there is nothing to hold' when fresh && hold && !focus; under fresh print 'Starting a fresh conversation from the defaults of <name> (<title>)' and '  No handoff document, no summary, no parent link.' instead of the Creating/Author/Authoring lines; send fresh and omit handoffAuthor/handoffAuthorModel; success line 'Started fresh conversation <name> (no parent link)'. SKILL.md (same commit, skills-CLI lockstep): '## Fresh start' section with examples 'pan handoff self --fresh build a new Dwarf Fortress fort' and 'pan handoff 2185 --fresh --model claude-haiku-4-5 --cwd /home/you/Projects/df-wt start a new fort', the lineage sentence names the --fresh exception, frontmatter description mentions --fresh. Then 'npm run build:cli && npm run generate:slash-commands' and commit packages/contracts/src/composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "fresh-cli.ac1",
+            "title": "Given 'pan handoff src --fresh start a fort' with no --model or --cwd, when the command runs, then forkConversationViaServer receives forkMode 'handoff', fresh true, focus 'start a fort', model undefined, cwd undefined and no handoffAuthor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-cli.ac2",
+            "title": "Given '--fresh --model claude-haiku-4-5 --cwd /home/u/wt', when the command runs, then forkConversationViaServer receives that model and cwd; given a source whose session file does not resolve, then the command still calls the server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-cli.ac3",
+            "title": "Given --fresh with --author source, or with --author-model, or with --hold and no focus, when the command runs, then it exits 1 with the PRD message and forkConversationViaServer is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-cli.ac4",
+            "title": "When node dist/cli/index.js handoff --help runs, then it lists --fresh; npm run lint:skills and npm run lint:slash-commands both pass with SKILL.md showing a '## Fresh start' section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-fresh-token",
+        "title": "Parse --fresh out of /handoff composer text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/handoffComposerArgs.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "handoffComposerArgs.test.ts passes including the --fresh cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add 'fresh: boolean' to ParsedHandoffComposerArgs; add 'const FRESH_FLAG = /(?:^|\\s)--fresh(?=\\s|$)/g;' and strip it exactly like HOLD_FLAG, setting fresh = true; name --fresh in the header comment. Extend handoffComposerArgs.test.ts."
+        },
+        "items": [
+          {
+            "id": "composer-fresh-token.ac1",
+            "title": "Given '--fresh build a fort', when parseHandoffComposerArgs runs, then it returns focus 'build a fort' and fresh true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-fresh-token.ac2",
+            "title": "Given 'build a fort --fresh --hold', when parsed, then it returns fresh true, hold true and focus 'build a fort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-fresh-token.ac3",
+            "title": "Given text without the token, or with '--freshly', when parsed, then fresh is false and '--freshly' stays in the focus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-dialog",
+        "title": "Fresh start checkbox in the Continue dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ForkModal.test.tsx src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ForkModal.test.tsx passes including the Fresh start tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. ForkModal.tsx: 'const [freshStart, setFreshStart] = useState(parsedComposerArgs.fresh)'; under the Agent handoff intent render checkbox 'Fresh start — no summary, no parent link' beside Hold. When checked: Focus label 'First message (optional)' with hint 'Sent verbatim as the new conversation's first message. Nothing from this conversation is carried over.'; hide the Authored-by fieldset and Authoring model picker; handoffUnavailable false; while the name is not dirty forkTitle is '' with placeholder 'Named from the first message'; Continue disabled with hint 'Hold needs a first message' when hold && no focus. onConfirm passes handoffAuthor/handoffAuthorModel undefined and handoffExtras.fresh true. Add 'fresh?: boolean' to the handoffExtras type in ForkModalProps, ConversationMutations.submitFork, submitFork and summaryForkConversation, and spread '...(opts.handoffExtras?.fresh ? { fresh: true } : {})' into the POST body. Success toast 'Fresh conversation started — no summary, no parent link' when fresh. Telemetry adds fresh_start. FORK_HELP_CONTENT gets a '### Fresh start' paragraph. Run ForkModal.test.tsx and handoffComposerArgs.test.ts; when both pass, append both to test:frontend-subset in root package.json. Before writing the initialFocus test, grep 'openForkModal(' in src/dashboard/frontend/src/components/chat/ConversationPanel.tsx and src/dashboard/frontend/src/components/Stage/index.tsx to confirm composer text reaches ForkModal with flags intact (as D13 does for --hold)."
+        },
+        "items": [
+          {
+            "id": "fresh-dialog.ac1",
+            "title": "Given a claude-code source and initialMode 'handoff', when the operator checks Fresh start and clicks Continue, then onConfirm receives forkMode 'handoff', handoffAuthor undefined, handoffAuthorModel undefined and handoffExtras containing fresh: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-dialog.ac2",
+            "title": "Given initialFocus '--fresh build a fort', when the dialog renders, then the Fresh start checkbox is checked and the focus textarea value is 'build a fort'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-dialog.ac3",
+            "title": "Given Fresh start is checked, when Advanced options is opened, then no 'Authored by' legend renders; given Hold is also checked with an empty focus, then the Continue button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-dialog.ac4",
+            "title": "When the root package.json is read, then test:frontend-subset contains src/components/CommandDeck/__tests__/ForkModal.test.tsx and src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fresh-docs",
+        "title": "Document fresh starts in fork, conversation, agents-directory, lanes and dashboard docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T02:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4565",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FORKS.md",
+            "features/conversations.mdx",
+            "reference/agents-directory.mdx",
+            "reference/lanes.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Fresh start (PAN-4565)' docs/FORKS.md",
+            "grep -n -- '--fresh' features/conversations.mdx reference/agents-directory.mdx reference/lanes.mdx docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "docs lint passes",
+            "FORKS.md has the Fresh start (PAN-4565) heading",
+            "each of the four other doc files mentions --fresh"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/FORKS.md: '### Fresh start (PAN-4565)' under Fork Modes covering no document, no summary, transcript never read, no parent link, focus = first message, empty-focus and hold rules, issue not inherited, title rule, lane refusal, recovery replays fresh; Developer Notes sentence 'Every fork mode ... stamps parent_conversation_id' names the fresh exception; key-functions list names fork-fresh.ts and fork-source-session.ts. features/conversations.mdx: '--fresh' row in the pan handoff Options table, '### Starting fresh' subsection with one example, and a sentence about the dialog's 'Fresh start' checkbox. reference/agents-directory.mdx (both 'continues ← #<id>' passages) and reference/lanes.mdx ('Handoffs and succession'): a --fresh successor has no parent link, shows no 'continues ←' link, and is refused for a lane or a lane's successor. docs/DASHBOARD-ARCHITECTURE.md 'Lanes and successors (PAN-4223)': one sentence that a fresh handoff successor has no parentId/continuesFrom. The pan-handoff SKILL.md is updated in fresh-cli."
+        },
+        "items": [
+          {
+            "id": "fresh-docs.ac1",
+            "title": "When docs/FORKS.md is read, then it contains a 'Fresh start (PAN-4565)' heading and its Developer Notes state that a handoff with fresh: true creates a root row with no parent_conversation_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-docs.ac2",
+            "title": "When features/conversations.mdx is read, then the pan handoff Options table has a '--fresh' row and the Continue dialog section describes the 'Fresh start' checkbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fresh-docs.ac3",
+            "title": "When reference/agents-directory.mdx, reference/lanes.mdx and docs/DASHBOARD-ARCHITECTURE.md are read, then each states that a --fresh successor shows no 'continues ←' link, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-fork-source-session",
+        "to": "fresh-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "fresh-pipeline",
+        "to": "fresh-route",
+        "type": "blocks"
+      },
+      {
+        "from": "fresh-route",
+        "to": "fresh-lane-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fresh-route",
+        "to": "fresh-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "fresh-route",
+        "to": "fresh-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-fresh-token",
+        "to": "fresh-dialog",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

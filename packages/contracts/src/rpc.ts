@@ -327,10 +327,21 @@ export const GetSnapshotRpc = Rpc.make(WS_METHODS.getSnapshot, {
   error: PanRpcError,
 })
 
+/**
+ * PAN-4559: the server answers this instead of events when the gap after
+ * fromSequence exceeds its replay cap; the client re-bootstraps via getSnapshot.
+ */
+export const ReplayTooFarBehind = Schema.Struct({ tooFarBehind: Schema.Literal(true) })
+export type ReplayTooFarBehind = typeof ReplayTooFarBehind.Type
+
+/** Replay result: the missed events (unchanged array shape), or ReplayTooFarBehind. */
+export const ReplayEventsResult = Schema.Union([Schema.Array(DomainEvent), ReplayTooFarBehind])
+export type ReplayEventsResult = typeof ReplayEventsResult.Type
+
 /** 5. Replay events since a given sequence number (unary) */
 export const ReplayEventsRpc = Rpc.make(WS_METHODS.replayEvents, {
   payload: Schema.Struct({ fromSequence: SequenceNumber }),
-  success: Schema.Array(DomainEvent),
+  success: ReplayEventsResult,
   error: PanRpcError,
 })
 
