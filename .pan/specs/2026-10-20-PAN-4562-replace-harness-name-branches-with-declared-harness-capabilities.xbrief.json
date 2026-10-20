@@ -4,17 +4,17 @@
     "created": "2026-10-20T03:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4562: Replace harness-name branches with declared harness capabilities",
-    "updated": "2026-10-20T03:03:13.064Z"
+    "updated": "2026-10-20T03:04:04.609Z"
   },
   "plan": {
     "id": "pan-4562",
     "title": "Replace harness-name branches with declared harness capabilities",
-    "status": "proposed",
+    "status": "running",
     "uid": "e18a9cc9-ec6e-481a-b6c0-a93556a7bc8a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T03:30:00Z",
-    "updated": "2026-10-20T03:03:13.064Z",
+    "updated": "2026-10-20T03:04:04.609Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4562",
@@ -1268,5 +1268,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
