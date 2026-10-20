@@ -4,17 +4,17 @@
     "created": "2026-10-20T02:47:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4563: Replay-backed protocol tests for codex app-server and ACP transports",
-    "updated": "2026-10-20T02:57:31.389Z"
+    "updated": "2026-10-20T02:58:21.207Z"
   },
   "plan": {
     "id": "pan-4563",
     "title": "Replay-backed protocol tests for codex app-server and ACP transports",
-    "status": "proposed",
+    "status": "running",
     "uid": "31e5e57a-4f75-4d48-af95-cdeeaa757935",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-20T02:47:32Z",
-    "updated": "2026-10-20T02:57:31.389Z",
+    "updated": "2026-10-20T02:58:21.207Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4563",
@@ -1425,5 +1425,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
