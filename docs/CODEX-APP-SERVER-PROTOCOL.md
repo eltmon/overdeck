@@ -151,7 +151,7 @@ needed for Codex CLI 0.144.x.
    choice, not a schema restriction. The generated `RequestId` allows string or
    integer IDs; Overdeck uses integers.
 
-## Replay Fixtures
+## Replay fixtures
 
 Recorded fixtures of live `codex app-server` sessions drive replay tests of the
 real stdio transport, manager, and host. How to record, review, and replay them

@@ -248,10 +248,11 @@ codex-cli 0.159.0.
 
 | Defect or observation | Fixture | Disposition |
 | --- | --- | --- |
-| D-1: Codex state could not report an interrupted turn | `interrupt.jsonl` | Fixed in PAN-4563: `lastTurnStatus` on manager state and host `status()` |
-| D-2: user-input answers were sent as `string[]` instead of `{ answers: string[] }` | `user-input.jsonl` | Fixed in PAN-4563; checked against the codex-cli 0.159.0 schema, and Codex answered with the chosen color |
-| A Codex sub-agent's `turn/started` arrives before the `spawnAgent` item that names it, so its start line is labeled `thread:` instead of `sub:` | `subagent.jsonl` | Filed as PAN-4568; pinned in case 3 |
-| Kimi interrupt: effect-acp sends `session/cancel` with `"id":""`, Kimi answers "Method not found" and keeps streaming; late chunks land in the transcript after `turn_completed`; effect-rpc also writes `@effect/rpc/Interrupt` to the ACP wire | `kimi-interrupt.jsonl` | Filed as PAN-4575; pinned in the ACP interrupt case |
+| D-1: Codex state could not report an interrupted turn | `interrupt.jsonl` | Fixed in [PAN-4563](https://github.com/eltmon/overdeck/issues/4563): `lastTurnStatus` on manager state and host `status()` |
+| Recorded Codex interrupt order (codex-cli 0.159.0): the `turn/interrupt` response, then the owner idle status, then `turn/completed` with `turn.status: interrupted`; case 2 asserts this order and fails naming case 2 if it changes | `interrupt.jsonl` | Observed ordering, no defect |
+| D-2: user-input answers were sent as `string[]` instead of `{ answers: string[] }` | `user-input.jsonl` | Fixed in [PAN-4563](https://github.com/eltmon/overdeck/issues/4563); checked against the codex-cli 0.159.0 schema, and Codex answered with the chosen color |
+| A Codex sub-agent's `turn/started` arrives before the `spawnAgent` item that names it, so its start line is labeled `thread:` instead of `sub:` | `subagent.jsonl` | Filed as [PAN-4568](https://github.com/eltmon/overdeck/issues/4568); pinned in case 3 |
+| Kimi interrupt: effect-acp sends `session/cancel` with `"id":""`, Kimi answers "Method not found" and keeps streaming; late chunks land in the transcript after `turn_completed`; effect-rpc also writes `@effect/rpc/Interrupt` to the ACP wire | `kimi-interrupt.jsonl` | Filed as [PAN-4575](https://github.com/eltmon/overdeck/issues/4575); pinned in the ACP interrupt case |
 | Codex sends the host name and a stable `installationId` in `remoteControl/status/changed` | all Codex fixtures | Scrubbed (`<HOSTNAME>`, `installationId` redacted) |
 | With an invalid OAuth grant, `kimi acp` answered `session/prompt` with `stopReason: end_turn` and no error, so a failed turn looks like a successful empty one | not committed (failed recording) | Recorded here; outside Overdeck's control |
 | A network `curl` in the `workspace-write` sandbox fails without asking for approval (codex-cli 0.159.0) | `approval.jsonl` | Recorder uses a `$HOME` write instead |
