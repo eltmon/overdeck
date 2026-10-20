@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CommandDeck } from '../index';
+import { agentIdsByIssueKey } from '../agentIdsByIssueKey';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 import { usePanesStore } from '../../../lib/panesStore';
 import {
@@ -78,7 +79,7 @@ async function renderDeck() {
   counter.reset();
   // Fake timers from here on: the agent-set invalidation debounce must not run on real time.
   vi.useFakeTimers();
-  return counter;
+  return { counter, client };
 }
 
 beforeEach(() => {
@@ -100,7 +101,7 @@ afterEach(() => {
 
 describe('CommandDeck root subscriptions', () => {
   it('does not re-render for runtime, status-only or non-title issue changes', async () => {
-    const counter = await renderDeck();
+    const { counter } = await renderDeck();
 
     applyStoreEvents([event('agent.activity_changed', { agentId: 'agent-pan-1', activity: 'working', currentTool: 'Read' }, 1)]);
     expect(counter.count('deck')).toBe(0);
@@ -112,12 +113,26 @@ describe('CommandDeck root subscriptions', () => {
     expect(counter.count('deck')).toBe(0);
   });
 
-  it('re-renders when an agent with a new id appears', async () => {
-    const counter = await renderDeck();
+  it('re-renders and invalidates the projects query when an agent with a new id appears', async () => {
+    const { counter, client } = await renderDeck();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
 
     applyStoreEvents([event('agent.created', { agentId: 'agent-pan-3', issueId: 'PAN-3', agent: agent(3) }, 1)]);
+    await vi.advanceTimersByTimeAsync(1_000);
 
     expect(counter.count('deck')).toBeGreaterThanOrEqual(1);
-    await vi.advanceTimersByTimeAsync(1_000);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['command-deck-projects'] });
+  });
+});
+
+describe('agentIdsByIssueKey', () => {
+  it('maps each lowercased issue id to its agent- prefixed agent, as resolveIssue did', () => {
+    const map = agentIdsByIssueKey({
+      'review-pan-1-a': { id: 'review-pan-1-a', issueId: 'PAN-1' },
+      'agent-pan-1': { id: 'agent-pan-1', issueId: 'PAN-1' },
+      'planning-pan-2': { id: 'planning-pan-2', issueId: 'PAN-2' },
+      'conv-1': { id: 'conv-1' },
+    });
+    expect(map).toEqual({ 'pan-1': 'agent-pan-1', 'pan-2': 'planning-pan-2' });
   });
 });
