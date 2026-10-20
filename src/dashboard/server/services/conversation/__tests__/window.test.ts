@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  readPageParams,
   selectInitialWindow,
   selectPageBefore,
   selectResumeDelta,
@@ -64,6 +65,26 @@ function pageToStart(input: WindowInput, limit = 75): { ids: string[]; pages: nu
 describe('transcriptIdOf', () => {
   it('formats dev and inode', () => {
     expect(transcriptIdOf({ dev: 2049, ino: 123 })).toBe('2049:123');
+  });
+});
+
+describe('readPageParams', () => {
+  const cursor = encodeURIComponent(encodeTimelineCursor([at(1), 1, 0, 'm1']));
+
+  it('returns null without a before cursor', () => {
+    expect(readPageParams(new URLSearchParams('limit=10'))).toBeNull();
+  });
+
+  it('rejects a malformed cursor', () => {
+    expect(readPageParams(new URLSearchParams('before=x'))).toBe('invalid-cursor');
+  });
+
+  it('defaults the limit to 75 and clamps it to [1, 200]', () => {
+    expect(readPageParams(new URLSearchParams(`before=${cursor}`))).toEqual({ before: [at(1), 1, 0, 'm1'], limit: 75 });
+    expect(readPageParams(new URLSearchParams(`before=${cursor}&limit=abc`))).toMatchObject({ limit: 75 });
+    expect(readPageParams(new URLSearchParams(`before=${cursor}&limit=0`))).toMatchObject({ limit: 1 });
+    expect(readPageParams(new URLSearchParams(`before=${cursor}&limit=5000`))).toMatchObject({ limit: 200 });
+    expect(readPageParams(new URLSearchParams(`before=${cursor}&limit=40`))).toMatchObject({ limit: 40 });
   });
 });
 

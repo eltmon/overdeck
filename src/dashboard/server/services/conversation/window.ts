@@ -1,7 +1,10 @@
 import {
   compareTimelineKeys,
+  CONVERSATION_PAGE_DEFAULT_LIMIT,
+  CONVERSATION_PAGE_MAX_LIMIT,
   CONVERSATION_WINDOW_MAX_BYTES,
   CONVERSATION_WINDOW_MAX_ROWS,
+  decodeTimelineCursor,
   encodeTimelineCursor,
   hasToolResult,
   RESUME_OPEN_IDS_MAX,
@@ -46,6 +49,23 @@ type TimelineItem =
 
 export function transcriptIdOf(stats: { dev: number; ino: number }): string {
   return `${stats.dev}:${stats.ino}`;
+}
+
+/**
+ * FR-4 query parsing shared by the HTTP routes: `before` (cursor) and `limit`.
+ * Returns null when no `before` is present, and 'invalid-cursor' for a cursor
+ * that does not decode. `limit` defaults to 75 and clamps to [1, 200].
+ */
+export function readPageParams(params: URLSearchParams): { before: TimelineKey; limit: number } | 'invalid-cursor' | null {
+  const rawBefore = params.get('before');
+  if (rawBefore === null) return null;
+  const before = decodeTimelineCursor(rawBefore);
+  if (!before) return 'invalid-cursor';
+  const parsed = Number.parseInt(params.get('limit') ?? '', 10);
+  const limit = Number.isNaN(parsed)
+    ? CONVERSATION_PAGE_DEFAULT_LIMIT
+    : Math.min(CONVERSATION_PAGE_MAX_LIMIT, Math.max(1, parsed));
+  return { before, limit };
 }
 
 function timelineItems(input: WindowInput): TimelineItem[] {

@@ -64,6 +64,7 @@ import { parseAcpConversationMessages } from '../../dashboard/server/services/ac
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
+import { selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../dashboard/server/services/conversation/window.js';
 import {
   readLauncherPinnedSessionId,
   resolveAcpTranscriptPath,
@@ -72,7 +73,7 @@ import {
   resolvePiSessionPath,
 } from '../agents/transcript-resolver.js';
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
-import { resolveEffectivePullRequest } from '@overdeck/contracts';
+import { resolveEffectivePullRequest, type TimelineKey } from '@overdeck/contracts';
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
@@ -551,10 +552,21 @@ export async function getConversationRead(
   }
 }
 
+/**
+ * PAN-4558: `window` (default) bounds a cold open to the newest rows, `page`
+ * returns the rows older than `before`, and `all` is the full unprojected body
+ * (transcript export).
+ */
+export type ConversationMessagesReadOptions =
+  | { mode: 'window' }
+  | { mode: 'all' }
+  | { mode: 'page'; before: TimelineKey; limit: number };
+
 export async function getConversationMessagesRead(
   name: string,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'shouldReportUnresolvedLiveSession'>,
   agentId?: string,
+  options: ConversationMessagesReadOptions = { mode: 'window' },
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name);
@@ -589,6 +601,10 @@ export async function getConversationMessagesRead(
 
     try {
       const parsed = await getCachedMessages(sessionFile, false);
+      if (options.mode === 'page') {
+        const transcript = transcriptIdOf(await stat(sessionFile));
+        return result(selectPageBefore(parsed, options.before, options.limit, transcript));
+      }
       if (agentId === undefined && conv && !browseCopy && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
@@ -600,9 +616,12 @@ export async function getConversationMessagesRead(
           : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
+      const rows = options.mode === 'all'
+        ? { messages: parsed.messages, workLog: parsed.workLog }
+        : selectInitialWindow(parsed, transcriptIdOf(await stat(sessionFile)));
+
       return result({
-        messages: parsed.messages,
-        workLog: parsed.workLog,
+        ...rows,
         streaming: parsed.streaming,
         totalCost: browseCopy ? 0 : parsed.totalCost,
         totalTokens: browseCopy ? 0 : parsed.totalTokens,

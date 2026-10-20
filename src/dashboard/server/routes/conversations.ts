@@ -51,7 +51,9 @@ import {
   handleConversationMove,
   retitleConversation,
   resolveSessionFile,
+  type ConversationMessagesReadOptions,
 } from '../../../lib/overdeck/conversation-reads.js';
+import { readPageParams } from '../services/conversation/window.js';
 import {
   getConversationListWithVaultCopies,
   invalidateConversationFavoritesCache,
@@ -470,9 +472,15 @@ const getConversationMessagesRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const searchParams = new URL(request.url, 'http://localhost').searchParams;
+    const page = readPageParams(searchParams);
+    if (page === 'invalid-cursor') return jsonResponse({ error: 'Invalid cursor' }, { status: 400 });
+    const options: ConversationMessagesReadOptions = page
+      ? { mode: 'page', ...page }
+      : { mode: searchParams.get('window') === 'all' ? 'all' : 'window' };
     return yield* Effect.promise(async () => {
-      const agentId = new URL(request.url, 'http://localhost').searchParams.get('agentId') ?? undefined;
-      return conversationReadJson(await getConversationMessagesRead(name, conversationReadDependencies, agentId));
+      const agentId = searchParams.get('agentId') ?? undefined;
+      return conversationReadJson(await getConversationMessagesRead(name, conversationReadDependencies, agentId, options));
     });
   }),
 );
