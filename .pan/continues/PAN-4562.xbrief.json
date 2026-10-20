@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:14:53.435Z",
+  "updated": "2026-10-20T04:15:12.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "capabilities-foundation.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T04:14:53.435Z"
+    },
+    "capabilities-foundation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:15:12.697Z"
     }
   }
 }
