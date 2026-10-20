@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:27:10.921Z",
+  "updated": "2026-10-20T03:27:25.196Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4563",
       "claimedAt": "2026-10-20T03:25:07.109Z",
       "doneAt": "2026-10-20T03:27:10.921Z"
+    },
+    "acp-case-turn-completion": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:27:25.195Z"
     }
   }
 }
