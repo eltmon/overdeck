@@ -85,7 +85,7 @@ export const SCENARIOS: readonly Scenario[] = [
   { harness: 'acp', name: 'interrupt', prompt: COUNT_PROMPT, actions: 'interrupt on the first [assistant] pane line' },
 ];
 
-const DEFAULTS: Record<Harness, { model: string; effort: string | undefined }> = {
+const DEFAULTS: Record<Harness, { model: string; effort: string }> = {
   codex: { model: 'gpt-5.6-luna', effort: 'low' },
   // K3 refuses to launch without an effort level (resolveKimiNativeEffort).
   acp: { model: 'k3', effort: 'low' },
@@ -156,14 +156,13 @@ interface RecordInput {
   scenario: Scenario;
   out: string;
   model: string;
-  effort: string | undefined;
+  effort: string;
   cwd: string;
   overdeckHome: string;
 }
 
 async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void> {
-  const { scenario, model, cwd, overdeckHome } = input;
-  const effort = input.effort ?? 'low';
+  const { scenario, model, effort, cwd, overdeckHome } = input;
   const codexHome = await mkdtemp(join(tmpdir(), 'pan-capture-codex-'));
   tempDirs.push(codexHome);
   initCodexHome(codexHome, { effort, trustedDir: cwd });
@@ -255,7 +254,7 @@ async function recordAcp(input: RecordInput): Promise<void> {
     provider: 'kimi',
     cliVersion: await kimiVersion(),
     scenario: scenario.name,
-    hostOptions: { model, effort: effort ?? null, prompt: scenario.prompt },
+    hostOptions: { model, effort, prompt: scenario.prompt },
   });
 
   const scope = await Effect.runPromise(Scope.make());
