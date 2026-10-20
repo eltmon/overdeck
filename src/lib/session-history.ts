@@ -22,7 +22,7 @@ import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'path';
-import { isEffortLevel, type EffortLevel } from '@overdeck/contracts';
+import { isEffortLevel, isLegacyPiHarnessName, type EffortLevel, type HarnessTranscriptKind } from '@overdeck/contracts';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -70,15 +70,19 @@ export function transcriptCandidateKey(kind: TranscriptCandidateKind, sessionId:
   return `${kind}:${sessionId}`;
 }
 
+const CANDIDATE_KIND_BY_TRANSCRIPT: Record<HarnessTranscriptKind, TranscriptCandidateKind> = {
+  'claude-jsonl': 'claude',
+  'ohmypi-jsonl': 'ohmypi',
+  'codex-rollout-jsonl': 'codex',
+  'acp-jsonl': 'acp',
+  'kimi-wire-jsonl': 'kimi',
+  'muse-jsonl': 'muse',
+  'prime-agent-jsonl': 'prime-agent',
+};
+
 export function transcriptCandidateKind(harness: string | null | undefined): TranscriptCandidateKind {
-  const transcriptKind = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind;
-  if (transcriptKind === 'codex-rollout-jsonl') return 'codex';
-  if (transcriptKind === 'ohmypi-jsonl') return harness === 'pi' ? 'pi' : 'ohmypi';
-  if (transcriptKind === 'acp-jsonl') return 'acp';
-  if (transcriptKind === 'kimi-wire-jsonl') return 'kimi';
-  if (transcriptKind === 'muse-jsonl') return 'muse';
-  if (transcriptKind === 'prime-agent-jsonl') return 'prime-agent';
-  return 'claude';
+  if (isLegacyPiHarnessName(harness)) return 'pi';
+  return CANDIDATE_KIND_BY_TRANSCRIPT[getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind];
 }
 
 /** Untagged legacy entries predate harness metadata and may belong to Claude. */

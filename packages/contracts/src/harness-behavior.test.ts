@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest"
 
-import { CLAUDE_CODE_BEHAVIOR, PRIME_AGENT_BEHAVIOR, getHarnessBehavior, getRuntimeBehavior } from "./harness-behavior"
+import {
+  CLAUDE_CODE_BEHAVIOR,
+  PRIME_AGENT_BEHAVIOR,
+  getHarnessBehavior,
+  getRuntimeBehavior,
+  isLegacyPiHarnessName,
+  normalizeHarnessName,
+  type RuntimeName,
+} from "./harness-behavior"
+import { HARNESS_CAPABILITY_KEYS } from "./harness-capabilities"
 import { KNOWN_HARNESSES } from "./types"
 
 describe("PRIME_AGENT_BEHAVIOR", () => {
@@ -49,5 +58,62 @@ describe("steerKind (PAN-4292)", () => {
     for (const harness of ["codex", "acp", "opencode", "kimi-code", "muse", "prime-agent"] as const) {
       expect(getHarnessBehavior(harness).steerKind).toBeNull()
     }
+  })
+})
+
+describe("HarnessCapabilities (PAN-4562)", () => {
+  const RUNTIMES: readonly RuntimeName[] = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent"]
+
+  it("every runtime declares every capability key with a defined value", () => {
+    for (const runtime of RUNTIMES) {
+      const capabilities = getRuntimeBehavior(runtime).capabilities
+      expect(Object.keys(capabilities).sort()).toEqual([...HARNESS_CAPABILITY_KEYS].sort())
+      for (const key of HARNESS_CAPABILITY_KEYS) expect(capabilities[key]).not.toBeUndefined()
+    }
+  })
+
+  it("OpenCode declares its own capabilities, not ACP's", () => {
+    const opencode = getRuntimeBehavior("opencode").capabilities
+    expect(opencode).not.toBe(getRuntimeBehavior("acp").capabilities)
+    expect(opencode.hostEffortFlag).toBe(true)
+    expect(opencode.binaryConfigKey).toBeNull()
+    expect(opencode.contextChannel).toBe("acp-initial-context")
+  })
+
+  it.each([
+    ["claude-code", "append-system-prompt-file", false, false],
+    ["ohmypi", "append-system-prompt", false, false],
+    ["codex", "developer_instructions", false, false],
+    ["acp", "acp-initial-context", true, true],
+    ["kimi-code", "initial-message-envelope", true, true],
+    ["opencode", "acp-initial-context", true, true],
+    ["muse", "append-system-prompt-file", true, false],
+    ["prime-agent", "prime-agent-append-system-prompt", true, true],
+  ] as const)("%s declares contextChannel=%s stopRuntimeOnStartFailure=%s initialPromptMustLand=%s", (runtime, contextChannel, stopRuntimeOnStartFailure, initialPromptMustLand) => {
+    const capabilities = getRuntimeBehavior(runtime).capabilities
+    expect(capabilities.contextChannel).toBe(contextChannel)
+    expect(capabilities.stopRuntimeOnStartFailure).toBe(stopRuntimeOnStartFailure)
+    expect(capabilities.initialPromptMustLand).toBe(initialPromptMustLand)
+  })
+})
+
+describe("normalizeHarnessName (PAN-4562)", () => {
+  it("maps legacy pi to ohmypi, keeps known names, and rejects everything else", () => {
+    expect(normalizeHarnessName("pi")).toBe("ohmypi")
+    expect(normalizeHarnessName("codex")).toBe("codex")
+    expect(normalizeHarnessName("claude")).toBeNull()
+    expect(normalizeHarnessName(42)).toBeNull()
+    expect(normalizeHarnessName(undefined)).toBeNull()
+  })
+
+  it("isLegacyPiHarnessName matches only the pi alias", () => {
+    expect(isLegacyPiHarnessName("pi")).toBe(true)
+    expect(isLegacyPiHarnessName("ohmypi")).toBe(false)
+    expect(isLegacyPiHarnessName(undefined)).toBe(false)
+  })
+
+  it("getHarnessBehavior falls back to Claude Code for missing or unknown names", () => {
+    expect(getHarnessBehavior(undefined)).toBe(CLAUDE_CODE_BEHAVIOR)
+    expect(getHarnessBehavior("nope" as never)).toBe(CLAUDE_CODE_BEHAVIOR)
   })
 })

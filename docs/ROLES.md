@@ -190,6 +190,8 @@ First user message = the spawn prompt
 
 The orchestrator that inlines convoy templates is `src/lib/cloister/review-agent.ts:buildConvoyPrompt()`. It reads `packageRoot/roles/review-<subRole>.md` and embeds the body inside a spawn message that also supplies the per-run identifiers (output file path, context manifest path).
 
+The role chain above is harness-independent. Harness-specific launch and delivery behavior (how the context layer is delivered, whether a failed start tears the runtime down, how attachments reach the agent) comes from the harness's declared capabilities, not from harness-name checks. See [Harness capabilities](../configuration/harnesses.mdx#harness-capabilities).
+
 ---
 
 ## Adding a new role or sub-role

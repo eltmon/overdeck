@@ -55,6 +55,14 @@ function writeEffectFacadesBaseline(root: string, rows: string[]): void {
   );
 }
 
+function writeHarnessBranchesBaseline(root: string, rows: string[]): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts', 'harness-branches-baseline.txt'),
+    `# Harness-name branch ratchet baseline (PAN-4562).\n# Lower with --update\n${rows.join('\n')}\n`,
+  );
+}
+
 function commitAll(root: string, message: string): string {
   execFileSync('git', ['add', '-A'], { cwd: root });
   execFileSync('git', ['commit', '-m', message, '--quiet'], { cwd: root });
@@ -394,5 +402,28 @@ describe('lint-ratchet-audit.sh', () => {
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('requires an issue reference to raise or add a harness-branch baseline row, and lowers freely', () => {
+    const seed = ['3 src/lib/a.ts', '2 src/lib/b.ts'];
+    const refLess = setupRepo();
+    writeHarnessBranchesBaseline(refLess, seed);
+    commitAll(refLess, 'initialize harness-branch baseline');
+    writeHarnessBranchesBaseline(refLess, ['4 src/lib/a.ts', '1 src/lib/b.ts', '1 src/lib/c.ts']);
+    commitAll(refLess, 'raise harness-branch rows');
+
+    const failed = runAudit(refLess, ['--range', 'HEAD~1..HEAD']);
+    expect(failed.ok).toBe(false);
+    expect(failed.output).toContain('harness branches baseline increased: 4 src/lib/a.ts');
+    expect(failed.output).toContain('harness branches baseline increased: 1 src/lib/c.ts');
+    expect(failed.output).not.toContain('increased: 1 src/lib/b.ts');
+
+    const lowered = setupRepo();
+    writeHarnessBranchesBaseline(lowered, seed);
+    commitAll(lowered, 'initialize harness-branch baseline');
+    writeHarnessBranchesBaseline(lowered, ['1 src/lib/a.ts']);
+    commitAll(lowered, 'lower harness-branch rows');
+
+    expect(runAudit(lowered, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
   });
 });

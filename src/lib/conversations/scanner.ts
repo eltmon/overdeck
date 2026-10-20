@@ -22,7 +22,9 @@ import {
   upsertDiscoveredSession,
 } from '../overdeck/discovered-sessions.js';
 import { getAgentState } from '../agents/agent-state.js';
-import { parseSessionJsonl } from './jsonl-async.js';
+import { parseSessionJsonl, type SessionMetadata } from './jsonl-async.js';
+import type { HarnessTranscriptKind } from '@overdeck/contracts';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
 import { Effect } from 'effect';
@@ -78,27 +80,26 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const parseJsonlEff = opts.parseJsonl ?? parseSessionJsonl;
   const parseJsonl = (path: string) => Effect.runPromise(parseJsonlEff(path));
   const resolver = new HashResolver(opts.watchDirs ?? []);
-  const parseMetadata = (file: DiscoveredFile) => {
-    if (file.harness === 'pi' || file.harness === 'ohmypi') {
-      return parsePiSessionMetadata(file.jsonlPath);
-    }
-    if (file.harness === 'codex') {
-      return parseCodexSessionMetadata(file.jsonlPath);
-    }
-    if (file.harness === 'muse') return parseMuseSessionMetadata(file.jsonlPath);
-    if (file.harness === 'acp' || file.harness === 'opencode') {
-      return parseAcpSessionMetadata(file.jsonlPath);
-    }
-    return parseJsonl(file.jsonlPath);
+  const metadataParsers: Record<HarnessTranscriptKind, (path: string) => Promise<SessionMetadata>> = {
+    'claude-jsonl': parseJsonl,
+    'ohmypi-jsonl': parsePiSessionMetadata,
+    'codex-rollout-jsonl': parseCodexSessionMetadata,
+    'muse-jsonl': parseMuseSessionMetadata,
+    'acp-jsonl': parseAcpSessionMetadata,
+    // No dedicated metadata parser yet; these fell through to the Claude parser before PAN-4562.
+    'kimi-wire-jsonl': parseJsonl,
+    'prime-agent-jsonl': parseJsonl,
   };
+  const parseMetadata = (file: DiscoveredFile) => metadataParsers[getHarnessBehavior(file.harness).transcriptKind](file.jsonlPath);
   const resolveWorkspace = async (file: DiscoveredFile, cwdFromFirstMessage: string | null) => {
-    if (file.harness === 'claude-code') {
+    const resolution = getHarnessBehavior(file.harness).capabilities.workspaceResolution;
+    if (resolution === 'claude-project-hash') {
       return resolver.resolve(file.jsonlPath, cwdFromFirstMessage);
     }
     if (cwdFromFirstMessage) {
       return { workspacePath: cwdFromFirstMessage, workspaceHash: null as string | null, warning: null as string | null };
     }
-    if (file.harness === 'codex' || file.harness === 'acp' || file.harness === 'opencode') {
+    if (resolution === 'agent-dir') {
       return { workspacePath: resolveAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
     }
     return { workspacePath: null as string | null, workspaceHash: null as string | null, warning: null as string | null };
@@ -177,7 +178,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
     const fileMtime = new Date(stat.mtimeMs).toISOString();
     const baseCorrelation = correlationMap.get(jsonlPath);
-    const correlation = combineCorrelation(baseCorrelation, harness === 'claude-code' ? null : existing?.sessionId, locatorCorrelationMap);
+    const correlation = combineCorrelation(baseCorrelation, getHarnessBehavior(harness).capabilities.correlatesBySessionId ? existing?.sessionId : null, locatorCorrelationMap);
     if (
       existing &&
       existing.fileSize === stat.size &&
@@ -232,7 +233,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     // Parse, resolve, and upsert — wrap so one bad file can't leave progress incomplete.
     try {
       const meta = await parseMetadata(file);
-      const effectiveCorrelation = combineCorrelation(correlationMap.get(jsonlPath), harness === 'claude-code' ? null : meta.sessionId, locatorCorrelationMap);
+      const effectiveCorrelation = combineCorrelation(correlationMap.get(jsonlPath), getHarnessBehavior(harness).capabilities.correlatesBySessionId ? meta.sessionId : null, locatorCorrelationMap);
 
       // Resolve workspace path
       const resolved = await resolveWorkspace(file, meta.cwdFromFirstMessage);

@@ -39,12 +39,16 @@ vi.mock('../../../dashboard/server/services/conversation-eaten-message-watcher.j
 vi.mock('../../model-capabilities.js', () => ({
   modelSupportsImages: vi.fn(() => true),
 }));
-vi.mock('../../runtimes/behavior.js', () => ({
-  getHarnessBehavior: vi.fn(() => ({
-    injectsPromptTimeMemory: false,
-    transcriptKind: 'claude-jsonl',
-  })),
-}));
+vi.mock('../../runtimes/behavior.js', async () => {
+  const { getHarnessBehavior } = await vi.importActual<typeof import('@overdeck/contracts')>('@overdeck/contracts');
+  return {
+    getHarnessBehavior: vi.fn((harness: RuntimeName) => ({
+      capabilities: getHarnessBehavior(harness).capabilities,
+      injectsPromptTimeMemory: false,
+      transcriptKind: 'claude-jsonl',
+    })),
+  };
+});
 vi.mock('../../runtimes/kimi-context-envelope.js', () => ({
   waitForManagedKimiSessionId: vi.fn(async () => 'session-matrix'),
 }));

@@ -1004,12 +1004,84 @@ using the OS-bundled `curl` and `tar` tools.
   protocol surface (or plan to reuse the same setup with a future non-Kimi ACP
   agent).
 
+## Harness capabilities
+
+Each harness declares what it does in `HarnessBehavior.capabilities`
+(`packages/contracts/src/harness-capabilities.ts`). Code that must decide
+something per harness reads that declaration. It does not compare the harness
+name. Every field is required, so a harness cannot leave a decision undeclared.
+
+| Field | What it decides |
+| --- | --- |
+| `contextChannel` | How the launcher delivers the Overdeck context layer, and the channel the context receipt records. |
+| `initialPromptMustLand` | A conversation start fails when the first prompt is not confirmed delivered. |
+| `stopRuntimeOnStartFailure` | A failed conversation start or resume stops the runtime it launched. |
+| `resumeContractMustLand` | A resume fails when the resume contract message is not confirmed delivered. |
+| `reapsPrivateDaemonOnStop` | Stopping a conversation also reaps the harness's private daemon. |
+| `attachmentDelivery` | `native`: the harness reads attachments itself. `inline-paths`: Overdeck inlines the attachment paths into the message. |
+| `nativeManualCompact` | The harness has a native manual `/compact` that Overdeck can intercept. |
+| `paneInputGuard` | A message send first checks the pane for a permission prompt and the main input target. |
+| `transcriptDeliveryReceipt` | Delivery is confirmed by finding the sent turn in the transcript. |
+| `hostEffortFlag` | The launch host accepts an `--effort` flag for this harness. |
+| `binaryLabel` | The name used in binary-resolution errors. |
+| `installHint` | The install command shown when the binary is missing, or `null`. |
+| `binaryConfigKey` | The config key that holds an operator-configured binary path, or `null`. |
+| `launchPreflight` | A check run before launch (`claude-code-model-minimum`), or `null`. |
+| `workspaceResolution` | How the conversation scanner finds a transcript's workspace: `claude-project-hash`, `agent-dir`, or `first-message-only`. |
+| `correlatesBySessionId` | The conversation scanner correlates transcripts to agents by session id. |
+
+The rule for harness-specific code:
+
+- A behavior decision reads a capability field.
+- Adapter selection (which parser, resolver or launch builder) uses an
+  exhaustive table keyed by `transcriptKind`, or a `switch` on an adapter-kind
+  field such as `readinessKind` or `launchCommandKind`. A
+  `Record<HarnessTranscriptKind, …>` table fails `tsc` when a kind has no entry.
+- Never compare a harness name. `src/lib/harness-policy.ts` is the one
+  exception: its ToS rules key on names on purpose.
+
+### The harness-branch ratchet
+
+`npm run lint:harness-branches` (`scripts/lint-harness-branches.sh`, part of
+`npm run lint`) counts, per `src/` file, the comparisons of a harness name or
+transcript kind against a string literal, such as `harness === 'codex'` or
+`'acp' !== conv.harness`. Comment lines, tests, `harness-policy.ts`, the
+runtime adapters in `src/lib/runtimes/` and `src/lib/runtimes/storage/` are not
+counted. The baseline `scripts/harness-branches-baseline.txt` holds one
+`<count> <path>` row per file. The check fails when a file gains a branch or a
+new file has one. When you remove branches, lower the baseline with
+`bash scripts/lint-harness-branches.sh --update`. Raising a row is a hand edit
+in a commit whose message carries an issue reference;
+`scripts/lint-ratchet-audit.sh` enforces that.
+
+### Adding a harness
+
+1. Add the name to `Harness` and `KNOWN_HARNESSES` in
+   `packages/contracts/src/types.ts`.
+2. Write `<NAME>_CAPABILITIES` in `packages/contracts/src/harness-capabilities.ts`
+   and `<NAME>_BEHAVIOR` in `packages/contracts/src/harness-behavior.ts`, then
+   add the behavior to `BEHAVIORS`.
+3. Add an entry to every `Record<HarnessTranscriptKind, …>` and
+   `Record<RuntimeName, …>` table that `tsc` flags.
+4. Write the runtime adapter `src/lib/runtimes/<name>.ts` and register it in
+   `getGlobalRegistry()` (`src/lib/runtimes/index.ts`).
+5. Add its executable to `HARNESS_BINARY_BY_RUNTIME` (`src/lib/harness-binary.ts`).
+6. Add its transcript storage module under `src/lib/runtimes/storage/` and a
+   discovery source in `src/lib/conversations/harness-discovery.ts`.
+7. Add its launch rules to `canUseHarness` in `src/lib/harness-policy.ts`.
+   Unlisted harnesses are denied.
+8. Run `npm run lint:harness-branches`.
+
+Steps 1–3 are the capability declaration. Steps 4–7 are the adapter work that
+the declaration does not replace.
+
 ## Implementation
 
 - `src/lib/runtimes/ohmypi.ts` — `OhmypiRuntime` (the `AgentRuntime` adapter for omp)
 - `src/lib/runtimes/ohmypi-fifo.ts` — `createOhmypiFifo`, `writeOhmypiCommandSync`, `OhmypiNotReady`
 - `src/lib/cost-parsers/ohmypi-parser.ts` — omp JSONL active-branch walker
 - `src/lib/harness-policy.ts` — `canUseHarness` ToS/model-provider gate
+- `packages/contracts/src/harness-capabilities.ts` — `HarnessCapabilities`, the per-harness behavior declarations (see [Harness capabilities](#harness-capabilities))
 - `packages/ohmypi-extension/` — vendored lifecycle extension omp loads via `--extension`
 - `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
 - `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser

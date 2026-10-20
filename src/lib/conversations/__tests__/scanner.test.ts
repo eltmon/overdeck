@@ -472,6 +472,29 @@ describe('scanner', () => {
     });
   });
 
+  // PAN-4562: correlatesBySessionId decides whether a parsed session id reaches the locator map.
+  it('correlates a codex session id through its locator but never a claude-code session id', async () => {
+    const codexPath = join(odb.home, '.codex', 'sessions', '2026', '07', '02', 'rollout-2026-07-02T00-00-00-000Z-locator.jsonl');
+    mkdirSync(dirname(codexPath), { recursive: true });
+    writeFileSync(codexPath, [
+      JSON.stringify({ type: 'session_meta', timestamp: '2026-07-02T11:00:00.000Z', payload: { type: 'session_meta', id: 'codex-locator-1', cwd: '/home/user/Projects/codex' } }),
+      codexWithoutSessionMetaJsonl().trim(),
+    ].join('\n') + '\n', 'utf8');
+    seedConversationFile(odb, { id: 'conv-codex-loc', name: 'conv-codex-loc', cwd: '/home/user/Projects/codex', issueId: 'PAN-4562', locator: 'codex-locator-1', harness: 'codex' });
+    // A Claude file whose session id matches a locator recorded under another cwd: only the
+    // Claude path derivation may correlate it, never the bare session id.
+    const claudePath = join(fakeClaudeDir, '-home-user-Projects-myapp', 'claude-locator.jsonl');
+    writeFileSync(claudePath, SESSION_JSONL, 'utf8');
+    seedConversationFile(odb, { id: 'conv-claude-loc', name: 'conv-claude-loc', cwd: '/elsewhere', issueId: 'PAN-4563', locator: 'sess-1', harness: 'claude-code' });
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const sessions = findDiscoveredSessions();
+
+    expect(result.errors).toBe(0);
+    expect(sessions.find((s) => s.jsonlPath === codexPath)).toMatchObject({ harness: 'codex', overdeckManaged: true, panIssueId: 'PAN-4562' });
+    expect(sessions.find((s) => s.jsonlPath === claudePath)).toMatchObject({ harness: 'claude-code', sessionId: 'sess-1', overdeckManaged: false, panIssueId: null });
+  });
+
   it('leaves ad-hoc pi rows unmanaged when no locator matches', async () => {
     const p = join(odb.home, '.pi', 'agent', 'sessions', '-home-user-Projects-pi', '20260702_adhoc-pi.jsonl');
     mkdirSync(dirname(p), { recursive: true });
@@ -487,6 +510,32 @@ describe('scanner', () => {
       panIssueId: null,
       workspacePath: '/home/user/Projects/pi',
     });
+  });
+
+  // PAN-4562: workspace resolution reads the declared workspaceResolution capability.
+  it('resolves opencode from its agent dir and leaves muse unresolved without a first-message cwd', async () => {
+    const agentsRoot = join(odb.home, '.overdeck', 'agents');
+    const opencodeDir = join(agentsRoot, 'agent-opencode-scanner');
+    const opencodePath = join(opencodeDir, 'acp-session.jsonl');
+    mkdirSync(opencodeDir, { recursive: true });
+    writeFileSync(join(opencodeDir, 'state.json'), JSON.stringify({ harness: 'opencode' }), 'utf8');
+    writeFileSync(opencodePath, ACP_SESSION_JSONL, 'utf8');
+    seedAgent(odb, 'agent-opencode-scanner', '/home/user/Projects/opencode-owned', 'opencode', 'opencode/big-pickle');
+    const musePath = join(agentsRoot, 'agent-muse-scanner', 'muse-data', 'muse', 'sessions', '2026', '07', '02', '01900000-0000-7000-8000-000000004562', 'session.jsonl');
+    mkdirSync(dirname(musePath), { recursive: true });
+    writeFileSync(musePath, `${JSON.stringify({ payload_type: 'runtime.event' })}\n`, 'utf8');
+    seedAgent(odb, 'agent-muse-scanner', '/home/user/Projects/muse-owned', 'muse', 'muse-spark-1.3');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const sessions = findDiscoveredSessions();
+
+    expect(result.errors).toBe(0);
+    expect(sessions.find((s) => s.jsonlPath === opencodePath)).toMatchObject({
+      harness: 'opencode',
+      sessionId: 'acp-session-1',
+      workspacePath: '/home/user/Projects/opencode-owned',
+    });
+    expect(sessions.find((s) => s.jsonlPath === musePath)).toMatchObject({ harness: 'muse', workspacePath: null });
   });
 
   it('resolves codex workspace from the owning agent dir when rollout metadata has no cwd', async () => {

@@ -1,0 +1,1272 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-20T03:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4562: Replace harness-name branches with declared harness capabilities",
+    "updated": "2026-10-20T03:04:04.609Z"
+  },
+  "plan": {
+    "id": "pan-4562",
+    "title": "Replace harness-name branches with declared harness capabilities",
+    "status": "running",
+    "uid": "e18a9cc9-ec6e-481a-b6c0-a93556a7bc8a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-10-20T03:30:00Z",
+    "updated": "2026-10-20T03:04:04.609Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4562",
+        "label": "PAN-4562",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "harness",
+      "capabilities",
+      "refactor",
+      "lint-ratchet",
+      "contracts"
+    ],
+    "narratives": {
+      "Problem": "Harness-specific behavior is decided by ~208 harness-name and transcript-kind string comparisons in 74 src files. Each new harness must find every check by hand; missed checks are silent gaps (Muse rows show the raw id 'muse', OpenCode receipts record the Claude channel, Kimi/Prime transcripts fall to the Claude metadata parser).",
+      "Proposal": "Add HarnessCapabilities (16 required fields) to the shared HarnessBehavior table in packages/contracts so server, CLI and frontend read one declaration. Convert the ten densest files: behavior decisions read capabilities; adapter selection becomes exhaustive Record<HarnessTranscriptKind,…> tables or switches on declared kind fields, so no string comparison remains. Add a shrink-only per-file ratchet (scripts/lint-harness-branches.sh) audited for raises, lower it after the conversions, prove with a mocked fake runtime that capability sets drive behavior, and document the model. Full detail: .pan/drafts/PAN-4562.md.",
+      "NonGoals": "- Converting files outside the ten in the issue table (conversation-delivery.ts, conversation-forks.ts, agents/spawn.ts, agents/recovery.ts, settings-api.ts, conversations.ts normalizeHarness, conversation-restart-all.ts stay as-is, held by the ratchet)\n- Any change to src/lib/harness-policy.ts\n- Moving existing HarnessBehavior top-level booleans (supportsPtySupervisor, usesRpcFifo, usesCodexHome, steerKind, …) into capabilities\n- Making HarnessBehavior.nativeCommands or effortLevels required\n- Changing the missing/unknown-harness ⇒ claude-code fallback\n- Counting switch/case harness statements in the ratchet\n- Any behavior change other than the ConversationRow labels (Pi, Muse Code) and the OpenCode receipt channel (acp-initial-context)\n- Raising scripts/file-size-allowlist.txt or hand-raising a ratchet baseline row\n- Adding a test-only harness registration API"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Declare HarnessCapabilities in packages/contracts as HarnessBehavior.capabilities rather than in src/lib/runtimes/types.ts.",
+        "rationale": "The frontend can import only @overdeck/contracts, and the existing behavior table is already the per-runtime declaration; one record avoids two sources of truth. Record<RuntimeName, HarnessBehavior> makes tsc enforce that every runtime declares it."
+      },
+      {
+        "summary": "Express parser/adapter selection as exhaustive Record tables or switches on declared kind fields instead of keeping exempt transcriptKind === chains.",
+        "rationale": "The issue exempts adapter selection from 'no name branches' but its ratchet counts transcriptKind ===; tables dissolve the conflict, let the ten files reach zero, and make a missing entry a tsc error."
+      },
+      {
+        "summary": "Keep one issue with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "The issue's acceptance criteria bind the ten files, the lowered baseline and the fake-runtime proof; the projected-surface lint counts each root doc/script as its own subsystem."
+      },
+      {
+        "summary": "Render ConversationRow labels from displayName (ohmypi shows 'Pi', muse shows 'Muse Code').",
+        "rationale": "Removes a hand-kept label list that already missed Muse; ohmypi support is being removed, so the 'oh-my-pi' wording change is low-cost."
+      },
+      {
+        "summary": "Correct OpenCode's context receipt channel to 'acp-initial-context'.",
+        "rationale": "OpenCode launches through acp-host --context-file like acp; the old value was a fall-through default, and the receipt is audit-only metadata."
+      },
+      {
+        "summary": "Inject the fake runtime by vi.mock of the @overdeck/contracts definition lookups.",
+        "rationale": "Mocking the definition module is the test equivalent of adding a declaration and needs no consumer change or test-only API."
+      },
+      {
+        "summary": "Ratchet counts occurrences of any *harness/*Harness/transcriptKind identifier compared with ===/!== to a harness name or *-jsonl literal, both operand orders, excluding tests, comments, harness-policy.ts, runtime adapter files and runtimes/storage.",
+        "rationale": "Matches the issue's definition while catching conv.harness/requestedHarness variants and skipping typeof guards; occurrence counting makes multi-name conditions visible."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue's acceptance criteria require all ten densest files converted, the ratchet lowered and a fake-runtime proof in one done-state; each conversion is its own small item with its own test file, which roughly doubles the file count, and root-level docs/scripts each count as a separate subsystem in the projected-surface lint. Remaining files are explicitly deferred to a follow-up issue.",
+      "canonicalFilename": "2026-10-20-PAN-4562-replace-harness-name-branches-with-declared-harness-capabilities.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "capabilities-foundation",
+        "title": "Declare HarnessCapabilities on every HarnessBehavior in contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4562",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/harness-behavior.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-behavior.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "runtime-readiness-kinds",
+            "runtime-lifecycle-caps",
+            "message-caps",
+            "session-history-table",
+            "launcher-caps",
+            "binary-caps",
+            "scanner-table",
+            "row-label",
+            "registry-normalize",
+            "fake-runtime-contract",
+            "docs-capabilities"
+          ],
+          "parallelSafeReason": "Touches only packages/contracts files that no other item edits; downstream items wait on it via blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/harness-capabilities.ts with the union types, interface HarnessCapabilities (16 readonly required fields), HARNESS_CAPABILITY_KEYS and eight <NAME>_CAPABILITIES constants with values exactly per the PRD 'Capability model' table. Add readonly capabilities: HarnessCapabilities to HarnessBehavior and to every behavior constant; OPENCODE_BEHAVIOR gets capabilities: OPENCODE_CAPABILITIES explicitly (full object, no ACP spread). Add normalizeHarnessName(raw: unknown): RuntimeName | null and isLegacyPiHarnessName(raw: unknown): boolean (using KNOWN_HARNESSES from ./types), and rewrite getHarnessBehavior as BEHAVIORS[normalizeHarnessName(harness) ?? 'claude-code']. Export the new module from index.ts. Do not change src/lib/runtimes/behavior.ts; consumers import the helpers from @overdeck/contracts."
+        },
+        "items": [
+          {
+            "id": "capabilities-foundation.ac1",
+            "title": "Given packages/contracts/src/harness-capabilities.ts, when a reviewer reads interface HarnessCapabilities, then it declares exactly the 16 fields of the PRD table, each readonly, with no '?:' member and no member type containing undefined.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capabilities-foundation.ac2",
+            "title": "Given each of the eight runtime names, when harness-behavior.test.ts runs, then Object.keys(getRuntimeBehavior(name).capabilities) equals HARNESS_CAPABILITY_KEYS and every value is defined, and the per-runtime contextChannel, stopRuntimeOnStartFailure and initialPromptMustLand values match the PRD table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capabilities-foundation.ac3",
+            "title": "Given OPENCODE_BEHAVIOR, when its capabilities are read, then hostEffortFlag is true, binaryConfigKey is null, contextChannel is 'acp-initial-context', and the object is not the ACP capabilities object.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capabilities-foundation.ac4",
+            "title": "Given normalizeHarnessName, when called with 'pi', 'codex', 'claude', 42 and undefined, then it returns 'ohmypi', 'codex', null, null and null; and getHarnessBehavior(undefined) returns CLAUDE_CODE_BEHAVIOR.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-script",
+        "title": "Add the shrink-only harness-branch lint ratchet with its initial baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-harness-branches.sh",
+            "scripts/harness-branches-baseline.txt",
+            "scripts/lint-ratchet-audit.sh",
+            "package.json",
+            "tests/unit/scripts/lint-harness-branches.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:harness-branches",
+            "npx vitest run tests/unit/scripts/lint-harness-branches.test.ts",
+            "bash scripts/lint-ratchet-audit.sh"
+          ],
+          "expected_outputs": [
+            "ratchet passes on the branch",
+            "lint-harness-branches.test.ts passes",
+            "ratchet audit passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Write scripts/lint-harness-branches.sh per the PRD 'Ratchet definition' (regexes P1/P2, occurrence counting, comment-line skip, exclusions: tests, __tests__, src/lib/harness-policy.ts, src/lib/runtimes/storage/*, runtime adapter files src/lib/runtimes/{acp,claude-code,codex,kimi-code,muse,ohmypi,pi,prime-agent}.ts; src/lib/runtimes/index.ts IS scanned), modeled on scripts/lint-effect-facades.sh (check and --update modes, two header lines, rows '<count> <path>'). Generate scripts/harness-branches-baseline.txt with --update. Add lint:harness-branches to package.json and to the lint chain after lint:harness-storage. Extend scripts/lint-ratchet-audit.sh with a harness_branches_baseline_increases_for_commit function keyed by path, call it in audit_commit, and add the baseline to the final file loop. Write the temp-dir fixture test."
+        },
+        "items": [
+          {
+            "id": "ratchet-script.ac1",
+            "title": "Given the committed baseline, when npm run lint:harness-branches runs on the branch, then it exits 0 and prints '✓ harness-branch ratchet passed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac2",
+            "title": "Given a fixture src tree, when a file exceeds its baseline row or a new file contains 'harness === \\'codex\\'', then the script exits 1 and names the file (the new-file case prints NEW).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac3",
+            "title": "Given a fixture with typeof x.harness === 'string', a '// harness === \\'codex\\'' comment, src/lib/harness-policy.ts and a __tests__ file, when the script counts, then none of them is counted, while '\\'codex\\' === conv.harness' and requestedHarness === 'pi' are counted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac4",
+            "title": "Given --update, when a count drops to zero, then the row is removed, and when a file has no row, then no row is added.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-script.ac5",
+            "title": "Given a commit that raises a harness-branches baseline row without an issue reference, when lint-ratchet-audit.sh audits it, then it exits 1 and prints 'harness branches baseline increased'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-readiness-kinds",
+        "title": "Dispatch conversation readiness and launch fields on declared kinds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-readiness.test.ts",
+            "src/lib/overdeck/conversation-readiness.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-readiness.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "readiness test passes",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In conversation-runtime.ts: shouldReportUnresolvedLiveSession uses sessionIdSource === 'launcher-session-id'; shouldUseSupervisorForConversation drops the harness check (options.codexTransport === 'app-server' alone); waitForConversationRuntimeReady becomes an exhaustive switch on getHarnessBehavior(harness).readinessKind preserving every waiter, timeout and error text listed in the PRD, with a never-typed default; handleConversationSwitchModel uses normalizeHarnessName(requestedHarness); muse and ohmypi launch-field checks use behavior.launchCommandKind === 'muse-tui' / 'ohmypi-rpc'. The file must end at <= 1171 lines; if not, move waitForConversationRuntimeReady and waitForPiTuiReady to src/lib/overdeck/conversation-readiness.ts and re-export them from conversation-runtime.ts."
+        },
+        "items": [
+          {
+            "id": "runtime-readiness-kinds.ac1",
+            "title": "Given each readiness kind, when waitForConversationRuntimeReady runs in the readiness test, then exactly the PRD-listed waiter runs with the PRD-listed timeout, and codex runs no waiter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-readiness-kinds.ac2",
+            "title": "Given claude-code in 'respawn' mode, when readiness runs, then waitForReadySignal(tmuxSession, 30) is called and waitForClaudeReady is not.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-readiness-kinds.ac3",
+            "title": "Given the edited file, when wc -l counts it, then conversation-runtime.ts has at most 1171 lines and bash scripts/lint-file-size.sh exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-lifecycle-caps",
+        "title": "Read start, resume and stop decisions from capabilities in conversation-runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-start.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "start test passes",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. stopConversationRuntime reaps the Prime daemon when capabilities.reapsPrivateDaemonOnStop. startConversationRuntime computes caps before the try: contextInFirstMessage = caps.contextChannel === 'initial-message-envelope' && !launchContext.bareContext; throws on a failed delivery when caps.initialPromptMustLand; stops the runtime in catch when caps.stopRuntimeOnStartFailure. The resume path uses the same contextChannel check for deliverMandatoryKimiResumeContext, caps.resumeContractMustLand for assertKimiResumeContractResult, and caps.stopRuntimeOnStartFailure for teardown. Add the eight-runtime table test."
+        },
+        "items": [
+          {
+            "id": "runtime-lifecycle-caps.ac1",
+            "title": "Given each of the eight runtimes and an injected spawn that throws, when startConversationRuntime runs, then deps.stop is called exactly for acp, opencode, kimi-code, muse and prime-agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-lifecycle-caps.ac2",
+            "title": "Given an injected deliver returning { ok: false } with a message, when startConversationRuntime runs, then the spawn error is recorded exactly for acp, opencode, kimi-code and prime-agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-lifecycle-caps.ac3",
+            "title": "Given the file after this item, when grep -cE \"[Hh]arness [!=]== '|transcriptKind [!=]== '\" src/lib/overdeck/conversation-runtime.ts runs, then it prints 0 and the file has at most 1171 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-caps",
+        "title": "Read conversation send behavior from capabilities in conversation-message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-upload.test.ts",
+            "src/lib/overdeck/__tests__/conversation-message-input-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-upload.test.ts src/lib/overdeck/__tests__/conversation-message-input-target.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both message tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Replace the six branches in conversation-message.ts: transformMessageForHarness returns early when capabilities.attachmentDelivery === 'native'; manual compact interception uses capabilities.nativeManualCompact; the permission-prompt hold + ensureMainInputTarget block and the response inputTarget field use capabilities.paneInputGuard; the transcript user-record snapshot uses capabilities.transcriptDeliveryReceipt && conv.claudeSessionId; the Kimi session-id wait uses capabilities.contextChannel === 'initial-message-envelope' && !conv.bareContext."
+        },
+        "items": [
+          {
+            "id": "message-caps.ac1",
+            "title": "Given claude-code, when transformMessageForHarness runs with attachment paths, then it returns the message unchanged; given codex, then it returns the rewritten message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-caps.ac2",
+            "title": "Given a claude-code conversation, when a message is sent, then the response contains inputTarget 'main'; given a codex conversation, then the response has no inputTarget field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-caps.ac3",
+            "title": "Given the edited file, when grep -cE \"[Hh]arness [!=]== '|transcriptKind [!=]== '\" src/lib/overdeck/conversation-message.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reads-session-table",
+        "title": "Resolve conversation session files through an exhaustive transcript-kind table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "tests/unit/lib/overdeck/conversation-reads-session-file.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversation-reads-session-file.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "session-file test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Replace the harness and transcriptKind branches in resolveSessionFile with the module-level HARNESS_SESSION_FILE: Record<HarnessTranscriptKind, HarnessSessionFileLookup | null> table and one lookup, exactly as in the PRD snippet (muse and prime-agent onMiss 'return'; ohmypi, codex, acp, kimi onMiss 'fallback'; claude null). Keep the vault branch."
+        },
+        "items": [
+          {
+            "id": "reads-session-table.ac1",
+            "title": "Given a muse or prime-agent conversation whose resolver returns null, when resolveSessionFile runs, then it returns null without trying the Claude path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reads-session-table.ac2",
+            "title": "Given a codex conversation whose rollout path is null, when resolveSessionFile runs, then it falls through to the Claude pinned-session path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reads-session-table.ac3",
+            "title": "Given the edited file, when grep -cE \"[Hh]arness [!=]== '|transcriptKind [!=]== '\" src/lib/overdeck/conversation-reads.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-history-table",
+        "title": "Map transcript candidate kinds through an exhaustive table in session-history",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "tests/unit/lib/session-history-candidate-kind.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/session-history-candidate-kind.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "candidate-kind test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Replace transcriptCandidateKind's if-chain with CANDIDATE_KIND_BY_TRANSCRIPT: Record<HarnessTranscriptKind, TranscriptCandidateKind> and isLegacyPiHarnessName(harness) for the legacy 'pi' result. Leave the two typeof entry.harness === 'string' guards."
+        },
+        "items": [
+          {
+            "id": "session-history-table.ac1",
+            "title": "Given each runtime name, when transcriptCandidateKind runs, then it returns the same kind as before (claude-code→claude, ohmypi→ohmypi, codex→codex, acp and opencode→acp, kimi-code→kimi, muse→muse, prime-agent→prime-agent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-history-table.ac2",
+            "title": "Given 'pi', null and 'unknown', when transcriptCandidateKind runs, then it returns 'pi', 'claude' and 'claude'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-history-table.ac3",
+            "title": "Given the edited file, when grep -nE \"[Hh]arness [!=]== '|transcriptKind [!=]== '\" src/lib/session-history.ts runs, then the only matching lines are the two typeof … === 'string' guards.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-caps",
+        "title": "Read launcher receipt channel, effort flag and launch kinds from declarations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator test passes",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In launcher-generator.ts: ohmypi model provisioning uses launchCommandKind === 'ohmypi-rpc'; receiptChannel = getHarnessBehavior(config.harness ?? 'claude-code').capabilities.contextChannel; buildNonConversationCommand uses launchCommandKind === 'muse-tui' and reuses that behavior lookup; the acp-host --effort flag uses capabilities.hostEffortFlag. File must stay <= 998 lines."
+        },
+        "items": [
+          {
+            "id": "launcher-caps.ac1",
+            "title": "Given launchers generated for codex, ohmypi, kimi-code, acp, prime-agent and claude-code with context files, when the receipt command is read, then each contains its pre-change deliveryChannel value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-caps.ac2",
+            "title": "Given an opencode launcher with a context file, when the receipt command is read, then it contains 'acp-initial-context'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-caps.ac3",
+            "title": "Given acpEffort set, when opencode and acp launchers are generated, then the opencode command contains '--effort' and the acp command does not.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-caps.ac4",
+            "title": "Given the edited file, when grep -cE \"[Hh]arness [!=]== '|transcriptKind [!=]== '\" src/lib/launcher-generator.ts runs, then it prints 0 and bash scripts/lint-file-size.sh exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "binary-caps",
+        "title": "Read binary labels, install hint, config key and preflight from capabilities",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-binary.ts",
+            "src/lib/__tests__/harness-binary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-binary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-binary test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. configuredHarnessBinaryPath reads capabilities.binaryConfigKey through a CONFIGURED_BINARY_PATH: Record<HarnessBinaryConfigKey, () => string | undefined> table; requireHarnessBinary takes binaryLabel and installHint from capabilities; prepareHarnessLaunch runs the Claude Code model-minimum check when capabilities.launchPreflight === 'claude-code-model-minimum'."
+        },
+        "items": [
+          {
+            "id": "binary-caps.ac1",
+            "title": "Given each runtime with no binary on PATH, when requireHarnessBinary rejects, then the error starts with that runtime's binaryLabel (Claude Code, OhMyPi, Codex CLI, Kimi Code CLI, OpenCode, Muse Code, Prime Agent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binary-caps.ac2",
+            "title": "Given a WSL-interop-only candidate, when requireHarnessBinary rejects, then only the claude-code message contains 'curl -fsSL https://claude.ai/install.sh | bash'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binary-caps.ac3",
+            "title": "Given config acp.kimi.binaryPath set, when configuredHarnessBinaryPath runs, then acp returns that path and opencode returns undefined.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binary-caps.ac4",
+            "title": "Given the edited file, when grep -cE \"[Hh]arness [!=]== '\" src/lib/harness-binary.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scanner-table",
+        "title": "Select scanner metadata parsers by table and read workspace and correlation capabilities",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/scanner.ts",
+            "src/lib/conversations/__tests__/scanner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/conversations/__tests__/scanner.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "scanner test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Inside scan(), replace parseMetadata with a Record<HarnessTranscriptKind, …> table (kimi-wire-jsonl and prime-agent-jsonl keep the Claude parseJsonl); resolveWorkspace switches on capabilities.workspaceResolution; both correlation sites use capabilities.correlatesBySessionId. Type the table value as the union the old parseMetadata returned; never cast to any."
+        },
+        "items": [
+          {
+            "id": "scanner-table.ac1",
+            "title": "Given discovered files for claude-code, codex, acp, opencode and muse, when scan runs, then claude resolves its workspace through the hash resolver, codex/acp/opencode through the agent dir, and muse without a first-message cwd gets a null workspace.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scanner-table.ac2",
+            "title": "Given a claude-code file, when correlation is combined, then no session id is passed; given a codex file, then its parsed session id is passed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scanner-table.ac3",
+            "title": "Given the edited file, when grep -cE \"[Hh]arness [!=]== '\" src/lib/conversations/scanner.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-table",
+        "title": "Select conversation activity sources through an exhaustive table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/activity-summary.ts",
+            "src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts",
+            "src/dashboard/server/services/conversation/__tests__/activity-summary-sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts src/dashboard/server/services/conversation/__tests__/activity-summary-sources.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both activity tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Replace the transcriptKind branches in summarizeConversationActivity with ACTIVITY_SOURCES: Record<HarnessTranscriptKind, ActivitySource> ('projected' for acp-jsonl; 'parsed' with parse + toolsInWorkLog for the rest; toolsInWorkLog true only for codex). The claude-jsonl entry is parseClaudeOrLegacyPiActivity, which keeps the isOhmypiSessionFile / isPiSessionFile sniffing and the parseFromLastCompactBoundary fallback. Cache-hit stall adjustment and the projected path run for kind 'projected'; the workLog current-tool fallback runs when toolsInWorkLog."
+        },
+        "items": [
+          {
+            "id": "activity-table.ac1",
+            "title": "Given each harness with its parser mocked, when summarizeConversationActivity runs, then exactly that harness's parser is called (claude falls back to parseFromLastCompactBoundary).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-table.ac2",
+            "title": "Given a claude-code harness file under .overdeck/agents/x/sessions/, when summarizeConversationActivity runs, then the ohmypi parser is used.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-table.ac3",
+            "title": "Given an ACP transcript with a pending tool call written under 30 seconds ago, when summarizeConversationActivity runs, then isWorking is true and currentTool names that tool call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-table.ac4",
+            "title": "Given the edited file, when grep -cE \"transcriptKind [!=]== '\" src/dashboard/server/services/conversation/activity-summary.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-label",
+        "title": "Render the Command Deck harness label from the declared displayName",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "frontend typecheck passes",
+            "ConversationRow test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. shortHarness becomes: normalizeHarnessName(harness) → getRuntimeBehavior(runtime).displayName, else the raw id. Update any oh-my-pi assertion in this test file to Pi. Add a separate describe block that mocks @overdeck/contracts as in PRD WI-14 and asserts a fake-harness row renders 'Fake Harness' (frontend half of FR-17)."
+        },
+        "items": [
+          {
+            "id": "row-label.ac1",
+            "title": "Given conversations with harness muse, ohmypi and codex, when ConversationRow renders, then the labels read 'Muse Code', 'Pi' and 'Codex'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-label.ac2",
+            "title": "Given a mocked fake-harness definition with displayName 'Fake Harness', when a fake-harness row renders, then it shows 'Fake Harness'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-label.ac3",
+            "title": "Given the edited file, when grep -cE \"harness [!=]== '\" ConversationRow.tsx runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-normalize",
+        "title": "Resolve runtimes for agents through normalizeHarnessName",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/index.ts",
+            "src/lib/runtimes/__tests__/registry-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/registry-dispatch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "registry-dispatch test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ],
+          "acJustification": "One mechanical replacement; behavior and residual-branch checks cover it."
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Replace the getRuntimeForAgent if-chain with return this.get(normalizeHarnessName(harness) ?? 'claude-code') ?? null; keep the legacy-fallback doc comment."
+        },
+        "items": [
+          {
+            "id": "registry-normalize.ac1",
+            "title": "Given agent states with harness 'pi', missing, 'claude' and each registered name, when getRuntimeForAgent runs, then it returns the ohmypi runtime, the claude-code runtime, the claude-code runtime and the matching runtime.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-normalize.ac2",
+            "title": "Given the edited file, when grep -cE \"harness [!=]== '\" src/lib/runtimes/index.ts runs, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fake-runtime-contract",
+        "title": "Prove a fake runtime definition drives CLI and server behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/harness-capability-contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/harness-capability-contract.test.ts"
+          ],
+          "expected_outputs": [
+            "harness-capability-contract.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. New test that vi.mocks @overdeck/contracts (normalizeHarnessName, getHarnessBehavior, getRuntimeBehavior) so 'fake-harness' resolves to a mutable vi.hoisted slot holding a whole fake HarnessBehavior ({ ...MUSE_BEHAVIOR, displayName, transcriptKind, capabilities }). Each case sets two opposite definitions: startConversationRuntime teardown (capabilities.stopRuntimeOnStartFailure), transformMessageForHarness (capabilities.attachmentDelivery; serves the dashboard message route), configuredHarnessBinaryPath (capabilities.binaryConfigKey), and declared adapter selection in summarizeConversationActivity (transcriptKind codex-rollout-jsonl then kimi-wire-jsonl, with a distinct temp transcript file per run because the activity cache key includes the path). Also assert every runtime in getGlobalRegistry().getAll() has all HARNESS_CAPABILITY_KEYS defined. If a consumer import bypasses the mock, change that import to @overdeck/contracts or src/lib/runtimes/behavior.js; never add a test-only registration API."
+        },
+        "items": [
+          {
+            "id": "fake-runtime-contract.ac1",
+            "title": "Given fake-harness with stopRuntimeOnStartFailure true and then false, when startConversationRuntime's injected spawn throws, then deps.stop is called in the first run and not in the second.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fake-runtime-contract.ac2",
+            "title": "Given fake-harness with attachmentDelivery 'native' and then 'inline-paths', when transformMessageForHarness runs with an attachment, then the message is unchanged in the first run and rewritten in the second.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fake-runtime-contract.ac3",
+            "title": "Given a fake definition with transcriptKind 'codex-rollout-jsonl' and then 'kimi-wire-jsonl', each run on its own temp transcript file, when summarizeConversationActivity runs, then the codex parser is called in the first run and the kimi parser in the second.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fake-runtime-contract.ac4",
+            "title": "Given the global runtime registry, when the test iterates getAll(), then every runtime's declared capabilities contain all HARNESS_CAPABILITY_KEYS with defined values.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-lower",
+        "title": "Lower the harness-branch baseline after the ten conversions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/harness-branches-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:harness-branches",
+            "bash scripts/lint-ratchet-audit.sh"
+          ],
+          "expected_outputs": [
+            "ratchet passes with the lowered total",
+            "ratchet audit passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ],
+          "acJustification": "Single mechanical --update commit; two checks cover it."
+        },
+        "narrative": {
+          "Action": "PRD WI-15. Run bash scripts/lint-harness-branches.sh --update and commit the lowered baseline. If any of the ten target files keeps a row, fix the conversion in its own item; never hand-edit the baseline."
+        },
+        "items": [
+          {
+            "id": "ratchet-lower.ac1",
+            "title": "Given the lowered baseline, when grep -E 'conversation-runtime.ts|session-history.ts|launcher-generator.ts|harness-binary.ts|conversations/scanner.ts|activity-summary.ts|ConversationRow.tsx|runtimes/index.ts|conversation-reads.ts|conversation-message.ts' scripts/harness-branches-baseline.txt runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-lower.ac2",
+            "title": "Given the lowered baseline, when npm run lint:harness-branches runs, then it exits 0 and every baseline row's count equals the count the scan reports for that file (no stale higher rows).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-capabilities",
+        "title": "Document the capability model, the ratchet and adding a harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-20T03:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4562",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/ROLES.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "docs lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. Add '## Harness capabilities' before '## Implementation' in configuration/harnesses.mdx: what HarnessBehavior.capabilities is, a table of the 16 fields with one-line meanings, the rule (behavior decisions read a capability; adapter selection uses an exhaustive table or adapter-kind switch; never compare a harness name), the eight-step 'Adding a harness' checklist from PRD WI-16 (declaration steps 1-3: types/KNOWN_HARNESSES, behavior+capabilities constants, tsc-flagged tables; adapter steps 4-7: runtime adapter registered in getGlobalRegistry, HARNESS_BINARY_BY_RUNTIME, storage module + harness-discovery.ts source, canUseHarness rule; step 8: npm run lint:harness-branches), and the ratchet (what it counts, --update, raises need an issue reference); add harness-capabilities.ts to the Implementation list. Add one paragraph to docs/ROLES.md 'How a run actually gets the right instructions' linking configuration/harnesses.mdx#harness-capabilities. Update the runtimes/ bullet in .overdeck/context/codebase/architecture.md and its last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-capabilities.ac1",
+            "title": "Given configuration/harnesses.mdx, when a reader opens '## Harness capabilities', then it lists all 16 capability fields and an eight-step 'Adding a harness' checklist that names getGlobalRegistry, HARNESS_BINARY_BY_RUNTIME, harness-discovery.ts, canUseHarness and npm run lint:harness-branches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-capabilities.ac2",
+            "title": "Given docs/ROLES.md, when a reader reaches the end of 'How a run actually gets the right instructions', then a paragraph links configuration/harnesses.mdx#harness-capabilities.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-capabilities.ac3",
+            "title": "Given .overdeck/context/codebase/architecture.md, when its runtimes/ bullet is read, then it names packages/contracts/src/harness-capabilities.ts and the lint:harness-branches ratchet, and npm run lint:docs exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "capabilities-foundation",
+        "to": "runtime-readiness-kinds",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "runtime-lifecycle-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "message-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "session-history-table",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "launcher-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "binary-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "scanner-table",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "row-label",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "registry-normalize",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "fake-runtime-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "capabilities-foundation",
+        "to": "docs-capabilities",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-readiness-kinds",
+        "to": "runtime-lifecycle-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-lifecycle-caps",
+        "to": "fake-runtime-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "message-caps",
+        "to": "fake-runtime-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "binary-caps",
+        "to": "fake-runtime-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-table",
+        "to": "fake-runtime-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-script",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-readiness-kinds",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-lifecycle-caps",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "message-caps",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "reads-session-table",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "session-history-table",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-caps",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "binary-caps",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "scanner-table",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-table",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "row-label",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-normalize",
+        "to": "ratchet-lower",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-script",
+        "to": "docs-capabilities",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

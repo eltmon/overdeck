@@ -410,3 +410,53 @@ describe('configuredHarnessBinaryPath', () => {
     expect(configuredHarnessBinaryPath('claude-code')).toBeUndefined();
   });
 });
+
+describe('binary handling reads declared capabilities (PAN-4562)', () => {
+  const missing = (harness: Parameters<typeof prepareHarnessLaunch>[0], extra: Parameters<typeof prepareHarnessLaunch>[1] = {}) => prepareHarnessLaunch(harness, {
+    pathValue: '/usr/bin',
+    home: '/home/test',
+    accessExecutable: executableAccess([]),
+    runCommand: vi.fn(async () => ''),
+    allowLoginShell: false,
+    ...extra,
+  }).then(() => '', (error: unknown) => (error as Error).message);
+
+  it.each([
+    ['claude-code', 'Claude Code'],
+    ['ohmypi', 'OhMyPi'],
+    ['codex', 'Codex CLI'],
+    ['acp', 'Kimi Code CLI'],
+    ['kimi-code', 'Kimi Code CLI'],
+    ['opencode', 'OpenCode'],
+    ['muse', 'Muse Code'],
+    ['prime-agent', 'Prime Agent'],
+  ] as const)('%s names itself %s when its binary is missing', async (harness, label) => {
+    expect(await missing(harness)).toMatch(new RegExp(`^${label} executable `));
+  });
+
+  it('only claude-code adds its install command to the WSL message', async () => {
+    const wsl = (harness: 'claude-code' | 'codex') => {
+      const windowsBinary = `/mnt/c/Users/test/AppData/Roaming/npm/${harnessBinaryName(harness)}`;
+      return missing(harness, {
+        pathValue: '/usr/bin:/mnt/c/Users/test/AppData/Roaming/npm',
+        windowsMountRoots: ['/mnt/c'],
+        accessExecutable: executableAccess([windowsBinary]),
+      });
+    };
+    expect(await wsl('claude-code')).toContain('Install Claude Code inside WSL (curl -fsSL https://claude.ai/install.sh | bash), then restart');
+    expect(await wsl('codex')).toContain('Install Codex CLI inside WSL, then restart');
+  });
+
+  it('reads the configured binary path from the declared config key only', () => {
+    configMock.loadConfigSync.mockReturnValue({ config: { acp: { kimi: { binaryPath: '/opt/acp-kimi' } }, kimiCode: { binaryPath: '/opt/kimi' } } } as never);
+    try {
+      expect(configuredHarnessBinaryPath('acp')).toBe('/opt/acp-kimi');
+      expect(configuredHarnessBinaryPath('kimi-code')).toBe('/opt/kimi');
+      expect(configuredHarnessBinaryPath('opencode')).toBeUndefined();
+      expect(configuredHarnessBinaryPath('claude-code')).toBeUndefined();
+    } finally {
+      configMock.loadConfigSync.mockReturnValue({ config: {} });
+    }
+  });
+});
+

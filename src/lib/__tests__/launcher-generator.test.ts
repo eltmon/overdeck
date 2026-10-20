@@ -2358,3 +2358,42 @@ describe('generateLauncherScript — skill overrides (PAN-3942)', () => {
     }
   });
 });
+
+describe('launcher reads declared harness capabilities (PAN-4562)', () => {
+  const ACP_FIELDS = { acpAgentId: 'conv-r', acpProvider: 'kimi', acpWorkspace: '/workspace/project', acpBinaryPath: '/opt/bin/kimi' } as const;
+  const HARNESS_FIELDS: Record<string, Partial<LauncherConfig>> = {
+    'claude-code': { baseCommand: 'claude' },
+    ohmypi: { piEffort: 'high', piExtensionPath: '/x/dist/index.js', piFifoPath: '/x/rpc.in', piSessionDir: '/x/sessions' },
+    codex: {},
+    acp: ACP_FIELDS,
+    'kimi-code': { kimiCodeModel: 'kimi-code/k3', kimiCodeEffort: 'high' },
+    opencode: ACP_FIELDS,
+    'prime-agent': { model: 'gpt-5.5', primeAgent: { agentId: 'conv-r', binaryPath: '/opt/prime/bin/prime-agent', provider: 'openai', workspace: '/workspace/project', contextFile: '/tmp/ctx.md' } },
+  };
+  const launcher = (harness: NonNullable<LauncherConfig['harness']>, extra: Partial<LauncherConfig> = {}) => generateLauncherScript({
+    ...DEFAULT_CONFIG,
+    harness,
+    managedStateKey: 'conv-r',
+    acpContextFile: '/tmp/ctx.md',
+    ...HARNESS_FIELDS[harness],
+    ...extra,
+  });
+
+  it.each([
+    ['claude-code', 'append-system-prompt-file'],
+    ['ohmypi', 'append-system-prompt'],
+    ['codex', 'developer_instructions'],
+    ['acp', 'acp-initial-context'],
+    ['kimi-code', 'initial-message-envelope'],
+    ['opencode', 'acp-initial-context'],
+    ['prime-agent', 'prime-agent-append-system-prompt'],
+  ] as const)('%s records the %s context receipt channel', (harness, channel) => {
+    expect(launcher(harness)).toContain(`context-receipt.json' '${channel}' `);
+  });
+
+  it('passes the host effort flag for opencode and not for acp', () => {
+    expect(launcher('opencode', { acpEffort: 'high' })).toContain("--effort 'high'");
+    expect(launcher('acp', { acpEffort: 'high' })).not.toContain('--effort');
+  });
+});
+

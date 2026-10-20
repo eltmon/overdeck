@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { HarnessTranscriptKind } from '@overdeck/contracts';
+
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
@@ -59,19 +61,24 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
   return null;
 }
 
+/** Native transcript resolvers by transcript kind (PAN-4562); null = the Claude path below. */
+const FORK_SOURCE_RESOLVER: Record<HarnessTranscriptKind, ((conv: Conversation) => Promise<string | null>) | null> = {
+  'claude-jsonl': null,
+  'acp-jsonl': null,
+  'muse-jsonl': null,
+  'prime-agent-jsonl': null,
+  'ohmypi-jsonl': (conv) => resolvePiSessionPath(conv.tmuxSession),
+  'codex-rollout-jsonl': (conv) => resolveCodexRolloutPath(conv.tmuxSession),
+  // workspaceOverride because a conversation has no AgentState row to derive it from.
+  'kimi-wire-jsonl': (conv) => resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd }),
+};
+
 export async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
-    const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    if (piPath) return piPath;
-  }
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
-    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
-    if (codexPath) return codexPath;
-  }
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
-    // workspaceOverride because a conversation has no AgentState row to derive it from.
-    const kimiPath = await resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
-    if (kimiPath) return kimiPath;
+  const resolveNative = FORK_SOURCE_RESOLVER[getHarnessBehavior(conv.harness).transcriptKind];
+  if (resolveNative) {
+    // A miss falls through to the Claude path (stale harness recovery).
+    const nativePath = await resolveNative(conv);
+    if (nativePath) return nativePath;
   }
   const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
   const sessionId = pinned ?? conv.claudeSessionId;
