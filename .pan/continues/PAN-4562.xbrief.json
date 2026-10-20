@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:29:37.131Z",
+  "updated": "2026-10-20T04:29:55.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -306,6 +306,10 @@
     "docs-capabilities.ac1": {
       "status": "completed",
       "doneAt": "2026-10-20T04:29:37.130Z"
+    },
+    "docs-capabilities.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:29:55.014Z"
     }
   }
 }
