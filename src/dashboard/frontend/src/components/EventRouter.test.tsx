@@ -716,6 +716,46 @@ describe('EventRouter memory updates', () => {
     expect(useDashboardStore.getState().snapshotTimestamp).toBe('2026-05-16T12:10:00.000Z')
   })
 
+  it('treats a too-far-behind replay right after a snapshot as a failed bootstrap and retries after backoff', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let resolveSnapshot: (value: DashboardSnapshot) => void = () => undefined
+    const snapshotPromise = new Promise<DashboardSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    request
+      .mockReturnValueOnce(snapshotPromise)
+      .mockResolvedValueOnce({ tooFarBehind: true })
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce([])
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribed).not.toBeNull()
+
+    act(() => {
+      wsTransport.subscribed!(memoryObservationEvent(700))
+    })
+
+    await act(async () => {
+      resolveSnapshot(snapshot)
+      await vi.advanceTimersByTimeAsync(20)
+    })
+
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(useConnectionState.getState().streamLive).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500)
+    })
+
+    expect(request.mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect(requestedMethods()[2]).toBe('pan.getSnapshot')
+    error.mockRestore()
+  })
+
   it('times out a getSnapshot that never settles and retries after backoff, never showing the overlay', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)

@@ -244,8 +244,10 @@ export function EventRouter() {
           connection.setServerReachable(true)
           connection.setStreamLive(true)
           const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
-          if (needsReplay) {
-            await replay(snapshot.sequence)
+          // A fresh snapshot already past the replay cap: fail this attempt so
+          // the reconnect backoff paces the next one (PAN-4559).
+          if (needsReplay && (await replay(snapshot.sequence)) === 'too-far-behind') {
+            throw new Error('replay after snapshot is too far behind')
           }
           if (reconnecting) {
             reconnecting = false
