@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4565",
   "created": "2026-10-20T02:51:57.744Z",
-  "updated": "2026-10-20T03:28:37.855Z",
+  "updated": "2026-10-20T03:28:46.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4565",
       "claimedAt": "2026-10-20T03:20:04.629Z",
       "doneAt": "2026-10-20T03:28:37.855Z"
+    },
+    "composer-fresh-token": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4565",
+      "claimedAt": "2026-10-20T03:28:46.123Z"
     }
   }
 }
