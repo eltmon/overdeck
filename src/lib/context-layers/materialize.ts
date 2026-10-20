@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { Harness } from '@overdeck/contracts';
 
 import { getOverdeckHome, isDevMode } from '../paths.js';
+import { renderManagedMemorySections } from '../memory/facts/render.js';
 import { findProjectByPath } from '../projects.js';
 import { workspaceContextWithoutProjectLayer } from './assemble.js';
 import { renderForHarness } from './harness.js';
@@ -30,6 +31,8 @@ export function renderManagedLaunchContext(workspace: string, harness: Harness):
   const sections: string[] = [renderGlobalLayer(harness, isDevMode())];
   const project = findProjectByPath(workspace);
   if (project) sections.push(renderProjectLayer(project.path, harness));
+  // PAN-3957: curated facts, harness-neutral, read from the primary checkout.
+  sections.push(renderManagedMemorySections(project?.path ?? null));
 
   const workspaceFile = resolveWorkspaceContextFile(workspace);
   if (existsSync(workspaceFile)) {
