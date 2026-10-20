@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T03:53:35.413Z",
+  "updated": "2026-10-20T03:58:22.439Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-10-20T03:53:28.729Z"
     },
     "command-deck-root-subscriptions": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4560",
-      "claimedAt": "2026-10-20T03:53:35.413Z"
+      "claimedAt": "2026-10-20T03:53:35.413Z",
+      "doneAt": "2026-10-20T03:58:22.439Z"
     }
   }
 }
