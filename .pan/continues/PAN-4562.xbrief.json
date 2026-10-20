@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4562",
   "created": "2026-10-20T03:04:35.302Z",
-  "updated": "2026-10-20T04:15:33.111Z",
+  "updated": "2026-10-20T04:15:52.238Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "capabilities-foundation.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T04:15:33.111Z"
+    },
+    "ratchet-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:15:52.238Z"
     }
   }
 }
