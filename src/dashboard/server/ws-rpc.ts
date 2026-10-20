@@ -20,7 +20,7 @@ import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseResult } from './services/conversation-service.js';
+import type { ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import {
   listAgentTranscriptCandidates,
@@ -57,9 +57,10 @@ import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from './services/conversation/codex-subagents.js';
-import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
+import { subagentTranscriptPath } from './services/conversation/subagents.js';
 
-import { sharedTranscriptParser, parseStateFromSnapshot } from './services/shared-transcript-parser.js';
+import { sharedTranscriptParser } from './services/shared-transcript-parser.js';
+import { streamClaudeTranscript } from './services/claude-transcript-stream.js';
 import { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 export { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 
@@ -165,73 +166,6 @@ export function streamHarnessFullParseSnapshots(
     case 'claude-jsonl': return null;
     default: return null;
   }
-}
-
-const claudeInitialSnapshot = sharedTranscriptParser('claude-initial');
-
-function streamClaudeTranscript(
-  sessionFile: string,
-  conversationName: string,
-  model: string | null,
-  agentId?: string,
-): FullParseSnapshotStream {
-  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-    Effect.acquireRelease(
-      Effect.promise(async () => {
-        const offer = (event: ConversationEvent) => {
-          try { Queue.offerUnsafe(queue, event); } catch { /* disconnected */ }
-        };
-        const initial = await claudeInitialSnapshot(sessionFile);
-        let currentByteOffset = initial.byteOffset;
-        let currentContextUsage = contextUsageFromParseResult(initial, model);
-        let highWaterCount = initial.messages.length;
-        if (initial.messages.length === 0 && initial.workLog.length === 0 && currentByteOffset > 0) {
-          console.warn(`[conv-stream] initial parse of ${conversationName} yielded no transcript content despite byteOffset=${currentByteOffset}`);
-        }
-        const priorState = parseStateFromSnapshot(initial);
-        offer({
-          kind: 'messages',
-          messages: initial.messages,
-          workLog: [...initial.workLog, ...initial.pendingToolUse.values()],
-          streaming: initial.streaming,
-          snapshot: true,
-          proposedPlan: initial.proposedPlan,
-          compactBoundaries: initial.compactBoundaries?.length ? initial.compactBoundaries : undefined,
-          contextUsage: currentContextUsage,
-        });
-        let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());
-        const subagentPoller = agentId ? null : await startSubagentListPolling(
-          sessionFile,
-          () => pendingSubagentToolUseIds,
-          offer,
-        );
-        const handle = watchConversation(sessionFile, (result) => {
-          const fileWasReset = result.byteOffset < currentByteOffset;
-          const gate = gateSnapshotEmission(fileWasReset, result.messages.length, highWaterCount);
-          highWaterCount = gate.highWaterCount;
-          currentByteOffset = result.byteOffset;
-          currentContextUsage = contextUsageFromParseResult(result, model);
-          pendingSubagentToolUseIds = new Set(result.pendingToolUse.keys());
-          void subagentPoller?.refresh();
-          if (gate.suppressedShrink) {
-            console.warn(`[conv-stream] suppressed shrinking reset for ${conversationName}`);
-          }
-          offer({
-            kind: 'messages',
-            messages: result.messages,
-            workLog: result.workLog,
-            streaming: result.streaming,
-            snapshot: gate.snapshot,
-            proposedPlan: result.proposedPlan,
-            compactBoundaries: result.compactBoundaries?.length ? result.compactBoundaries : undefined,
-            contextUsage: currentContextUsage,
-          });
-        }, { byteOffset: initial.byteOffset, priorState });
-        return { stop() { handle.stop(); subagentPoller?.stop(); } };
-      }),
-      (handle) => Effect.sync(() => handle.stop()),
-    ),
-  );
 }
 
 function nearestExistingWatchRoot(path: string): { path: string; recursive: boolean } | null {
