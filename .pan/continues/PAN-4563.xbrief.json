@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:51:53.841Z",
+  "updated": "2026-10-20T20:52:05.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -350,6 +350,10 @@
     "fixture-hygiene.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T20:51:53.841Z"
+    },
+    "fixture-hygiene.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:52:05.984Z"
     }
   }
 }
