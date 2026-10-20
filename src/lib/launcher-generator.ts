@@ -306,7 +306,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // registry at ~/.omp/agent/models.json; providers absent from the catalog
   // (dashscope) must be provisioned before spawn or omp fails with
   // "No model selected".
-  if (config.harness === 'ohmypi' && config.model) {
+  if (getHarnessBehavior(config.harness ?? 'claude-code').launchCommandKind === 'ohmypi-rpc' && config.model) {
     provisionOhmypiProviderForModel(config.model);
   }
 
@@ -407,17 +407,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   ];
   if (receiptKey && receiptFiles.length > 0) {
     const receiptPath = join(getOverdeckHome(), 'agents', receiptKey, 'context-receipt.json');
-    const receiptChannel = config.harness === 'codex'
-      ? 'developer_instructions'
-      : config.harness === 'ohmypi'
-        ? 'append-system-prompt'
-        : config.harness === 'kimi-code'
-          ? 'initial-message-envelope'
-        : config.harness === 'acp'
-          ? 'acp-initial-context'
-          : config.harness === 'prime-agent'
-            ? 'prime-agent-append-system-prompt'
-            : 'append-system-prompt-file';
+    const receiptChannel = getHarnessBehavior(config.harness ?? 'claude-code').capabilities.contextChannel;
     const receiptScript = 'const fs=require("fs"),c=require("crypto"),p=require("path");const [out,ch,...files]=process.argv.slice(1);const sources=files.filter(f=>fs.existsSync(f)).map(path=>{const b=fs.readFileSync(path);return{path,bytes:b.length,estimatedTokens:Math.ceil(b.length/4),sha256:c.createHash("sha256").update(b).digest("hex")}});fs.mkdirSync(p.dirname(out),{recursive:true});const t=out+".tmp-"+process.pid;fs.writeFileSync(t,JSON.stringify({version:1,generatedAt:new Date().toISOString(),deliveryChannel:ch,sources},null,2)+"\\n",{mode:384});fs.renameSync(t,out)';
     lines.push(`node -e ${shellQuote(receiptScript)} ${shellQuote(receiptPath)} ${shellQuote(receiptChannel)} ${receiptFiles.map(shellQuote).join(' ')}`);
   }
@@ -653,8 +643,8 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'muse') return buildMuseCommand(config, useExec);
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, useExec);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
   }
@@ -882,7 +872,7 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.model) {
     tokens.push('--model', shellQuoteModelId(config.model));
   }
-  if (config.harness === 'opencode' && config.acpEffort) {
+  if (getHarnessBehavior(config.harness ?? 'claude-code').capabilities.hostEffortFlag && config.acpEffort) {
     tokens.push('--effort', shellQuote(config.acpEffort));
   }
   if (config.acpContextFile) {
