@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T03:11:33.987Z",
+  "updated": "2026-10-20T03:12:24.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4563",
       "claimedAt": "2026-10-20T03:10:45.935Z",
       "doneAt": "2026-10-20T03:11:33.987Z"
+    },
+    "replay-engine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4563",
+      "claimedAt": "2026-10-20T03:12:24.555Z"
     }
   }
 }
