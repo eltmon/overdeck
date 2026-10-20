@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4560",
   "created": "2026-10-20T03:13:32.572Z",
-  "updated": "2026-10-20T05:18:42.184Z",
+  "updated": "2026-10-20T05:18:55.177Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "command-deck-root-subscriptions.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T05:18:42.184Z"
+    },
+    "app-shell-subscriptions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T05:18:55.177Z"
     }
   }
 }
