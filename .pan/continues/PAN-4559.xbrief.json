@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4559",
   "created": "2026-10-20T02:52:39.553Z",
-  "updated": "2026-10-20T04:27:25.101Z",
+  "updated": "2026-10-20T04:27:40.026Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "service-bounded-read.ac2": {
       "status": "completed",
       "doneAt": "2026-10-20T04:27:25.100Z"
+    },
+    "contract-replay-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T04:27:40.026Z"
     }
   }
 }
