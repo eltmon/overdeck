@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4563",
   "created": "2026-10-20T02:58:35.639Z",
-  "updated": "2026-10-20T20:41:19.468Z",
+  "updated": "2026-10-20T20:41:30.688Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "format-scrub.ac4": {
       "status": "completed",
       "doneAt": "2026-10-20T20:41:19.468Z"
+    },
+    "capture-sink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-20T20:41:30.688Z"
     }
   }
 }
