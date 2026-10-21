@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T05:24:42.293Z",
+  "updated": "2026-10-21T05:24:54.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "w10-dashboard-sync-service.ac5": {
       "status": "completed",
       "doneAt": "2026-10-21T05:24:42.293Z"
+    },
+    "w11-pan-4577-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T05:24:54.221Z"
     }
   }
 }
