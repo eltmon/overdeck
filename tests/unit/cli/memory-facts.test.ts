@@ -319,6 +319,81 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
     });
   });
 
+  describe('post-write operator sync (PAN-4578 W8)', () => {
+    const userDir = () => join(process.env.OVERDECK_HOME as string, 'context', 'memory');
+    const syncedOutcome = () => ({
+      status: 'synced' as const,
+      dir: userDir(),
+      committed: true,
+      pulled: [],
+      pushed: true,
+      conflicts: [],
+      heldBack: [],
+    });
+    const addOptions = (overrides: Record<string, unknown>) => ({
+      type: 'feedback' as const,
+      description: 'A description.',
+      ...overrides,
+    });
+
+    it('add --user on a synced store runs one sync', async () => {
+      mkdirSync(join(userDir(), '.git'), { recursive: true });
+      const syncOperator = vi.fn(async () => syncedOutcome());
+
+      await memoryFactAddCommand('op-fact', addOptions({ user: true, syncOperator }));
+
+      expect(syncOperator).toHaveBeenCalledTimes(1);
+      expect(logSpy.mock.calls.flat().join('\n')).toContain('✓ Operator memory synced (0 pulled, pushed)');
+    });
+
+    it('add --user on an unsynced store does not sync', async () => {
+      const syncOperator = vi.fn(async () => syncedOutcome());
+      await memoryFactAddCommand('op-fact', addOptions({ user: true, syncOperator }));
+      expect(syncOperator).not.toHaveBeenCalled();
+      expect(readMemoryFactsSync(userDir(), 'user').facts).toHaveLength(1);
+    });
+
+    it('add --machine never syncs', async () => {
+      mkdirSync(join(userDir(), '.git'), { recursive: true });
+      mkdirSync(join(process.env.OVERDECK_HOME as string, 'context', 'machine-memory', '.git'), { recursive: true });
+      const syncOperator = vi.fn(async () => syncedOutcome());
+      await memoryFactAddCommand('m-fact', addOptions({ machine: true, syncOperator }));
+      expect(syncOperator).not.toHaveBeenCalled();
+    });
+
+    it('an offline outcome still exits 0', async () => {
+      mkdirSync(join(userDir(), '.git'), { recursive: true });
+      const syncOperator = vi.fn(async () => ({
+        status: 'offline' as const,
+        dir: userDir(),
+        error: 'fetch failed: x',
+        committed: true,
+        heldBack: [],
+      }));
+
+      await memoryFactAddCommand('op-fact', addOptions({ user: true, syncOperator }));
+
+      expect(exitCodes).toEqual([]);
+      expect(logSpy.mock.calls.flat().join('\n')).toContain('Operator memory sync is offline: fetch failed: x');
+      expect(readMemoryFactsSync(userDir(), 'user').facts.map((f) => f.id)).toEqual(['op-fact']);
+    });
+
+    it('--json adds the sync outcome, and edit/retire --user sync too', async () => {
+      mkdirSync(join(userDir(), '.git'), { recursive: true });
+      const syncOperator = vi.fn(async () => syncedOutcome());
+
+      await memoryFactAddCommand('op-fact', addOptions({ user: true, json: true, syncOperator }));
+      expect(JSON.parse(String(logSpy.mock.calls.at(-1)?.[0]))).toEqual({
+        file: join(userDir(), 'op-fact.md'),
+        sync: syncedOutcome(),
+      });
+
+      await memoryFactEditCommand('op-fact', { user: true, description: 'New.', syncOperator });
+      await memoryFactRetireCommand('op-fact', { user: true, syncOperator });
+      expect(syncOperator).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe('memoryFactEditCommand', () => {
     beforeEach(() => {
       writeFact(

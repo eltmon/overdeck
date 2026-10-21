@@ -21,9 +21,15 @@ import {
   userMemoryDir,
   writeMemoryFact,
 } from '../../lib/memory/facts/store.js';
+import {
+  isOperatorMemorySynced,
+  syncOperatorMemory,
+  type OperatorMemorySyncOutcome,
+} from '../../lib/memory/facts/operator-sync.js';
 import { findProjectByPath, getProjectSync } from '../../lib/projects.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { exitCli } from '../exit.js';
+import { formatSyncOutcome } from './memory-sync.js';
 
 const execFileAsync = promisify(execFile);
 const PROJECT_MEMORY_RELATIVE = '.overdeck/memory';
@@ -75,6 +81,32 @@ export function resolveFactTarget(flags: FactTargetFlags, mode: 'read' | 'write'
 
   const path = mode === 'write' || flags.here ? process.cwd() : project.path;
   return { scope: 'project', dir: projectMemoryDir(path), root: resolvePlanHome(path) };
+}
+
+/**
+ * D11.4: after a successful `--user` write to a synced operator store, run one
+ * sync. The fact is written either way, so the outcome never changes the exit code.
+ */
+async function syncAfterUserWrite(
+  target: FactTarget,
+  syncOperator: (() => Promise<OperatorMemorySyncOutcome>) | undefined,
+): Promise<OperatorMemorySyncOutcome | undefined> {
+  if (target.scope !== 'user' || !isOperatorMemorySynced(target.dir)) return undefined;
+  return (syncOperator ?? (() => syncOperatorMemory({ dir: target.dir })))();
+}
+
+function printWriteResult(
+  file: string,
+  verb: 'Wrote' | 'Removed',
+  json: boolean | undefined,
+  sync: OperatorMemorySyncOutcome | undefined,
+): void {
+  if (json) {
+    console.log(JSON.stringify(sync ? { file, sync } : { file }, null, 2));
+    return;
+  }
+  console.log(chalk.green(`✓ ${verb} ${file}`));
+  if (sync) for (const line of formatSyncOutcome(sync).lines) console.log(line);
 }
 
 export interface MemoryFactShowOptions extends FactTargetFlags {}
@@ -142,6 +174,8 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   json?: boolean;
   /** Injectable for tests; defaults to the real `git check-ignore` call (D11). */
   checkIgnored?: (root: string, relativePath: string) => Promise<boolean>;
+  /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
+  syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
 }
 
 function parseTags(tags: string | undefined): string[] {
@@ -196,11 +230,9 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
     return exitCli(1);
   }
 
-  if (options.json) {
-    console.log(JSON.stringify({ file }, null, 2));
-    return;
-  }
-  console.log(chalk.green(`✓ Wrote ${file}`));
+  const sync = await syncAfterUserWrite(target, options.syncOperator);
+  printWriteResult(file, 'Wrote', options.json, sync);
+  if (options.json) return;
   if (target.scope === 'project') console.log(`  Commit it: git -C ${target.root} add ${PROJECT_MEMORY_RELATIVE}/${id}.md`);
 }
 
@@ -213,6 +245,8 @@ export interface MemoryFactEditOptions extends FactTargetFlags {
   tags?: string;
   clearReview?: boolean;
   json?: boolean;
+  /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
+  syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
 }
 
 export async function memoryFactEditCommand(id: string, options: MemoryFactEditOptions): Promise<void> {
@@ -264,12 +298,13 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
     return exitCli(1);
   }
 
-  if (options.json) console.log(JSON.stringify({ file }, null, 2));
-  else console.log(chalk.green(`✓ Wrote ${file}`));
+  printWriteResult(file, 'Wrote', options.json, await syncAfterUserWrite(target, options.syncOperator));
 }
 
 export interface MemoryFactRetireOptions extends FactTargetFlags {
   json?: boolean;
+  /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
+  syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
 }
 
 export async function memoryFactRetireCommand(id: string, options: MemoryFactRetireOptions): Promise<void> {
@@ -289,11 +324,9 @@ export async function memoryFactRetireCommand(id: string, options: MemoryFactRet
     return exitCli(1);
   }
 
-  if (options.json) {
-    console.log(JSON.stringify({ file }, null, 2));
-    return;
-  }
-  console.log(chalk.green(`✓ Removed ${file}`));
+  const sync = await syncAfterUserWrite(target, options.syncOperator);
+  printWriteResult(file, 'Removed', options.json, sync);
+  if (options.json) return;
   if (target.scope === 'project') {
     console.log(
       `  Commit it: git -C ${target.root} rm --cached --ignore-unmatch ${PROJECT_MEMORY_RELATIVE}/${id}.md ` +
