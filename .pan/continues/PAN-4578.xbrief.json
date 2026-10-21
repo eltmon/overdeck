@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T04:49:37.216Z",
+  "updated": "2026-10-21T04:52:55.652Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4578",
       "claimedAt": "2026-10-21T04:45:37.709Z",
       "doneAt": "2026-10-21T04:49:37.216Z"
+    },
+    "w6-sync-conflicts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:52:55.652Z"
     }
   }
 }
