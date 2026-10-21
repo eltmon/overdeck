@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4578",
   "created": "2026-10-21T04:41:10.643Z",
-  "updated": "2026-10-21T04:44:01.068Z",
+  "updated": "2026-10-21T04:44:04.892Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4578",
       "claimedAt": "2026-10-21T04:43:30.083Z",
       "doneAt": "2026-10-21T04:44:01.067Z"
+    },
+    "w4-cli-machine-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4578",
+      "claimedAt": "2026-10-21T04:44:04.892Z"
     }
   }
 }
