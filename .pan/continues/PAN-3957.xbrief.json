@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:19:57.599Z",
+  "updated": "2026-10-21T00:20:10.072Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,10 @@
     "w7-bundled-rule.ac1": {
       "status": "completed",
       "doneAt": "2026-10-21T00:19:57.599Z"
+    },
+    "w7-bundled-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:10.072Z"
     }
   }
 }
