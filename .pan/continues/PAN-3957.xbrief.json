@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:18:06.979Z",
+  "updated": "2026-10-21T00:18:18.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "w6-search-facts-first.ac2": {
       "status": "completed",
       "doneAt": "2026-10-21T00:18:06.979Z"
+    },
+    "w6-search-facts-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:18:18.016Z"
     }
   }
 }
