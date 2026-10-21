@@ -10,6 +10,29 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.69.0" description="2026-10-21">
+  #### New
+
+  - **Curated memory in the repository:** short, reviewable facts (working agreements, corrections, non-obvious project facts) now live in `<planHome>/.overdeck/memory/<id>.md` and are committed with the code, so they reach every machine with a normal `git pull`. Every managed session gets an index of them at launch, whichever harness it runs, and the Context page preview shows the same sections. Use `pan memory add`, `edit`, `show`, `list` and `retire` to manage them; `pan memory search` lists matching facts before observations. A fact that contains a secret or a home-directory path is refused, and `pan done` refuses to finish with an uncommitted fact. See [Project memory](/configuration/memory). ([#4579](https://github.com/eltmon/overdeck/pull/4579))
+  - **Operator memory syncs across machines:** facts about you (`--user`) live in `~/.overdeck/context/memory/`, and `pan memory sync --setup <git-url>` turns that folder into a clone of a private repository you own. After setup, `pan memory sync`, `pan sync`, the dashboard (every 15 minutes) and each `--user` write keep it in sync. When two machines change the same fact, your copy is kept as `<id>-conflict-<machine>` for review and is not injected. Facts that are true on one machine only go in the new machine store (`--machine`), which never syncs. ([#4581](https://github.com/eltmon/overdeck/pull/4581))
+  - **Fresh-start handoffs:** `pan handoff --fresh` and the dashboard's **Fresh start** option start a clean conversation with no transcript, summary or parent link. Optional focus text becomes the first message. ([#4569](https://github.com/eltmon/overdeck/pull/4569))
+  - **Gemini 4 Argon:** `gemini-4-argon`, generally available from Google since 2026-10-13, is in the model pickers, the model catalog and cost tracking. It has a 1,048,576-token window and low, medium and high thinking. Cost tracking uses Google's introductory rates through 2026-11-30: &#36;2.00 input, &#36;0.10 cached input and &#36;10.00 output per MTok.
+
+  #### Improved
+
+  - **Long conversations open faster:** opening a conversation loads the most recent window of history instead of the whole transcript, and older messages load as you scroll up or jump to them. Large tool results show a preview with their size and load in full on demand. Exports still contain the complete transcript. ([#4574](https://github.com/eltmon/overdeck/pull/4574))
+  - **Smoother dashboard under heavy activity:** the dashboard re-renders less while many agents stream events, and reconnecting after a long gap catches up from a snapshot instead of replaying every missed event on the main thread. ([#4573](https://github.com/eltmon/overdeck/pull/4573), [#4571](https://github.com/eltmon/overdeck/pull/4571))
+
+  #### Fixed
+
+  - **Copy works again in the terminal view:** dragging to select text in a Herdr pane selected nothing, so Copy never appeared and Ctrl+C had nothing to copy. Plain drags select again; Shift is forced only while the app in the pane captures the mouse.
+  - **Multi-line paste arrives as one paste:** a Herdr terminal attach lost the pane's bracketed-paste mode, so pasted newlines reached the agent as separate Enter presses. The mode is now restored on attach, and keyboard and context-menu paste send one bracketed block. ([#4580](https://github.com/eltmon/overdeck/pull/4580))
+  - **A merge no longer fails on a duplicate PR:** when the lookup for a branch's open PR failed briefly, the merge tried to open a second PR and stopped with "Failed to create PR". It now reuses the existing PR.
+  - **Herdr shows Claude Code agents as agents:** Claude Code launchers now run as their own foreground job, so Herdr detects the agent in the pane and reports its status.
+
+  [Compare v0.68.0...v0.69.0](https://github.com/eltmon/overdeck/compare/v0.68.0...v0.69.0)
+</Update>
+
 <Update label="v0.68.0" description="2026-10-13">
   #### New
 
