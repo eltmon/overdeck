@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-20T23:39:26Z · model: claude-opus-5-5 · open: 833_
+_Last sequenced: 2026-10-21T00:23:54Z · model: claude-opus-5-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -17,7 +17,6 @@ _Last sequenced: 2026-10-20T23:39:26Z · model: claude-opus-5-5 · open: 833_
 | 12 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 13 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 14 | PAN-4551 | L | high | ok |  | PAN-4527, PAN-4532, PAN-4531, PAN-4540, PAN-4534 | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 16 | PAN-4563 | M | medium | ok |  |  | Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline. |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -207,7 +206,7 @@ _Last sequenced: 2026-10-20T23:39:26Z · model: claude-opus-5-5 · open: 833_
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
-| 224 | PAN-4575 | S | high | ok |  | PAN-4563 | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. |
+| 224 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -459,7 +458,7 @@ _Last sequenced: 2026-10-20T23:39:26Z · model: claude-opus-5-5 · open: 833_
 | 486 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
 | 487 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
 | 488 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 489 | PAN-4568 | XS | medium | ok |  | PAN-4563 | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. Pinned by PAN-4563 replay test. |
+| 489 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
 | 490 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
 | 491 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
 | 492 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
@@ -889,10 +888,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.
 
-### PAN-4563 (rank 16)
-
-New and already in the pipeline. Replay fixtures catch provider ordering changes (turn completion, interrupt, subagent nesting) that hand-written mocks miss. Valuable harness hardening but test infrastructure rather than a live defect, so medium.
-
 ### PAN-4572 (rank 19)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1161,6 +1156,10 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 
 Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
 
+### PAN-2817 (rank 95)
+
+Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; verify the composer-freeze detection gap against it. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1168,10 +1167,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-20T23:39:26Z",
+  "generatedAt": "2026-10-21T00:23:54Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 833,
+  "openCount": 832,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -1334,19 +1333,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       ],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. The body orders it after PAN-4527/4532/4531/4540/4534 so the large PR's own verification is reliable and the two do not conflict, so it depends on all five.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4563",
-      "rank": 16,
-      "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex app-server and ACP have only hand-written mocks; record real JSON-RPC frames and replay them to test turn ordering. In pipeline.",
-      "rationale": "New and already in the pipeline. Replay fixtures catch provider ordering changes (turn completion, interrupt, subagent nesting) that hand-written mocks miss. Valuable harness hardening but test infrastructure rather than a live defect, so medium.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3771,11 +3757,9 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "importance": "high",
       "score": 72,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4563"
-      ],
-      "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed.",
-      "rationale": "New issue with a source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. It is a small, well-scoped fix to an actively used harness. It ranks in the high tier behind PAN-4563, because PAN-4563 (in pipeline) adds the replay fixture and the pinned host-replay test this fix must flip.",
+      "dependsOn": [],
+      "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
+      "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6890,11 +6874,9 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4563"
-      ],
-      "why": "Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. Pinned by PAN-4563 replay test.",
-      "rationale": "New since the prior run. Cosmetic pane mislabel of a Codex sub-agent turn start; owner turn state stays correct. Small, well specified, and it needs the PAN-4563 replay fixture and test, so it follows that in-pipeline work and sits beside the related PAN-3770 Codex pane bug.",
+      "dependsOn": [],
+      "why": "Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed.",
+      "rationale": "Cosmetic pane mislabel of a Codex sub-agent turn start; owner turn state stays correct. Its prerequisite PAN-4563 (replay fixture and test) merged in #4576, so the dependency is cleared; rank is unchanged because the issue stays low-impact cosmetic work beside PAN-3770.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12901,25 +12883,11 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "confidence": 0.4
     },
     {
-      "from": "PAN-4563",
-      "to": "PAN-4568",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-4572",
       "to": "PAN-4561",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4563",
-      "to": "PAN-4575",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
     },
     {
       "from": "PAN-3957",
