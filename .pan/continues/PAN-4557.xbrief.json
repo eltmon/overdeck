@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4557",
   "created": "2026-10-21T04:34:51.196Z",
-  "updated": "2026-10-21T04:40:52.275Z",
+  "updated": "2026-10-21T04:40:58.724Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4557",
       "claimedAt": "2026-10-21T04:39:08.635Z",
       "doneAt": "2026-10-21T04:40:52.275Z"
+    },
+    "docs-herdr-snapshot-modes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4557",
+      "claimedAt": "2026-10-21T04:40:58.724Z"
     }
   }
 }
