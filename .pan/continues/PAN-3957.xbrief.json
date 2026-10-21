@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:14:41.240Z",
+  "updated": "2026-10-21T00:14:52.306Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "w3a-inject-launch.ac1": {
       "status": "completed",
       "doneAt": "2026-10-21T00:14:41.240Z"
+    },
+    "w3a-inject-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:14:52.306Z"
     }
   }
 }
