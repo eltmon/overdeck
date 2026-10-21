@@ -41,6 +41,7 @@
 - Delegation goes through `pan worker run` (a registered, issue-linked agent that reports back); `pan spawn` stays the foreman's pane-only item worker.
 - One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the terminal-backend session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's own `exited` lifecycle event, never inferred.
 - **One variant per operation in src/lib.** No exported Effect wrapper around in-repo Promise or sync code (Shapes A/B), no sync/async twin without a documented sync caller; `npm run lint:effect-facades` ratchets it. [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md)
+- Curated facts live in `<planHome>/.overdeck/memory/<id>.md` (operator: `~/.overdeck/context/memory/`); the index is rendered at launch into every managed harness and never stored. Write them with `pan memory add`, never into harness-native memory.
 
 ## Topic Index
 
