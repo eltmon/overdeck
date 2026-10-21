@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:19:46.726Z",
+  "updated": "2026-10-21T00:19:57.599Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "w14-closeout-carveout.ac3": {
       "status": "completed",
       "doneAt": "2026-10-21T00:19:46.726Z"
+    },
+    "w7-bundled-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:57.599Z"
     }
   }
 }
