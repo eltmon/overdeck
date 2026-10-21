@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:20:48.284Z",
+  "updated": "2026-10-21T00:20:59.457Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "w8a-user-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-10-21T00:20:48.283Z"
+    },
+    "w8b-dev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:20:59.457Z"
     }
   }
 }
