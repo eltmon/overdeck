@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4557",
   "created": "2026-10-21T04:34:51.196Z",
-  "updated": "2026-10-21T04:45:38.962Z",
+  "updated": "2026-10-21T04:45:50.091Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "context-menu-paste-via-xterm.ac2": {
       "status": "completed",
       "doneAt": "2026-10-21T04:45:38.962Z"
+    },
+    "context-menu-paste-via-xterm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-10-21T04:45:50.091Z"
     }
   }
 }
