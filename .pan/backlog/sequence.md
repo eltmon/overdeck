@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-10-21T05:51:11Z · model: claude-opus-5-5 · open: 831_
+_Last sequenced: 2026-10-21T06:00:23Z · model: claude-opus-5-5 · open: 829_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -399,7 +399,6 @@ _Last sequenced: 2026-10-21T05:51:11Z · model: claude-opus-5-5 · open: 831_
 | 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
 | 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 430 | PAN-4557 | S | medium | ok |  |  | Herdr attach snapshot drops bracketed-paste mode; dashboard multi-line paste reaches agents as separate Enter-terminated lines |
 | 431 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
 | 432 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
 | 433 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
@@ -636,8 +635,7 @@ _Last sequenced: 2026-10-21T05:51:11Z · model: claude-opus-5-5 · open: 831_
 | 664 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 665 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 666 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 668 | PAN-4577 | M | medium | ok |  | PAN-4578 | PAN-3957 phase 2: Claude auto-memory import + native-memory gate; W9 now routes machine paths to PAN-4578 machine store. |
-| 669 | PAN-4578 | M | low | needs-refinement |  |  | Sync operator memory across machines; deferred by operator. Open: store location, machine-local facts, conflicts. |
+| 668 | PAN-4577 | M | medium | ok |  |  | PAN-3957 phase 2: Claude auto-memory import + native-memory gate; machine store from PAN-4578 now merged, so W9 is unblocked. |
 | 670 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 671 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 672 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
@@ -1166,10 +1164,10 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-10-21T05:51:11Z",
+  "generatedAt": "2026-10-21T06:00:23Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 831,
+  "openCount": 829,
   "nodes": [
     {
       "issue": "PAN-4540",
@@ -6131,19 +6129,6 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "planning": "auto"
     },
     {
-      "issue": "PAN-4557",
-      "rank": 430,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr attach snapshot drops bracketed-paste mode; dashboard multi-line paste reaches agents as separate Enter-terminated lines",
-      "rationale": "New since the prior run. Observed via Playwright on /conv/3259: the browser xterm never sees ?2004h after a Herdr attach, so pastes are sent unwrapped and split into lines at the agent. Placed just ahead of PAN-1571 (multi-line pastes land unsubmitted) because it is a concrete, reproduced mechanism for the same operator-facing symptom; the open question is whether Herdr exposes pane mode state for ws-terminal.ts to replay.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1571",
       "rank": 431,
       "size": "S",
@@ -9067,24 +9052,9 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "importance": "medium",
       "score": 28,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4578"
-      ],
-      "why": "PAN-3957 phase 2: Claude auto-memory import + native-memory gate; W9 now routes machine paths to PAN-4578 machine store.",
-      "rationale": "A new comment moves W9 home-path imports onto the machine store PAN-4578 adds, so it now depends on in-pipeline PAN-4578; rank kept.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4578",
-      "rank": 669,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Sync operator memory across machines; deferred by operator. Open: store location, machine-local facts, conflicts.",
-      "rationale": "Prerequisite PAN-3957 merged (#4579), so this follow-up is no longer blocked; rank kept, dependency dropped.",
+      "why": "PAN-3957 phase 2: Claude auto-memory import + native-memory gate; machine store from PAN-4578 now merged, so W9 is unblocked.",
+      "rationale": "Its only dependency PAN-4578 (machine memory store) closed as completed, so the dependency is dropped and the issue is unblocked; rank kept because importance and scope are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12846,32 +12816,11 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
       "confidence": 0.5
     },
     {
-      "from": "PAN-4557",
-      "to": "PAN-1571",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4557",
-      "to": "PAN-3944",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4572",
       "to": "PAN-4561",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4578",
-      "to": "PAN-4577",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     }
   ]
 }
