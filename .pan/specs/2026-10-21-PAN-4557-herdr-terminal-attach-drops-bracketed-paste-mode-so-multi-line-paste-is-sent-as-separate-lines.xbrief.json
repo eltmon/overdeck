@@ -1,0 +1,268 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-10-21T04:32:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4557: Herdr terminal attach drops bracketed-paste mode, so multi-line paste is sent as separate lines",
+    "updated": "2026-10-21T04:34:01.236Z"
+  },
+  "plan": {
+    "id": "pan-4557",
+    "title": "Herdr terminal attach drops bracketed-paste mode, so multi-line paste is sent as separate lines",
+    "status": "proposed",
+    "uid": "a84d99c0-953f-422e-9230-c1b7d0e79c7a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-10-21T04:32:19Z",
+    "updated": "2026-10-21T04:34:01.236Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4557",
+        "label": "PAN-4557",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4557.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal",
+      "dashboard",
+      "paste",
+      "xterm"
+    ],
+    "narratives": {
+      "Problem": "On a Herdr host the browser xterm starts with bracketed paste off. Herdr's first full terminal.frame repaints the grid but never replays DEC private modes (live probe: only ?2026h ?25l ?25h ?2026l), Herdr exposes no mode state anywhere, and XTerminal.tsx calls term.reset() before writing the snapshot. So a multi-line paste goes out as raw text with \\r between lines and can reach the agent as separate submitted lines. Separately, the right-click context-menu Paste sends clipboard text straight to the WebSocket, bypassing xterm's bracketing and \\n to \\r conversion on every backend.",
+      "Proposal": "In serveHerdrTerminal (src/dashboard/server/ws-terminal.ts), prefix the first Herdr frame, the one sent as the snapshot control frame, with \\x1b[?2004h. This is safe because Herdr's attach input path (apply_terminal_attach_input, herdr v0.9.1 src/server/pane_input.rs) re-wraps a complete bracketed paste to the pane's live mode, so apps that never enabled bracketed paste receive plain text. Route the context-menu paste through term.paste(text). Document the Herdr snapshot mode gap in docs/TERMINAL-BACKENDS.md and docs/DASHBOARD-ARCHITECTURE.md. Full detail, before/after snippets and verified Herdr source references are in .pan/drafts/PAN-4557.md.",
+      "NonGoals": "- Injecting mouse-reporting (?1000/?1002/?1003/?1006) or focus (?1004) modes, or any DEC mode other than 2004 — it would re-break the drag-select fix in 5d2dafcf16d\n- Prefixing later Herdr frames, or changing decodeTerminalRecord / HerdrTerminalProcess.pump\n- Changing the tmux attach path (captureFreshSnapshot, captureViewportSnapshot, PTY hub)\n- Changing the RPC TerminalService.streamSession path (no frontend xterm consumer)\n- Changing Herdr itself; an upstream request for mode state in terminal.frame is a possible follow-up, not this issue\n- Sanitizing paste payloads for lone surrogates in controlTerminal.write (PAN-4506 scope)\n- Raising any scripts/file-size-allowlist.txt cap",
+      "UAT": "Browser UAT for the test role (Herdr host, isolated Playwright profile, throwaway conversation — never a live work agent or a shared browser session): (1) after attaching a Herdr-backed terminal view, xterm term.modes.bracketedPasteMode reads true; (2) pasting \"PASTEME line1\\nline2\" with the keyboard paste gesture sends exactly \"\\x1b[200~PASTEME line1\\rline2\\x1b[201~\" over /ws/terminal; (3) the agent composer renders one pasted block (both lines, or a [Pasted text placeholder) and does not submit line1 as its own turn."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Force ?2004h into the Herdr snapshot instead of replaying Herdr's mode state.",
+        "rationale": "Herdr v0.9.1-0.9.5 exposes no pane mode state (pane get, process-info, api snapshot, socket-api.mdx, and the observe stream all lack it), so replay is impossible. Herdr's apply_terminal_attach_input normalizes a complete bracketed paste to the pane's live mode, so always-on bracketing in the browser matches Herdr's own client contract and is safe for panes that never enabled it."
+      },
+      {
+        "summary": "Apply the prefix only to the first frame, inside serveHerdrTerminal.",
+        "rationale": "The client resets xterm before writing the snapshot, so the prefix must be inside the snapshot data. Applying it to later full frames would override an app that turned bracketed paste off after attach."
+      },
+      {
+        "summary": "Also fix the context-menu Paste to use term.paste(text).",
+        "rationale": "It shows the same symptom (multi-line paste arrives as separate lines) on both backends. It is a one-line change that also shrinks XTerminal.tsx, which sits at its file-size cap."
+      },
+      {
+        "summary": "Leave mouse and focus modes unreplayed.",
+        "rationale": "The issue names only bracketed paste as the observed harm. Forcing mouse modes would break the drag-select fix in 5d2dafcf16d, and Herdr encodes mouse input on its side via terminal.mouse."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Three small independent items across 6 files.",
+      "canonicalFilename": "2026-10-21-PAN-4557-herdr-terminal-attach-drops-bracketed-paste-mode-so-multi-line-paste-is-sent-as-separate-lines.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "herdr-snapshot-bracketed-paste",
+        "title": "Prefix the Herdr snapshot frame with ?2004h in serveHerdrTerminal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-10-21T04:32:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4557",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/__tests__/ws-terminal-herdr-snapshot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-terminal-herdr-snapshot.test.ts src/dashboard/server/__tests__/ws-terminal-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ws-terminal-herdr-snapshot.test.ts and ws-terminal-auth.test.ts pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/dashboard/server/ws-terminal.ts, add the module-level constant HERDR_SNAPSHOT_MODES = '\\x1b[?2004h' with the JSDoc from the PRD, placed just above serveHerdrTerminal's JSDoc. In serveHerdrTerminal's bridge.onData !sentSnapshot branch, send data: HERDR_SNAPSHOT_MODES + data in the snapshot control frame. Leave the later ws.send(data) and all tmux code untouched. Add src/dashboard/server/__tests__/ws-terminal-herdr-snapshot.test.ts using the ws-terminal-auth.test.ts scaffold (real http server, setupTerminalWebSocket, session-cookie auth from its 'accepts the upgrade with a valid session cookie' case). Mock '../services/terminal-service.js' so resolveTerminalAttachTarget returns { kind: 'herdr', terminalId: 'term_test' } and HerdrTerminalProcess is a vi.hoisted fake that records write() calls and lets the test emit frames. Wait on socket events with promises; never use real setTimeout sleeps."
+        },
+        "items": [
+          {
+            "id": "herdr-snapshot-bracketed-paste.ac1",
+            "title": "Given a Herdr-backed attach, when the fake bridge emits its first frame '\\x1b[2J\\x1b[1;1Hhello', then the client receives a snapshot control frame whose data equals '\\x1b[?2004h\\x1b[2J\\x1b[1;1Hhello'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-snapshot-bracketed-paste.ac2",
+            "title": "Given the snapshot was sent, when the fake bridge emits '\\x1b[?2004lplain', then the client receives exactly '\\x1b[?2004lplain' with no prefix added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-snapshot-bracketed-paste.ac3",
+            "title": "Given the client sent ready, when it sends '\\x1b[200~a\\rb\\x1b[201~', then the fake HerdrTerminalProcess.write records exactly that string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-snapshot-bracketed-paste.ac4",
+            "title": "git diff origin/main -- src/dashboard/server/ws-terminal.ts produces no changed lines inside captureFreshSnapshot, captureViewportSnapshot or the tmux PTY hub path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-menu-paste-via-xterm",
+        "title": "Route the terminal context-menu Paste through term.paste",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T04:32:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4557",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx",
+            "src/dashboard/frontend/src/components/XTerminal.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/XTerminal.test.tsx",
+            "wc -l src/dashboard/frontend/src/components/XTerminal.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "XTerminal.test.tsx passes, including the new context-menu paste test",
+            "XTerminal.tsx line count is at most 1072",
+            "lint-file-size.sh reports no violation",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In pasteFromClipboard (XTerminal.tsx ~line 291), replace the readText + 'if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(text)' block with 'term.paste(await navigator.clipboard.readText());' plus one comment line ('term.paste applies bracketed paste and \\n→\\r; its onData sends to the socket.'). Keep the existing catch and toast. XTerminal.tsx is 1072 lines on origin/main and must not grow; this change shrinks it. Never edit scripts/file-size-allowlist.txt. In XTerminal.test.tsx add 'paste = vi.fn();' to the mocked Terminal class next to 'focus = vi.fn();', and add a test beside the PAN-2529 context-menu test: readText resolves 'line1\\nline2', open the context menu on '.xterm-host', click Paste, assert the last Terminal instance's paste was called once with 'line1\\nline2' and MockWebSocket.instances[0].send was never called with 'line1\\nline2'."
+        },
+        "items": [
+          {
+            "id": "context-menu-paste-via-xterm.ac1",
+            "title": "Given the clipboard holds 'line1\\nline2', when the operator clicks Paste in the terminal context menu, then term.paste is called once with 'line1\\nline2' (new XTerminal.test.tsx case passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu-paste-via-xterm.ac2",
+            "title": "In the same test, MockWebSocket send is never called with the raw clipboard text, and pasteFromClipboard's source contains 'term.paste(' and no 'wsRef.current.send('",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu-paste-via-xterm.ac3",
+            "title": "wc -l reports at most 1072 lines for XTerminal.tsx, bash scripts/lint-file-size.sh exits 0, and scripts/file-size-allowlist.txt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-menu-paste-via-xterm.ac4",
+            "title": "The existing PAN-2529 test still passes: a rejected readText renders a toast.error containing 'Ctrl+V'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-herdr-snapshot-modes",
+        "title": "Document the Herdr snapshot mode gap and forced bracketed paste",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-10-21T04:32:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4557",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '2004h' docs/TERMINAL-BACKENDS.md docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'PAN-4557' docs/TERMINAL-BACKENDS.md docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one 2004h line in each of the two docs",
+            "grep prints a PAN-4557 reference in each of the two docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. (1) docs/TERMINAL-BACKENDS.md, the paragraph starting 'The dashboard terminal follows the same rule' (~line 609): add that a Herdr full frame carries no DEC private modes and Herdr exposes none, so serveHerdrTerminal prefixes the snapshot with \\x1b[?2004h (PAN-4557); this is safe because Herdr's attach input re-wraps a complete bracketed paste to the pane's live mode; mouse and focus modes are not forced (drag-select, 5d2dafcf16d). (2) docs/TERMINAL-BACKENDS.md '**Observe streaming**' example (~line 984): one sentence that the full frame holds no ?2004h or mouse modes. (3) docs/DASHBOARD-ARCHITECTURE.md bullet 'Attach uses a deterministic snapshot protocol' (~line 49): on a Herdr terminal the snapshot data starts with \\x1b[?2004h (PAN-4557) because the client resets xterm before writing it; context-menu Paste goes through term.paste. (4) If the OKF bundle ../overdeck-knowledge is reachable, update concept terminal-panel via /okf author with the same two facts; otherwise state in the PR body that the OKF update is pending."
+        },
+        "items": [
+          {
+            "id": "docs-herdr-snapshot-modes.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md states that Herdr full frames carry no DEC private modes and that serveHerdrTerminal prefixes the snapshot with \\x1b[?2004h; grep for '2004h' returns that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-herdr-snapshot-modes.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md snapshot-protocol bullet states that Herdr snapshot data starts with \\x1b[?2004h and cites PAN-4557; grep for 'PAN-4557' returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
