@@ -7,8 +7,9 @@
  * - `setupOperatorMemorySync` checks the remote is reachable, moves home-path facts
  *   into the machine store, runs `git init` + `remote add origin`, then syncs (D9).
  * - `syncOperatorMemory` commits local changes (minus held-back files), fetches,
- *   merges `origin/main`, and pushes, retrying a non-fast-forward push (D8). It
- *   never throws: every error becomes an `offline` or `failed` outcome (D7).
+ *   merges `origin/main` (conflicts become conflict copies, operator-sync-conflicts.ts),
+ *   and pushes, retrying a non-fast-forward push (D8). It never throws: every error
+ *   becomes an `offline` or `failed` outcome (D7).
  * - `readOperatorMemorySyncStatus` reports the clone's state without the network (D13).
  *
  * Every git call is an async `execFile` with `GIT_TERMINAL_PROMPT=0` (D6). Never
@@ -26,6 +27,7 @@ import { promisify } from 'node:util';
 import { readEnvironmentIdentity } from '../../environment-identity.js';
 import { redactSensitiveText } from '../../secret-redaction.js';
 import { withFileLock } from '../../vault/file-lock.js';
+import { resolveSyncConflicts, SYNC_CONFLICT_REVIEW } from './operator-sync-conflicts.js';
 import { MACHINE_PATH_PATTERN, machineMemoryDir, readMemoryFactsSync, userMemoryDir } from './store.js';
 
 const execFileAsync = promisify(execFile);
@@ -36,7 +38,6 @@ const PUSH_ATTEMPTS = 3;
 // A run can spend up to 3 × (fetch + push) × 30 s on the network, so the stale
 // window must exceed that or a second process would steal a live lock.
 const SYNC_LOCK_STALE_MS = 300_000;
-const SYNC_CONFLICT_REVIEW = 'sync-conflict';
 
 export interface HeldBackFile {
   path: string;
@@ -210,8 +211,12 @@ async function pushHead(dir: string, setUpstream: boolean): Promise<boolean> {
   throw new SyncOfflineError(`push failed: ${pushed.stderr.trim()}`);
 }
 
-/** Merge `origin/main` into HEAD; returns the top-level fact files the merge changed. */
-async function mergeOrigin(dir: string, label: string): Promise<string[]> {
+/**
+ * Merge `origin/main` into HEAD, resolving conflicts into conflict copies (D10).
+ * `pulled` is the top-level fact files the merge changed, minus the conflict
+ * copies this machine wrote (those came from here, not from the remote).
+ */
+async function mergeOrigin(dir: string, label: string): Promise<{ pulled: string[]; conflicts: string[] }> {
   const pre = (await git(dir, ['rev-parse', 'HEAD'])).trim();
   const merged = await runGit(dir, [
     ...identityArgs(label),
@@ -220,13 +225,20 @@ async function mergeOrigin(dir: string, label: string): Promise<string[]> {
     '--allow-unrelated-histories',
     `origin/${SYNC_BRANCH}`,
   ]);
+  let conflicts: string[] = [];
   if (!merged.ok) {
-    const conflicted = splitLines((await runGit(dir, ['diff', '--name-only', '--diff-filter=U'])).stdout);
-    if (existsSync(join(dir, '.git', 'MERGE_HEAD'))) await git(dir, ['merge', '--abort']);
-    if (conflicted.length > 0) throw new Error(`merge conflict in ${conflicted.join(', ')}; nothing was changed`);
-    throw new Error(`merge failed: ${(merged.stderr || merged.stdout).trim()}`);
+    const conflicted = splitNul((await runGit(dir, ['diff', '--name-only', '--diff-filter=U', '-z'])).stdout);
+    if (conflicted.length === 0) {
+      if (existsSync(join(dir, '.git', 'MERGE_HEAD'))) await git(dir, ['merge', '--abort']);
+      throw new Error(`merge failed: ${(merged.stderr || merged.stdout).trim()}`);
+    }
+    conflicts = await resolveSyncConflicts({ dir, labelSlug: labelSlug(label), git: (args) => git(dir, args) });
+    await git(dir, [...identityArgs(label), 'commit', '-q', '--no-edit']);
   }
-  return splitLines(await git(dir, ['diff', '--name-only', pre, 'HEAD'])).filter(isTopLevelFactFile);
+  const copies = new Set(conflicts.map((id) => `${id}.md`));
+  const pulled = splitLines(await git(dir, ['diff', '--name-only', pre, 'HEAD']))
+    .filter((path) => isTopLevelFactFile(path) && !copies.has(path));
+  return { pulled, conflicts };
 }
 
 /** D8. The caller holds the store lock. Never throws. */
@@ -245,6 +257,7 @@ async function syncLocked(dir: string, label: string): Promise<OperatorMemorySyn
     }
 
     const pulled = new Set<string>();
+    const conflicts = new Set<string>();
     let pushed = false;
     for (let attempt = 1; attempt <= PUSH_ATTEMPTS; attempt += 1) {
       await fetchOrigin(dir);
@@ -255,6 +268,9 @@ async function syncLocked(dir: string, label: string): Promise<OperatorMemorySyn
         if (await pushHead(dir, true)) {
           pushed = true;
           break;
+        }
+        if (attempt === PUSH_ATTEMPTS) {
+          return { status: 'offline', dir, error: `push rejected ${PUSH_ATTEMPTS} times`, committed, heldBack };
         }
         continue;
       }
@@ -267,7 +283,9 @@ async function syncLocked(dir: string, label: string): Promise<OperatorMemorySyn
           if (isTopLevelFactFile(path)) pulled.add(path);
         }
       } else {
-        for (const path of await mergeOrigin(dir, label)) pulled.add(path);
+        const merged = await mergeOrigin(dir, label);
+        for (const path of merged.pulled) pulled.add(path);
+        for (const id of merged.conflicts) conflicts.add(id);
       }
 
       const ahead = Number((await git(dir, ['rev-list', '--count', `origin/${SYNC_BRANCH}..HEAD`])).trim());
@@ -281,7 +299,15 @@ async function syncLocked(dir: string, label: string): Promise<OperatorMemorySyn
       }
     }
 
-    return { status: 'synced', dir, committed, pulled: [...pulled].sort(), pushed, conflicts: [], heldBack };
+    return {
+      status: 'synced',
+      dir,
+      committed,
+      pulled: [...pulled].sort(),
+      pushed,
+      conflicts: [...conflicts].sort(),
+      heldBack,
+    };
   } catch (error) {
     if (error instanceof SyncOfflineError) {
       return { status: 'offline', dir, error: error.message, committed, heldBack };

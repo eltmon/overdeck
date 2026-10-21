@@ -275,7 +275,7 @@ describe('operator memory sync (PAN-4578)', () => {
     expect(status.lastCommit?.subject).toBe('local');
   });
 
-  it('a conflicting edit aborts the merge and returns failed with nothing changed', async () => {
+  it('two machines editing one fact keep both versions', async () => {
     writeFact(dirA, 'shared', factText('Original.'));
     await setupA();
     await setupB();
@@ -285,8 +285,26 @@ describe('operator memory sync (PAN-4578)', () => {
     writeFact(dirB, 'shared', factText('Edited on B.'));
 
     const outcome = await syncOperatorMemory({ dir: dirB, label: 'beta' });
-    expect(outcome).toEqual({ status: 'failed', dir: dirB, error: 'merge conflict in shared.md; nothing was changed' });
-    expect(readFileSync(join(dirB, 'shared.md'), 'utf8')).toBe(factText('Edited on B.'));
+    expect(outcome).toMatchObject({
+      status: 'synced',
+      committed: true,
+      pulled: ['shared.md'],
+      pushed: true,
+      conflicts: ['shared-conflict-beta'],
+    });
+    expect(readFileSync(join(dirB, 'shared.md'), 'utf8')).toBe(factText('Edited on A.'));
+    expect(readFileSync(join(dirB, 'shared-conflict-beta.md'), 'utf8')).toContain('Edited on B.');
     expect(existsSync(join(dirB, '.git', 'MERGE_HEAD'))).toBe(false);
+    expect((await readOperatorMemorySyncStatus({ dir: dirB })).conflicts).toEqual(['shared-conflict-beta']);
+  });
+
+  it('setup on a store with .git but no origin adds origin and syncs', async () => {
+    writeFact(dirA, 'be-decisive', factText('Decide.'));
+    git(dirA, 'init', '-q');
+
+    const result = await setupA();
+    expect(git(dirA, 'remote', 'get-url', 'origin').trim()).toBe(bare);
+    expect(result.outcome).toMatchObject({ status: 'synced', pushed: true });
+    expect(remoteHas('be-decisive.md')).toBe(true);
   });
 });
