@@ -4,17 +4,17 @@
     "created": "2026-10-21T04:32:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4557: Herdr terminal attach drops bracketed-paste mode, so multi-line paste is sent as separate lines",
-    "updated": "2026-10-21T04:34:01.236Z"
+    "updated": "2026-10-21T04:34:30.307Z"
   },
   "plan": {
     "id": "pan-4557",
     "title": "Herdr terminal attach drops bracketed-paste mode, so multi-line paste is sent as separate lines",
-    "status": "proposed",
+    "status": "running",
     "uid": "a84d99c0-953f-422e-9230-c1b7d0e79c7a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-21T04:32:19Z",
-    "updated": "2026-10-21T04:34:01.236Z",
+    "updated": "2026-10-21T04:34:30.307Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4557",
@@ -264,5 +264,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
