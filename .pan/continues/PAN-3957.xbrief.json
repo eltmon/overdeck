@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:19:24.594Z",
+  "updated": "2026-10-21T00:19:35.773Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "w14-closeout-carveout.ac1": {
       "status": "completed",
       "doneAt": "2026-10-21T00:19:24.593Z"
+    },
+    "w14-closeout-carveout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:19:35.773Z"
     }
   }
 }
