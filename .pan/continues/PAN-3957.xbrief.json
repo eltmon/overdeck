@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3957",
   "created": "2026-10-20T21:53:35.214Z",
-  "updated": "2026-10-21T00:16:16.381Z",
+  "updated": "2026-10-21T00:16:27.629Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "w4-context-preview.ac3": {
       "status": "completed",
       "doneAt": "2026-10-21T00:16:16.380Z"
+    },
+    "w5a-cli-read-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-10-21T00:16:27.629Z"
     }
   }
 }
