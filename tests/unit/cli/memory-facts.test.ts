@@ -115,8 +115,21 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
 
     it('--project and --user together is an error', () => {
       expect(() => resolveFactTarget({ project: 'overdeck', user: true }, 'read')).toThrow(
-        '--project, --user and --here are mutually exclusive',
+        '--project, --user, --machine and --here are mutually exclusive',
       );
+    });
+
+    it('--user and --machine together are refused', () => {
+      expect(() => resolveFactTarget({ user: true, machine: true }, 'read')).toThrow(
+        '--project, --user, --machine and --here are mutually exclusive',
+      );
+    });
+
+    it('--machine resolves to the machine store with no root', () => {
+      const target = resolveFactTarget({ machine: true }, 'write');
+      expect(target.scope).toBe('machine');
+      expect(target.dir).toBe(join(process.env.OVERDECK_HOME as string, 'context', 'machine-memory'));
+      expect(target.root).toBeNull();
     });
 
     it('outside a registered project with neither flag is an error', () => {
@@ -250,7 +263,15 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
     it('--type user without --user is refused', async () => {
       await expect(memoryFactAddCommand('user-fact', baseAddOptions({ type: 'user' }))).rejects.toThrow();
       expect(exitCodes).toEqual([1]);
-      expect(errorSpy.mock.calls.flat().join('\n')).toContain('add --user');
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain(
+        'user facts go in the operator store: add --user (or --machine for this machine only)',
+      );
+    });
+
+    it('add --type user --machine is accepted', async () => {
+      await memoryFactAddCommand('user-fact', baseAddOptions({ type: 'user', machine: true }));
+      const dir = join(process.env.OVERDECK_HOME as string, 'context', 'machine-memory');
+      expect(readMemoryFactsSync(dir, 'machine').facts.map((f) => f.type)).toEqual(['user']);
     });
 
     it('refuses when check-ignore reports ignored', async () => {
@@ -280,9 +301,21 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(errorSpy.mock.calls.flat().join('\n')).toContain('machine-specific path');
     });
 
-    it('--user accepts the same text', async () => {
-      await memoryFactAddCommand('path-fact', baseAddOptions({ user: true, body: 'See /home/alice/notes.' }));
-      expect(readMemoryFactsSync(join(process.env.OVERDECK_HOME as string, 'context', 'memory'), 'user').facts).toHaveLength(1);
+    it('add --user refuses a home-directory path with the --machine hint', async () => {
+      await expect(
+        memoryFactAddCommand('path-fact', baseAddOptions({ user: true, body: 'See /home/alice/notes.' })),
+      ).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain(
+        'machine-specific path "/home/alice/"; use ~ or a relative path, or keep the fact on this machine with --machine',
+      );
+    });
+
+    it('add --machine writes into OVERDECK_HOME/context/machine-memory', async () => {
+      await memoryFactAddCommand('path-fact', baseAddOptions({ machine: true, body: 'See /home/alice/notes.' }));
+      const dir = join(process.env.OVERDECK_HOME as string, 'context', 'machine-memory');
+      expect(readMemoryFactsSync(dir, 'machine').facts.map((f) => f.id)).toEqual(['path-fact']);
+      expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Commit it:');
     });
   });
 
@@ -351,6 +384,19 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(output).toContain('Project memory:');
       const matchedLines = output.split('\n').filter((line) => line.startsWith('  feedback/fact-'));
       expect(matchedLines).toHaveLength(5);
+    });
+
+    it('search prints Machine memory after Operator memory', () => {
+      const home = process.env.OVERDECK_HOME as string;
+      writeFact(join(home, 'context', 'memory'), 'op-fact', '---\ntype: feedback\ndescription: Decide fast op.\n---\nBody.\n');
+      writeFact(join(home, 'context', 'machine-memory'), 'gpu-fact', '---\ntype: reference\ndescription: Decide fast gpu.\n---\nBody.\n');
+
+      printMatchingFacts('decide', {});
+
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain('reference/gpu-fact: Decide fast gpu.');
+      expect(output.indexOf('Machine memory:')).toBeGreaterThan(output.indexOf('Operator memory:'));
+      expect(output.indexOf('Operator memory:')).toBeGreaterThanOrEqual(0);
     });
 
     it('silently skips the project store outside a registered project', () => {
