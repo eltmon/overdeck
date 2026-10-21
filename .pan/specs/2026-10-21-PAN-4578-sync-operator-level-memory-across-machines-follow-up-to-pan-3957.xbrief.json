@@ -4,17 +4,17 @@
     "created": "2026-10-21T05:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4578: Sync operator-level memory across machines (follow-up to PAN-3957)",
-    "updated": "2026-10-21T04:40:28.800Z"
+    "updated": "2026-10-21T04:40:58.706Z"
   },
   "plan": {
     "id": "pan-4578",
     "title": "Sync operator-level memory across machines (follow-up to PAN-3957)",
-    "status": "proposed",
+    "status": "running",
     "uid": "acb2e804-870e-4ba3-b90a-ec641b9df85b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-10-21T05:00:00Z",
-    "updated": "2026-10-21T04:40:28.800Z",
+    "updated": "2026-10-21T04:40:58.706Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4578",
@@ -999,5 +999,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
