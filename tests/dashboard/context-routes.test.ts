@@ -200,6 +200,7 @@ describe('dashboard context route helpers', () => {
 
       expect(response.previews['claude-code']).not.toContain('## Project memory');
       expect(response.previews['claude-code']).not.toContain('## Operator memory');
+      expect(response.previews['claude-code']).not.toContain('## Machine memory');
     });
   });
 });

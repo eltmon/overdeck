@@ -378,6 +378,25 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(readMemoryFactsSync(userDir(), 'user').facts.map((f) => f.id)).toEqual(['op-fact']);
     });
 
+    it('edit --user with an offline outcome rewrites the fact and exits 0', async () => {
+      mkdirSync(join(userDir(), '.git'), { recursive: true });
+      writeFact(userDir(), 'op-fact', '---\ntype: feedback\ndescription: Old.\n---\nBody.\n');
+      const syncOperator = vi.fn(async () => ({
+        status: 'offline' as const,
+        dir: userDir(),
+        error: 'fetch failed: x',
+        committed: true,
+        heldBack: [],
+      }));
+
+      await memoryFactEditCommand('op-fact', { user: true, description: 'd', syncOperator });
+
+      expect(exitCodes).toEqual([]);
+      expect(syncOperator).toHaveBeenCalledTimes(1);
+      expect(readMemoryFactsSync(userDir(), 'user').facts[0]?.description).toBe('d');
+      expect(logSpy.mock.calls.flat().join('\n')).toContain('Operator memory sync is offline: fetch failed: x');
+    });
+
     it('--json adds the sync outcome, and edit/retire --user sync too', async () => {
       mkdirSync(join(userDir(), '.git'), { recursive: true });
       const syncOperator = vi.fn(async () => syncedOutcome());
